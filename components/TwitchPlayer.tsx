@@ -3,18 +3,25 @@
 import { useEffect, useState } from "react";
 
 interface Props {
-  channel: string;
+  channel?: string;
+  vodId?: string;
 }
 
-export default function TwitchPlayer({ channel }: Props) {
+export default function TwitchPlayer({ channel, vodId }: Props) {
   const [src, setSrc] = useState<string | null>(null);
 
   useEffect(() => {
     const parent = window.location.hostname;
-    setSrc(
-      `https://player.twitch.tv/?channel=${encodeURIComponent(channel)}&parent=${parent}&autoplay=true&muted=false`
-    );
-  }, [channel]);
+    if (channel) {
+      setSrc(
+        `https://player.twitch.tv/?channel=${encodeURIComponent(channel)}&parent=${parent}&autoplay=true&muted=false`
+      );
+    } else if (vodId) {
+      setSrc(
+        `https://player.twitch.tv/?video=${encodeURIComponent(vodId)}&parent=${parent}&autoplay=true&muted=false`
+      );
+    }
+  }, [channel, vodId]);
 
   if (!src) return null;
 
@@ -26,8 +33,6 @@ export default function TwitchPlayer({ channel }: Props) {
         allowFullScreen
         style={{ border: "none", pointerEvents: "none" }}
       />
-      {/* Subtle dark overlay so the Twitch UI doesn't distract */}
-      <div className="absolute inset-0 bg-black/20 pointer-events-none" />
     </div>
   );
 }

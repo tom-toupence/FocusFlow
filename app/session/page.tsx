@@ -62,14 +62,14 @@ export default function SessionPage() {
   const { startSession } = useSessionSummaryStore();
   const { notes, addNote } = useNotesStore();
   const { selectedPlaylistUri, accessToken } = useSpotifyStore();
-  const { selectedChannel } = useTwitchStore();
+  const { selectedChannel, selectedVodId } = useTwitchStore();
 
   const allVideos = getAllVideos();
   const video = allVideos.find((v) => v.id === selectedVideoId) ?? allVideos[0];
   const selectedPlaylist = playlists.find((p) => p.id === selectedPlaylistId) ?? null;
   const isPlaylistMode = !!selectedPlaylistId && !!selectedPlaylist;
   const isSpotifyMode = !!selectedPlaylistUri && !!accessToken;
-  const isTwitchMode = !!selectedChannel;
+  const isTwitchMode = !!selectedChannel || !!selectedVodId;
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevSecondsRef = useRef(secondsLeft);
@@ -265,7 +265,7 @@ export default function SessionPage() {
           playlistUri={selectedPlaylistUri!}
         />
       ) : isTwitchMode ? (
-        <TwitchPlayer channel={selectedChannel!} />
+        <TwitchPlayer channel={selectedChannel ?? undefined} vodId={selectedVodId ?? undefined} />
       ) : (
         <div
           id="yt-player"

@@ -92,7 +92,7 @@ export default function SettingsPage() {
   const { selectedVideoId, selectedPlaylistId, getAllVideos } = useSessionStore();
   const { playlists } = usePlaylistStore();
   const { selectedPlaylistUri, playlists: spotifyPlaylists } = useSpotifyStore();
-  const { selectedChannel } = useTwitchStore();
+  const { selectedChannel, selectedVodId } = useTwitchStore();
 
   const [preset, setPreset] = useState<TimerPreset>(settings.preset ?? "classic");
   const [work, setWork] = useState(settings.workDuration);
@@ -113,7 +113,7 @@ export default function SettingsPage() {
   const isPlaylistMode = !!selectedPlaylistId && !!playlist;
   const spotifyPlaylist = spotifyPlaylists.find((p) => p.uri === selectedPlaylistUri) ?? null;
   const isSpotifyMode = !!selectedPlaylistUri && !!spotifyPlaylist;
-  const isTwitchMode = !!selectedChannel;
+  const isTwitchMode = !!selectedChannel || !!selectedVodId;
   const [imgError, setImgError] = useState(false);
 
   const handleAddTodo = () => {
@@ -283,12 +283,16 @@ export default function SettingsPage() {
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-2.5">
-                  <p className="text-white text-xs font-medium line-clamp-1">{selectedChannel}</p>
-                  <p className="text-white/40 text-[10px]">Stream en direct</p>
+                  <p className="text-white text-xs font-medium line-clamp-1">
+                    {selectedChannel ?? `VOD ${selectedVodId}`}
+                  </p>
+                  <p className="text-white/40 text-[10px]">
+                    {selectedChannel ? "Stream en direct" : "Rediffusion"}
+                  </p>
                 </div>
                 <div className="absolute top-2 right-2">
                   <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-[#9146ff]/20 text-[#9146ff]">
-                    Live
+                    {selectedChannel ? "Live" : "VOD"}
                   </span>
                 </div>
               </>

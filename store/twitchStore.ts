@@ -2,18 +2,89 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { TwitchChannel } from "@/lib/twitch";
+
+export type { TwitchChannel };
 
 interface TwitchState {
+  // Auth (persisted)
+  accessToken: string | null;
+  refreshToken: string | null;
+  expiresAt: number | null;
+  userId: string | null;
+  userLogin: string | null;
+  followedChannels: TwitchChannel[];
+
+  // Selected content (persisted)
   selectedChannel: string | null;
+  selectedVodId: string | null;
+
+  // Actions
+  setAuth: (accessToken: string, refreshToken: string, expiresAt: number) => void;
+  updateToken: (accessToken: string, expiresAt: number) => void;
+  clearAuth: () => void;
+  setUser: (userId: string, userLogin: string) => void;
+  setFollowedChannels: (channels: TwitchChannel[]) => void;
   selectChannel: (channel: string | null) => void;
+  selectVod: (vodId: string | null) => void;
+  clear: () => void;
 }
 
 export const useTwitchStore = create<TwitchState>()(
   persist(
     (set) => ({
+      accessToken: null,
+      refreshToken: null,
+      expiresAt: null,
+      userId: null,
+      userLogin: null,
+      followedChannels: [],
       selectedChannel: null,
-      selectChannel: (channel) => set({ selectedChannel: channel }),
+      selectedVodId: null,
+
+      setAuth: (accessToken, refreshToken, expiresAt) =>
+        set({ accessToken, refreshToken, expiresAt }),
+
+      updateToken: (accessToken, expiresAt) =>
+        set({ accessToken, expiresAt }),
+
+      clearAuth: () =>
+        set({
+          accessToken: null,
+          refreshToken: null,
+          expiresAt: null,
+          userId: null,
+          userLogin: null,
+          followedChannels: [],
+        }),
+
+      setUser: (userId, userLogin) => set({ userId, userLogin }),
+      setFollowedChannels: (channels) => set({ followedChannels: channels }),
+      selectChannel: (channel) => set({ selectedChannel: channel, selectedVodId: null }),
+      selectVod: (vodId) => set({ selectedVodId: vodId, selectedChannel: null }),
+      clear: () => set({ selectedChannel: null, selectedVodId: null }),
     }),
-    { name: "focusflow-twitch" }
+    {
+      name: "focusflow-twitch",
+      partialize: (s) => ({
+        accessToken: s.accessToken,
+        refreshToken: s.refreshToken,
+        expiresAt: s.expiresAt,
+        userId: s.userId,
+        userLogin: s.userLogin,
+        followedChannels: s.followedChannels,
+        selectedChannel: s.selectedChannel,
+        selectedVodId: s.selectedVodId,
+      }),
+    }
   )
 );
+
+export function extractTwitchVodId(url: string): string | null {
+  const m1 = url.match(/twitch\.tv\/videos\/(\d+)/);
+  if (m1) return m1[1];
+  const m2 = url.match(/twitch\.tv\/\w+\/v\/(\d+)/);
+  if (m2) return m2[1];
+  if (/^\d+$/.test(url.trim())) return url.trim();
+  return null;
+}

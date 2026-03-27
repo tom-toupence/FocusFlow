@@ -6,7 +6,8 @@ import { VideoMood, moodLabels, moodColors, extractYouTubeId, getVideoColor, Vid
 import { useSessionStore } from "@/store/sessionStore";
 import { usePlaylistStore, SavedPlaylist, extractPlaylistId, extractFirstVideoId, fetchPlaylistMeta } from "@/store/playlistStore";
 import { useSpotifyStore, SpotifyPlaylist } from "@/store/spotifyStore";
-import { useTwitchStore } from "@/store/twitchStore";
+import { useTwitchStore, extractTwitchVodId, TwitchChannel } from "@/store/twitchStore";
+import { loginWithTwitch, getFollowedChannels, getLiveFollowedStreams, searchChannels, refreshTwitchToken } from "@/lib/twitch";
 import { loginWithSpotify, fetchMyPlaylists, refreshAccessToken } from "@/lib/spotify";
 import { cn } from "@/lib/utils";
 import StatsSection from "@/components/StatsSection";
@@ -549,6 +550,71 @@ function SpotifyPlaylistCard({
   );
 }
 
+// ─── Twitch channel card ──────────────────────────────────────────────────────
+
+function TwitchChannelCard({
+  channel,
+  selected,
+  onStart,
+}: {
+  channel: TwitchChannel;
+  selected: boolean;
+  onStart: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "group relative rounded-xl overflow-hidden aspect-video cursor-pointer transition-all duration-200",
+        selected ? "ring-2 ring-[#9146ff]" : "hover:ring-1 hover:ring-[#9146ff]/50"
+      )}
+      onClick={onStart}
+    >
+      {channel.thumbnailUrl ? (
+        <img
+          src={channel.thumbnailUrl}
+          alt={channel.displayName}
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+      ) : (
+        <div className="w-full h-full bg-gradient-to-br from-[#1a0a3a] to-[#0d0d1a] flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
+          <svg viewBox="0 0 24 24" className="w-10 h-10 text-[#9146ff]/30" fill="currentColor">
+            <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+          </svg>
+        </div>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-2">
+        <div className="w-10 h-10 rounded-full bg-[#9146ff] flex items-center justify-center shadow-lg">
+          <svg className="w-4 h-4 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        </div>
+        <span className="text-white text-xs font-semibold tracking-wide">Démarrer</span>
+      </div>
+      <div className="absolute bottom-0 left-0 right-0 p-2.5 transition-opacity duration-200 group-hover:opacity-0">
+        <p className="text-white text-xs font-medium leading-tight truncate">{channel.displayName}</p>
+        {channel.gameName && <p className="text-white/50 text-[10px] mt-0.5 truncate">{channel.gameName}</p>}
+        {channel.isLive && channel.viewerCount !== undefined && (
+          <p className="text-white/40 text-[10px]">{channel.viewerCount.toLocaleString()} spectateurs</p>
+        )}
+      </div>
+      <div className="absolute top-2 right-2">
+        {channel.isLive ? (
+          <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-red-500/20 text-red-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+            Live
+          </span>
+        ) : (
+          <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-[#9146ff]/20 text-[#9146ff]">
+            Twitch
+          </span>
+        )}
+      </div>
+      {selected && <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-[#9146ff] shadow" />}
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
@@ -561,9 +627,21 @@ export default function LandingPage() {
     setAuth, updateToken, clearAuth, setPlaylists, selectPlaylist,
   } = useSpotifyStore();
 
-  const { selectedChannel, selectChannel } = useTwitchStore();
+  const {
+    accessToken: twitchToken, refreshToken: twitchRefreshToken, expiresAt: twitchExpiresAt,
+    userId: twitchUserId, userLogin: twitchUserLogin,
+    followedChannels, selectedChannel, selectedVodId,
+    updateToken: updateTwitchToken, clearAuth: clearTwitchAuth, setFollowedChannels,
+  } = useTwitchStore();
+
   const [activeTab, setActiveTab] = useState<"catalogue" | "library" | "spotify" | "twitch">("catalogue");
   const [twitchInput, setTwitchInput] = useState("");
+  const [vodInput, setVodInput] = useState("");
+  const [vodError, setVodError] = useState("");
+  const [twitchLoading, setTwitchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<TwitchChannel[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const isTwitchConnected = !!twitchToken;
   const [activeFilter, setActiveFilter] = useState<VideoMood | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddPlaylistModal, setShowAddPlaylistModal] = useState(false);
@@ -597,16 +675,77 @@ export default function LandingPage() {
     load();
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load followed channels when Twitch tab opens
+  useEffect(() => {
+    if (activeTab !== "twitch" || !twitchToken) return;
+
+    const load = async () => {
+      setTwitchLoading(true);
+      let token = twitchToken;
+
+      if (twitchExpiresAt && Date.now() > twitchExpiresAt - 60_000) {
+        if (!twitchRefreshToken) { clearTwitchAuth(); return; }
+        const result = await refreshTwitchToken(twitchRefreshToken);
+        if (!result) { clearTwitchAuth(); return; }
+        updateTwitchToken(result.accessToken, result.expiresAt);
+        token = result.accessToken;
+      }
+
+      if (!twitchUserId) { setTwitchLoading(false); return; }
+
+      const [followed, live] = await Promise.all([
+        getFollowedChannels(token, twitchUserId),
+        getLiveFollowedStreams(token, twitchUserId),
+      ]);
+
+      const liveLogins = new Set(live.map((s) => s.login));
+      const merged = followed.map((ch) => {
+        const liveData = live.find((s) => s.login === ch.login);
+        return liveData ?? { ...ch, isLive: liveLogins.has(ch.login) };
+      });
+      // Live first, then alphabetical
+      merged.sort((a, b) => {
+        if (a.isLive !== b.isLive) return a.isLive ? -1 : 1;
+        return a.displayName.localeCompare(b.displayName);
+      });
+
+      setFollowedChannels(merged);
+      setTwitchLoading(false);
+    };
+
+    load();
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounced search
+  useEffect(() => {
+    if (!twitchInput.trim() || !twitchToken) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setSearchLoading(true);
+      let token = twitchToken;
+      if (twitchExpiresAt && Date.now() > twitchExpiresAt - 60_000 && twitchRefreshToken) {
+        const result = await refreshTwitchToken(twitchRefreshToken);
+        if (result) { updateTwitchToken(result.accessToken, result.expiresAt); token = result.accessToken; }
+      }
+      const results = await searchChannels(token, twitchInput.trim());
+      setSearchResults(results);
+      setSearchLoading(false);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [twitchInput]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleStart = (videoId: string) => {
     useSpotifyStore.getState().selectPlaylist(null);
-    useTwitchStore.getState().selectChannel(null);
+    useTwitchStore.getState().clear();
     useSessionStore.getState().selectVideo(videoId);
     router.push("/settings");
   };
 
   const handleStartPlaylist = (id: string) => {
     useSpotifyStore.getState().selectPlaylist(null);
-    useTwitchStore.getState().selectChannel(null);
+    useTwitchStore.getState().clear();
     useSessionStore.getState().selectPlaylist(id);
     router.push("/settings");
   };
@@ -614,7 +753,7 @@ export default function LandingPage() {
   const handleStartSpotify = (uri: string) => {
     useSessionStore.getState().selectVideo("v1");
     useSessionStore.setState({ selectedPlaylistId: null });
-    useTwitchStore.getState().selectChannel(null);
+    useTwitchStore.getState().clear();
     selectPlaylist(uri);
     router.push("/settings");
   };
@@ -624,7 +763,21 @@ export default function LandingPage() {
     useSessionStore.getState().selectVideo("v1");
     useSessionStore.setState({ selectedPlaylistId: null });
     useSpotifyStore.getState().selectPlaylist(null);
-    selectChannel(channel.trim());
+    useTwitchStore.getState().selectChannel(channel.trim());
+    router.push("/settings");
+  };
+
+  const handleStartTwitchVod = () => {
+    const vodId = extractTwitchVodId(vodInput.trim());
+    if (!vodId) {
+      setVodError("Lien de rediffusion invalide. Colle un lien twitch.tv/videos/…");
+      return;
+    }
+    setVodError("");
+    useSessionStore.getState().selectVideo("v1");
+    useSessionStore.setState({ selectedPlaylistId: null });
+    useSpotifyStore.getState().selectPlaylist(null);
+    useTwitchStore.getState().selectVod(vodId);
     router.push("/settings");
   };
 
@@ -938,76 +1091,184 @@ export default function LandingPage() {
                   </svg>
                 </h1>
                 <p className="text-foreground/40 mt-1 text-sm">
-                  Regarde un stream en direct pendant ta session. Entre le nom d'un streamer et c'est parti.
+                  {isTwitchConnected
+                    ? `Connecté en tant que ${twitchUserLogin} — tes abonnements Twitch.`
+                    : "Connecte ton compte Twitch pour voir tes abonnements, ou entre directement un nom de chaîne."}
                 </p>
               </div>
-            </div>
-
-            {/* Custom channel input */}
-            <div className="flex gap-2 mb-8">
-              <input
-                value={twitchInput}
-                onChange={(e) => setTwitchInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleStartTwitch(twitchInput)}
-                placeholder="Nom du streamer... (ex: lofigirl)"
-                className="flex-1 max-w-sm bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-foreground/25 transition-colors"
-              />
-              <button
-                onClick={() => handleStartTwitch(twitchInput)}
-                disabled={!twitchInput.trim()}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#9146ff] hover:bg-[#7c3ae0] disabled:opacity-30 text-white text-xs font-semibold transition-all"
-              >
-                Démarrer
-              </button>
-            </div>
-
-            {/* Default channels */}
-            <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-4">Suggestions</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-              {[
-                { channel: "lofigirl", label: "Lofi Girl" },
-                { channel: "chillhopmusic", label: "Chillhop Music" },
-                { channel: "monstercat", label: "Monstercat" },
-                { channel: "twitchmusic", label: "Twitch Music" },
-              ].map(({ channel, label }) => (
-                <div
-                  key={channel}
-                  className={cn(
-                    "group relative rounded-xl overflow-hidden aspect-video cursor-pointer transition-all duration-200",
-                    selectedChannel === channel
-                      ? "ring-2 ring-[#9146ff]"
-                      : "hover:ring-1 hover:ring-[#9146ff]/50"
-                  )}
-                  onClick={() => handleStartTwitch(channel)}
+              {isTwitchConnected && (
+                <button
+                  onClick={() => clearTwitchAuth()}
+                  className="text-xs text-foreground/25 hover:text-foreground/50 transition-colors"
                 >
-                  <div className="w-full h-full bg-gradient-to-br from-[#1a0a3a] to-[#0d0d1a] flex items-center justify-center">
-                    <svg viewBox="0 0 24 24" className="w-10 h-10 text-[#9146ff]/30" fill="currentColor">
-                      <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
-                    </svg>
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-2">
-                    <div className="w-10 h-10 rounded-full bg-[#9146ff] flex items-center justify-center shadow-lg">
-                      <svg className="w-4 h-4 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    </div>
-                    <span className="text-white text-xs font-semibold tracking-wide">Démarrer</span>
-                  </div>
-                  <div className="absolute bottom-0 left-0 right-0 p-2.5 transition-opacity duration-200 group-hover:opacity-0">
-                    <p className="text-white text-xs font-medium leading-tight">{label}</p>
-                    <p className="text-white/50 text-[10px] mt-0.5">{channel}</p>
-                  </div>
-                  <div className="absolute top-2 right-2">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-[#9146ff]/20 text-[#9146ff]">
-                      Live
-                    </span>
-                  </div>
-                  {selectedChannel === channel && (
-                    <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-[#9146ff] shadow" />
+                  Déconnecter
+                </button>
+              )}
+            </div>
+
+            {/* Search input (always visible) */}
+            <div className="relative mb-6 max-w-lg">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" strokeLinecap="round" />
+                  </svg>
+                  <input
+                    value={twitchInput}
+                    onChange={(e) => { setTwitchInput(e.target.value); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !searchResults.length) handleStartTwitch(twitchInput);
+                    }}
+                    placeholder={isTwitchConnected ? "Rechercher une chaîne Twitch…" : "Nom du streamer (ex: lofigirl)"}
+                    className="w-full bg-foreground/5 border border-foreground/10 rounded-xl pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-foreground/25 transition-colors"
+                  />
+                  {searchLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border border-foreground/20 border-t-[#9146ff] rounded-full animate-spin" />
                   )}
                 </div>
-              ))}
+                <button
+                  onClick={() => handleStartTwitch(twitchInput)}
+                  disabled={!twitchInput.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#9146ff] hover:bg-[#7c3ae0] disabled:opacity-30 text-white text-xs font-semibold transition-all flex-shrink-0"
+                >
+                  Démarrer
+                </button>
+              </div>
+
+              {/* Search results dropdown */}
+              {searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-foreground/10 rounded-xl shadow-2xl overflow-hidden z-20">
+                  {searchResults.map((ch) => (
+                    <button
+                      key={ch.login}
+                      onClick={() => { handleStartTwitch(ch.login); setTwitchInput(""); setSearchResults([]); }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-foreground/5 transition-colors text-left"
+                    >
+                      {ch.thumbnailUrl ? (
+                        <img src={ch.thumbnailUrl} alt="" className="w-10 h-6 rounded object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-10 h-6 rounded bg-[#1a0a3a] flex items-center justify-center flex-shrink-0">
+                          <svg viewBox="0 0 24 24" className="w-3 h-3 text-[#9146ff]/50" fill="currentColor">
+                            <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+                          </svg>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-foreground font-medium truncate">{ch.displayName}</p>
+                        {ch.gameName && <p className="text-xs text-foreground/40 truncate">{ch.gameName}</p>}
+                      </div>
+                      {ch.isLive && (
+                        <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-red-500/15 text-red-400 flex-shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                          Live
+                          {ch.viewerCount !== undefined && ` · ${ch.viewerCount.toLocaleString()}`}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Connect Twitch CTA */}
+            {!isTwitchConnected && (
+              <div className="flex flex-col items-center justify-center py-16 gap-6 border border-foreground/[0.06] rounded-2xl mb-8">
+                <div className="w-14 h-14 rounded-full bg-[#9146ff]/10 flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#9146ff]" fill="currentColor">
+                    <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+                  </svg>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-medium text-foreground/60">Connecte ton compte Twitch</p>
+                  <p className="text-xs text-foreground/30 mt-1 max-w-xs">
+                    Pour voir tes abonnements et rechercher des chaînes directement depuis FocusFlow.
+                  </p>
+                </div>
+                <button
+                  onClick={loginWithTwitch}
+                  className="flex items-center gap-2.5 px-6 py-3 rounded-xl bg-[#9146ff] hover:bg-[#7c3ae0] text-white font-semibold text-sm transition-all shadow-lg shadow-[#9146ff]/20"
+                >
+                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+                    <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+                  </svg>
+                  Connecter avec Twitch
+                </button>
+              </div>
+            )}
+
+            {/* Connected: followed channels */}
+            {isTwitchConnected && (
+              twitchLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="w-6 h-6 border-2 border-foreground/10 border-t-[#9146ff] rounded-full animate-spin" />
+                </div>
+              ) : followedChannels.length === 0 ? (
+                <p className="text-foreground/25 text-sm text-center py-10">Aucun abonnement trouvé</p>
+              ) : (
+                <div className="flex flex-col gap-10">
+                  {/* Live now */}
+                  {followedChannels.some((c) => c.isLive) && (
+                    <section>
+                      <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                        En direct maintenant
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                        {followedChannels.filter((c) => c.isLive).map((ch) => (
+                          <TwitchChannelCard
+                            key={ch.login}
+                            channel={ch}
+                            selected={selectedChannel === ch.login}
+                            onStart={() => handleStartTwitch(ch.login)}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                  {/* All followed */}
+                  <section>
+                    <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-4">Mes abonnements</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                      {followedChannels.map((ch) => (
+                        <TwitchChannelCard
+                          key={ch.login}
+                          channel={ch}
+                          selected={selectedChannel === ch.login}
+                          onStart={() => handleStartTwitch(ch.login)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                </div>
+              )
+            )}
+
+            {/* VOD / Rediffusion */}
+            <div className="mt-10">
+              <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-1">Rediffusion (VOD)</p>
+              <p className="text-xs text-foreground/30 mb-4">
+                Colle le lien d'une rediffusion Twitch. Les VODs abonné uniquement nécessitent un abonnement actif au streamer.
+              </p>
+              <div className="flex gap-2 max-w-lg">
+                <input
+                  value={vodInput}
+                  onChange={(e) => { setVodInput(e.target.value); setVodError(""); }}
+                  onKeyDown={(e) => e.key === "Enter" && handleStartTwitchVod()}
+                  placeholder="https://www.twitch.tv/videos/1234567890"
+                  className="flex-1 bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-foreground/25 transition-colors"
+                />
+                <button
+                  onClick={handleStartTwitchVod}
+                  disabled={!vodInput.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#9146ff] hover:bg-[#7c3ae0] disabled:opacity-30 text-white text-xs font-semibold transition-all flex-shrink-0"
+                >
+                  Démarrer
+                </button>
+              </div>
+              {vodError && <p className="text-red-400 text-xs mt-2">{vodError}</p>}
+              {selectedVodId && (
+                <p className="text-[#9146ff]/70 text-xs mt-2">VOD sélectionnée : {selectedVodId}</p>
+              )}
             </div>
           </>
         )}
