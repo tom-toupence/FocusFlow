@@ -12,8 +12,8 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               // Scripts : app + YouTube IFrame API + Spotify Web Playback SDK
               "script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com https://sdk.scdn.co",
-              // Iframes : YouTube embed
-              "frame-src https://www.youtube.com https://www.youtube-nocookie.com",
+              // Iframes : YouTube embed + Spotify SDK
+              "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://sdk.scdn.co",
               // Images : YouTube thumbnails + Spotify artwork + oEmbed
               "img-src 'self' data: https: blob:",
               // Styles
