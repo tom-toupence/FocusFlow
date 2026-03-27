@@ -160,6 +160,9 @@ export default function SessionPage() {
 
   useEffect(() => {
     if (isSpotifyMode || isTwitchMode) return;
+
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+
     if (window.YT?.Player) {
       initPlayer();
     } else {
@@ -173,8 +176,18 @@ export default function SessionPage() {
         prev?.();
         initPlayer();
       };
+      // Fallback poll in case callback was already fired before we set it
+      pollInterval = setInterval(() => {
+        if (window.YT?.Player) {
+          clearInterval(pollInterval!);
+          pollInterval = null;
+          initPlayer();
+        }
+      }, 100);
     }
+
     return () => {
+      if (pollInterval) clearInterval(pollInterval);
       playerRef.current?.destroy();
       playerRef.current = null;
       playerReadyRef.current = false;
@@ -283,6 +296,30 @@ export default function SessionPage() {
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(0,0,0,0.45)_100%)]" />
       )}
 
+      {/* Twitch sub-only fallback banner */}
+      {isTwitchMode && !isBreak && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
+          <a
+            href={
+              selectedVodId
+                ? `https://www.twitch.tv/videos/${selectedVodId}`
+                : `https://www.twitch.tv/${selectedChannel}`
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-black/70 backdrop-blur-md border border-[#9146ff]/30 text-white/70 hover:text-white hover:border-[#9146ff]/60 text-xs font-medium transition-all"
+          >
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-[#9146ff]" fill="currentColor">
+              <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+            </svg>
+            Contenu réservé aux abonnés ? Ouvrir sur Twitch
+            <svg className="w-3 h-3 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </a>
+        </div>
+      )}
+
       {/* ── Break overlay ──────────────────────────────────────────────────── */}
       {isBreak && (
         <div className="absolute inset-0 z-20 bg-[#0a0a0c]/95 flex flex-col items-center justify-center gap-8">
@@ -347,7 +384,7 @@ export default function SessionPage() {
           <button
             onClick={addNote}
             title="Ajouter un post-it"
-            className="fixed bottom-6 left-6 z-[100] flex items-center gap-2 px-3 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/15 text-white/50 hover:text-white/90 hover:bg-black/80 text-xs font-medium transition-all"
+            className="fixed bottom-6 left-6 z-[100] flex items-center gap-2 px-3 py-2 rounded-xl bg-black/70 backdrop-blur-sm border border-white/25 text-white/75 hover:text-white hover:bg-black/80 text-xs font-medium transition-all"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round" />
@@ -367,7 +404,7 @@ export default function SessionPage() {
             {/* Terminer */}
             <button
               onClick={handleStop}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/50 backdrop-blur-sm border border-white/10 text-white/50 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/10 text-xs font-medium transition-all"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/75 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/10 text-xs font-medium transition-all"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="6" y="6" width="12" height="12" rx="1.5" />
@@ -412,13 +449,13 @@ export default function SessionPage() {
               )}
               <button
                 onClick={isRunning ? pause : start}
-                className="px-4 py-2 rounded-xl bg-black/50 backdrop-blur-sm border border-white/10 text-white/50 hover:text-white text-xs font-medium transition-all"
+                className="px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/80 hover:text-white text-xs font-medium transition-all"
               >
                 {isRunning ? "Pause" : "Reprendre"}
               </button>
               <button
                 onClick={() => setShowTodos((v) => !v)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-black/50 backdrop-blur-sm border border-white/10 text-white/50 hover:text-white text-xs font-medium transition-all"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/80 hover:text-white text-xs font-medium transition-all"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" strokeLinecap="round" />

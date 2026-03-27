@@ -85,6 +85,6 @@ export function extractTwitchVodId(url: string): string | null {
   if (m1) return m1[1];
   const m2 = url.match(/twitch\.tv\/\w+\/v\/(\d+)/);
   if (m2) return m2[1];
-  if (/^\d+$/.test(url.trim())) return url.trim();
+  if (/^\d{8,12}$/.test(url.trim())) return url.trim();
   return null;
 }

@@ -449,7 +449,7 @@ function CompletedTodosBacklog() {
   }
 
   return (
-    <section className="border-t border-foreground/[0.06] py-8 px-6 max-w-7xl mx-auto w-full">
+    <section className="pt-8 pb-8">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-foreground/30 uppercase tracking-widest">Tâches accomplies</h2>
         <button
@@ -634,7 +634,7 @@ export default function LandingPage() {
     updateToken: updateTwitchToken, clearAuth: clearTwitchAuth, setFollowedChannels,
   } = useTwitchStore();
 
-  const [activeTab, setActiveTab] = useState<"catalogue" | "library" | "spotify" | "twitch">("catalogue");
+  const [activeTab, setActiveTab] = useState<"catalogue" | "library" | "spotify" | "twitch" | "activite">("catalogue");
   const [twitchInput, setTwitchInput] = useState("");
   const [vodInput, setVodInput] = useState("");
   const [vodError, setVodError] = useState("");
@@ -861,6 +861,18 @@ export default function LandingPage() {
                 Live
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setActiveTab("activite")}
+            className={cn(
+              "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5",
+              activeTab === "activite" ? "bg-foreground/15 text-foreground" : "text-foreground/40 hover:text-foreground/70 bg-foreground/5"
+            )}
+          >
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Activité
           </button>
         </div>
 
@@ -1272,13 +1284,18 @@ export default function LandingPage() {
             </div>
           </>
         )}
+        {/* ── Activité ────────────────────────────────────────────────────────── */}
+        {activeTab === "activite" && (
+          <>
+            <div className="mb-8">
+              <h1 className="text-3xl font-semibold text-foreground tracking-tight">Activité</h1>
+              <p className="text-foreground/40 mt-1 text-sm">Ton historique de sessions et tes tâches accomplies.</p>
+            </div>
+            <StatsSection embedded />
+            <CompletedTodosBacklog />
+          </>
+        )}
       </main>
-
-      {/* Completed todos backlog */}
-      <CompletedTodosBacklog />
-
-      {/* Stats */}
-      <StatsSection />
 
       {/* Add video modal */}
       {showAddModal && (

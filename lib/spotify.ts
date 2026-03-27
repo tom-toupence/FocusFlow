@@ -172,7 +172,9 @@ export async function startPlayback(
   deviceId: string,
   contextUri: string
 ): Promise<void> {
-  await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+  const playUrl = new URL("https://api.spotify.com/v1/me/player/play");
+  playUrl.searchParams.set("device_id", deviceId);
+  await fetch(playUrl.toString(), {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -187,7 +189,10 @@ export async function setRepeat(
   deviceId: string,
   state: "track" | "context" | "off"
 ): Promise<void> {
-  await fetch(`https://api.spotify.com/v1/me/player/repeat?state=${state}&device_id=${deviceId}`, {
+  const repeatUrl = new URL("https://api.spotify.com/v1/me/player/repeat");
+  repeatUrl.searchParams.set("state", state);
+  repeatUrl.searchParams.set("device_id", deviceId);
+  await fetch(repeatUrl.toString(), {
     method: "PUT",
     headers: { Authorization: `Bearer ${accessToken}` },
   });

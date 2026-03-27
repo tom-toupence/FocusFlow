@@ -375,6 +375,11 @@ export default function SettingsPage() {
               </>
             )}
           </div>
+          {isTwitchMode && selectedVodId && (
+            <p className="text-[10px] text-amber-400/60 mt-2 leading-snug">
+              Rediffusion abonné uniquement ? Utilise le bouton &quot;Ouvrir sur Twitch&quot; dans la session.
+            </p>
+          )}
         </div>
 
         {/* Right: settings */}

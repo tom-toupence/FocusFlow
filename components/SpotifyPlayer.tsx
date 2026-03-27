@@ -178,6 +178,8 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
   useEffect(() => {
     if (!accessToken) return;
 
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+
     if (window.Spotify?.Player) {
       initPlayer();
     } else {
@@ -187,9 +189,18 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
         document.head.appendChild(script);
       }
       window.onSpotifyWebPlaybackSDKReady = initPlayer;
+      // Fallback poll in case SDK was already initialized before callback was set
+      pollInterval = setInterval(() => {
+        if (window.Spotify?.Player) {
+          clearInterval(pollInterval!);
+          pollInterval = null;
+          initPlayer();
+        }
+      }, 100);
     }
 
     return () => {
+      if (pollInterval) clearInterval(pollInterval);
       playerRef.current?.disconnect();
       playerRef.current = null;
       setDeviceId(null);

@@ -2,10 +2,20 @@
 
 import { useEffect, useRef } from "react";
 
+interface TwitchEmbedPlayer {
+  setQuality: (quality: string) => void;
+}
+
+interface TwitchEmbedInstance {
+  destroy: () => void;
+  addEventListener: (event: string, cb: () => void) => void;
+  getPlayer: () => TwitchEmbedPlayer;
+}
+
 declare global {
   interface Window {
     Twitch: {
-      Embed: new (
+      Embed: (new (
         id: string,
         options: {
           channel?: string;
@@ -18,7 +28,9 @@ declare global {
           autoplay?: boolean;
           muted?: boolean;
         }
-      ) => { destroy: () => void };
+      ) => TwitchEmbedInstance) & {
+        VIDEO_READY: string;
+      };
     };
   }
 }
@@ -31,7 +43,7 @@ interface Props {
 
 export default function TwitchPlayer({ channel, vodId, token }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const embedRef = useRef<{ destroy: () => void } | null>(null);
+  const embedRef = useRef<TwitchEmbedInstance | null>(null);
 
   useEffect(() => {
     const initEmbed = () => {
@@ -39,8 +51,6 @@ export default function TwitchPlayer({ channel, vodId, token }: Props) {
 
       embedRef.current?.destroy();
       embedRef.current = null;
-
-      // Clear any previous embed content
       if (containerRef.current) containerRef.current.innerHTML = "";
 
       const options: {
@@ -66,7 +76,18 @@ export default function TwitchPlayer({ channel, vodId, token }: Props) {
       if (vodId) options.video = vodId;
       if (token) options.oauth_token = token;
 
-      embedRef.current = new window.Twitch.Embed("twitch-embed-container", options);
+      const embed = new window.Twitch.Embed("twitch-embed-container", options);
+
+      embed.addEventListener(window.Twitch.Embed.VIDEO_READY, () => {
+        try {
+          embed.getPlayer().setQuality("720p60");
+        } catch {
+          // quality string may vary — try fallback
+          try { embed.getPlayer().setQuality("720p"); } catch { /* ignore */ }
+        }
+      });
+
+      embedRef.current = embed;
     };
 
     if (window.Twitch?.Embed) {
@@ -79,7 +100,6 @@ export default function TwitchPlayer({ channel, vodId, token }: Props) {
         script.onload = initEmbed;
         document.head.appendChild(script);
       } else {
-        // Script already added, poll until ready
         const poll = setInterval(() => {
           if (window.Twitch?.Embed) {
             clearInterval(poll);

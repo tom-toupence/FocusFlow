@@ -12,10 +12,34 @@ function getRedirectUri(): string {
   return "";
 }
 
+// ─── PKCE helpers ─────────────────────────────────────────────────────────────
+
+function generateCodeVerifier(): string {
+  const array = new Uint8Array(64);
+  crypto.getRandomValues(array);
+  return btoa(String.fromCharCode(...array))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=/g, "");
+}
+
+async function generateCodeChallenge(verifier: string): Promise<string> {
+  const data = new TextEncoder().encode(verifier);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=/g, "");
+}
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export async function loginWithTwitch(): Promise<void> {
+  const verifier = generateCodeVerifier();
+  const challenge = await generateCodeChallenge(verifier);
   const state = crypto.randomUUID();
+
+  sessionStorage.setItem("twitch_code_verifier", verifier);
   sessionStorage.setItem("twitch_auth_state", state);
 
   const params = new URLSearchParams({
@@ -24,6 +48,8 @@ export async function loginWithTwitch(): Promise<void> {
     redirect_uri: getRedirectUri(),
     scope: "user:read:follows",
     state,
+    code_challenge_method: "S256",
+    code_challenge: challenge,
   });
 
   window.location.href = `https://id.twitch.tv/oauth2/authorize?${params}`;
@@ -34,8 +60,11 @@ export async function handleTwitchCallback(
   state: string
 ): Promise<{ accessToken: string; refreshToken: string; expiresAt: number } | null> {
   const savedState = sessionStorage.getItem("twitch_auth_state");
-  if (!savedState || state !== savedState) return null;
+  const verifier = sessionStorage.getItem("twitch_code_verifier");
+  if (!savedState || state !== savedState || !verifier) return null;
+
   sessionStorage.removeItem("twitch_auth_state");
+  sessionStorage.removeItem("twitch_code_verifier");
 
   const res = await fetch("/api/twitch/token", {
     method: "POST",
@@ -43,6 +72,7 @@ export async function handleTwitchCallback(
     body: JSON.stringify({
       grant_type: "authorization_code",
       code,
+      code_verifier: verifier,
       redirect_uri: getRedirectUri(),
     }),
   });

@@ -32,7 +32,7 @@ const intensityClasses = [
 const dayLabels = ["L", "M", "M", "J", "V", "S", "D"];
 const monthNames = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
 
-export default function StatsSection() {
+export default function StatsSection({ embedded }: { embedded?: boolean }) {
   const { days } = useStatsStore();
 
   // Avoid SSR/client mismatch — only render after client mount
@@ -72,8 +72,8 @@ export default function StatsSection() {
   });
 
   return (
-    <section className="border-t border-foreground/[0.06] py-8 px-6 max-w-7xl mx-auto w-full">
-      <h2 className="text-sm font-semibold text-foreground/30 uppercase tracking-widest mb-6">Activité</h2>
+    <section className={cn(embedded ? "pb-8" : "border-t border-foreground/[0.06] py-8 px-6 max-w-7xl mx-auto w-full")}>
+      {!embedded && <h2 className="text-sm font-semibold text-foreground/30 uppercase tracking-widest mb-6">Activité</h2>}
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
