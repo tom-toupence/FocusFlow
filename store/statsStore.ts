@@ -93,3 +93,27 @@ export function getLast119Days(days: Record<string, DayStats>): { date: string; 
     return { date: key, minutes: days[key]?.minutesWorked ?? 0 };
   });
 }
+
+export function getTotalStats(days: Record<string, DayStats>): { sessions: number; minutesWorked: number; activeDays: number } {
+  const values = Object.values(days);
+  return {
+    sessions: values.reduce((a, d) => a + d.sessions, 0),
+    minutesWorked: values.reduce((a, d) => a + d.minutesWorked, 0),
+    activeDays: values.filter((d) => d.sessions > 0).length,
+  };
+}
+
+export function getBestDay(days: Record<string, DayStats>): DayStats | null {
+  const values = Object.values(days).filter((d) => d.minutesWorked > 0);
+  if (values.length === 0) return null;
+  return values.reduce((best, d) => d.minutesWorked > best.minutesWorked ? d : best);
+}
+
+export function getLast7Days(days: Record<string, DayStats>): { date: string; minutes: number; label: string }[] {
+  const dayShort = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+  return Array.from({ length: 7 }, (_, i) => {
+    const key = localDateMinus(6 - i);
+    const d = new Date(key + "T00:00:00");
+    return { date: key, minutes: days[key]?.minutesWorked ?? 0, label: dayShort[d.getDay()] };
+  });
+}

@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 
 interface TwitchEmbedPlayer {
   setQuality: (quality: string) => void;
+  setVolume: (volume: number) => void;
 }
 
 interface TwitchEmbedInstance {
@@ -39,9 +40,10 @@ interface Props {
   channel?: string;
   vodId?: string;
   token?: string;
+  volume?: number; // 0–1
 }
 
-export default function TwitchPlayer({ channel, vodId, token }: Props) {
+export default function TwitchPlayer({ channel, vodId, token, volume = 0.8 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const embedRef = useRef<TwitchEmbedInstance | null>(null);
 
@@ -115,6 +117,11 @@ export default function TwitchPlayer({ channel, vodId, token }: Props) {
       embedRef.current = null;
     };
   }, [channel, vodId, token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!embedRef.current) return;
+    try { embedRef.current.getPlayer().setVolume(volume); } catch { /* ignore */ }
+  }, [volume]);
 
   return (
     <div className="absolute inset-0 w-full h-full overflow-hidden">

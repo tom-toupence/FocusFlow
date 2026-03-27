@@ -25,6 +25,7 @@ interface YTPlayer {
   pauseVideo: () => void;
   destroy: () => void;
   setPlaybackQuality: (q: string) => void;
+  setVolume: (v: number) => void;
 }
 
 declare global {
@@ -80,6 +81,9 @@ export default function SessionPage() {
   const [todoInput, setTodoInput] = useState("");
   const [showTodos, setShowTodos] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [volume, setVolumeState] = useState(0.8);
+  const [showVolume, setShowVolume] = useState(false);
+  const volumeRef = useRef(0.8);
   useEffect(() => setMounted(true), []);
 
   const isBreak = mode !== "work";
@@ -116,6 +120,7 @@ export default function SessionPage() {
     const onReady = (e: { target: YTPlayer }) => {
       playerReadyRef.current = true;
       e.target.setPlaybackQuality("hd1080");
+      e.target.setVolume(Math.round(volumeRef.current * 100));
       if (!isBreakRef.current && isRunningRef.current) {
         e.target.playVideo();
       } else {
@@ -253,6 +258,14 @@ export default function SessionPage() {
     setTodoInput("");
   };
 
+  const handleVolumeChange = (v: number) => {
+    setVolumeState(v);
+    volumeRef.current = v;
+    if (!isSpotifyMode && !isTwitchMode && playerRef.current && playerReadyRef.current) {
+      playerRef.current.setVolume(Math.round(v * 100));
+    }
+  };
+
   const progress = (() => {
     const total =
       mode === "work" ? settings.workDuration * 60
@@ -282,6 +295,7 @@ export default function SessionPage() {
           channel={selectedChannel ?? undefined}
           vodId={selectedVodId ?? undefined}
           token={twitchToken ?? undefined}
+          volume={volume}
         />
       ) : (
         <div
@@ -439,20 +453,72 @@ export default function SessionPage() {
                   }
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-black/50 backdrop-blur-sm border border-white/10 text-white/50 hover:text-[#9146ff] hover:border-[#9146ff]/30 text-xs font-medium transition-all"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/60 hover:text-[#9146ff] hover:border-[#9146ff]/40 text-xs font-medium transition-all"
                 >
                   <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor">
                     <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
                   </svg>
-                  Ouvrir sur Twitch
+                  Twitch
                 </a>
               )}
+
+              {/* Volume (YouTube & Twitch only — Spotify has its own) */}
+              {!isSpotifyMode && (
+                <div className="relative flex items-center">
+                  {showVolume && (
+                    <input
+                      type="range"
+                      min={0} max={1} step={0.05}
+                      value={volume}
+                      onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                      className="absolute right-full mr-2 w-20 h-1 accent-white cursor-pointer"
+                    />
+                  )}
+                  <button
+                    onClick={() => setShowVolume((v) => !v)}
+                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/75 hover:text-white transition-all"
+                    title="Volume"
+                  >
+                    {volume === 0 ? (
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                        <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
+                        <line x1="23" y1="9" x2="17" y2="15" strokeLinecap="round" />
+                        <line x1="17" y1="9" x2="23" y2="15" strokeLinecap="round" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                        <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" strokeLinecap="round" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* Pause / Resume — prominent */}
               <button
                 onClick={isRunning ? pause : start}
-                className="px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/80 hover:text-white text-xs font-medium transition-all"
+                className="flex items-center gap-2 px-5 py-2 rounded-full bg-white/20 backdrop-blur-md border border-white/40 text-white text-sm font-semibold transition-all hover:bg-white/30 shadow-lg shadow-black/30"
               >
-                {isRunning ? "Pause" : "Reprendre"}
+                {isRunning ? (
+                  <>
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="6" y="4" width="4" height="16" rx="1" />
+                      <rect x="14" y="4" width="4" height="16" rx="1" />
+                    </svg>
+                    Pause
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                    Reprendre
+                  </>
+                )}
               </button>
+
+              {/* Tâches */}
               <button
                 onClick={() => setShowTodos((v) => !v)}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/80 hover:text-white text-xs font-medium transition-all"
