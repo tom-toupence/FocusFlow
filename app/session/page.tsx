@@ -62,7 +62,7 @@ export default function SessionPage() {
   const { startSession } = useSessionSummaryStore();
   const { notes, addNote } = useNotesStore();
   const { selectedPlaylistUri, accessToken } = useSpotifyStore();
-  const { selectedChannel, selectedVodId } = useTwitchStore();
+  const { selectedChannel, selectedVodId, accessToken: twitchToken } = useTwitchStore();
 
   const allVideos = getAllVideos();
   const video = allVideos.find((v) => v.id === selectedVideoId) ?? allVideos[0];
@@ -265,7 +265,11 @@ export default function SessionPage() {
           playlistUri={selectedPlaylistUri!}
         />
       ) : isTwitchMode ? (
-        <TwitchPlayer channel={selectedChannel ?? undefined} vodId={selectedVodId ?? undefined} />
+        <TwitchPlayer
+          channel={selectedChannel ?? undefined}
+          vodId={selectedVodId ?? undefined}
+          token={twitchToken ?? undefined}
+        />
       ) : (
         <div
           id="yt-player"
