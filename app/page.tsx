@@ -6,6 +6,7 @@ import { VideoMood, moodLabels, moodColors, extractYouTubeId, getVideoColor, Vid
 import { useSessionStore } from "@/store/sessionStore";
 import { usePlaylistStore, SavedPlaylist, extractPlaylistId, extractFirstVideoId, fetchPlaylistMeta } from "@/store/playlistStore";
 import { useSpotifyStore, SpotifyPlaylist } from "@/store/spotifyStore";
+import { useTwitchStore } from "@/store/twitchStore";
 import { loginWithSpotify, fetchMyPlaylists, refreshAccessToken } from "@/lib/spotify";
 import { cn } from "@/lib/utils";
 import StatsSection from "@/components/StatsSection";
@@ -560,7 +561,9 @@ export default function LandingPage() {
     setAuth, updateToken, clearAuth, setPlaylists, selectPlaylist,
   } = useSpotifyStore();
 
-  const [activeTab, setActiveTab] = useState<"catalogue" | "library" | "spotify">("catalogue");
+  const { selectedChannel, selectChannel } = useTwitchStore();
+  const [activeTab, setActiveTab] = useState<"catalogue" | "library" | "spotify" | "twitch">("catalogue");
+  const [twitchInput, setTwitchInput] = useState("");
   const [activeFilter, setActiveFilter] = useState<VideoMood | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddPlaylistModal, setShowAddPlaylistModal] = useState(false);
@@ -596,12 +599,14 @@ export default function LandingPage() {
 
   const handleStart = (videoId: string) => {
     useSpotifyStore.getState().selectPlaylist(null);
+    useTwitchStore.getState().selectChannel(null);
     useSessionStore.getState().selectVideo(videoId);
     router.push("/settings");
   };
 
   const handleStartPlaylist = (id: string) => {
     useSpotifyStore.getState().selectPlaylist(null);
+    useTwitchStore.getState().selectChannel(null);
     useSessionStore.getState().selectPlaylist(id);
     router.push("/settings");
   };
@@ -609,7 +614,17 @@ export default function LandingPage() {
   const handleStartSpotify = (uri: string) => {
     useSessionStore.getState().selectVideo("v1");
     useSessionStore.setState({ selectedPlaylistId: null });
+    useTwitchStore.getState().selectChannel(null);
     selectPlaylist(uri);
+    router.push("/settings");
+  };
+
+  const handleStartTwitch = (channel: string) => {
+    if (!channel.trim()) return;
+    useSessionStore.getState().selectVideo("v1");
+    useSessionStore.setState({ selectedPlaylistId: null });
+    useSpotifyStore.getState().selectPlaylist(null);
+    selectChannel(channel.trim());
     router.push("/settings");
   };
 
@@ -669,6 +684,28 @@ export default function LandingPage() {
                 activeTab === "spotify" ? "bg-[#1db954]/20" : "bg-[#1db954]/10 text-[#1db954]"
               )}>
                 Premium
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("twitch")}
+            className={cn(
+              "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5",
+              activeTab === "twitch"
+                ? "bg-[#9146ff]/15 text-[#9146ff]"
+                : "text-foreground/40 hover:text-foreground/70 bg-foreground/5"
+            )}
+          >
+            <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor">
+              <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+            </svg>
+            Twitch
+            {selectedChannel && (
+              <span className={cn(
+                "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
+                activeTab === "twitch" ? "bg-[#9146ff]/20" : "bg-[#9146ff]/10 text-[#9146ff]"
+              )}>
+                Live
               </span>
             )}
           </button>
@@ -886,6 +923,92 @@ export default function LandingPage() {
                 ))}
               </div>
             )}
+          </>
+        )}
+
+        {/* ── Twitch ──────────────────────────────────────────────────────────── */}
+        {activeTab === "twitch" && (
+          <>
+            <div className="flex items-end justify-between mb-8">
+              <div>
+                <h1 className="text-3xl font-semibold text-foreground tracking-tight flex items-center gap-3">
+                  Twitch
+                  <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#9146ff]" fill="currentColor">
+                    <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+                  </svg>
+                </h1>
+                <p className="text-foreground/40 mt-1 text-sm">
+                  Regarde un stream en direct pendant ta session. Entre le nom d'un streamer et c'est parti.
+                </p>
+              </div>
+            </div>
+
+            {/* Custom channel input */}
+            <div className="flex gap-2 mb-8">
+              <input
+                value={twitchInput}
+                onChange={(e) => setTwitchInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleStartTwitch(twitchInput)}
+                placeholder="Nom du streamer... (ex: lofigirl)"
+                className="flex-1 max-w-sm bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-foreground/25 transition-colors"
+              />
+              <button
+                onClick={() => handleStartTwitch(twitchInput)}
+                disabled={!twitchInput.trim()}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#9146ff] hover:bg-[#7c3ae0] disabled:opacity-30 text-white text-xs font-semibold transition-all"
+              >
+                Démarrer
+              </button>
+            </div>
+
+            {/* Default channels */}
+            <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-4">Suggestions</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              {[
+                { channel: "lofigirl", label: "Lofi Girl" },
+                { channel: "chillhopmusic", label: "Chillhop Music" },
+                { channel: "monstercat", label: "Monstercat" },
+                { channel: "twitchmusic", label: "Twitch Music" },
+              ].map(({ channel, label }) => (
+                <div
+                  key={channel}
+                  className={cn(
+                    "group relative rounded-xl overflow-hidden aspect-video cursor-pointer transition-all duration-200",
+                    selectedChannel === channel
+                      ? "ring-2 ring-[#9146ff]"
+                      : "hover:ring-1 hover:ring-[#9146ff]/50"
+                  )}
+                  onClick={() => handleStartTwitch(channel)}
+                >
+                  <div className="w-full h-full bg-gradient-to-br from-[#1a0a3a] to-[#0d0d1a] flex items-center justify-center">
+                    <svg viewBox="0 0 24 24" className="w-10 h-10 text-[#9146ff]/30" fill="currentColor">
+                      <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+                    </svg>
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-2">
+                    <div className="w-10 h-10 rounded-full bg-[#9146ff] flex items-center justify-center shadow-lg">
+                      <svg className="w-4 h-4 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
+                    <span className="text-white text-xs font-semibold tracking-wide">Démarrer</span>
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 p-2.5 transition-opacity duration-200 group-hover:opacity-0">
+                    <p className="text-white text-xs font-medium leading-tight">{label}</p>
+                    <p className="text-white/50 text-[10px] mt-0.5">{channel}</p>
+                  </div>
+                  <div className="absolute top-2 right-2">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-[#9146ff]/20 text-[#9146ff]">
+                      Live
+                    </span>
+                  </div>
+                  {selectedChannel === channel && (
+                    <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-[#9146ff] shadow" />
+                  )}
+                </div>
+              ))}
+            </div>
           </>
         )}
       </main>

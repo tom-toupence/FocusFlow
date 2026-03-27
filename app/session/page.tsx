@@ -12,8 +12,10 @@ import { Input } from "@/components/ui/input";
 import { useStatsStore } from "@/store/statsStore";
 import { useNotesStore } from "@/store/notesStore";
 import { useSpotifyStore } from "@/store/spotifyStore";
+import { useTwitchStore } from "@/store/twitchStore";
 import StickyNote from "@/components/StickyNote";
 import SpotifyPlayer from "@/components/SpotifyPlayer";
+import TwitchPlayer from "@/components/TwitchPlayer";
 import TodoStatusDropdown from "@/components/TodoStatusDropdown";
 
 // ─── YouTube IFrame API types ─────────────────────────────────────────────────
@@ -60,12 +62,14 @@ export default function SessionPage() {
   const { startSession } = useSessionSummaryStore();
   const { notes, addNote } = useNotesStore();
   const { selectedPlaylistUri, accessToken } = useSpotifyStore();
+  const { selectedChannel } = useTwitchStore();
 
   const allVideos = getAllVideos();
   const video = allVideos.find((v) => v.id === selectedVideoId) ?? allVideos[0];
   const selectedPlaylist = playlists.find((p) => p.id === selectedPlaylistId) ?? null;
   const isPlaylistMode = !!selectedPlaylistId && !!selectedPlaylist;
   const isSpotifyMode = !!selectedPlaylistUri && !!accessToken;
+  const isTwitchMode = !!selectedChannel;
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevSecondsRef = useRef(secondsLeft);
@@ -155,7 +159,7 @@ export default function SessionPage() {
   }, [video?.youtubeId, isPlaylistMode, selectedPlaylist?.playlistId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (isSpotifyMode) return; // Spotify handles its own playback
+    if (isSpotifyMode || isTwitchMode) return;
     if (window.YT?.Player) {
       initPlayer();
     } else {
@@ -175,18 +179,18 @@ export default function SessionPage() {
       playerRef.current = null;
       playerReadyRef.current = false;
     };
-  }, [initPlayer, isSpotifyMode]);
+  }, [initPlayer, isSpotifyMode, isTwitchMode]);
 
   // ── Control video playback ────────────────────────────────────────────────
   useEffect(() => {
-    if (isSpotifyMode) return;
+    if (isSpotifyMode || isTwitchMode) return;
     if (!playerReadyRef.current || !playerRef.current) return;
     if (!isBreak && isRunning) {
       playerRef.current.playVideo();
     } else {
       playerRef.current.pauseVideo();
     }
-  }, [isBreak, isRunning, isSpotifyMode]);
+  }, [isBreak, isRunning, isSpotifyMode, isTwitchMode]);
 
   // ── Timer tick ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -254,12 +258,14 @@ export default function SessionPage() {
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
-      {/* Audio/video source — YouTube or Spotify */}
+      {/* Audio/video source — YouTube, Spotify, or Twitch */}
       {isSpotifyMode ? (
         <SpotifyPlayer
           shouldPlay={!isBreak && isRunning}
           playlistUri={selectedPlaylistUri!}
         />
+      ) : isTwitchMode ? (
+        <TwitchPlayer channel={selectedChannel!} />
       ) : (
         <div
           id="yt-player"

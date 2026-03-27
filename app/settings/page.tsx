@@ -8,6 +8,7 @@ import { useSessionStore } from "@/store/sessionStore";
 import { usePlaylistStore } from "@/store/playlistStore";
 import { useNotesStore } from "@/store/notesStore";
 import { useSpotifyStore } from "@/store/spotifyStore";
+import { useTwitchStore } from "@/store/twitchStore";
 import { getVideoColor } from "@/data/videos";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -91,6 +92,7 @@ export default function SettingsPage() {
   const { selectedVideoId, selectedPlaylistId, getAllVideos } = useSessionStore();
   const { playlists } = usePlaylistStore();
   const { selectedPlaylistUri, playlists: spotifyPlaylists } = useSpotifyStore();
+  const { selectedChannel } = useTwitchStore();
 
   const [preset, setPreset] = useState<TimerPreset>(settings.preset ?? "classic");
   const [work, setWork] = useState(settings.workDuration);
@@ -111,6 +113,7 @@ export default function SettingsPage() {
   const isPlaylistMode = !!selectedPlaylistId && !!playlist;
   const spotifyPlaylist = spotifyPlaylists.find((p) => p.uri === selectedPlaylistUri) ?? null;
   const isSpotifyMode = !!selectedPlaylistUri && !!spotifyPlaylist;
+  const isTwitchMode = !!selectedChannel;
   const [imgError, setImgError] = useState(false);
 
   const handleAddTodo = () => {
@@ -268,10 +271,28 @@ export default function SettingsPage() {
         {/* Left: selected content */}
         <div className="w-full lg:w-64 flex-shrink-0">
           <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-3">
-            {isSpotifyMode ? "Playlist Spotify" : isPlaylistMode ? "Playlist choisie" : "Vidéo choisie"}
+            {isTwitchMode ? "Stream Twitch" : isSpotifyMode ? "Playlist Spotify" : isPlaylistMode ? "Playlist choisie" : "Vidéo choisie"}
           </p>
           <div className="rounded-xl overflow-hidden aspect-video relative">
-            {isSpotifyMode ? (
+            {isTwitchMode ? (
+              <>
+                <div className="w-full h-full bg-gradient-to-br from-[#1a0a3a] to-[#0d0d1a] flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" className="w-10 h-10 text-[#9146ff]/30" fill="currentColor">
+                    <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+                  </svg>
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-2.5">
+                  <p className="text-white text-xs font-medium line-clamp-1">{selectedChannel}</p>
+                  <p className="text-white/40 text-[10px]">Stream en direct</p>
+                </div>
+                <div className="absolute top-2 right-2">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-[#9146ff]/20 text-[#9146ff]">
+                    Live
+                  </span>
+                </div>
+              </>
+            ) : isSpotifyMode ? (
               <>
                 {spotifyPlaylist!.imageUrl && !imgError ? (
                   <img
