@@ -42,7 +42,16 @@ export default function TwitchPlayer({ channel, vodId, token }: Props) {
       // Clear any previous embed content
       if (containerRef.current) containerRef.current.innerHTML = "";
 
-      const options: Parameters<typeof window.Twitch.Embed>[1] = {
+      const options: {
+        channel?: string;
+        video?: string;
+        oauth_token?: string;
+        parent: string[];
+        width: string | number;
+        height: string | number;
+        autoplay?: boolean;
+        muted?: boolean;
+      } = {
         parent: [window.location.hostname],
         width: "100%",
         height: "100%",
