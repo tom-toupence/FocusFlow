@@ -5,12 +5,21 @@ import { persist } from "zustand/middleware";
 
 export type TimerMode = "work" | "short-break" | "long-break";
 
-interface TimerSettings {
+export type TimerPreset = "classic" | "deep" | "custom";
+
+export interface TimerSettings {
+  preset: TimerPreset;
   workDuration: number;
   shortBreakDuration: number;
   longBreakDuration: number;
   sessionsBeforeLongBreak: number;
 }
+
+export const PRESETS: Record<TimerPreset, Omit<TimerSettings, "preset">> = {
+  classic: { workDuration: 25, shortBreakDuration: 5,  longBreakDuration: 15, sessionsBeforeLongBreak: 4 },
+  deep:    { workDuration: 50, shortBreakDuration: 10, longBreakDuration: 30, sessionsBeforeLongBreak: 3 },
+  custom:  { workDuration: 25, shortBreakDuration: 5,  longBreakDuration: 15, sessionsBeforeLongBreak: 4 },
+};
 
 interface TimerState {
   mode: TimerMode;
@@ -19,20 +28,20 @@ interface TimerState {
   sessionsCompleted: number;
   settings: TimerSettings;
 
+  applyPreset: (preset: TimerPreset) => void;
+  updateSettings: (settings: Partial<TimerSettings>) => void;
   setMode: (mode: TimerMode) => void;
   tick: () => void;
   start: () => void;
   pause: () => void;
   reset: () => void;
-  nextSession: () => void;
-  updateSettings: (settings: Partial<TimerSettings>) => void;
+  nextSession: (autoStart?: boolean) => void;
+  resetAll: () => void;
 }
 
 const defaultSettings: TimerSettings = {
-  workDuration: 25,
-  shortBreakDuration: 5,
-  longBreakDuration: 15,
-  sessionsBeforeLongBreak: 4,
+  preset: "classic",
+  ...PRESETS.classic,
 };
 
 function getDuration(mode: TimerMode, settings: TimerSettings): number {
@@ -49,6 +58,18 @@ export const useTimerStore = create<TimerState>()(
       isRunning: false,
       sessionsCompleted: 0,
       settings: defaultSettings,
+
+      applyPreset: (preset) => {
+        const values = PRESETS[preset];
+        const merged: TimerSettings = { preset, ...values };
+        set({ settings: merged, mode: "work", secondsLeft: values.workDuration * 60, isRunning: false });
+      },
+
+      updateSettings: (newSettings) => {
+        const { settings, mode } = get();
+        const merged = { ...settings, ...newSettings, preset: "custom" as TimerPreset };
+        set({ settings: merged, secondsLeft: getDuration(mode, merged), isRunning: false });
+      },
 
       setMode: (mode) => {
         const { settings } = get();
@@ -72,7 +93,7 @@ export const useTimerStore = create<TimerState>()(
         set({ secondsLeft: getDuration(mode, settings), isRunning: false });
       },
 
-      nextSession: () => {
+      nextSession: (autoStart = false) => {
         const { mode, sessionsCompleted, settings } = get();
         let nextMode: TimerMode;
         let newSessionsCompleted = sessionsCompleted;
@@ -90,27 +111,19 @@ export const useTimerStore = create<TimerState>()(
         set({
           mode: nextMode,
           secondsLeft: getDuration(nextMode, settings),
-          isRunning: false,
+          isRunning: autoStart,
           sessionsCompleted: newSessionsCompleted,
         });
       },
 
-      updateSettings: (newSettings) => {
-        const { settings, mode } = get();
-        const merged = { ...settings, ...newSettings };
-        set({
-          settings: merged,
-          secondsLeft: getDuration(mode, merged),
-          isRunning: false,
-        });
+      resetAll: () => {
+        const { settings } = get();
+        set({ mode: "work", secondsLeft: getDuration("work", settings), isRunning: false, sessionsCompleted: 0 });
       },
     }),
     {
       name: "focusflow-timer",
-      partialize: (state) => ({
-        settings: state.settings,
-        sessionsCompleted: state.sessionsCompleted,
-      }),
+      partialize: (state) => ({ settings: state.settings }),
     }
   )
 );

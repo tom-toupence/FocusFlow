@@ -1,11 +1,10 @@
 "use client";
 
 import { useSessionStore } from "@/store/sessionStore";
-import { videos } from "@/data/videos";
 
 export default function VideoPlayer() {
-  const selectedVideoId = useSessionStore((s) => s.selectedVideoId);
-  const video = videos.find((v) => v.id === selectedVideoId);
+  const { selectedVideoId, getAllVideos } = useSessionStore();
+  const video = getAllVideos().find((v) => v.id === selectedVideoId);
 
   if (!video) {
     return (

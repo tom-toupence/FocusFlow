@@ -52,11 +52,11 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #374151;
+  background: color-mix(in oklch, var(--foreground) 30%, transparent);
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #4b5563;
+  background: color-mix(in oklch, var(--foreground) 45%, transparent);
 }
 
 @theme inline {
@@ -145,5 +145,8 @@
   }
   html {
     @apply font-sans;
+  }
+  *, *::before, *::after {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
   }
 }

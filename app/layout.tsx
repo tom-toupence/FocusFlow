@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
+import SupabaseProvider from "@/components/SupabaseProvider";
+import AuthGate from "@/components/AuthGate";
 
 const geist = Geist({
   variable: "--font-geist",
@@ -18,9 +20,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className={`${geist.variable} h-full`}>
-      <body className="min-h-full bg-gray-950 text-gray-100 antialiased">
-        {children}
+    <html lang="fr" className={`${geist.variable} h-full dark`}>
+      <head>
+        {/* Apply saved theme before first paint to avoid flash */}
+        <script dangerouslySetInnerHTML={{ __html: `try{var t=JSON.parse(localStorage.getItem('focusflow-theme')||'{}').state?.theme;if(t==='light')document.documentElement.classList.remove('dark');else document.documentElement.classList.add('dark');}catch(e){}` }} />
+      </head>
+      <body className="min-h-full antialiased">
+        <SupabaseProvider>
+          <AuthGate>{children}</AuthGate>
+        </SupabaseProvider>
       </body>
     </html>
   );
