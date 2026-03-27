@@ -278,8 +278,8 @@ export default function SessionPage() {
         />
       )}
 
-      {/* Vignette (work only) */}
-      {!isBreak && (
+      {/* Vignette (work only, not on Twitch to keep natural brightness) */}
+      {!isBreak && !isTwitchMode && (
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(0,0,0,0.45)_100%)]" />
       )}
 
@@ -393,6 +393,23 @@ export default function SessionPage() {
 
             {/* Right controls */}
             <div className="flex items-center gap-2">
+              {isTwitchMode && (
+                <a
+                  href={
+                    selectedVodId
+                      ? `https://www.twitch.tv/videos/${selectedVodId}`
+                      : `https://www.twitch.tv/${selectedChannel}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-black/50 backdrop-blur-sm border border-white/10 text-white/50 hover:text-[#9146ff] hover:border-[#9146ff]/30 text-xs font-medium transition-all"
+                >
+                  <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor">
+                    <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+                  </svg>
+                  Ouvrir sur Twitch
+                </a>
+              )}
               <button
                 onClick={isRunning ? pause : start}
                 className="px-4 py-2 rounded-xl bg-black/50 backdrop-blur-sm border border-white/10 text-white/50 hover:text-white text-xs font-medium transition-all"

@@ -14,6 +14,7 @@ declare global {
           parent: string[];
           width: string | number;
           height: string | number;
+          layout?: string;
           autoplay?: boolean;
           muted?: boolean;
         }
@@ -49,12 +50,14 @@ export default function TwitchPlayer({ channel, vodId, token }: Props) {
         parent: string[];
         width: string | number;
         height: string | number;
+        layout?: string;
         autoplay?: boolean;
         muted?: boolean;
       } = {
         parent: [window.location.hostname],
         width: "100%",
         height: "100%",
+        layout: "video",
         autoplay: true,
         muted: false,
       };
