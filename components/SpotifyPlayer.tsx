@@ -13,6 +13,7 @@ interface SpotifySDKPlayer {
   pause: () => Promise<void>;
   resume: () => Promise<void>;
   nextTrack: () => Promise<void>;
+  previousTrack: () => Promise<void>;
   setVolume: (vol: number) => Promise<void>;
 }
 
@@ -221,7 +222,11 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
     playerRef.current?.setVolume(v).catch(() => {});
   };
 
-  // ── Skip ─────────────────────────────────────────────────────────────────
+  // ── Previous / Skip ──────────────────────────────────────────────────────
+  const handlePrevious = () => {
+    playerRef.current?.previousTrack().catch(() => {});
+  };
+
   const handleSkip = () => {
     playerRef.current?.nextTrack().catch(() => {});
   };
@@ -329,6 +334,17 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
                 )}
               </button>
             </div>
+
+            {/* Previous */}
+            <button
+              onClick={handlePrevious}
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-black/50 backdrop-blur-sm border border-white/10 text-white/50 hover:text-white transition-all"
+              title="Piste précédente"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 4l-10 8 10 8V4zM5 4v16h2V4H5z"/>
+              </svg>
+            </button>
 
             {/* Skip */}
             <button

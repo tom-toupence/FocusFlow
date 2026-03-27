@@ -67,7 +67,6 @@ export const defaultVideos: Video[] = [
   // ─── Corée du Sud ────────────────────────────────────────────────────────────
   { id: "driv-04", title: "Seoul Night Drive — Gangnam 4K HDR + Lofi",   channel: "Seoul Drives",     youtubeId: "40xZVEFVBuE", mood: "lofi",      color: "#1a2a3a", country: "Corée du Sud" },
   { id: "driv-05", title: "Seoul Night Drive — Downtown Vibes + Lofi",   channel: "Seoul Drives",     youtubeId: "SRpMapyw6Aw", mood: "lofi",      color: "#1e2a3a", country: "Corée du Sud" },
-  { id: "city-01", title: "Driving in Seoul — Night Lofi",               channel: "Seoul Vibes",      youtubeId: "na7Do_cWT-8", mood: "lofi",      color: "#1a2e3b", country: "Corée du Sud" },
 
   // ─── États-Unis ──────────────────────────────────────────────────────────────
   { id: "noma-01", title: "Snowfall in New York — Times Square",         channel: "Nomadic Ambience", youtubeId: "2JWKWszOu7g", mood: "ambience",  color: "#1e2a3a", country: "États-Unis" },
@@ -75,71 +74,23 @@ export const defaultVideos: Video[] = [
   { id: "noma-06", title: "New York Penthouse Cityscape View",           channel: "Nomadic Ambience", youtubeId: "PJnXm7opYks", mood: "ambience",  color: "#2a1e2e", country: "États-Unis" },
   { id: "city-02", title: "New York City Drive — Harlem to SoHo 4K",    channel: "4K Urban Life",    youtubeId: "88ESxZZzY-A", mood: "ambience",  color: "#2a1e2a", country: "États-Unis" },
   { id: "us-04",   title: "New York Jazz Lounge — Bar Classics",         channel: "Jazz Lounge",      youtubeId: "mM1dIwGO00w", mood: "jazz",      color: "#2e1a1e", country: "États-Unis" },
-  { id: "us-05",   title: "New Orleans Jazz Street — Night Walk",        channel: "Street Jazz",      youtubeId: "7NOlm1Gkh6g", mood: "jazz",      color: "#2a1a0e", country: "États-Unis" },
-  { id: "us-06",   title: "Chicago at Night — Lake Shore Drive",         channel: "City Drives USA",  youtubeId: "5DmrBJkMCqg", mood: "ambience",  color: "#1a2e3a", country: "États-Unis" },
-  { id: "us-07",   title: "San Francisco Night Drive — Golden Gate",     channel: "City Drives USA",  youtubeId: "OUKWoA3v_VA", mood: "synthwave", color: "#2e1e1a", country: "États-Unis" },
-
-  // ─── France ──────────────────────────────────────────────────────────────────
-  { id: "fr-01",   title: "Walking in Paris at Night — 4K",              channel: "Prowalk Tours",    youtubeId: "VF4v3dVRCLw", mood: "ambience",  color: "#2e2a1a", country: "France" },
-  { id: "fr-02",   title: "Paris in the Rain — Autumn Walk 4K",          channel: "Paris Walks",      youtubeId: "U96fBf4MNCY", mood: "ambience",  color: "#1e2a2e", country: "France" },
-  { id: "fr-03",   title: "Paris Café Jazz — Rainy Afternoon",           channel: "Paris Jazz",       youtubeId: "_9VkY2PR3xw", mood: "jazz",      color: "#2a1a1e", country: "France" },
-  { id: "fr-04",   title: "Versailles Gardens — Calm Walk 4K",           channel: "France Scenic",    youtubeId: "B3M1xQjMbFM", mood: "nature",    color: "#2a3a1a", country: "France" },
-
-  // ─── Royaume-Uni ─────────────────────────────────────────────────────────────
-  { id: "uk-01",   title: "Walking in London — Rainy Night 4K",          channel: "London Walks",     youtubeId: "2X2vD4GKIFE", mood: "ambience",  color: "#1e1e2a", country: "Royaume-Uni" },
-  { id: "uk-02",   title: "London at Night — Thames Walk 4K",            channel: "London Walks",     youtubeId: "BTYAsjAVa3c", mood: "ambience",  color: "#1a2a2e", country: "Royaume-Uni" },
-  { id: "uk-03",   title: "Edinburgh Old Town — Misty Morning Walk",     channel: "Scotland Walks",   youtubeId: "Wn7T3bLnsBg", mood: "ambience",  color: "#1e2e2a", country: "Royaume-Uni" },
 
   // ─── Italie ──────────────────────────────────────────────────────────────────
   { id: "noma-09", title: "Venice Italy Cityscape 8K HDR",               channel: "Nomadic Ambience", youtubeId: "89r4hUMxMtg", mood: "ambience",  color: "#2e2a1e", country: "Italie" },
   { id: "noma-10", title: "Sea Sounds — Manarola Italy Cliffside",       channel: "Nomadic Ambience", youtubeId: "c1AywfvVmvI", mood: "nature",    color: "#1a2a2e", country: "Italie" },
-  { id: "it-03",   title: "Rome Night Walk — Eternal City 4K",           channel: "Prowalk Tours",    youtubeId: "MRHXtEFhgBU", mood: "ambience",  color: "#2e2a1a", country: "Italie" },
   { id: "it-04",   title: "Amalfi Coast Drive — Sunrise 4K",             channel: "Italy Scenic",     youtubeId: "IUN664s7N-c", mood: "nature",    color: "#2a1e1a", country: "Italie" },
-
-  // ─── Espagne ─────────────────────────────────────────────────────────────────
-  { id: "es-01",   title: "Barcelona Night Walk — Gothic Quarter 4K",    channel: "Spain Walks",      youtubeId: "q8ZXFiNiQAc", mood: "ambience",  color: "#2e1a1a", country: "Espagne" },
-  { id: "es-02",   title: "Seville — Barrio Santa Cruz Evening Walk",    channel: "Spain Walks",      youtubeId: "sGj2VLzSXoU", mood: "ambience",  color: "#3a2a1a", country: "Espagne" },
 
   // ─── Norvège ─────────────────────────────────────────────────────────────────
   { id: "noma-08", title: "Windy Walk — Lofoten, Norway 4K",             channel: "Nomadic Ambience", youtubeId: "cVB07aYcsyY", mood: "nature",    color: "#1a2e2e", country: "Norvège" },
   { id: "noma-11", title: "Snowstorm Drive — Arctic Circle Norway",      channel: "Nomadic Ambience", youtubeId: "cPz7ZOZNXMA", mood: "ambience",  color: "#2a2e3a", country: "Norvège" },
-  { id: "no-03",   title: "Northern Norway — Fjords 4K Relaxation",      channel: "Norway Scenic",    youtubeId: "nPJzMgplm80", mood: "nature",    color: "#1a3a2e", country: "Norvège" },
 
   // ─── Suisse ──────────────────────────────────────────────────────────────────
   { id: "noma-07", title: "Autumn Walk — Lauterbrunnen, Switzerland",    channel: "Nomadic Ambience", youtubeId: "u4DUtsiedcA", mood: "nature",    color: "#2a3a1e", country: "Suisse" },
   { id: "trai-01", title: "Grindelwald to Interlaken — Swiss Train",     channel: "Train Views",      youtubeId: "h0vrvXBLoCU", mood: "nature",    color: "#2a3a2e", country: "Suisse" },
   { id: "trai-03", title: "Train Through the Swiss Alps — 4K",           channel: "Train Views",      youtubeId: "ADt_RisXY0U", mood: "nature",    color: "#2e3a2a", country: "Suisse" },
 
-  // ─── Islande ─────────────────────────────────────────────────────────────────
-  { id: "is-01",   title: "Northern Lights Iceland — 4K Timelapse",      channel: "Iceland Scenic",   youtubeId: "b9rGWIoRJog", mood: "nature",    color: "#1a1e3a", country: "Islande" },
-  { id: "is-02",   title: "Iceland Waterfalls & Glaciers 8K",             channel: "Iceland Scenic",   youtubeId: "RV4zP4SJoFc", mood: "nature",    color: "#1e2e3a", country: "Islande" },
-
-  // ─── Pays-Bas ────────────────────────────────────────────────────────────────
-  { id: "nl-01",   title: "Amsterdam Canal Walk at Night 4K",             channel: "Amsterdam Walks",  youtubeId: "R-jKlgIlOGk", mood: "ambience",  color: "#1a2e2a", country: "Pays-Bas" },
-  { id: "nl-02",   title: "Amsterdam Rain Walk — Autumn 4K",              channel: "Amsterdam Walks",  youtubeId: "ztZF2eZ2GTs", mood: "ambience",  color: "#1e2a1e", country: "Pays-Bas" },
-
-  // ─── Turquie ─────────────────────────────────────────────────────────────────
-  { id: "tr-01",   title: "Istanbul at Night — Bosphorus Walk 4K",        channel: "Istanbul Walks",   youtubeId: "aJnFgHNkgsc", mood: "ambience",  color: "#2a1a1a", country: "Turquie" },
-  { id: "tr-02",   title: "Istanbul Grand Bazaar — Evening Ambience",     channel: "Istanbul Walks",   youtubeId: "KTgSMvPrfYs", mood: "ambience",  color: "#3a2a1a", country: "Turquie" },
-
-  // ─── Maroc ───────────────────────────────────────────────────────────────────
-  { id: "ma-01",   title: "Marrakech Medina — Sunset Walk 4K",            channel: "Morocco Walks",    youtubeId: "X5WqORoWIjE", mood: "ambience",  color: "#3a2a0e", country: "Maroc" },
-  { id: "ma-02",   title: "Chefchaouen Blue City Walk",                   channel: "Morocco Walks",    youtubeId: "3VfBR0LHSME", mood: "ambience",  color: "#1a2e3a", country: "Maroc" },
-
   // ─── Émirats Arabes Unis ─────────────────────────────────────────────────────
   { id: "ae-01",   title: "Dubai Night Drive — Burj Khalifa 4K",          channel: "Dubai Drives",     youtubeId: "bTqVqk7FSmY", mood: "synthwave", color: "#2e2a1a", country: "Émirats" },
-  { id: "ae-02",   title: "Dubai Marina Walk at Night 4K",                channel: "Dubai Walks",      youtubeId: "uS7IiADhgJU", mood: "ambience",  color: "#1e2a2e", country: "Émirats" },
-
-  // ─── Inde ────────────────────────────────────────────────────────────────────
-  { id: "in-01",   title: "Mumbai in the Rain — Monsoon Walk 4K",         channel: "India Walks",      youtubeId: "fBgT6l6dBvE", mood: "ambience",  color: "#2a1e1a", country: "Inde" },
-  { id: "in-02",   title: "Varanasi Ghats — Sunrise on the Ganges",       channel: "India Scenic",     youtubeId: "gDwSCKDUaGs", mood: "nature",    color: "#3a2a1a", country: "Inde" },
-
-  // ─── Brésil ──────────────────────────────────────────────────────────────────
-  { id: "br-01",   title: "Rio de Janeiro Sunset — Copacabana 4K",        channel: "Brazil Scenic",    youtubeId: "qF4-Z5V0jmM", mood: "ambience",  color: "#3a2a1e", country: "Brésil" },
-
-  // ─── Australie ───────────────────────────────────────────────────────────────
-  { id: "au-01",   title: "Sydney Harbour Night Walk 4K",                 channel: "Australia Walks",  youtubeId: "LNMV8GQsTWE", mood: "ambience",  color: "#1a2a3a", country: "Australie" },
-  { id: "au-02",   title: "Melbourne CBD Night Walk 4K",                  channel: "Australia Walks",  youtubeId: "yJG9r9TNTP4", mood: "ambience",  color: "#1e2e2e", country: "Australie" },
 
   // ─── Cozy / Ambiance (universel) ────────────────────────────────────────────
   { id: "cafe-01", title: "Cozy Coffee Shop — Smooth Piano Jazz",        channel: "Café Ambience",    youtubeId: "MYPVQccHhAQ", mood: "jazz" },
