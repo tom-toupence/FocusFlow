@@ -1,36 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FocusFlow
 
-## Getting Started
+> A free Pomodoro timer paired with lofi music — pick a YouTube video or your Spotify playlist, stay focused, track your tasks.
 
-First, run the development server:
+## Features
+
+- **Pomodoro timer** — Classic (25/5), Deep Work (50/10), or custom durations
+- **YouTube lofi catalogue** — Curated videos + add your own URLs or playlists
+- **Spotify integration** — Connect your Premium account and play your own playlists
+- **Task management** — 3-state todos (todo / in progress / done) with session tracking
+- **Draggable sticky notes** — Post-its on the session screen
+- **Stats** — Sessions and minutes worked per day
+- **Google login** — Sync your data across devices via Supabase
+
+## Stack
+
+- Next.js 16 (App Router) + TypeScript
+- Zustand (state management)
+- Tailwind CSS v4
+- Supabase (auth + database)
+- Spotify Web Playback SDK (PKCE OAuth)
+- YouTube IFrame API
+
+## Setup
 
 ```bash
+npm install
+cp .env.local.example .env.local
+# Fill in your Supabase and Spotify credentials
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Environment variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anon key |
+| `NEXT_PUBLIC_SPOTIFY_CLIENT_ID` | Your Spotify app client ID |
+| `NEXT_PUBLIC_SPOTIFY_REDIRECT_URI` | OAuth callback URL |
