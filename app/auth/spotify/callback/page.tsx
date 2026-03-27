@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { handleSpotifyCallback } from "@/lib/spotify";
 import { useSpotifyStore } from "@/store/spotifyStore";
 
-export default function SpotifyCallbackPage() {
+function SpotifyCallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const setAuth = useSpotifyStore((s) => s.setAuth);
@@ -39,5 +39,13 @@ export default function SpotifyCallbackPage() {
         <p className="text-sm text-foreground/40">Connexion Spotify…</p>
       </div>
     </div>
+  );
+}
+
+export default function SpotifyCallbackPage() {
+  return (
+    <Suspense>
+      <SpotifyCallbackInner />
+    </Suspense>
   );
 }
