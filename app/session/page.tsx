@@ -13,6 +13,7 @@ import { useStatsStore } from "@/store/statsStore";
 import { useNotesStore } from "@/store/notesStore";
 import { useSpotifyStore } from "@/store/spotifyStore";
 import { useTwitchStore } from "@/store/twitchStore";
+import { usePlayHistoryStore } from "@/store/playHistoryStore";
 import StickyNote from "@/components/StickyNote";
 import SpotifyPlayer from "@/components/SpotifyPlayer";
 import TwitchPlayer from "@/components/TwitchPlayer";
@@ -62,8 +63,9 @@ export default function SessionPage() {
   const { recordSession } = useStatsStore();
   const { startSession } = useSessionSummaryStore();
   const { notes, addNote } = useNotesStore();
-  const { selectedPlaylistUri, accessToken } = useSpotifyStore();
+  const { selectedPlaylistUri, accessToken, playlists: spotifyPlaylists } = useSpotifyStore();
   const { selectedChannel, selectedVodId, accessToken: twitchToken } = useTwitchStore();
+  const { record: recordPlay } = usePlayHistoryStore();
 
   const allVideos = getAllVideos();
   const video = allVideos.find((v) => v.id === selectedVideoId) ?? allVideos[0];
@@ -228,9 +230,12 @@ export default function SessionPage() {
         icon: "/favicon.ico",
       });
     }
-    if (mode === "work") recordSession(settings.workDuration);
+    if (mode === "work") {
+      recordSession(settings.workDuration);
+      recordPlay(buildPlayEntry(settings.workDuration));
+    }
     nextSession(true);
-  }, [mode, nextSession, recordSession, settings.workDuration]);
+  }, [mode, nextSession, recordSession, settings.workDuration]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (prevSecondsRef.current > 0 && secondsLeft === 0) handleSessionEnd();
@@ -244,7 +249,10 @@ export default function SessionPage() {
     if (mode === "work") {
       const secondsWorked = settings.workDuration * 60 - secondsLeft;
       const minutesWorked = Math.round(secondsWorked / 60);
-      if (minutesWorked >= 1) recordSession(minutesWorked);
+      if (minutesWorked >= 1) {
+        recordSession(minutesWorked);
+        recordPlay(buildPlayEntry(minutesWorked));
+      }
     }
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     router.push("/summary");
@@ -256,6 +264,23 @@ export default function SessionPage() {
     if (!t) return;
     addTodo(t);
     setTodoInput("");
+  };
+
+  const buildPlayEntry = (minutes: number) => {
+    const today = new Date();
+    const date = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, "0"), String(today.getDate()).padStart(2, "0")].join("-");
+    if (isSpotifyMode) {
+      const pl = spotifyPlaylists.find((p) => p.uri === selectedPlaylistUri);
+      return { type: "spotify" as const, title: pl?.name ?? "Playlist Spotify", subtitle: `${pl?.trackCount ?? 0} titres`, thumbnailUrl: pl?.imageUrl, mediaKey: selectedPlaylistUri ?? "spotify", date, timestamp: Date.now(), minutes };
+    }
+    if (isTwitchMode) {
+      if (selectedVodId) return { type: "twitch-vod" as const, title: `VOD ${selectedVodId}`, subtitle: "Twitch VOD", mediaKey: `vod:${selectedVodId}`, date, timestamp: Date.now(), minutes };
+      return { type: "twitch-live" as const, title: selectedChannel ?? "Twitch", subtitle: "Live Twitch", mediaKey: `live:${selectedChannel}`, date, timestamp: Date.now(), minutes };
+    }
+    if (isPlaylistMode && selectedPlaylist) {
+      return { type: "playlist" as const, title: selectedPlaylist.title, subtitle: selectedPlaylist.channelName ?? "YouTube Playlist", thumbnailUrl: selectedPlaylist.thumbnailUrl, mediaKey: `pl:${selectedPlaylist.playlistId}`, date, timestamp: Date.now(), minutes };
+    }
+    return { type: "youtube" as const, title: video.title, subtitle: video.channel, thumbnailUrl: `https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`, mediaKey: video.youtubeId, date, timestamp: Date.now(), minutes };
   };
 
   const handleVolumeChange = (v: number) => {
@@ -521,13 +546,18 @@ export default function SessionPage() {
               {/* Tâches */}
               <button
                 onClick={() => setShowTodos((v) => !v)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/80 hover:text-white text-xs font-medium transition-all"
+                className="relative flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/15 backdrop-blur-sm border border-white/30 text-white text-xs font-semibold transition-all hover:bg-white/25"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" strokeLinecap="round" />
                   <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                {pendingTodos.length > 0 ? `${pendingTodos.length} tâche${pendingTodos.length > 1 ? "s" : ""}` : "Tâches"}
+                Tâches
+                {pendingTodos.length > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-white text-black text-[9px] font-bold flex items-center justify-center leading-none">
+                    {pendingTodos.length}
+                  </span>
+                )}
               </button>
             </div>
           </div>

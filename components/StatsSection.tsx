@@ -1,6 +1,7 @@
 "use client";
 
 import { useStatsStore, getTodayStats, getWeekStats, getStreak, getLast119Days, getLast7Days, getTotalStats, getBestDay, localToday } from "@/store/statsStore";
+import { usePlayHistoryStore, getTopPlays, PlayType } from "@/store/playHistoryStore";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 
@@ -39,11 +40,11 @@ const monthNames = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "S
 
 export default function StatsSection({ embedded }: { embedded?: boolean }) {
   const { days } = useStatsStore();
+  const { entries: historyEntries } = usePlayHistoryStore();
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   if (!mounted) return null;
-
   const today = getTodayStats(days);
   const week = getWeekStats(days);
   const streak = getStreak(days);
@@ -51,6 +52,8 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
   const bestDay = getBestDay(days);
   const last7 = getLast7Days(days);
   const calDays = getLast119Days(days);
+  const topPlays = getTopPlays(historyEntries);
+  const recentPlays = historyEntries.slice(0, 10);
 
   const maxMinutes7 = Math.max(...last7.map((d) => d.minutes), 1);
 
@@ -191,6 +194,63 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
         </div>
       </div>
 
+      {/* ── Top lectures ─────────────────────────────────────────────────────── */}
+      {topPlays.length > 0 && (
+        <div className="mb-8">
+          <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-4">Top lectures</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {topPlays.map((play) => (
+              <div key={play.mediaKey} className="flex items-center gap-3 bg-foreground/[0.03] border border-foreground/[0.06] rounded-xl p-3 min-w-0">
+                <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-foreground/[0.06]">
+                  {play.thumbnailUrl ? (
+                    <img src={play.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <PlayTypeIcon type={play.type} />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-foreground truncate leading-tight">{play.title}</p>
+                  <p className="text-[11px] text-foreground/40 truncate">{play.subtitle}</p>
+                  <p className="text-[10px] text-foreground/25 mt-0.5">{formatMinutes(play.totalMinutes)} · {play.playCount}×</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Écoutes récentes ─────────────────────────────────────────────────── */}
+      {recentPlays.length > 0 && (
+        <div className="mb-8">
+          <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-4">Écoutes récentes</p>
+          <div className="flex flex-col gap-1.5">
+            {recentPlays.map((entry) => (
+              <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-foreground/[0.02] hover:bg-foreground/[0.04] transition-colors group">
+                <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-foreground/[0.06]">
+                  {entry.thumbnailUrl ? (
+                    <img src={entry.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <PlayTypeIcon type={entry.type} small />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-foreground truncate">{entry.title}</p>
+                  <p className="text-[11px] text-foreground/35 truncate">{entry.subtitle}</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-xs text-foreground/40">{formatMinutes(entry.minutes)}</p>
+                  <p className="text-[10px] text-foreground/20">{formatDate(entry.date)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Heatmap calendar ─────────────────────────────────────────────────── */}
       <div>
         <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-4">Calendrier</p>
@@ -252,6 +312,25 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
         </div>
       </div>
     </section>
+  );
+}
+
+function PlayTypeIcon({ type, small }: { type: PlayType; small?: boolean }) {
+  const sz = small ? "w-3.5 h-3.5" : "w-4 h-4";
+  if (type === "spotify") return (
+    <svg className={cn(sz, "text-[#1db954]")} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+    </svg>
+  );
+  if (type === "twitch-live" || type === "twitch-vod") return (
+    <svg className={cn(sz, "text-[#9146ff]")} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+    </svg>
+  );
+  return (
+    <svg className={cn(sz, "text-red-500")} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/>
+    </svg>
   );
 }
 
