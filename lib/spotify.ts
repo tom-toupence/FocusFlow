@@ -181,3 +181,14 @@ export async function startPlayback(
     body: JSON.stringify({ context_uri: contextUri }),
   });
 }
+
+export async function setRepeat(
+  accessToken: string,
+  deviceId: string,
+  state: "track" | "context" | "off"
+): Promise<void> {
+  await fetch(`https://api.spotify.com/v1/me/player/repeat?state=${state}&device_id=${deviceId}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}

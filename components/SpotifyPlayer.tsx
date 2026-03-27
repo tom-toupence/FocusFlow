@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSpotifyStore } from "@/store/spotifyStore";
-import { startPlayback, refreshAccessToken } from "@/lib/spotify";
+import { startPlayback, setRepeat, refreshAccessToken } from "@/lib/spotify";
 
 // ─── Spotify SDK types ────────────────────────────────────────────────────────
 
@@ -12,6 +12,8 @@ interface SpotifySDKPlayer {
   addListener: (event: string, cb: (data: unknown) => void) => void;
   pause: () => Promise<void>;
   resume: () => Promise<void>;
+  nextTrack: () => Promise<void>;
+  setVolume: (vol: number) => Promise<void>;
 }
 
 declare global {
@@ -45,6 +47,8 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
 
   const [status, setStatus] = useState<Status>("loading");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [volume, setVolumeState] = useState(0.8);
+  const [showVolume, setShowVolume] = useState(false);
 
   const playerRef = useRef<SpotifySDKPlayer | null>(null);
   const deviceIdRef = useRef<string | null>(deviceId);
@@ -76,55 +80,42 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
 
   const initPlayer = () => {
     if (playerRef.current || !window.Spotify) return;
-    console.log("[Spotify] initPlayer called");
     setStatus("connecting");
 
     const player = new window.Spotify.Player({
       name: "FocusFlow",
       getOAuthToken: (cb) => {
-        console.log("[Spotify] getOAuthToken called");
-        getValidToken().then((token) => {
-          if (token) {
-            console.log("[Spotify] token provided to SDK");
-            cb(token);
-          } else {
-            console.error("[Spotify] no valid token available");
-          }
-        });
+        getValidToken().then((token) => { if (token) cb(token); });
       },
-      volume: 0.8,
+      volume,
     });
 
     player.addListener("ready", async (data: unknown) => {
       const { device_id } = data as { device_id: string };
-      console.log("[Spotify] ready, device_id:", device_id);
       deviceIdRef.current = device_id;
       setDeviceId(device_id);
       setStatus("ready");
 
+      const token = await getValidToken();
+      if (!token) return;
+
       if (shouldPlayRef.current && playlistUri) {
-        const token = await getValidToken();
-        if (token) {
-          console.log("[Spotify] starting playback:", playlistUri);
-          const res = await fetch(
-            `https://api.spotify.com/v1/me/player/play?device_id=${device_id}`,
-            {
-              method: "PUT",
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ context_uri: playlistUri }),
-            }
-          );
-          console.log("[Spotify] startPlayback response:", res.status, res.statusText);
-          if (!res.ok) {
-            const body = await res.text();
-            console.error("[Spotify] startPlayback error body:", body);
-            setErrorMsg(`Playback error ${res.status}: ${body}`);
-          } else {
-            playlistStartedRef.current = playlistUri;
+        const res = await fetch(
+          `https://api.spotify.com/v1/me/player/play?device_id=${device_id}`,
+          {
+            method: "PUT",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ context_uri: playlistUri }),
           }
+        );
+        if (res.ok) {
+          playlistStartedRef.current = playlistUri;
+          // Activer la répétition de la playlist
+          await setRepeat(token, device_id, "context");
+        } else {
+          const body = await res.text();
+          console.error("[Spotify] startPlayback error:", res.status, body);
+          setErrorMsg(`Erreur ${res.status}`);
         }
       }
     });
@@ -151,8 +142,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
       }
     });
 
-    player.addListener("not_ready", (data: unknown) => {
-      console.warn("[Spotify] not_ready:", data);
+    player.addListener("not_ready", () => {
       deviceIdRef.current = null;
       setDeviceId(null);
       setStatus("connecting");
@@ -160,56 +150,42 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
 
     player.addListener("initialization_error", (data: unknown) => {
       const msg = (data as { message: string }).message;
-      console.error("[Spotify] initialization_error:", msg);
       setStatus("error");
-      setErrorMsg(`Init error: ${msg}`);
+      setErrorMsg(`Init: ${msg}`);
     });
 
     player.addListener("authentication_error", (data: unknown) => {
       const msg = (data as { message: string }).message;
-      console.error("[Spotify] authentication_error:", msg);
+      console.error("[Spotify] auth error:", msg);
       setStatus("error");
-      setErrorMsg(`Auth error: ${msg}`);
+      setErrorMsg(`Auth: ${msg}`);
       clearAuth();
     });
 
     player.addListener("account_error", (data: unknown) => {
       const msg = (data as { message: string }).message;
-      console.error("[Spotify] account_error (Premium required?):", msg);
+      console.error("[Spotify] account error (Premium?):", msg);
       setStatus("error");
-      setErrorMsg(`Account error: ${msg}`);
+      setErrorMsg("Compte Spotify Premium requis");
     });
 
-    player.addListener("playback_error", (data: unknown) => {
-      const msg = (data as { message: string }).message;
-      console.error("[Spotify] playback_error:", msg);
-    });
-
-    player.connect().then((success) => {
-      console.log("[Spotify] player.connect() result:", success);
-    });
-
+    player.connect();
     playerRef.current = player;
   };
 
   // ── SDK init ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!accessToken) return;
-    console.log("[Spotify] mounting, accessToken present");
 
     if (window.Spotify?.Player) {
       initPlayer();
     } else {
       if (!document.querySelector('script[src="https://sdk.scdn.co/spotify-player.js"]')) {
-        console.log("[Spotify] loading SDK script");
         const script = document.createElement("script");
         script.src = "https://sdk.scdn.co/spotify-player.js";
         document.head.appendChild(script);
       }
-      window.onSpotifyWebPlaybackSDKReady = () => {
-        console.log("[Spotify] SDK ready callback");
-        initPlayer();
-      };
+      window.onSpotifyWebPlaybackSDKReady = initPlayer;
     }
 
     return () => {
@@ -225,22 +201,30 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
     if (!deviceIdRef.current || !playlistUri) return;
     if (playlistStartedRef.current === playlistUri) return;
     getValidToken().then(async (token) => {
-      if (token && deviceIdRef.current) {
-        await startPlayback(token, deviceIdRef.current, playlistUri);
-        playlistStartedRef.current = playlistUri;
-      }
+      if (!token || !deviceIdRef.current) return;
+      await startPlayback(token, deviceIdRef.current, playlistUri);
+      await setRepeat(token, deviceIdRef.current, "context");
+      playlistStartedRef.current = playlistUri;
     });
   }, [playlistUri, deviceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Play / pause ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!playerRef.current) return;
-    if (shouldPlay) {
-      playerRef.current.resume().catch(() => {});
-    } else {
-      playerRef.current.pause().catch(() => {});
-    }
+    if (shouldPlay) playerRef.current.resume().catch(() => {});
+    else playerRef.current.pause().catch(() => {});
   }, [shouldPlay]);
+
+  // ── Volume ───────────────────────────────────────────────────────────────
+  const handleVolumeChange = (v: number) => {
+    setVolumeState(v);
+    playerRef.current?.setVolume(v).catch(() => {});
+  };
+
+  // ── Skip ─────────────────────────────────────────────────────────────────
+  const handleSkip = () => {
+    playerRef.current?.nextTrack().catch(() => {});
+  };
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
@@ -268,7 +252,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
         </div>
       )}
 
-      {/* Status indicator while connecting */}
+      {/* Status while connecting */}
       {status !== "ready" && !currentTrack && (
         <div className="absolute inset-0 flex items-center justify-center z-10">
           <div className="flex flex-col items-center gap-3">
@@ -289,9 +273,10 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
         </div>
       )}
 
-      {/* Track info */}
+      {/* Track info + controls — bottom left */}
       {currentTrack && (
-        <div className="absolute bottom-20 left-6 flex items-center gap-3 z-10">
+        <div className="absolute bottom-20 left-6 flex items-end gap-4 z-10">
+          {/* Album art small */}
           {currentTrack.albumArt && (
             <img
               src={currentTrack.albumArt}
@@ -299,13 +284,68 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
               className="w-11 h-11 rounded-xl shadow-lg flex-shrink-0 object-cover"
             />
           )}
-          <div>
-            <p className="text-white text-sm font-semibold leading-tight drop-shadow">{currentTrack.name}</p>
-            <p className="text-white/50 text-xs drop-shadow">{currentTrack.artist}</p>
+
+          {/* Track name + artist */}
+          <div className="flex-1 min-w-0">
+            <p className="text-white text-sm font-semibold leading-tight drop-shadow truncate max-w-[180px]">
+              {currentTrack.name}
+            </p>
+            <p className="text-white/50 text-xs drop-shadow truncate max-w-[180px]">
+              {currentTrack.artist}
+            </p>
           </div>
-          <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#1db954] ml-1 flex-shrink-0" fill="currentColor">
-            <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
-          </svg>
+
+          {/* Controls */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Volume */}
+            <div className="relative flex items-center gap-1.5">
+              {showVolume && (
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={volume}
+                  onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                  className="w-20 h-1 accent-[#1db954] cursor-pointer"
+                />
+              )}
+              <button
+                onClick={() => setShowVolume((v) => !v)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-black/50 backdrop-blur-sm border border-white/10 text-white/50 hover:text-white transition-all"
+                title="Volume"
+              >
+                {volume === 0 ? (
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
+                    <line x1="23" y1="9" x2="17" y2="15" strokeLinecap="round" />
+                    <line x1="17" y1="9" x2="23" y2="15" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" strokeLinecap="round" />
+                  </svg>
+                )}
+              </button>
+            </div>
+
+            {/* Skip */}
+            <button
+              onClick={handleSkip}
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-black/50 backdrop-blur-sm border border-white/10 text-white/50 hover:text-white transition-all"
+              title="Piste suivante"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M5 4l10 8-10 8V4zM19 4v16h-2V4h2z"/>
+              </svg>
+            </button>
+
+            {/* Spotify logo */}
+            <svg viewBox="0 0 24 24" className="w-4 h-4 text-[#1db954] ml-0.5 flex-shrink-0" fill="currentColor">
+              <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+            </svg>
+          </div>
         </div>
       )}
     </div>
