@@ -35,7 +35,7 @@ function TwitchCallbackInner() {
       setAuth(result.accessToken, result.refreshToken, result.expiresAt);
 
       const user = await getCurrentUser(result.accessToken);
-      if (user) setUser(user.id, user.login);
+      if (user) setUser(user.id, user.login, user.displayName, user.avatarUrl);
 
       router.replace("/");
     });

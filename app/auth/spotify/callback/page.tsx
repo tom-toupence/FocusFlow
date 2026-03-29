@@ -4,13 +4,14 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { handleSpotifyCallback } from "@/lib/spotify";
+import { handleSpotifyCallback, getSpotifyProfile } from "@/lib/spotify";
 import { useSpotifyStore } from "@/store/spotifyStore";
 
 function SpotifyCallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const setAuth = useSpotifyStore((s) => s.setAuth);
+  const setProfile = useSpotifyStore((s) => s.setProfile);
   const handled = useRef(false);
 
   useEffect(() => {
@@ -26,9 +27,11 @@ function SpotifyCallbackInner() {
       return;
     }
 
-    handleSpotifyCallback(code, state).then((result) => {
+    handleSpotifyCallback(code, state).then(async (result) => {
       if (result) {
         setAuth(result.accessToken, result.refreshToken, result.expiresAt);
+        const profile = await getSpotifyProfile(result.accessToken);
+        if (profile) setProfile(profile);
       }
       router.replace("/");
     });

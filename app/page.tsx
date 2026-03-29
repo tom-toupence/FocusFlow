@@ -8,10 +8,11 @@ import { usePlaylistStore, SavedPlaylist, extractPlaylistId, extractFirstVideoId
 import { useSpotifyStore, SpotifyPlaylist } from "@/store/spotifyStore";
 import { useTwitchStore, extractTwitchVodId, TwitchChannel } from "@/store/twitchStore";
 import { loginWithTwitch, getFollowedChannels, getLiveFollowedStreams, searchChannels, refreshTwitchToken } from "@/lib/twitch";
-import { loginWithSpotify, fetchMyPlaylists, refreshAccessToken, checkIsPremium } from "@/lib/spotify";
+import { loginWithSpotify, fetchMyPlaylists, refreshAccessToken, getSpotifyProfile } from "@/lib/spotify";
 import { cn } from "@/lib/utils";
 import StatsSection from "@/components/StatsSection";
 import ThemeToggle from "@/components/ThemeToggle";
+import AccountsPanel from "@/components/AccountsPanel";
 
 const allMoods: VideoMood[] = ["lofi", "jazz", "ambience", "nature", "synthwave", "classical"];
 
@@ -40,6 +41,7 @@ function VideoCard({
     >
       {/* Thumbnail */}
       {!imgError ? (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={`https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`}
           alt={video.title}
@@ -152,6 +154,7 @@ function AddVideoModal({ onClose, onAdd }: { onClose: () => void; onAdd: (video:
         {/* Preview */}
         {preview && (
           <div className="rounded-xl overflow-hidden aspect-video bg-foreground/5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`https://img.youtube.com/vi/${preview}/mqdefault.jpg`}
               alt="Aperçu"
@@ -285,6 +288,7 @@ function AddPlaylistModal({ onClose, onAdd }: { onClose: () => void; onAdd: (p: 
         {/* Preview */}
         {previewSrc && (
           <div className="rounded-xl overflow-hidden aspect-video bg-foreground/5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={previewSrc}
               alt="Aperçu"
@@ -370,6 +374,7 @@ function PlaylistCard({
     >
       {/* Thumbnail */}
       {playlist.thumbnailUrl && !imgError ? (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={playlist.thumbnailUrl}
           alt={playlist.title}
@@ -433,6 +438,7 @@ function PlaylistCard({
 function CompletedTodosBacklog() {
   const { todos, deleteTodo } = useSessionStore();
   const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMounted(true); }, []);
 
   if (!mounted) return null;
@@ -512,6 +518,7 @@ function SpotifyPlaylistCard({
       onClick={onStart}
     >
       {playlist.imageUrl && !imgError ? (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={playlist.imageUrl}
           alt={playlist.name}
@@ -570,6 +577,7 @@ function TwitchChannelCard({
       onClick={onStart}
     >
       {channel.thumbnailUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={channel.thumbnailUrl}
           alt={channel.displayName}
@@ -624,7 +632,7 @@ export default function LandingPage() {
   const {
     accessToken, refreshToken, expiresAt,
     playlists: spotifyPlaylists, selectedPlaylistUri, isPremium,
-    setAuth, updateToken, clearAuth, setPlaylists, selectPlaylist, setPremium,
+    updateToken, clearAuth, setPlaylists, selectPlaylist, setProfile: setSpotifyProfile,
   } = useSpotifyStore();
 
   const {
@@ -646,6 +654,7 @@ export default function LandingPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddPlaylistModal, setShowAddPlaylistModal] = useState(false);
   const [spotifyLoading, setSpotifyLoading] = useState(false);
+  const [showAccountsPanel, setShowAccountsPanel] = useState(false);
 
   const catalogueVideos = activeFilter ? defaultVideos.filter((v) => v.mood === activeFilter) : defaultVideos;
   const hasLibraryContent = customVideos.length > 0 || playlists.length > 0;
@@ -667,11 +676,11 @@ export default function LandingPage() {
         token = result.accessToken;
       }
 
-      const [premium, list] = await Promise.all([
-        checkIsPremium(token),
+      const [profile, list] = await Promise.all([
+        getSpotifyProfile(token),
         fetchMyPlaylists(token),
       ]);
-      setPremium(premium);
+      if (profile) setSpotifyProfile(profile);
       setPlaylists(list);
       setSpotifyLoading(false);
     };
@@ -723,6 +732,7 @@ export default function LandingPage() {
   // Debounced search
   useEffect(() => {
     if (!twitchInput.trim() || !twitchToken) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearchResults([]);
       return;
     }
@@ -790,7 +800,27 @@ export default function LandingPage() {
       {/* Header */}
       <header className="sticky top-0 z-20 bg-background/90 backdrop-blur-md border-b border-foreground/[0.06] px-6 h-14 flex items-center justify-between">
         <span className="text-sm font-semibold text-foreground/90 tracking-tight">FocusFlow</span>
-        <ThemeToggle />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAccountsPanel(true)}
+            className={cn(
+              "relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+              (isSpotifyConnected || isTwitchConnected)
+                ? "bg-foreground/8 text-foreground/60 hover:text-foreground/90 hover:bg-foreground/12"
+                : "bg-foreground/5 text-foreground/35 hover:text-foreground/60 hover:bg-foreground/8"
+            )}
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            Comptes
+            {(isSpotifyConnected || isTwitchConnected) && (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-400 border-2 border-background" />
+            )}
+          </button>
+          <ThemeToggle />
+        </div>
       </header>
 
       <main className="flex-1 px-6 py-8 max-w-7xl mx-auto w-full">
@@ -1019,36 +1049,18 @@ export default function LandingPage() {
         {/* ── Spotify ─────────────────────────────────────────────────────────── */}
         {activeTab === "spotify" && (
           <>
-            <div className="flex items-end justify-between mb-8">
-              <div>
-                <h1 className="text-3xl font-semibold text-foreground tracking-tight flex items-center gap-3">
-                  Spotify
-                  <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#1db954]" fill="currentColor">
-                    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
-                  </svg>
-                </h1>
-                <p className="text-foreground/40 mt-1 text-sm">
-                  {isSpotifyConnected
-                    ? "Tes playlists Spotify Premium — clique pour démarrer."
-                    : "Connecte ton compte Spotify Premium pour écouter tes playlists."}
-                </p>
-              </div>
-              {isSpotifyConnected && (
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => { clearAuth(); loginWithSpotify(); }}
-                    className="text-xs text-foreground/40 hover:text-foreground/70 transition-colors"
-                  >
-                    Changer de compte
-                  </button>
-                  <button
-                    onClick={() => clearAuth()}
-                    className="text-xs text-foreground/25 hover:text-foreground/50 transition-colors"
-                  >
-                    Déconnecter
-                  </button>
-                </div>
-              )}
+            <div className="mb-8">
+              <h1 className="text-3xl font-semibold text-foreground tracking-tight flex items-center gap-3">
+                Spotify
+                <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#1db954]" fill="currentColor">
+                  <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+                </svg>
+              </h1>
+              <p className="text-foreground/40 mt-1 text-sm">
+                {isSpotifyConnected
+                  ? "Tes playlists — clique sur une playlist pour démarrer."
+                  : "Connecte ton compte Spotify Premium pour écouter tes playlists."}
+              </p>
             </div>
 
             {!isSpotifyConnected ? (
@@ -1148,14 +1160,6 @@ export default function LandingPage() {
                     : "Connecte ton compte Twitch pour voir tes abonnements, ou entre directement un nom de chaîne."}
                 </p>
               </div>
-              {isTwitchConnected && (
-                <button
-                  onClick={() => clearTwitchAuth()}
-                  className="text-xs text-foreground/25 hover:text-foreground/50 transition-colors"
-                >
-                  Déconnecter
-                </button>
-              )}
             </div>
 
             {/* Search input (always visible) */}
@@ -1197,6 +1201,7 @@ export default function LandingPage() {
                       className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-foreground/5 transition-colors text-left"
                     >
                       {ch.thumbnailUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img src={ch.thumbnailUrl} alt="" className="w-10 h-6 rounded object-cover flex-shrink-0" />
                       ) : (
                         <div className="w-10 h-6 rounded bg-[#1a0a3a] flex items-center justify-center flex-shrink-0">
@@ -1237,7 +1242,7 @@ export default function LandingPage() {
                   </p>
                 </div>
                 <button
-                  onClick={loginWithTwitch}
+                  onClick={() => loginWithTwitch()}
                   className="flex items-center gap-2.5 px-6 py-3 rounded-xl bg-[#9146ff] hover:bg-[#7c3ae0] text-white font-semibold text-sm transition-all shadow-lg shadow-[#9146ff]/20"
                 >
                   <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
@@ -1299,7 +1304,7 @@ export default function LandingPage() {
             <div className="mt-10">
               <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-1">Rediffusion (VOD)</p>
               <p className="text-xs text-foreground/30 mb-4">
-                Colle le lien d'une rediffusion Twitch. Les VODs abonné uniquement nécessitent un abonnement actif au streamer.
+                {"Colle le lien d'une rediffusion Twitch. Les VODs abonné uniquement nécessitent un abonnement actif au streamer."}
               </p>
               <div className="flex gap-2 max-w-lg">
                 <input
@@ -1352,6 +1357,8 @@ export default function LandingPage() {
           onAdd={(p) => { addPlaylist(p); setShowAddPlaylistModal(false); }}
         />
       )}
+
+      <AccountsPanel open={showAccountsPanel} onClose={() => setShowAccountsPanel(false)} />
     </div>
   );
 }

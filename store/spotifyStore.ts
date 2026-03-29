@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { SpotifyPlaylist, SpotifyTrack } from "@/lib/spotify";
+import type { SpotifyPlaylist, SpotifyTrack, SpotifyProfile } from "@/lib/spotify";
 
 export type { SpotifyPlaylist, SpotifyTrack };
 
@@ -13,11 +13,13 @@ interface SpotifyState {
   expiresAt: number | null;
   playlists: SpotifyPlaylist[];
   selectedPlaylistUri: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+  isPremium: boolean | null;
 
   // Runtime (not persisted)
   currentTrack: SpotifyTrack | null;
   deviceId: string | null;
-  isPremium: boolean | null;
 
   // Actions
   setAuth: (accessToken: string, refreshToken: string, expiresAt: number) => void;
@@ -27,7 +29,7 @@ interface SpotifyState {
   selectPlaylist: (uri: string | null) => void;
   setCurrentTrack: (track: SpotifyTrack | null) => void;
   setDeviceId: (id: string | null) => void;
-  setPremium: (v: boolean | null) => void;
+  setProfile: (profile: SpotifyProfile) => void;
 }
 
 export const useSpotifyStore = create<SpotifyState>()(
@@ -38,9 +40,11 @@ export const useSpotifyStore = create<SpotifyState>()(
       expiresAt: null,
       playlists: [],
       selectedPlaylistUri: null,
+      displayName: null,
+      avatarUrl: null,
+      isPremium: null,
       currentTrack: null,
       deviceId: null,
-      isPremium: null,
 
       setAuth: (accessToken, refreshToken, expiresAt) =>
         set({ accessToken, refreshToken, expiresAt }),
@@ -55,16 +59,19 @@ export const useSpotifyStore = create<SpotifyState>()(
           expiresAt: null,
           playlists: [],
           selectedPlaylistUri: null,
+          displayName: null,
+          avatarUrl: null,
+          isPremium: null,
           currentTrack: null,
           deviceId: null,
-          isPremium: null,
         }),
 
       setPlaylists: (playlists) => set({ playlists }),
       selectPlaylist: (uri) => set({ selectedPlaylistUri: uri }),
       setCurrentTrack: (track) => set({ currentTrack: track }),
       setDeviceId: (id) => set({ deviceId: id }),
-      setPremium: (v) => set({ isPremium: v }),
+      setProfile: ({ displayName, avatarUrl, isPremium }) =>
+        set({ displayName, avatarUrl, isPremium }),
     }),
     {
       name: "focusflow-spotify",
@@ -74,6 +81,9 @@ export const useSpotifyStore = create<SpotifyState>()(
         expiresAt: s.expiresAt,
         playlists: s.playlists,
         selectedPlaylistUri: s.selectedPlaylistUri,
+        displayName: s.displayName,
+        avatarUrl: s.avatarUrl,
+        isPremium: s.isPremium,
       }),
     }
   )

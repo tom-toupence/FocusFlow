@@ -13,6 +13,8 @@ interface TwitchState {
   expiresAt: number | null;
   userId: string | null;
   userLogin: string | null;
+  userDisplayName: string | null;
+  avatarUrl: string | null;
   followedChannels: TwitchChannel[];
 
   // Selected content (persisted)
@@ -23,7 +25,7 @@ interface TwitchState {
   setAuth: (accessToken: string, refreshToken: string, expiresAt: number) => void;
   updateToken: (accessToken: string, expiresAt: number) => void;
   clearAuth: () => void;
-  setUser: (userId: string, userLogin: string) => void;
+  setUser: (userId: string, userLogin: string, userDisplayName: string, avatarUrl: string | null) => void;
   setFollowedChannels: (channels: TwitchChannel[]) => void;
   selectChannel: (channel: string | null) => void;
   selectVod: (vodId: string | null) => void;
@@ -38,6 +40,8 @@ export const useTwitchStore = create<TwitchState>()(
       expiresAt: null,
       userId: null,
       userLogin: null,
+      userDisplayName: null,
+      avatarUrl: null,
       followedChannels: [],
       selectedChannel: null,
       selectedVodId: null,
@@ -55,10 +59,13 @@ export const useTwitchStore = create<TwitchState>()(
           expiresAt: null,
           userId: null,
           userLogin: null,
+          userDisplayName: null,
+          avatarUrl: null,
           followedChannels: [],
         }),
 
-      setUser: (userId, userLogin) => set({ userId, userLogin }),
+      setUser: (userId, userLogin, userDisplayName, avatarUrl) =>
+        set({ userId, userLogin, userDisplayName, avatarUrl }),
       setFollowedChannels: (channels) => set({ followedChannels: channels }),
       selectChannel: (channel) => set({ selectedChannel: channel, selectedVodId: null }),
       selectVod: (vodId) => set({ selectedVodId: vodId, selectedChannel: null }),
@@ -72,6 +79,8 @@ export const useTwitchStore = create<TwitchState>()(
         expiresAt: s.expiresAt,
         userId: s.userId,
         userLogin: s.userLogin,
+        userDisplayName: s.userDisplayName,
+        avatarUrl: s.avatarUrl,
         followedChannels: s.followedChannels,
         selectedChannel: s.selectedChannel,
         selectedVodId: s.selectedVodId,

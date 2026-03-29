@@ -185,13 +185,23 @@ export async function startPlayback(
   });
 }
 
-export async function checkIsPremium(accessToken: string): Promise<boolean> {
+export interface SpotifyProfile {
+  displayName: string;
+  avatarUrl: string | null;
+  isPremium: boolean;
+}
+
+export async function getSpotifyProfile(accessToken: string): Promise<SpotifyProfile | null> {
   const res = await fetch("https://api.spotify.com/v1/me", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) return false;
+  if (!res.ok) return null;
   const data = await res.json();
-  return data.product === "premium";
+  return {
+    displayName: data.display_name || data.id || "Utilisateur Spotify",
+    avatarUrl: data.images?.[0]?.url ?? null,
+    isPremium: data.product === "premium",
+  };
 }
 
 export async function setRepeat(

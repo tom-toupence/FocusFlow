@@ -34,7 +34,7 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-export async function loginWithTwitch(): Promise<void> {
+export async function loginWithTwitch(forceVerify = false): Promise<void> {
   const verifier = generateCodeVerifier();
   const challenge = await generateCodeChallenge(verifier);
   const state = crypto.randomUUID();
@@ -51,6 +51,7 @@ export async function loginWithTwitch(): Promise<void> {
     code_challenge_method: "S256",
     code_challenge: challenge,
   });
+  if (forceVerify) params.set("force_verify", "true");
 
   window.location.href = `https://id.twitch.tv/oauth2/authorize?${params}`;
 }
@@ -136,11 +137,16 @@ async function twitchFetch(token: string, url: string) {
 
 export async function getCurrentUser(
   token: string
-): Promise<{ id: string; login: string; displayName: string } | null> {
+): Promise<{ id: string; login: string; displayName: string; avatarUrl: string | null } | null> {
   const data = await twitchFetch(token, "https://api.twitch.tv/helix/users");
   if (!data?.data?.[0]) return null;
   const u = data.data[0];
-  return { id: u.id, login: u.login, displayName: u.display_name };
+  return {
+    id: u.id,
+    login: u.login,
+    displayName: u.display_name,
+    avatarUrl: u.profile_image_url ?? null,
+  };
 }
 
 export async function getFollowedChannels(
