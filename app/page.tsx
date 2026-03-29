@@ -8,7 +8,7 @@ import { usePlaylistStore, SavedPlaylist, extractPlaylistId, extractFirstVideoId
 import { useSpotifyStore, SpotifyPlaylist } from "@/store/spotifyStore";
 import { useTwitchStore, extractTwitchVodId, TwitchChannel } from "@/store/twitchStore";
 import { loginWithTwitch, getFollowedChannels, getLiveFollowedStreams, searchChannels, refreshTwitchToken } from "@/lib/twitch";
-import { loginWithSpotify, fetchMyPlaylists, refreshAccessToken } from "@/lib/spotify";
+import { loginWithSpotify, fetchMyPlaylists, refreshAccessToken, checkIsPremium } from "@/lib/spotify";
 import { cn } from "@/lib/utils";
 import StatsSection from "@/components/StatsSection";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -623,8 +623,8 @@ export default function LandingPage() {
   const { playlists, addPlaylist, removePlaylist } = usePlaylistStore();
   const {
     accessToken, refreshToken, expiresAt,
-    playlists: spotifyPlaylists, selectedPlaylistUri,
-    setAuth, updateToken, clearAuth, setPlaylists, selectPlaylist,
+    playlists: spotifyPlaylists, selectedPlaylistUri, isPremium,
+    setAuth, updateToken, clearAuth, setPlaylists, selectPlaylist, setPremium,
   } = useSpotifyStore();
 
   const {
@@ -667,7 +667,11 @@ export default function LandingPage() {
         token = result.accessToken;
       }
 
-      const list = await fetchMyPlaylists(token);
+      const [premium, list] = await Promise.all([
+        checkIsPremium(token),
+        fetchMyPlaylists(token),
+      ]);
+      setPremium(premium);
       setPlaylists(list);
       setSpotifyLoading(false);
     };
@@ -1030,12 +1034,20 @@ export default function LandingPage() {
                 </p>
               </div>
               {isSpotifyConnected && (
-                <button
-                  onClick={() => clearAuth()}
-                  className="text-xs text-foreground/25 hover:text-foreground/50 transition-colors"
-                >
-                  Déconnecter
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => { clearAuth(); loginWithSpotify(); }}
+                    className="text-xs text-foreground/40 hover:text-foreground/70 transition-colors"
+                  >
+                    Changer de compte
+                  </button>
+                  <button
+                    onClick={() => clearAuth()}
+                    className="text-xs text-foreground/25 hover:text-foreground/50 transition-colors"
+                  >
+                    Déconnecter
+                  </button>
+                </div>
               )}
             </div>
 
@@ -1065,6 +1077,34 @@ export default function LandingPage() {
             ) : spotifyLoading ? (
               <div className="flex items-center justify-center py-24">
                 <div className="w-6 h-6 border-2 border-foreground/10 border-t-[#1db954] rounded-full animate-spin" />
+              </div>
+            ) : isPremium === false ? (
+              <div className="flex flex-col items-center justify-center py-24 gap-6">
+                <div className="w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-orange-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                  </svg>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-medium text-foreground/70">Compte Spotify Free détecté</p>
+                  <p className="text-xs text-foreground/40 mt-1 max-w-xs">
+                    La lecture directe dans le navigateur nécessite un abonnement <strong className="text-foreground/60">Spotify Premium</strong>. Les playlists ne peuvent pas être récupérées avec un compte gratuit.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => { clearAuth(); loginWithSpotify(); }}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1db954] hover:bg-[#1ed760] text-black font-semibold text-sm transition-all"
+                  >
+                    Changer de compte
+                  </button>
+                  <button
+                    onClick={() => clearAuth()}
+                    className="text-xs text-foreground/30 hover:text-foreground/50 transition-colors"
+                  >
+                    Déconnecter
+                  </button>
+                </div>
               </div>
             ) : spotifyPlaylists.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 gap-3 text-foreground/25">

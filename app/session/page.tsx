@@ -546,71 +546,68 @@ export default function SessionPage() {
               {/* Tâches */}
               <button
                 onClick={() => setShowTodos((v) => !v)}
-                className="relative flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/15 backdrop-blur-sm border border-white/30 text-white text-xs font-semibold transition-all hover:bg-white/25"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/15 backdrop-blur-sm border border-white/30 text-white text-xs font-semibold transition-all hover:bg-white/25"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" strokeLinecap="round" />
                   <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                Tâches
-                {pendingTodos.length > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-white text-black text-[9px] font-bold flex items-center justify-center leading-none">
-                    {pendingTodos.length}
-                  </span>
-                )}
+                {pendingTodos.length > 0 ? `${pendingTodos.length} tâche${pendingTodos.length > 1 ? "s" : ""}` : "Tâches"}
               </button>
             </div>
           </div>
 
           {/* Tasks panel */}
           {showTodos && (
-            <div className="absolute bottom-6 right-6 w-72 bg-black/55 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl shadow-black/60 overflow-hidden z-10">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
-                <span className="text-xs font-semibold text-white/40 uppercase tracking-widest">Tâches</span>
-                <span className="text-[11px] text-white/25">{doneTodos.length}/{todos.length}</span>
+            <div className="absolute bottom-6 right-6 w-72 bg-black/85 backdrop-blur-xl rounded-2xl border border-white/15 shadow-2xl shadow-black/80 overflow-hidden z-10">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                <span className="text-xs font-semibold text-white/70 uppercase tracking-widest">Tâches</span>
+                {todos.length > 0 && (
+                  <span className="text-[11px] text-white/40">{doneTodos.length}/{todos.length} faites</span>
+                )}
               </div>
-              <div className="max-h-60 overflow-y-auto">
+              <div className="max-h-64 overflow-y-auto">
                 {todos.length === 0 && (
-                  <p className="text-white/20 text-xs text-center py-5">Aucune tâche</p>
+                  <p className="text-white/30 text-xs text-center py-6">Aucune tâche pour cette session</p>
                 )}
                 {pendingTodos.map((todo) => (
-                  <div key={todo.id} className="flex items-center gap-2 px-4 py-2 hover:bg-white/5 transition-colors">
+                  <div key={todo.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors">
                     <TodoStatusDropdown
                       status={todo.status}
                       onChange={(s) => setTodoStatus(todo.id, s)}
                       dark
                     />
-                    <span className="flex-1 text-xs text-white/65 min-w-0 truncate">{todo.text}</span>
+                    <span className="flex-1 text-sm text-white min-w-0 truncate">{todo.text}</span>
                   </div>
                 ))}
                 {doneTodos.length > 0 && (
                   <>
-                    {pendingTodos.length > 0 && <div className="h-px bg-white/[0.05] mx-4" />}
+                    {pendingTodos.length > 0 && <div className="h-px bg-white/[0.08] mx-4 my-1" />}
                     {doneTodos.map((todo) => (
-                      <div key={todo.id} className="flex items-center gap-2 px-4 py-2 opacity-50">
+                      <div key={todo.id} className="flex items-center gap-3 px-4 py-2.5">
                         <TodoStatusDropdown
                           status={todo.status}
                           onChange={(s) => setTodoStatus(todo.id, s)}
                           dark
                         />
-                        <span className="flex-1 text-xs text-white/30 line-through min-w-0 truncate">{todo.text}</span>
+                        <span className="flex-1 text-sm text-white/30 line-through min-w-0 truncate">{todo.text}</span>
                       </div>
                     ))}
                   </>
                 )}
               </div>
-              <div className="border-t border-white/[0.06] px-3 py-2.5 flex gap-2">
+              <div className="border-t border-white/10 px-3 py-2.5 flex gap-2">
                 <Input
                   value={todoInput}
                   onChange={(e) => setTodoInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAddTodo()}
-                  placeholder="Ajouter une tâche..."
-                  className="flex-1 h-8 bg-white/5 border-white/10 text-white placeholder:text-white/20 text-xs rounded-lg focus-visible:ring-white/20"
+                  placeholder="Nouvelle tâche..."
+                  className="flex-1 h-8 bg-white/8 border-white/15 text-white placeholder:text-white/30 text-sm rounded-lg focus-visible:ring-white/20"
                 />
                 <button
                   onClick={handleAddTodo}
                   disabled={!todoInput.trim()}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-20 text-white transition-colors flex-shrink-0"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/15 hover:bg-white/25 disabled:opacity-20 text-white transition-colors flex-shrink-0"
                 >
                   <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                     <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />

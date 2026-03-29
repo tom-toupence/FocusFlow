@@ -17,6 +17,7 @@ interface SpotifyState {
   // Runtime (not persisted)
   currentTrack: SpotifyTrack | null;
   deviceId: string | null;
+  isPremium: boolean | null;
 
   // Actions
   setAuth: (accessToken: string, refreshToken: string, expiresAt: number) => void;
@@ -26,6 +27,7 @@ interface SpotifyState {
   selectPlaylist: (uri: string | null) => void;
   setCurrentTrack: (track: SpotifyTrack | null) => void;
   setDeviceId: (id: string | null) => void;
+  setPremium: (v: boolean | null) => void;
 }
 
 export const useSpotifyStore = create<SpotifyState>()(
@@ -38,6 +40,7 @@ export const useSpotifyStore = create<SpotifyState>()(
       selectedPlaylistUri: null,
       currentTrack: null,
       deviceId: null,
+      isPremium: null,
 
       setAuth: (accessToken, refreshToken, expiresAt) =>
         set({ accessToken, refreshToken, expiresAt }),
@@ -54,12 +57,14 @@ export const useSpotifyStore = create<SpotifyState>()(
           selectedPlaylistUri: null,
           currentTrack: null,
           deviceId: null,
+          isPremium: null,
         }),
 
       setPlaylists: (playlists) => set({ playlists }),
       selectPlaylist: (uri) => set({ selectedPlaylistUri: uri }),
       setCurrentTrack: (track) => set({ currentTrack: track }),
       setDeviceId: (id) => set({ deviceId: id }),
+      setPremium: (v) => set({ isPremium: v }),
     }),
     {
       name: "focusflow-spotify",

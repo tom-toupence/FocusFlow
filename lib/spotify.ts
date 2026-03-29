@@ -60,6 +60,7 @@ export async function loginWithSpotify(): Promise<void> {
     code_challenge_method: "S256",
     code_challenge: challenge,
     state,
+    show_dialog: "true", // force account picker so switching accounts always works
   });
 
   window.location.href = `https://accounts.spotify.com/authorize?${params}`;
@@ -182,6 +183,15 @@ export async function startPlayback(
     },
     body: JSON.stringify({ context_uri: contextUri }),
   });
+}
+
+export async function checkIsPremium(accessToken: string): Promise<boolean> {
+  const res = await fetch("https://api.spotify.com/v1/me", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) return false;
+  const data = await res.json();
+  return data.product === "premium";
 }
 
 export async function setRepeat(
