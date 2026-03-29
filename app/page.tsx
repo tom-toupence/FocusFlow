@@ -12,7 +12,9 @@ import { loginWithSpotify, fetchMyPlaylists, refreshAccessToken, getSpotifyProfi
 import { cn } from "@/lib/utils";
 import StatsSection from "@/components/StatsSection";
 import ThemeToggle from "@/components/ThemeToggle";
-import AccountsPanel from "@/components/AccountsPanel";
+import ProfilePanel from "@/components/ProfilePanel";
+import TaskPlanner from "@/components/TaskPlanner";
+import { useProfileStore, resolvedProfile } from "@/store/profileStore";
 
 const allMoods: VideoMood[] = ["lofi", "jazz", "ambience", "nature", "synthwave", "classical"];
 
@@ -642,7 +644,10 @@ export default function LandingPage() {
     updateToken: updateTwitchToken, clearAuth: clearTwitchAuth, setFollowedChannels,
   } = useTwitchStore();
 
-  const [activeTab, setActiveTab] = useState<"catalogue" | "library" | "spotify" | "twitch" | "activite">("catalogue");
+  const profileState = useProfileStore();
+  const profile = resolvedProfile(profileState);
+
+  const [activeTab, setActiveTab] = useState<"catalogue" | "library" | "spotify" | "twitch" | "activite" | "planifier">("catalogue");
   const [twitchInput, setTwitchInput] = useState("");
   const [vodInput, setVodInput] = useState("");
   const [vodError, setVodError] = useState("");
@@ -654,7 +659,7 @@ export default function LandingPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddPlaylistModal, setShowAddPlaylistModal] = useState(false);
   const [spotifyLoading, setSpotifyLoading] = useState(false);
-  const [showAccountsPanel, setShowAccountsPanel] = useState(false);
+  const [showProfilePanel, setShowProfilePanel] = useState(false);
 
   const catalogueVideos = activeFilter ? defaultVideos.filter((v) => v.mood === activeFilter) : defaultVideos;
   const hasLibraryContent = customVideos.length > 0 || playlists.length > 0;
@@ -802,21 +807,20 @@ export default function LandingPage() {
         <span className="text-sm font-semibold text-foreground/90 tracking-tight">FocusFlow</span>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowAccountsPanel(true)}
-            className={cn(
-              "relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
-              (isSpotifyConnected || isTwitchConnected)
-                ? "bg-foreground/8 text-foreground/60 hover:text-foreground/90 hover:bg-foreground/12"
-                : "bg-foreground/5 text-foreground/35 hover:text-foreground/60 hover:bg-foreground/8"
-            )}
+            onClick={() => setShowProfilePanel(true)}
+            className="relative w-8 h-8 rounded-full overflow-hidden bg-foreground/10 hover:ring-2 hover:ring-foreground/30 transition-all flex-shrink-0 flex items-center justify-center"
+            title="Mon profil"
           >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-            Comptes
+            {profile.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profile.avatarUrl} alt={profile.displayName} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-xs font-semibold text-foreground/60">
+                {profile.displayName.charAt(0).toUpperCase()}
+              </span>
+            )}
             {(isSpotifyConnected || isTwitchConnected) && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-400 border-2 border-background" />
+              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-background" />
             )}
           </button>
           <ThemeToggle />
@@ -907,6 +911,21 @@ export default function LandingPage() {
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             Activité
+          </button>
+          <button
+            onClick={() => setActiveTab("planifier")}
+            className={cn(
+              "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5",
+              activeTab === "planifier" ? "bg-foreground/15 text-foreground" : "text-foreground/40 hover:text-foreground/70 bg-foreground/5"
+            )}
+          >
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round" />
+              <line x1="16" y1="2" x2="16" y2="6" strokeLinecap="round" />
+              <line x1="8" y1="2" x2="8" y2="6" strokeLinecap="round" />
+              <line x1="3" y1="10" x2="21" y2="10" strokeLinecap="round" />
+            </svg>
+            Planifier
           </button>
         </div>
 
@@ -1340,6 +1359,9 @@ export default function LandingPage() {
             <CompletedTodosBacklog />
           </>
         )}
+
+        {/* ── Planifier ───────────────────────────────────────────────────────── */}
+        {activeTab === "planifier" && <TaskPlanner />}
       </main>
 
       {/* Add video modal */}
@@ -1358,7 +1380,7 @@ export default function LandingPage() {
         />
       )}
 
-      <AccountsPanel open={showAccountsPanel} onClose={() => setShowAccountsPanel(false)} />
+      <ProfilePanel open={showProfilePanel} onClose={() => setShowProfilePanel(false)} />
     </div>
   );
 }

@@ -7,12 +7,24 @@ import { getCurrentUserId } from "@/lib/authState";
 import { upsertCustomVideo, deleteCustomVideo, upsertTodo, deleteTodo as dbDeleteTodo } from "@/lib/db";
 
 export type TodoStatus = "todo" | "in-progress" | "done";
+export type TodoPriority = "urgent" | "normal" | "low";
 
 export interface Todo {
   id: string;
   text: string;
   status: TodoStatus;
-  completedAt?: string; // local date "YYYY-MM-DD", set when marked done
+  completedAt?: string;   // YYYY-MM-DD
+  createdAt?: string;     // YYYY-MM-DD
+  priority?: TodoPriority;
+  dueDate?: string;       // YYYY-MM-DD
+  pomodoroEstimate?: number;
+  pomodorosUsed?: number;
+}
+
+export interface AddTodoOptions {
+  priority?: TodoPriority;
+  dueDate?: string;
+  pomodoroEstimate?: number;
 }
 
 interface SessionState {
@@ -29,8 +41,10 @@ interface SessionState {
   getAllVideos: () => Video[];
 
   // todos
-  addTodo: (text: string) => void;
+  addTodo: (text: string, opts?: AddTodoOptions) => void;
   setTodoStatus: (id: string, status: TodoStatus) => void;
+  updateTodo: (id: string, fields: Partial<Pick<Todo, "text" | "priority" | "dueDate" | "pomodoroEstimate">>) => void;
+  incrementPomodoro: (id: string) => void;
   deleteTodo: (id: string) => void;
   clearDone: () => void;
 }
@@ -78,8 +92,17 @@ export const useSessionStore = create<SessionState>()(
         return [...defaultVideos, ...customVideos];
       },
 
-      addTodo: (text) => {
-        const todo: Todo = { id: crypto.randomUUID(), text, status: "todo" };
+      addTodo: (text, opts) => {
+        const todo: Todo = {
+          id: crypto.randomUUID(),
+          text,
+          status: "todo",
+          createdAt: localDate(),
+          priority: opts?.priority ?? "normal",
+          dueDate: opts?.dueDate,
+          pomodoroEstimate: opts?.pomodoroEstimate ?? 1,
+          pomodorosUsed: 0,
+        };
         set((s) => ({ todos: [...s.todos, todo] }));
         const userId = getCurrentUserId();
         if (userId) upsertTodo(userId, todo);
@@ -91,6 +114,26 @@ export const useSessionStore = create<SessionState>()(
           t.id === id
             ? { ...t, status, completedAt: status === "done" ? localDate() : undefined }
             : t
+        );
+        set({ todos: updated });
+        const todo = updated.find((t) => t.id === id);
+        const userId = getCurrentUserId();
+        if (todo && userId) upsertTodo(userId, todo);
+      },
+
+      updateTodo: (id, fields) => {
+        const { todos } = get();
+        const updated = todos.map((t) => t.id === id ? { ...t, ...fields } : t);
+        set({ todos: updated });
+        const todo = updated.find((t) => t.id === id);
+        const userId = getCurrentUserId();
+        if (todo && userId) upsertTodo(userId, todo);
+      },
+
+      incrementPomodoro: (id) => {
+        const { todos } = get();
+        const updated = todos.map((t) =>
+          t.id === id ? { ...t, pomodorosUsed: (t.pomodorosUsed ?? 0) + 1 } : t
         );
         set({ todos: updated });
         const todo = updated.find((t) => t.id === id);

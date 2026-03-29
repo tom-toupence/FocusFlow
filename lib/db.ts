@@ -61,8 +61,13 @@ export async function fetchTodos(userId: string): Promise<Todo[]> {
   return (data ?? []).map((r) => ({
     id: r.id,
     text: r.text,
-    status: (r.done ? "done" : "todo") as "todo" | "in-progress" | "done",
+    status: (r.status ?? (r.done ? "done" : "todo")) as "todo" | "in-progress" | "done",
     completedAt: r.completed_at ?? undefined,
+    priority: (r.priority ?? "normal") as "urgent" | "normal" | "low",
+    dueDate: r.due_date ?? undefined,
+    pomodoroEstimate: r.pomodoro_estimate ?? 1,
+    pomodorosUsed: r.pomodoros_used ?? 0,
+    createdAt: r.created_at_local ?? undefined,
   }));
 }
 
@@ -73,7 +78,13 @@ export async function upsertTodo(userId: string, todo: Todo): Promise<void> {
     user_id: userId,
     text: todo.text,
     done: todo.status === "done",
+    status: todo.status,
     completed_at: todo.completedAt ?? null,
+    priority: todo.priority ?? "normal",
+    due_date: todo.dueDate ?? null,
+    pomodoro_estimate: todo.pomodoroEstimate ?? 1,
+    pomodoros_used: todo.pomodorosUsed ?? 0,
+    created_at_local: todo.createdAt ?? null,
   });
   if (error) console.error("[db] upsertTodo:", error.message);
 }
@@ -118,6 +129,35 @@ export async function upsertPlaylist(userId: string, playlist: SavedPlaylist): P
 export async function deletePlaylist(userId: string, playlistId: string): Promise<void> {
   if (!supabase) return;
   await supabase.from("user_playlists").delete().eq("id", playlistId).eq("user_id", userId);
+}
+
+// ─── User Profile ─────────────────────────────────────────────────────────────
+
+export interface DbProfile {
+  displayName: string | null;
+  avatarData: string | null;
+}
+
+export async function fetchProfile(userId: string): Promise<DbProfile | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("display_name, avatar_data")
+    .eq("id", userId)
+    .single();
+  if (error) return null; // row may not exist yet
+  return { displayName: data.display_name ?? null, avatarData: data.avatar_data ?? null };
+}
+
+export async function upsertProfile(userId: string, profile: DbProfile): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase.from("profiles").upsert({
+    id: userId,
+    display_name: profile.displayName,
+    avatar_data: profile.avatarData,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) console.error("[db] upsertProfile:", error.message);
 }
 
 // ─── Work Sessions (stats) ────────────────────────────────────────────────────

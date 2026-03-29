@@ -12,10 +12,11 @@
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { setCurrentUserId } from "@/lib/authState";
-import { fetchCustomVideos, fetchTodos, fetchWorkSessions, fetchPlaylists } from "@/lib/db";
+import { fetchCustomVideos, fetchTodos, fetchWorkSessions, fetchPlaylists, fetchProfile } from "@/lib/db";
 import { useSessionStore } from "@/store/sessionStore";
 import { usePlaylistStore } from "@/store/playlistStore";
 import { useStatsStore } from "@/store/statsStore";
+import { useProfileStore } from "@/store/profileStore";
 
 // Guard module-level : évite de ré-écraser le state si l'event auth refire
 // (React Strict Mode double-mount, token refresh, etc.)
@@ -25,17 +26,30 @@ export default function SupabaseProvider({ children }: { children: React.ReactNo
   useEffect(() => {
     if (!supabase) return;
 
-    const setupSync = async (userId: string) => {
+    const setupSync = async (userId: string, user: { email?: string; user_metadata?: Record<string, string> }) => {
       // Ne syncer qu'une seule fois par utilisateur par session browser
       if (syncedUserId === userId) return;
       syncedUserId = userId;
 
-      const [remoteVideos, remoteTodos, remoteSessions, remotePlaylists] = await Promise.all([
+      // Populate Google profile immediately (no DB wait needed)
+      useProfileStore.getState().setGoogleProfile(
+        user.user_metadata?.full_name ?? user.user_metadata?.name ?? null,
+        user.user_metadata?.avatar_url ?? null,
+        user.email ?? null,
+      );
+
+      const [remoteVideos, remoteTodos, remoteSessions, remotePlaylists, remoteProfile] = await Promise.all([
         fetchCustomVideos(userId),
         fetchTodos(userId),
         fetchWorkSessions(userId),
         fetchPlaylists(userId),
+        fetchProfile(userId),
       ]);
+
+      // Load custom profile overrides
+      if (remoteProfile) {
+        useProfileStore.getState().setCustomProfile(remoteProfile.displayName, remoteProfile.avatarData);
+      }
 
       // Merge custom videos : remote wins pour les conflits d'id,
       // mais on conserve les items ajoutés localement pendant le fetch.
@@ -77,10 +91,11 @@ export default function SupabaseProvider({ children }: { children: React.ReactNo
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if ((event === "INITIAL_SESSION" || event === "SIGNED_IN") && session?.user) {
         setCurrentUserId(session.user.id);
-        await setupSync(session.user.id);
+        await setupSync(session.user.id, session.user);
       } else if (event === "SIGNED_OUT") {
         syncedUserId = null;
         setCurrentUserId(null);
+        useProfileStore.getState().clear();
       }
     });
 
