@@ -141,7 +141,11 @@ export interface SpotifyTrack {
 
 // ─── API calls ────────────────────────────────────────────────────────────────
 
-export async function fetchMyPlaylists(accessToken: string): Promise<SpotifyPlaylist[]> {
+export type PlaylistsResult =
+  | { ok: true; playlists: SpotifyPlaylist[] }
+  | { ok: false; status: number };
+
+export async function fetchMyPlaylists(accessToken: string): Promise<PlaylistsResult> {
   const playlists: SpotifyPlaylist[] = [];
   let url: string | null = "https://api.spotify.com/v1/me/playlists?limit=50";
 
@@ -150,7 +154,7 @@ export async function fetchMyPlaylists(accessToken: string): Promise<SpotifyPlay
     const res = await fetch(currentUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    if (!res.ok) break;
+    if (!res.ok) return { ok: false, status: res.status };
     const data = await res.json();
     for (const item of data.items ?? []) {
       if (!item) continue;
@@ -165,7 +169,7 @@ export async function fetchMyPlaylists(accessToken: string): Promise<SpotifyPlay
     url = data.next ?? null;
   }
 
-  return playlists;
+  return { ok: true, playlists };
 }
 
 export async function startPlayback(

@@ -658,6 +658,7 @@ export default function LandingPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddPlaylistModal, setShowAddPlaylistModal] = useState(false);
   const [spotifyLoading, setSpotifyLoading] = useState(false);
+  const [spotifyApiError, setSpotifyApiError] = useState<"forbidden" | "error" | null>(null);
   const [showProfilePanel, setShowProfilePanel] = useState(false);
 
   const catalogueVideos = activeFilter ? defaultVideos.filter((v) => v.mood === activeFilter) : defaultVideos;
@@ -670,6 +671,7 @@ export default function LandingPage() {
 
     const load = async () => {
       setSpotifyLoading(true);
+      setSpotifyApiError(null);
       let token = accessToken;
 
       if (expiresAt && Date.now() > expiresAt - 60_000) {
@@ -680,12 +682,16 @@ export default function LandingPage() {
         token = result.accessToken;
       }
 
-      const [profile, list] = await Promise.all([
+      const [profile, result] = await Promise.all([
         getSpotifyProfile(token),
         fetchMyPlaylists(token),
       ]);
       if (profile) setSpotifyProfile(profile);
-      setPlaylists(list);
+      if (result.ok) {
+        setPlaylists(result.playlists);
+      } else {
+        setSpotifyApiError(result.status === 403 ? "forbidden" : "error");
+      }
       setSpotifyLoading(false);
     };
 
@@ -1092,6 +1098,38 @@ export default function LandingPage() {
             ) : spotifyLoading ? (
               <div className="flex items-center justify-center py-24">
                 <div className="w-6 h-6 border-2 border-foreground/10 border-t-[#1db954] rounded-full animate-spin" />
+              </div>
+            ) : spotifyApiError === "forbidden" ? (
+              <div className="flex flex-col items-center justify-center py-24 gap-6">
+                <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div className="text-center max-w-sm">
+                  <p className="text-sm font-medium text-foreground/70">Accès refusé par Spotify</p>
+                  <p className="text-xs text-foreground/40 mt-2 leading-relaxed">
+                    L&apos;application est en <strong className="text-foreground/60">mode développement</strong> — seuls les comptes ajoutés manuellement peuvent l&apos;utiliser.
+                    Demande au propriétaire de l&apos;app de t&apos;ajouter dans le <strong className="text-foreground/60">Spotify Developer Dashboard</strong>.
+                  </p>
+                </div>
+                <button
+                  onClick={() => clearAuth()}
+                  className="text-xs text-foreground/30 hover:text-foreground/50 transition-colors"
+                >
+                  Déconnecter
+                </button>
+              </div>
+            ) : spotifyApiError === "error" ? (
+              <div className="flex flex-col items-center justify-center py-24 gap-4 text-foreground/25">
+                <p className="text-sm">Erreur lors du chargement des playlists</p>
+                <button
+                  onClick={() => setActiveTab("spotify")}
+                  className="text-xs text-foreground/30 hover:text-foreground/50 underline"
+                >
+                  Réessayer
+                </button>
               </div>
             ) : isPremium === false ? (
               <div className="flex flex-col items-center justify-center py-24 gap-6">
