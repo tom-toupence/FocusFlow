@@ -17,6 +17,8 @@ import { useSessionStore } from "@/store/sessionStore";
 import { usePlaylistStore } from "@/store/playlistStore";
 import { useStatsStore } from "@/store/statsStore";
 import { useProfileStore } from "@/store/profileStore";
+import { useSpotifyStore } from "@/store/spotifyStore";
+import { useTwitchStore } from "@/store/twitchStore";
 
 // Guard module-level : évite de ré-écraser le state si l'event auth refire
 // (React Strict Mode double-mount, token refresh, etc.)
@@ -30,6 +32,19 @@ export default function SupabaseProvider({ children }: { children: React.ReactNo
       // Ne syncer qu'une seule fois par utilisateur par session browser
       if (syncedUserId === userId) return;
       syncedUserId = userId;
+
+      // Clear Spotify / Twitch if they were connected by a different user
+      const spotify = useSpotifyStore.getState();
+      if (spotify.supabaseUserId !== null && spotify.supabaseUserId !== userId) {
+        spotify.clearAuth();
+      }
+      useSpotifyStore.getState().setOwner(userId);
+
+      const twitch = useTwitchStore.getState();
+      if (twitch.supabaseUserId !== null && twitch.supabaseUserId !== userId) {
+        twitch.clearAuth();
+      }
+      useTwitchStore.getState().setOwner(userId);
 
       // Populate Google profile immediately (no DB wait needed)
       useProfileStore.getState().setGoogleProfile(

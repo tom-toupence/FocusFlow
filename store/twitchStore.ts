@@ -16,6 +16,8 @@ interface TwitchState {
   userDisplayName: string | null;
   avatarUrl: string | null;
   followedChannels: TwitchChannel[];
+  /** Supabase user ID that owns this Twitch connection — used to detect user switches */
+  supabaseUserId: string | null;
 
   // Selected content (persisted)
   selectedChannel: string | null;
@@ -30,6 +32,7 @@ interface TwitchState {
   selectChannel: (channel: string | null) => void;
   selectVod: (vodId: string | null) => void;
   clear: () => void;
+  setOwner: (userId: string) => void;
 }
 
 export const useTwitchStore = create<TwitchState>()(
@@ -43,6 +46,7 @@ export const useTwitchStore = create<TwitchState>()(
       userDisplayName: null,
       avatarUrl: null,
       followedChannels: [],
+      supabaseUserId: null,
       selectedChannel: null,
       selectedVodId: null,
 
@@ -62,6 +66,7 @@ export const useTwitchStore = create<TwitchState>()(
           userDisplayName: null,
           avatarUrl: null,
           followedChannels: [],
+          supabaseUserId: null,
         }),
 
       setUser: (userId, userLogin, userDisplayName, avatarUrl) =>
@@ -70,6 +75,7 @@ export const useTwitchStore = create<TwitchState>()(
       selectChannel: (channel) => set({ selectedChannel: channel, selectedVodId: null }),
       selectVod: (vodId) => set({ selectedVodId: vodId, selectedChannel: null }),
       clear: () => set({ selectedChannel: null, selectedVodId: null }),
+      setOwner: (userId) => set({ supabaseUserId: userId }),
     }),
     {
       name: "focusflow-twitch",
@@ -82,6 +88,7 @@ export const useTwitchStore = create<TwitchState>()(
         userDisplayName: s.userDisplayName,
         avatarUrl: s.avatarUrl,
         followedChannels: s.followedChannels,
+        supabaseUserId: s.supabaseUserId,
         selectedChannel: s.selectedChannel,
         selectedVodId: s.selectedVodId,
       }),

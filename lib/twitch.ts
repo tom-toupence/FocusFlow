@@ -39,8 +39,8 @@ export async function loginWithTwitch(forceVerify = false): Promise<void> {
   const challenge = await generateCodeChallenge(verifier);
   const state = crypto.randomUUID();
 
-  sessionStorage.setItem("twitch_code_verifier", verifier);
-  sessionStorage.setItem("twitch_auth_state", state);
+  localStorage.setItem("twitch_code_verifier", verifier);
+  localStorage.setItem("twitch_auth_state", state);
 
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
@@ -60,12 +60,12 @@ export async function handleTwitchCallback(
   code: string,
   state: string
 ): Promise<{ accessToken: string; refreshToken: string; expiresAt: number } | null> {
-  const savedState = sessionStorage.getItem("twitch_auth_state");
-  const verifier = sessionStorage.getItem("twitch_code_verifier");
+  const savedState = localStorage.getItem("twitch_auth_state");
+  const verifier = localStorage.getItem("twitch_code_verifier");
   if (!savedState || state !== savedState || !verifier) return null;
 
-  sessionStorage.removeItem("twitch_auth_state");
-  sessionStorage.removeItem("twitch_code_verifier");
+  localStorage.removeItem("twitch_auth_state");
+  localStorage.removeItem("twitch_code_verifier");
 
   const res = await fetch("/api/twitch/token", {
     method: "POST",

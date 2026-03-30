@@ -49,8 +49,8 @@ export async function loginWithSpotify(): Promise<void> {
   const challenge = await generateCodeChallenge(verifier);
   const state = crypto.randomUUID();
 
-  sessionStorage.setItem("spotify_code_verifier", verifier);
-  sessionStorage.setItem("spotify_auth_state", state);
+  localStorage.setItem("spotify_code_verifier", verifier);
+  localStorage.setItem("spotify_auth_state", state);
 
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
@@ -70,13 +70,13 @@ export async function handleSpotifyCallback(
   code: string,
   state: string
 ): Promise<{ accessToken: string; refreshToken: string; expiresAt: number } | null> {
-  const verifier = sessionStorage.getItem("spotify_code_verifier");
-  const savedState = sessionStorage.getItem("spotify_auth_state");
+  const verifier = localStorage.getItem("spotify_code_verifier");
+  const savedState = localStorage.getItem("spotify_auth_state");
 
   if (!verifier || state !== savedState) return null;
 
-  sessionStorage.removeItem("spotify_code_verifier");
-  sessionStorage.removeItem("spotify_auth_state");
+  localStorage.removeItem("spotify_code_verifier");
+  localStorage.removeItem("spotify_auth_state");
 
   const res = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",

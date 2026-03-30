@@ -12,8 +12,11 @@ import type { User } from "@supabase/supabase-js";
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  // Supabase not configured, or OAuth callback page → no gate
-  if (!supabase || pathname === "/auth/callback") return <>{children}</>;
+  // Supabase not configured, or any OAuth callback page → no gate
+  const isCallbackRoute = pathname === "/auth/callback"
+    || pathname === "/auth/spotify/callback"
+    || pathname === "/auth/twitch/callback";
+  if (!supabase || isCallbackRoute) return <>{children}</>;
 
   return <AuthGateInner>{children}</AuthGateInner>;
 }
