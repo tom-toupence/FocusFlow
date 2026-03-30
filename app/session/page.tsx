@@ -18,6 +18,7 @@ import StickyNote from "@/components/StickyNote";
 import SpotifyPlayer from "@/components/SpotifyPlayer";
 import TwitchPlayer from "@/components/TwitchPlayer";
 import TodoStatusDropdown from "@/components/TodoStatusDropdown";
+import { playBreakChime, playWorkChime } from "@/lib/sounds";
 
 // ─── YouTube IFrame API types ─────────────────────────────────────────────────
 
@@ -86,6 +87,7 @@ export default function SessionPage() {
   const [volume, setVolumeState] = useState(0.8);
   const [showVolume, setShowVolume] = useState(false);
   const volumeRef = useRef(0.8);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
   const isBreak = mode !== "work";
@@ -94,6 +96,18 @@ export default function SessionPage() {
   // Keep refs in sync for use inside IFrame API callbacks
   useEffect(() => { isBreakRef.current = isBreak; }, [isBreak]);
   useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
+
+  // ── Chime sounds on mode transitions ─────────────────────────────────────
+  const prevModeRef = useRef(mode);
+  useEffect(() => {
+    if (prevModeRef.current === mode) return;
+    if (mode !== "work") {
+      playBreakChime();
+    } else {
+      playWorkChime();
+    }
+    prevModeRef.current = mode;
+  }, [mode]);
 
   // ── Record session start ─────────────────────────────────────────────────
   useEffect(() => {
@@ -116,6 +130,7 @@ export default function SessionPage() {
   }, []);
 
   // ── YouTube IFrame API ────────────────────────────────────────────────────
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const initPlayer = useCallback(() => {
     if (!window.YT?.Player || playerRef.current) return;
 
@@ -222,7 +237,26 @@ export default function SessionPage() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [isRunning, tick]);
 
+  // ── Build play history entry ──────────────────────────────────────────────
+  const buildPlayEntry = (minutes: number) => {
+    const today = new Date();
+    const date = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, "0"), String(today.getDate()).padStart(2, "0")].join("-");
+    if (isSpotifyMode) {
+      const pl = spotifyPlaylists.find((p) => p.uri === selectedPlaylistUri);
+      return { type: "spotify" as const, title: pl?.name ?? "Playlist Spotify", subtitle: `${pl?.trackCount ?? 0} titres`, thumbnailUrl: pl?.imageUrl, mediaKey: selectedPlaylistUri ?? "spotify", date, timestamp: Date.now(), minutes };
+    }
+    if (isTwitchMode) {
+      if (selectedVodId) return { type: "twitch-vod" as const, title: `VOD ${selectedVodId}`, subtitle: "Twitch VOD", mediaKey: `vod:${selectedVodId}`, date, timestamp: Date.now(), minutes };
+      return { type: "twitch-live" as const, title: selectedChannel ?? "Twitch", subtitle: "Live Twitch", mediaKey: `live:${selectedChannel}`, date, timestamp: Date.now(), minutes };
+    }
+    if (isPlaylistMode && selectedPlaylist) {
+      return { type: "playlist" as const, title: selectedPlaylist.title, subtitle: selectedPlaylist.channelName ?? "YouTube Playlist", thumbnailUrl: selectedPlaylist.thumbnailUrl, mediaKey: `pl:${selectedPlaylist.playlistId}`, date, timestamp: Date.now(), minutes };
+    }
+    return { type: "youtube" as const, title: video.title, subtitle: video.channel, thumbnailUrl: `https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`, mediaKey: video.youtubeId, date, timestamp: Date.now(), minutes };
+  };
+
   // ── Session end ───────────────────────────────────────────────────────────
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleSessionEnd = useCallback(() => {
     if (typeof window !== "undefined" && Notification.permission === "granted") {
       new Notification("FocusFlow", {
@@ -264,23 +298,6 @@ export default function SessionPage() {
     if (!t) return;
     addTodo(t);
     setTodoInput("");
-  };
-
-  const buildPlayEntry = (minutes: number) => {
-    const today = new Date();
-    const date = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, "0"), String(today.getDate()).padStart(2, "0")].join("-");
-    if (isSpotifyMode) {
-      const pl = spotifyPlaylists.find((p) => p.uri === selectedPlaylistUri);
-      return { type: "spotify" as const, title: pl?.name ?? "Playlist Spotify", subtitle: `${pl?.trackCount ?? 0} titres`, thumbnailUrl: pl?.imageUrl, mediaKey: selectedPlaylistUri ?? "spotify", date, timestamp: Date.now(), minutes };
-    }
-    if (isTwitchMode) {
-      if (selectedVodId) return { type: "twitch-vod" as const, title: `VOD ${selectedVodId}`, subtitle: "Twitch VOD", mediaKey: `vod:${selectedVodId}`, date, timestamp: Date.now(), minutes };
-      return { type: "twitch-live" as const, title: selectedChannel ?? "Twitch", subtitle: "Live Twitch", mediaKey: `live:${selectedChannel}`, date, timestamp: Date.now(), minutes };
-    }
-    if (isPlaylistMode && selectedPlaylist) {
-      return { type: "playlist" as const, title: selectedPlaylist.title, subtitle: selectedPlaylist.channelName ?? "YouTube Playlist", thumbnailUrl: selectedPlaylist.thumbnailUrl, mediaKey: `pl:${selectedPlaylist.playlistId}`, date, timestamp: Date.now(), minutes };
-    }
-    return { type: "youtube" as const, title: video.title, subtitle: video.channel, thumbnailUrl: `https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`, mediaKey: video.youtubeId, date, timestamp: Date.now(), minutes };
   };
 
   const handleVolumeChange = (v: number) => {

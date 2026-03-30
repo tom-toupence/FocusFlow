@@ -4,7 +4,7 @@ import { useState, KeyboardEvent } from "react";
 import TodoStatusDropdown from "@/components/TodoStatusDropdown";
 import { useRouter } from "next/navigation";
 import { useTimerStore, TimerPreset, PRESETS } from "@/store/timerStore";
-import { useSessionStore } from "@/store/sessionStore";
+import { useSessionStore, Todo, TodoPriority } from "@/store/sessionStore";
 import { usePlaylistStore } from "@/store/playlistStore";
 import { useNotesStore } from "@/store/notesStore";
 import { useSpotifyStore } from "@/store/spotifyStore";
@@ -80,6 +80,40 @@ function NumberInput({
           className="w-7 h-7 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground/70 flex items-center justify-center transition-colors text-sm font-medium"
         >
           +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const PRIORITY_DOT: Record<TodoPriority, string> = {
+  urgent: "bg-red-500",
+  normal: "bg-amber-400",
+  low:    "bg-foreground/20",
+};
+
+function KanbanCard({
+  todo,
+  onStatus,
+  onDelete,
+}: {
+  todo: Todo;
+  onStatus: (s: import("@/store/sessionStore").TodoStatus) => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="group flex items-start gap-2 px-2.5 py-2 rounded-lg bg-foreground/[0.04] border border-foreground/[0.07] hover:border-foreground/15 transition-colors">
+      <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5", PRIORITY_DOT[todo.priority ?? "normal"])} />
+      <span className="flex-1 text-xs text-foreground/75 leading-relaxed min-w-0 break-words">{todo.text}</span>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <TodoStatusDropdown status={todo.status} onChange={onStatus} />
+        <button
+          onClick={onDelete}
+          className="opacity-0 group-hover:opacity-100 text-foreground/25 hover:text-foreground/60 transition-all"
+        >
+          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+          </svg>
         </button>
       </div>
     </div>
@@ -299,6 +333,7 @@ export default function SettingsPage() {
             ) : isSpotifyMode ? (
               <>
                 {spotifyPlaylist!.imageUrl && !imgError ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={spotifyPlaylist!.imageUrl}
                     alt={spotifyPlaylist!.name}
@@ -328,6 +363,7 @@ export default function SettingsPage() {
             ) : isPlaylistMode ? (
               <>
                 {playlist.thumbnailUrl && !imgError ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={playlist.thumbnailUrl}
                     alt={playlist.title}
@@ -358,6 +394,7 @@ export default function SettingsPage() {
             ) : (
               <>
                 {!imgError ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={`https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`}
                     alt={video.title}
@@ -428,24 +465,28 @@ export default function SettingsPage() {
             <span>Pause longue après {sessions} sessions</span>
           </div>
 
-          {/* Tasks */}
+          {/* Tasks — Kanban */}
           <div>
-            <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-3">
-              Tâches de la session
-              {todos.length > 0 && <span className="ml-2 text-foreground/20 normal-case font-normal">{todos.filter(t => t.status !== "done").length} à faire</span>}
-            </p>
-            <div className="flex gap-2 mb-2">
+            <div className="flex items-baseline gap-2 mb-3">
+              <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest">Tâches de la session</p>
+              {todos.length > 0 && (
+                <span className="text-[10px] text-foreground/20">{activeTodos.length} à faire</span>
+              )}
+            </div>
+
+            {/* Add task */}
+            <div className="flex gap-2 mb-4">
               <Input
                 value={todoInput}
                 onChange={(e) => setTodoInput(e.target.value)}
                 onKeyDown={handleTodoKey}
-                placeholder="Qu'est-ce que tu veux accomplir ?"
-                className="flex-1 bg-foreground/5 border-foreground/10 text-foreground placeholder:text-foreground/25 focus-visible:ring-foreground/20 rounded-xl text-sm h-10"
+                placeholder="Ajouter une tâche…"
+                className="flex-1 bg-foreground/5 border-foreground/10 text-foreground placeholder:text-foreground/25 focus-visible:ring-foreground/20 rounded-xl text-sm h-9"
               />
               <button
                 onClick={handleAddTodo}
                 disabled={!todoInput.trim()}
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-foreground/10 hover:bg-foreground/15 disabled:opacity-20 text-foreground transition-colors flex-shrink-0"
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-foreground/10 hover:bg-foreground/15 disabled:opacity-20 text-foreground transition-colors flex-shrink-0"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                   <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round"/>
@@ -453,30 +494,82 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            {activeTodos.length > 0 && (
-              <div className="flex flex-col gap-1 max-h-52 overflow-y-auto pr-1">
-                {activeTodos.map((todo) => (
-                  <div
-                    key={todo.id}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-foreground/[0.03] group"
-                  >
-                    <TodoStatusDropdown
-                      status={todo.status}
-                      onChange={(s) => setTodoStatus(todo.id, s)}
-                    />
-                    <span className="flex-1 text-xs text-foreground/75">
-                      {todo.text}
-                    </span>
-                    <button
-                      onClick={() => deleteTodo(todo.id)}
-                      className="opacity-0 group-hover:opacity-100 text-foreground/25 hover:text-foreground/60 transition-all"
-                    >
-                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                        <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/>
-                      </svg>
-                    </button>
+            {/* Kanban columns */}
+            {todos.length === 0 ? (
+              <p className="text-xs text-foreground/20 text-center py-5">Ajoute des tâches avant de démarrer</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2.5">
+                {/* À faire */}
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-foreground/30 flex-shrink-0" />
+                    <span className="text-[10px] font-semibold text-foreground/40 uppercase tracking-wider">À faire</span>
+                    {todos.filter(t => t.status === "todo").length > 0 && (
+                      <span className="ml-auto text-[10px] text-foreground/20">{todos.filter(t => t.status === "todo").length}</span>
+                    )}
                   </div>
-                ))}
+                  <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto">
+                    {todos.filter(t => t.status === "todo").length === 0 && (
+                      <p className="text-[10px] text-foreground/15 text-center py-3">–</p>
+                    )}
+                    {todos.filter(t => t.status === "todo").map((todo) => (
+                      <KanbanCard
+                        key={todo.id}
+                        todo={todo}
+                        onStatus={(s) => setTodoStatus(todo.id, s)}
+                        onDelete={() => deleteTodo(todo.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* En cours */}
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                    <span className="text-[10px] font-semibold text-amber-400/70 uppercase tracking-wider">En cours</span>
+                    {todos.filter(t => t.status === "in-progress").length > 0 && (
+                      <span className="ml-auto text-[10px] text-foreground/20">{todos.filter(t => t.status === "in-progress").length}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto">
+                    {todos.filter(t => t.status === "in-progress").length === 0 && (
+                      <p className="text-[10px] text-foreground/15 text-center py-3">–</p>
+                    )}
+                    {todos.filter(t => t.status === "in-progress").map((todo) => (
+                      <KanbanCard
+                        key={todo.id}
+                        todo={todo}
+                        onStatus={(s) => setTodoStatus(todo.id, s)}
+                        onDelete={() => deleteTodo(todo.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Terminées */}
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                    <span className="text-[10px] font-semibold text-emerald-500/70 uppercase tracking-wider">Terminées</span>
+                    {todos.filter(t => t.status === "done").length > 0 && (
+                      <span className="ml-auto text-[10px] text-foreground/20">{todos.filter(t => t.status === "done").length}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto">
+                    {todos.filter(t => t.status === "done").length === 0 && (
+                      <p className="text-[10px] text-foreground/15 text-center py-3">–</p>
+                    )}
+                    {todos.filter(t => t.status === "done").map((todo) => (
+                      <KanbanCard
+                        key={todo.id}
+                        todo={todo}
+                        onStatus={(s) => setTodoStatus(todo.id, s)}
+                        onDelete={() => deleteTodo(todo.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>
