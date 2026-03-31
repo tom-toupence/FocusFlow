@@ -18,6 +18,8 @@ interface SpotifyState {
   isPremium: boolean | null;
   /** Supabase user ID that owns this Spotify connection — used to detect user switches */
   supabaseUserId: string | null;
+  /** true = lecture aléatoire, false = dans l'ordre */
+  shuffle: boolean;
 
   // Runtime (not persisted)
   currentTrack: SpotifyTrack | null;
@@ -33,6 +35,7 @@ interface SpotifyState {
   setDeviceId: (id: string | null) => void;
   setProfile: (profile: SpotifyProfile) => void;
   setOwner: (userId: string) => void;
+  setShuffle: (shuffle: boolean) => void;
 }
 
 export const useSpotifyStore = create<SpotifyState>()(
@@ -47,6 +50,7 @@ export const useSpotifyStore = create<SpotifyState>()(
       avatarUrl: null,
       isPremium: null,
       supabaseUserId: null,
+      shuffle: true,
       currentTrack: null,
       deviceId: null,
 
@@ -78,6 +82,7 @@ export const useSpotifyStore = create<SpotifyState>()(
       setProfile: ({ displayName, avatarUrl, isPremium }) =>
         set({ displayName, avatarUrl, isPremium }),
       setOwner: (userId) => set({ supabaseUserId: userId }),
+      setShuffle: (shuffle) => set({ shuffle }),
     }),
     {
       name: "focusflow-spotify",
@@ -91,6 +96,7 @@ export const useSpotifyStore = create<SpotifyState>()(
         avatarUrl: s.avatarUrl,
         isPremium: s.isPremium,
         supabaseUserId: s.supabaseUserId,
+        shuffle: s.shuffle,
       }),
     }
   )

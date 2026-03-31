@@ -212,6 +212,20 @@ export async function getSpotifyProfile(accessToken: string): Promise<SpotifyPro
   };
 }
 
+export async function setShuffle(
+  accessToken: string,
+  deviceId: string,
+  state: boolean
+): Promise<void> {
+  const url = new URL("https://api.spotify.com/v1/me/player/shuffle");
+  url.searchParams.set("state", String(state));
+  url.searchParams.set("device_id", deviceId);
+  await fetch(url.toString(), {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
 export async function setRepeat(
   accessToken: string,
   deviceId: string,

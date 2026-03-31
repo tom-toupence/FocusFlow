@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSpotifyStore } from "@/store/spotifyStore";
-import { startPlayback, setRepeat, refreshAccessToken } from "@/lib/spotify";
+import { startPlayback, setRepeat, setShuffle as apiSetShuffle, refreshAccessToken } from "@/lib/spotify";
 
 // ─── Spotify SDK types ────────────────────────────────────────────────────────
 
@@ -42,9 +42,11 @@ type Status = "loading" | "connecting" | "ready" | "error";
 export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
   const {
     accessToken, refreshToken, expiresAt,
-    currentTrack, deviceId,
-    setDeviceId, setCurrentTrack, updateToken, clearAuth,
+    currentTrack, deviceId, shuffle,
+    setDeviceId, setCurrentTrack, updateToken, clearAuth, setShuffle,
   } = useSpotifyStore();
+
+  const shuffleRef = useRef(shuffle);
 
   const [status, setStatus] = useState<Status>("loading");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -66,6 +68,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
   useEffect(() => { refreshTokenRef.current = refreshToken; }, [refreshToken]);
   useEffect(() => { expiresAtRef.current = expiresAt; }, [expiresAt]);
   useEffect(() => { deviceIdRef.current = deviceId; }, [deviceId]);
+  useEffect(() => { shuffleRef.current = shuffle; }, [shuffle]);
 
   const getValidToken = async (): Promise<string | null> => {
     if (!tokenRef.current) return null;
@@ -119,8 +122,8 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
         );
         if (res.ok) {
           playlistStartedRef.current = playlistUri;
-          // Activer la répétition de la playlist
           await setRepeat(token, device_id, "context");
+          await apiSetShuffle(token, device_id, shuffleRef.current);
         } else {
           const body = await res.text();
           console.error("[Spotify] startPlayback error:", res.status, body);
@@ -227,6 +230,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
       if (!token || !deviceIdRef.current) return;
       await startPlayback(token, deviceIdRef.current, playlistUri);
       await setRepeat(token, deviceIdRef.current, "context");
+      await apiSetShuffle(token, deviceIdRef.current, shuffleRef.current);
       playlistStartedRef.current = playlistUri;
     });
   }, [playlistUri, deviceId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -237,6 +241,16 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
     if (shouldPlay) playerRef.current.resume().catch(() => {});
     else playerRef.current.pause().catch(() => {});
   }, [shouldPlay]);
+
+  // ── Shuffle toggle ───────────────────────────────────────────────────────
+  const handleShuffleToggle = () => {
+    const next = !shuffle;
+    setShuffle(next);
+    getValidToken().then((token) => {
+      if (!token || !deviceIdRef.current) return;
+      apiSetShuffle(token, deviceIdRef.current, next).catch(() => {});
+    });
+  };
 
   // ── Volume ───────────────────────────────────────────────────────────────
   const handleVolumeChange = (v: number) => {
@@ -356,6 +370,24 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
                 )}
               </button>
             </div>
+
+            {/* Shuffle */}
+            <button
+              onClick={handleShuffleToggle}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg backdrop-blur-sm border transition-all ${
+                shuffle
+                  ? "bg-[#1db954]/20 border-[#1db954]/40 text-[#1db954]"
+                  : "bg-black/50 border-white/10 text-white/50 hover:text-white"
+              }`}
+              title={shuffle ? "Aléatoire activé" : "Dans l'ordre"}
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <polyline points="16 3 21 3 21 8" strokeLinecap="round" strokeLinejoin="round" />
+                <line x1="4" y1="20" x2="21" y2="3" strokeLinecap="round" />
+                <polyline points="21 16 21 21 16 21" strokeLinecap="round" strokeLinejoin="round" />
+                <line x1="15" y1="15" x2="21" y2="21" strokeLinecap="round" />
+              </svg>
+            </button>
 
             {/* Previous */}
             <button
