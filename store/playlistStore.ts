@@ -25,7 +25,7 @@ export const usePlaylistStore = create<PlaylistState>()(
     (set) => ({
       playlists: [],
       addPlaylist: (p) => {
-        const newPlaylist = { ...p, id: `pl-${Date.now()}` };
+        const newPlaylist = { ...p, id: crypto.randomUUID() };
         set((s) => ({ playlists: [...s.playlists, newPlaylist] }));
         const userId = getCurrentUserId();
         if (userId) {

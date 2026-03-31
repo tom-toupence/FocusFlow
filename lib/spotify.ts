@@ -118,7 +118,7 @@ export async function refreshAccessToken(
 
   return {
     accessToken: data.access_token,
-    expiresAt: Date.now() + data.expires_in * 1000,
+    expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000,
   };
 }
 
@@ -149,24 +149,28 @@ export async function fetchMyPlaylists(accessToken: string): Promise<PlaylistsRe
   const playlists: SpotifyPlaylist[] = [];
   let url: string | null = "https://api.spotify.com/v1/me/playlists?limit=50";
 
-  while (url) {
-    const currentUrl: string = url;
-    const res = await fetch(currentUrl, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!res.ok) return { ok: false, status: res.status };
-    const data = await res.json();
-    for (const item of data.items ?? []) {
-      if (!item) continue;
-      playlists.push({
-        id: item.id,
-        uri: item.uri,
-        name: item.name,
-        imageUrl: item.images?.[0]?.url,
-        trackCount: item.tracks?.total ?? 0,
+  try {
+    while (url) {
+      const currentUrl: string = url;
+      const res = await fetch(currentUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
+      if (!res.ok) return { ok: false, status: res.status };
+      const data = await res.json();
+      for (const item of data.items ?? []) {
+        if (!item) continue;
+        playlists.push({
+          id: item.id,
+          uri: item.uri,
+          name: item.name,
+          imageUrl: item.images?.[0]?.url,
+          trackCount: item.tracks?.total ?? 0,
+        });
+      }
+      url = data.next ?? null;
     }
-    url = data.next ?? null;
+  } catch {
+    return { ok: false, status: 0 };
   }
 
   return { ok: true, playlists };

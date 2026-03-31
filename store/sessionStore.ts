@@ -148,7 +148,11 @@ export const useSessionStore = create<SessionState>()(
       },
 
       clearDone: () => {
+        const { todos } = get();
+        const doneTodos = todos.filter((t) => t.status === "done");
         set((s) => ({ todos: s.todos.filter((t) => t.status !== "done") }));
+        const userId = getCurrentUserId();
+        if (userId) doneTodos.forEach((t) => dbDeleteTodo(userId, t.id));
       },
     }),
     {

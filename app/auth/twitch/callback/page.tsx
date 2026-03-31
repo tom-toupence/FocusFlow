@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { Suspense, useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { handleTwitchCallback, getCurrentUser } from "@/lib/twitch";
 import { useTwitchStore } from "@/store/twitchStore";
@@ -12,6 +12,7 @@ function TwitchCallbackInner() {
   const router = useRouter();
   const { setAuth, setUser } = useTwitchStore();
   const ran = useRef(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (ran.current) return;
@@ -22,13 +23,15 @@ function TwitchCallbackInner() {
     const error = searchParams.get("error");
 
     if (error || !code || !state) {
-      router.replace("/?twitch_error=1");
+      setFailed(true);
+      setTimeout(() => router.replace("/"), 3000);
       return;
     }
 
     handleTwitchCallback(code, state).then(async (result) => {
       if (!result) {
-        router.replace("/?twitch_error=1");
+        setFailed(true);
+        setTimeout(() => router.replace("/"), 3000);
         return;
       }
 
@@ -40,6 +43,26 @@ function TwitchCallbackInner() {
       router.replace("/");
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (failed) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-center px-6">
+          <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+            <svg className="w-6 h-6 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <circle cx="12" cy="12" r="10" />
+              <line x1="15" y1="9" x2="9" y2="15" strokeLinecap="round" />
+              <line x1="9" y1="9" x2="15" y2="15" strokeLinecap="round" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-foreground/80 text-sm font-medium">Connexion Twitch échouée</p>
+            <p className="text-foreground/40 text-xs mt-1">Redirection dans 3 secondes…</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">

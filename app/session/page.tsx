@@ -77,6 +77,7 @@ export default function SessionPage() {
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevSecondsRef = useRef(secondsLeft);
+  const sessionEndedRef = useRef(false);
   const playerRef = useRef<YTPlayer | null>(null);
   const playerReadyRef = useRef(false);
   const isBreakRef = useRef(mode !== "work");
@@ -269,8 +270,13 @@ export default function SessionPage() {
       });
     }
     if (mode === "work") {
-      recordSession(settings.workDuration);
-      recordPlay(buildPlayEntry(settings.workDuration));
+      if (!sessionEndedRef.current) {
+        sessionEndedRef.current = true;
+        recordSession(settings.workDuration);
+        recordPlay(buildPlayEntry(settings.workDuration));
+      }
+    } else {
+      sessionEndedRef.current = false;
     }
     nextSession(true);
   }, [mode, nextSession, recordSession, settings.workDuration]); // eslint-disable-line react-hooks/exhaustive-deps

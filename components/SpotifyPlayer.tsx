@@ -58,6 +58,8 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
   const tokenRef = useRef(accessToken);
   const refreshTokenRef = useRef(refreshToken);
   const expiresAtRef = useRef(expiresAt);
+  const initCalledRef = useRef(false);
+  const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
 
   useEffect(() => { shouldPlayRef.current = shouldPlay; }, [shouldPlay]);
   useEffect(() => { tokenRef.current = accessToken; }, [accessToken]);
@@ -71,16 +73,22 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
       return tokenRef.current;
     }
     if (!refreshTokenRef.current) { clearAuth(); return null; }
-    const result = await refreshAccessToken(refreshTokenRef.current);
-    if (!result) { clearAuth(); return null; }
-    updateToken(result.accessToken, result.expiresAt);
-    tokenRef.current = result.accessToken;
-    expiresAtRef.current = result.expiresAt;
-    return result.accessToken;
+    // Deduplicate concurrent refresh calls
+    if (refreshPromiseRef.current) return refreshPromiseRef.current;
+    refreshPromiseRef.current = refreshAccessToken(refreshTokenRef.current).then((result) => {
+      refreshPromiseRef.current = null;
+      if (!result) { clearAuth(); return null; }
+      updateToken(result.accessToken, result.expiresAt);
+      tokenRef.current = result.accessToken;
+      expiresAtRef.current = result.expiresAt;
+      return result.accessToken;
+    });
+    return refreshPromiseRef.current;
   };
 
   const initPlayer = () => {
-    if (playerRef.current || !window.Spotify) return;
+    if (initCalledRef.current || playerRef.current || !window.Spotify) return;
+    initCalledRef.current = true;
     setStatus("connecting");
 
     const player = new window.Spotify.Player({
@@ -203,6 +211,8 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
       if (pollInterval) clearInterval(pollInterval);
       playerRef.current?.disconnect();
       playerRef.current = null;
+      initCalledRef.current = false;
+      playlistStartedRef.current = null;
       setDeviceId(null);
       setCurrentTrack(null);
     };
@@ -212,6 +222,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
   useEffect(() => {
     if (!deviceIdRef.current || !playlistUri) return;
     if (playlistStartedRef.current === playlistUri) return;
+    setCurrentTrack(null);
     getValidToken().then(async (token) => {
       if (!token || !deviceIdRef.current) return;
       await startPlayback(token, deviceIdRef.current, playlistUri);

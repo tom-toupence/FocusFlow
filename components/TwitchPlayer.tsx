@@ -46,6 +46,8 @@ interface Props {
 export default function TwitchPlayer({ channel, vodId, token, volume = 0.8 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const embedRef = useRef<TwitchEmbedInstance | null>(null);
+  const volumeRef = useRef(volume);
+  useEffect(() => { volumeRef.current = volume; }, [volume]);
 
   useEffect(() => {
     const initEmbed = () => {
@@ -87,6 +89,7 @@ export default function TwitchPlayer({ channel, vodId, token, volume = 0.8 }: Pr
           // quality string may vary — try fallback
           try { embed.getPlayer().setQuality("720p"); } catch { /* ignore */ }
         }
+        try { embed.getPlayer().setVolume(volumeRef.current); } catch { /* ignore */ }
       });
 
       embedRef.current = embed;
