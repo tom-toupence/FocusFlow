@@ -7,10 +7,11 @@ import { upsertPlaylist, deletePlaylist } from "@/lib/db";
 
 export interface SavedPlaylist {
   id: string;
-  playlistId: string;     // YouTube PL ID (ex: "PLxxxxxxxx")
+  playlistId: string;      // YouTube playlist ID (ex: "PLxxxxxxxx" ou "RDxxxxxxxx" pour les mixes)
+  startVideoId?: string;   // Vidéo de départ — obligatoire pour les mixes (RD*), optionnel sinon
   title: string;
   channelName?: string;
-  thumbnailUrl?: string;  // thumbnail de la première vidéo ou oEmbed
+  thumbnailUrl?: string;
 }
 
 interface PlaylistState {

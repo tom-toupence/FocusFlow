@@ -48,11 +48,15 @@ create table if not exists user_playlists (
   id             text      primary key,
   user_id        uuid      references auth.users(id) on delete cascade not null,
   playlist_id    text      not null,
+  start_video_id text,
   title          text      not null,
   channel_name   text,
   thumbnail_url  text,
   created_at     timestamptz default now()
 );
+
+-- Migration (projets existants)
+alter table user_playlists add column if not exists start_video_id text;
 
 alter table user_playlists enable row level security;
 
@@ -60,25 +64,3 @@ create policy "own videos"    on custom_videos   for all using (auth.uid() = use
 create policy "own todos"     on todos            for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own sessions"  on work_sessions    for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own playlists" on user_playlists   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
--- ─── Profiles ─────────────────────────────────────────────────────────────────
--- Stores custom display name and avatar (base64) overriding the Google profile.
-
-create table if not exists profiles (
-  id              uuid    primary key references auth.users(id) on delete cascade,
-  display_name    text,
-  avatar_data     text,   -- base64 data URL, kept small (128×128 canvas-resized)
-  updated_at      timestamptz default now()
-);
-
-alter table profiles enable row level security;
-create policy "own profile" on profiles for all using (auth.uid() = id) with check (auth.uid() = id);
-
--- ─── Todo enrichments (run as migration on existing projects) ─────────────────
-
-alter table todos add column if not exists status            text    not null default 'todo';
-alter table todos add column if not exists priority         text    not null default 'normal';
-alter table todos add column if not exists due_date         text;
-alter table todos add column if not exists pomodoro_estimate int    not null default 1;
-alter table todos add column if not exists pomodoros_used   int    not null default 0;
-alter table todos add column if not exists created_at_local text;

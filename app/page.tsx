@@ -262,6 +262,7 @@ function AddPlaylistModal({ onClose, onAdd }: { onClose: () => void; onAdd: (p: 
     }
     onAdd({
       playlistId,
+      startVideoId: firstVideoId ?? undefined,
       title: title.trim(),
       channelName: channelName || undefined,
       thumbnailUrl: (thumbnailUrl ?? (firstVideoId ? `https://img.youtube.com/vi/${firstVideoId}/mqdefault.jpg` : undefined)) || undefined,

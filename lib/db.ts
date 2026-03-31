@@ -107,6 +107,7 @@ export async function fetchPlaylists(userId: string): Promise<SavedPlaylist[]> {
   return (data ?? []).map((r) => ({
     id: r.id,
     playlistId: r.playlist_id,
+    startVideoId: r.start_video_id ?? undefined,
     title: r.title,
     channelName: r.channel_name ?? undefined,
     thumbnailUrl: r.thumbnail_url ?? undefined,
@@ -119,6 +120,7 @@ export async function upsertPlaylist(userId: string, playlist: SavedPlaylist): P
     id: playlist.id,
     user_id: userId,
     playlist_id: playlist.playlistId,
+    start_video_id: playlist.startVideoId ?? null,
     title: playlist.title,
     channel_name: playlist.channelName ?? null,
     thumbnail_url: playlist.thumbnailUrl ?? null,

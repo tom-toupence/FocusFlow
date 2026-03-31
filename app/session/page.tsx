@@ -146,8 +146,12 @@ export default function SessionPage() {
     };
 
     if (isPlaylistMode && selectedPlaylist) {
-      // Mode playlist : YouTube enchaîne les vidéos automatiquement
+      // Les mixes YouTube (RD*) sont des playlists infinies dynamiques :
+      // - ils nécessitent le videoId de départ pour savoir où commencer
+      // - loop:1 est incompatible (YouTube gère la continuité lui-même)
+      const isMix = selectedPlaylist.playlistId.startsWith("RD");
       playerRef.current = new window.YT.Player("yt-player", {
+        ...(isMix && selectedPlaylist.startVideoId ? { videoId: selectedPlaylist.startVideoId } : {}),
         playerVars: {
           autoplay: 1,
           mute: 0,
@@ -156,7 +160,7 @@ export default function SessionPage() {
           modestbranding: 1,
           listType: "playlist",
           list: selectedPlaylist.playlistId,
-          loop: 1,
+          ...(isMix ? {} : { loop: 1 }),
         },
         events: { onReady },
       });
