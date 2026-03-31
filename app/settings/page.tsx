@@ -420,34 +420,39 @@ export default function SettingsPage() {
 
           {/* Spotify shuffle toggle */}
           {isSpotifyMode && (
-            <button
-              onClick={() => setShuffle(!shuffle)}
-              className={cn(
-                "mt-3 w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl border transition-all",
-                shuffle
-                  ? "border-[#1db954]/30 bg-[#1db954]/8 text-[#1db954]"
-                  : "border-foreground/[0.08] bg-foreground/[0.02] text-foreground/40 hover:border-foreground/15"
-              )}
-            >
-              <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <polyline points="16 3 21 3 21 8" strokeLinecap="round" strokeLinejoin="round" />
-                <line x1="4" y1="20" x2="21" y2="3" strokeLinecap="round" />
-                <polyline points="21 16 21 21 16 21" strokeLinecap="round" strokeLinejoin="round" />
-                <line x1="15" y1="15" x2="21" y2="21" strokeLinecap="round" />
-              </svg>
-              <span className="text-xs font-medium flex-1 text-left">
-                {shuffle ? "Lecture aléatoire" : "Lecture dans l'ordre"}
-              </span>
-              <div className={cn(
-                "w-7 h-4 rounded-full transition-colors flex-shrink-0 relative",
-                shuffle ? "bg-[#1db954]" : "bg-foreground/15"
-              )}>
-                <span className={cn(
-                  "absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform",
-                  shuffle ? "translate-x-3.5" : "translate-x-0.5"
-                )} />
-              </div>
-            </button>
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                onClick={() => setShuffle(false)}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-xs font-medium transition-all",
+                  !shuffle
+                    ? "border-foreground/25 bg-foreground/10 text-foreground"
+                    : "border-foreground/[0.07] bg-transparent text-foreground/35 hover:text-foreground/55 hover:border-foreground/12"
+                )}
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Dans l&apos;ordre
+              </button>
+              <button
+                onClick={() => setShuffle(true)}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-xs font-medium transition-all",
+                  shuffle
+                    ? "border-[#1db954]/40 bg-[#1db954]/10 text-[#1db954]"
+                    : "border-foreground/[0.07] bg-transparent text-foreground/35 hover:text-foreground/55 hover:border-foreground/12"
+                )}
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <polyline points="16 3 21 3 21 8" strokeLinecap="round" strokeLinejoin="round" />
+                  <line x1="4" y1="20" x2="21" y2="3" strokeLinecap="round" />
+                  <polyline points="21 16 21 21 16 21" strokeLinecap="round" strokeLinejoin="round" />
+                  <line x1="15" y1="15" x2="21" y2="21" strokeLinecap="round" />
+                </svg>
+                Aléatoire
+              </button>
+            </div>
           )}
         </div>
 
