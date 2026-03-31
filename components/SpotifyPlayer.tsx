@@ -43,7 +43,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
   const {
     accessToken, refreshToken, expiresAt,
     currentTrack, deviceId, shuffle,
-    setDeviceId, setCurrentTrack, updateToken, clearAuth, setShuffle,
+    setDeviceId, setCurrentTrack, updateToken, clearAuth,
   } = useSpotifyStore();
 
   const shuffleRef = useRef(shuffle);
@@ -242,16 +242,6 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
     else playerRef.current.pause().catch(() => {});
   }, [shouldPlay]);
 
-  // ── Shuffle toggle ───────────────────────────────────────────────────────
-  const handleShuffleToggle = () => {
-    const next = !shuffle;
-    setShuffle(next);
-    getValidToken().then((token) => {
-      if (!token || !deviceIdRef.current) return;
-      apiSetShuffle(token, deviceIdRef.current, next).catch(() => {});
-    });
-  };
-
   // ── Volume ───────────────────────────────────────────────────────────────
   const handleVolumeChange = (v: number) => {
     setVolumeState(v);
@@ -370,24 +360,6 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
                 )}
               </button>
             </div>
-
-            {/* Shuffle */}
-            <button
-              onClick={handleShuffleToggle}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg backdrop-blur-sm border transition-all ${
-                shuffle
-                  ? "bg-[#1db954]/20 border-[#1db954]/40 text-[#1db954]"
-                  : "bg-black/50 border-white/10 text-white/50 hover:text-white"
-              }`}
-              title={shuffle ? "Aléatoire activé" : "Dans l'ordre"}
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <polyline points="16 3 21 3 21 8" strokeLinecap="round" strokeLinejoin="round" />
-                <line x1="4" y1="20" x2="21" y2="3" strokeLinecap="round" />
-                <polyline points="21 16 21 21 16 21" strokeLinecap="round" strokeLinejoin="round" />
-                <line x1="15" y1="15" x2="21" y2="21" strokeLinecap="round" />
-              </svg>
-            </button>
 
             {/* Previous */}
             <button
