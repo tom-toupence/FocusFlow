@@ -31,6 +31,7 @@ export default function CoachModal({
   const [planned, setPlanned] = useState(false);
   const [loading, setLoading] = useState(false);
   const [source, setSource] = useState<"ai" | "local">("local");
+  const [notice, setNotice] = useState<string | null>(null);
 
   const applyTasks = (result: PlannedTask[], src: "ai" | "local") => {
     setTasks(result.map((t, i) => ({ ...t, id: `${Date.now()}-${i}`, include: true })));
@@ -43,6 +44,7 @@ export default function CoachModal({
     if (!obj) return;
     if (text) setObjective(text);
     setLoading(true);
+    setNotice(null);
     // Try the AI route first; fall back to the local heuristic planner on any failure
     // (no key configured, quota reached, network error). The feature always works.
     try {
@@ -57,6 +59,11 @@ export default function CoachModal({
           applyTasks(data.tasks, "ai");
           setLoading(false);
           return;
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        if (err?.status === 429) {
+          setNotice("Limite de l'IA atteinte (quota gratuit). Plan local utilisé — réessaie dans ~1 min pour l'IA.");
         }
       }
     } catch { /* ignore — fall through to local */ }
@@ -140,6 +147,15 @@ export default function CoachModal({
             )}
             {loading ? "Génération…" : planned ? "Re-générer" : "Découper en tâches"}
           </button>
+          {notice && (
+            <p className="flex items-start gap-1.5 text-[11px] text-amber-500 dark:text-amber-300/90 bg-amber-500/10 border border-amber-500/15 rounded-lg px-2.5 py-2">
+              <svg className="w-3.5 h-3.5 flex-shrink-0 mt-px" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M12 9v4M12 17h.01" strokeLinecap="round" />
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {notice}
+            </p>
+          )}
         </div>
 
         {/* Result */}
