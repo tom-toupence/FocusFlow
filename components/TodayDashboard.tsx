@@ -22,7 +22,7 @@ function fmtMin(min: number): string {
   return h > 0 ? `${h}h${m > 0 ? ` ${m}m` : ""}` : `${m} min`;
 }
 
-export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab: string) => void }) {
+export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab: "catalogue" | "organisation") => void }) {
   const router = useRouter();
   const { unit, target } = useGoalStore();
   const { days } = useStatsStore();
@@ -56,7 +56,8 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
   const hour = new Date().getHours();
   const greeting = hour < 6 ? "Bonne nuit" : hour < 12 ? "Bonjour" : hour < 18 ? "Bon après-midi" : "Bonsoir";
 
-  const startSession = () => router.push("/settings");
+  // Let the user pick their video / ambiance first (the catalogue routes to /settings on select).
+  const startSession = () => onNavigateTab("catalogue");
 
   return (
     <div className="flex flex-col gap-6">

@@ -962,7 +962,7 @@ export default function LandingPage() {
 
         {/* ── Aujourd'hui ────────────────────────────────────────────────────── */}
         {activeTab === "aujourdhui" && (
-          <TodayDashboard onNavigateTab={(t) => setActiveTab(t as "organisation")} />
+          <TodayDashboard onNavigateTab={(t) => setActiveTab(t)} />
         )}
 
         {/* ── Catalogue ──────────────────────────────────────────────────────── */}
