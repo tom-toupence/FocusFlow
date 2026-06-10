@@ -12,7 +12,7 @@
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { setCurrentUserId } from "@/lib/authState";
-import { fetchCustomVideos, fetchTodos, fetchWorkSessions, fetchPlaylists, fetchProfile, fetchPlanBlocks } from "@/lib/db";
+import { fetchCustomVideos, fetchTodos, fetchWorkSessions, fetchPlaylists, fetchProfile, fetchPlanBlocks, upsertPlanBlock } from "@/lib/db";
 import { usePlanStore } from "@/store/planStore";
 import { useSessionStore } from "@/store/sessionStore";
 import { usePlaylistStore } from "@/store/playlistStore";
@@ -97,10 +97,12 @@ export default function SupabaseProvider({ children }: { children: React.ReactNo
         return { days: merged };
       });
 
-      // Merge plan blocks : remote wins, on conserve les blocs locaux non encore en DB.
+      // Merge plan blocks : remote wins, on conserve les blocs locaux non encore en DB
+      // ET on les pousse vers Supabase (sinon le flux calendrier ne les voit jamais).
       usePlanStore.setState((s) => {
         const remoteIds = new Set(remoteBlocks.map((b) => b.id));
         const localOnly = s.blocks.filter((b) => !remoteIds.has(b.id));
+        for (const b of localOnly) upsertPlanBlock(userId, b);
         return { blocks: [...remoteBlocks, ...localOnly] };
       });
 
