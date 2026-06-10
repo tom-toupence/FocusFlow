@@ -98,7 +98,7 @@ export default function CoachModal({
               </svg>
               Coach de planification
             </h2>
-            <p className="text-[11px] text-foreground/40 mt-0.5">Décris ton objectif, je le découpe en tâches Pomodoro. IA gratuite (Gemini), avec repli local si indisponible.</p>
+            <p className="text-[11px] text-foreground/40 mt-0.5">Décris ton objectif, je le découpe en tâches Pomodoro. IA gratuite, avec repli local si indisponible.</p>
           </div>
           <button onClick={onClose} className="text-foreground/40 hover:text-foreground transition-colors flex-shrink-0">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -170,7 +170,7 @@ export default function CoachModal({
                   "text-[9px] px-1.5 py-0.5 rounded-md font-medium",
                   source === "ai" ? "bg-violet-500/15 text-violet-500 dark:text-violet-300" : "bg-foreground/10 text-foreground/40"
                 )}>
-                  {source === "ai" ? "✦ IA Gemini" : "Plan local"}
+                  {source === "ai" ? "✦ IA" : "Plan local"}
                 </span>
               </div>
               <p className="text-[10px] text-foreground/40">
