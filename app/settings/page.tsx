@@ -12,6 +12,8 @@ import { useTwitchStore } from "@/store/twitchStore";
 import { getVideoColor } from "@/data/videos";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import CoachModal from "@/components/CoachModal";
+import { PlannedTask } from "@/lib/coach";
 
 const presetConfig = [
   {
@@ -137,6 +139,11 @@ export default function SettingsPage() {
   const { todos, addTodo, setTodoStatus, deleteTodo } = useSessionStore();
   const [todoInput, setTodoInput] = useState("");
   const [showResumeModal, setShowResumeModal] = useState(false);
+  const [showCoach, setShowCoach] = useState(false);
+
+  const handleCoachAdd = (tasks: PlannedTask[]) => {
+    tasks.forEach((t) => addTodo(t.text, { pomodoroEstimate: t.pomodoroEstimate }));
+  };
 
   const activeTodos = todos.filter((t) => t.status !== "done");
   const inProgressTodos = activeTodos.filter((t) => t.status === "in-progress");
@@ -208,6 +215,9 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+
+      {/* ── Coach de planification (local, gratuit) ───────────────────── */}
+      {showCoach && <CoachModal onClose={() => setShowCoach(false)} onAdd={handleCoachAdd} />}
 
       {/* ── Modal : reprendre les tâches en cours ──────────────────────── */}
       {showResumeModal && (
@@ -509,6 +519,16 @@ export default function SettingsPage() {
               {todos.length > 0 && (
                 <span className="text-[10px] text-foreground/20">{activeTodos.length} à faire</span>
               )}
+              <button
+                onClick={() => setShowCoach(true)}
+                className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-violet-500 dark:text-violet-300 text-[11px] font-medium transition-all"
+                title="Découper un objectif en tâches (100 % local, gratuit)"
+              >
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M12 3l1.9 4.8L19 9.6l-4 3.4 1.2 5L12 15.8 7.8 18l1.2-5-4-3.4 5.1-1.8z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Coach
+              </button>
             </div>
 
             {/* Add task */}
