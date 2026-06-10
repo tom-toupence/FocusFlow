@@ -51,15 +51,15 @@ export async function POST(request: NextRequest) {
             maxOutputTokens: 700,
             responseMimeType: "application/json",
             responseSchema: {
-              type: "object",
+              type: "OBJECT",
               properties: {
                 tasks: {
-                  type: "array",
+                  type: "ARRAY",
                   items: {
-                    type: "object",
+                    type: "OBJECT",
                     properties: {
-                      text: { type: "string" },
-                      pomodoroEstimate: { type: "integer" },
+                      text: { type: "STRING" },
+                      pomodoroEstimate: { type: "INTEGER" },
                     },
                     required: ["text", "pomodoroEstimate"],
                   },
@@ -73,7 +73,8 @@ export async function POST(request: NextRequest) {
     );
 
     if (!res.ok) {
-      return NextResponse.json({ error: "upstream" }, { status: 502 });
+      const detail = (await res.text().catch(() => "")).slice(0, 300);
+      return NextResponse.json({ error: "upstream", status: res.status, detail }, { status: 502 });
     }
 
     const data = await res.json();
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
     if (tasks.length === 0) return NextResponse.json({ error: "empty_response" }, { status: 502 });
 
     return NextResponse.json({ tasks, source: "ai" });
-  } catch {
-    return NextResponse.json({ error: "upstream" }, { status: 502 });
+  } catch (err) {
+    return NextResponse.json({ error: "upstream", detail: String(err).slice(0, 300) }, { status: 502 });
   }
 }
