@@ -8,6 +8,7 @@ import { useSessionSummaryStore } from "@/store/sessionSummaryStore";
 import { useGoalStore, getTodayProgress } from "@/store/goalStore";
 import { useDistractionStore, getFocusScore } from "@/store/distractionStore";
 import GoalRing from "@/components/GoalRing";
+import JournalReflection from "@/components/JournalReflection";
 import { cn } from "@/lib/utils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -193,6 +194,9 @@ export default function SummaryPage() {
             />
           </div>
         </section>
+
+        {/* Reflection / journal */}
+        <JournalReflection pomodoros={sessionsCompleted} />
 
         {/* Pomodoro dots */}
         {sessionsCompleted > 0 && (

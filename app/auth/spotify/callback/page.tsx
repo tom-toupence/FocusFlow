@@ -24,7 +24,12 @@ function SpotifyCallbackInner() {
     const error = searchParams.get("error");
 
     if (error || !code || !state) {
-      router.replace("/");
+      // Spotify blocks non-allowlisted users at the authorize step (dev mode) with
+      // error=access_denied. Stash it so the Spotify tab can explain what to do.
+      if (error) {
+        try { sessionStorage.setItem("spotify_auth_error", error); } catch { /* ignore */ }
+      }
+      router.replace("/?spotify=error");
       return;
     }
 
@@ -35,8 +40,9 @@ function SpotifyCallbackInner() {
         if (profile) setProfile(profile);
         router.replace("/");
       } else {
+        try { sessionStorage.setItem("spotify_auth_error", "token_failed"); } catch { /* ignore */ }
         setFailed(true);
-        setTimeout(() => router.replace("/"), 3000);
+        setTimeout(() => router.replace("/?spotify=error"), 3000);
       }
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

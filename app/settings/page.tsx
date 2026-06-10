@@ -13,6 +13,7 @@ import { getVideoColor } from "@/data/videos";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import CoachModal from "@/components/CoachModal";
+import RoutineSaveModal from "@/components/RoutineSaveModal";
 import { PlannedTask } from "@/lib/coach";
 
 const presetConfig = [
@@ -140,6 +141,7 @@ export default function SettingsPage() {
   const [todoInput, setTodoInput] = useState("");
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [showCoach, setShowCoach] = useState(false);
+  const [showRoutineSave, setShowRoutineSave] = useState(false);
 
   const handleCoachAdd = (tasks: PlannedTask[]) => {
     tasks.forEach((t) => addTodo(t.text, { pomodoroEstimate: t.pomodoroEstimate }));
@@ -218,6 +220,9 @@ export default function SettingsPage() {
 
       {/* ── Coach de planification (local, gratuit) ───────────────────── */}
       {showCoach && <CoachModal onClose={() => setShowCoach(false)} onAdd={handleCoachAdd} />}
+
+      {/* ── Enregistrer comme routine ─────────────────────────────────── */}
+      {showRoutineSave && <RoutineSaveModal onClose={() => setShowRoutineSave(false)} />}
 
       {/* ── Modal : reprendre les tâches en cours ──────────────────────── */}
       {showResumeModal && (
@@ -640,6 +645,16 @@ export default function SettingsPage() {
               <path d="M8 5v14l11-7z"/>
             </svg>
             Démarrer la session
+          </button>
+          <button
+            onClick={() => setShowRoutineSave(true)}
+            className="flex items-center justify-center gap-2 -mt-3 text-xs text-foreground/40 hover:text-foreground/70 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M17 21v-8H7v8M7 3v5h8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Enregistrer cette config comme routine
           </button>
         </div>
       </main>

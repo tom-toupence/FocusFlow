@@ -25,6 +25,7 @@ import { usePrefsStore } from "@/store/prefsStore";
 import { useDistractionStore } from "@/store/distractionStore";
 import { useAchievementsStore } from "@/store/achievementsStore";
 import { useGoalStore, getTodayProgress } from "@/store/goalStore";
+import { useProjectStore } from "@/store/projectStore";
 import { ACHIEVEMENTS } from "@/lib/achievements";
 import { toast } from "@/components/Toast";
 import { playBreakChime, playWorkChime } from "@/lib/sounds";
@@ -311,6 +312,7 @@ export default function SessionPage() {
         sessionEndedRef.current = true;
         recordSession(settings.workDuration);
         recordPlay(buildPlayEntry(settings.workDuration));
+        useProjectStore.getState().logPomodoro(); // advance the active project, if any
         celebrateProgress();
       }
     } else {

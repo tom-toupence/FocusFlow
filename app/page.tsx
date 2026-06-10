@@ -13,6 +13,11 @@ import { cn } from "@/lib/utils";
 import StatsSection from "@/components/StatsSection";
 import ThemeToggle from "@/components/ThemeToggle";
 import ProfilePanel from "@/components/ProfilePanel";
+import TodayDashboard from "@/components/TodayDashboard";
+import ProjectsSection from "@/components/ProjectsSection";
+import WeekPlanner from "@/components/WeekPlanner";
+import RoutinesManager from "@/components/RoutinesManager";
+import JournalTimeline from "@/components/JournalTimeline";
 import { useProfileStore, resolvedProfile } from "@/store/profileStore";
 
 const allMoods: VideoMood[] = ["lofi", "jazz", "ambience", "nature", "synthwave", "classical"];
@@ -647,7 +652,7 @@ export default function LandingPage() {
   const profileState = useProfileStore();
   const profile = resolvedProfile(profileState);
 
-  const [activeTab, setActiveTab] = useState<"catalogue" | "library" | "spotify" | "twitch" | "activite">("catalogue");
+  const [activeTab, setActiveTab] = useState<"aujourdhui" | "catalogue" | "library" | "spotify" | "twitch" | "activite" | "organisation">("aujourdhui");
   const [twitchInput, setTwitchInput] = useState("");
   const [vodInput, setVodInput] = useState("");
   const [vodError, setVodError] = useState("");
@@ -660,11 +665,25 @@ export default function LandingPage() {
   const [showAddPlaylistModal, setShowAddPlaylistModal] = useState(false);
   const [spotifyLoading, setSpotifyLoading] = useState(false);
   const [spotifyApiError, setSpotifyApiError] = useState<"forbidden" | "error" | null>(null);
+  const [spotifyAuthError, setSpotifyAuthError] = useState<string | null>(null);
   const [showProfilePanel, setShowProfilePanel] = useState(false);
 
   const catalogueVideos = activeFilter ? defaultVideos.filter((v) => v.mood === activeFilter) : defaultVideos;
   const hasLibraryContent = customVideos.length > 0 || playlists.length > 0;
   const isSpotifyConnected = !!accessToken;
+
+  // Surface a Spotify authorization error (e.g. user not added to the dev-mode app)
+  // captured by the OAuth callback, and open the Spotify tab so the message is seen.
+  useEffect(() => {
+    let stored: string | null = null;
+    try { stored = sessionStorage.getItem("spotify_auth_error"); } catch { /* ignore */ }
+    if (stored) {
+      try { sessionStorage.removeItem("spotify_auth_error"); } catch { /* ignore */ }
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSpotifyAuthError(stored);
+      setActiveTab("spotify");
+    }
+  }, []);
 
   // Refresh Spotify token if expired, then load playlists when tab opens
   useEffect(() => {
@@ -835,7 +854,16 @@ export default function LandingPage() {
 
       <main className="flex-1 px-6 py-8 max-w-7xl mx-auto w-full">
         {/* Tabs */}
-        <div className="flex gap-1 mb-8">
+        <div className="flex gap-1 mb-8 flex-wrap">
+          <button
+            onClick={() => setActiveTab("aujourdhui")}
+            className={cn(
+              "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all",
+              activeTab === "aujourdhui" ? "bg-foreground/15 text-foreground" : "text-foreground/40 hover:text-foreground/70 bg-foreground/5"
+            )}
+          >
+            Aujourd&apos;hui
+          </button>
           <button
             onClick={() => setActiveTab("catalogue")}
             className={cn(
@@ -918,7 +946,24 @@ export default function LandingPage() {
             </svg>
             Activité
           </button>
+          <button
+            onClick={() => setActiveTab("organisation")}
+            className={cn(
+              "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5",
+              activeTab === "organisation" ? "bg-foreground/15 text-foreground" : "text-foreground/40 hover:text-foreground/70 bg-foreground/5"
+            )}
+          >
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="3" y1="10" x2="21" y2="10" /><line x1="9" y1="4" x2="9" y2="22" strokeLinecap="round" />
+            </svg>
+            Organisation
+          </button>
         </div>
+
+        {/* ── Aujourd'hui ────────────────────────────────────────────────────── */}
+        {activeTab === "aujourdhui" && (
+          <TodayDashboard onNavigateTab={(t) => setActiveTab(t as "organisation")} />
+        )}
 
         {/* ── Catalogue ──────────────────────────────────────────────────────── */}
         {activeTab === "catalogue" && (
@@ -1074,6 +1119,46 @@ export default function LandingPage() {
             </div>
 
             {!isSpotifyConnected ? (
+              spotifyAuthError ? (
+                <div className="flex flex-col items-center justify-center py-24 gap-6">
+                  <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                      <path d="M12 9v4M12 17h.01" strokeLinecap="round" />
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <div className="text-center max-w-md">
+                    {spotifyAuthError === "token_failed" ? (
+                      <>
+                        <p className="text-sm font-medium text-foreground/70">Connexion Spotify échouée</p>
+                        <p className="text-xs text-foreground/40 mt-2 leading-relaxed">
+                          Quelque chose s&apos;est mal passé pendant la connexion. Réessaie.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-medium text-foreground/70">Ton compte n&apos;est pas autorisé sur cette app</p>
+                        <p className="text-xs text-foreground/40 mt-2 leading-relaxed">
+                          Cette app Spotify est en <strong className="text-foreground/60">mode développement</strong> : seuls les comptes ajoutés manuellement peuvent l&apos;utiliser.
+                          Demande à l&apos;<strong className="text-foreground/60">administrateur</strong> d&apos;ajouter ton adresse e-mail Spotify dans le <strong className="text-foreground/60">Spotify Developer Dashboard</strong> (Settings → User Management), puis réessaie.
+                        </p>
+                        <p className="text-[11px] text-foreground/25 mt-2">
+                          (Si tu as annulé l&apos;autorisation volontairement, clique simplement sur Réessayer.)
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => { setSpotifyAuthError(null); loginWithSpotify(); }}
+                    className="flex items-center gap-2.5 px-6 py-3 rounded-xl bg-[#1db954] hover:bg-[#1ed760] text-black font-semibold text-sm transition-all shadow-lg shadow-[#1db954]/20"
+                  >
+                    <svg viewBox="0 0 24 24" className="w-4.5 h-4.5" fill="currentColor">
+                      <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+                    </svg>
+                    Réessayer
+                  </button>
+                </div>
+              ) : (
               <div className="flex flex-col items-center justify-center py-24 gap-6">
                 <div className="w-16 h-16 rounded-full bg-[#1db954]/10 flex items-center justify-center">
                   <svg viewBox="0 0 24 24" className="w-8 h-8 text-[#1db954]" fill="currentColor">
@@ -1096,6 +1181,7 @@ export default function LandingPage() {
                   Connecter avec Spotify
                 </button>
               </div>
+              )
             ) : spotifyLoading ? (
               <div className="flex items-center justify-center py-24">
                 <div className="w-6 h-6 border-2 border-foreground/10 border-t-[#1db954] rounded-full animate-spin" />
@@ -1391,6 +1477,22 @@ export default function LandingPage() {
             </div>
             <StatsSection embedded />
             <CompletedTodosBacklog />
+          </>
+        )}
+
+        {/* ── Organisation ───────────────────────────────────────────────────── */}
+        {activeTab === "organisation" && (
+          <>
+            <div className="mb-8">
+              <h1 className="text-3xl font-semibold text-foreground tracking-tight">Organisation</h1>
+              <p className="text-foreground/40 mt-1 text-sm">Projets, planning de la semaine, routines et journal.</p>
+            </div>
+            <div className="flex flex-col gap-12">
+              <ProjectsSection />
+              <WeekPlanner />
+              <RoutinesManager />
+              <JournalTimeline />
+            </div>
           </>
         )}
 
