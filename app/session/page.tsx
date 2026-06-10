@@ -101,6 +101,8 @@ export default function SessionPage() {
   const [volume, setVolumeState] = useState(0.8);
   const [showVolume, setShowVolume] = useState(false);
   const [showMixer, setShowMixer] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [distractionFlash, setDistractionFlash] = useState(0);
   const volumeRef = useRef(0.8);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
@@ -345,9 +347,11 @@ export default function SessionPage() {
   const handleDistraction = useCallback(() => {
     if (isBreakRef.current) return; // only count during focus
     markDistraction();
+    setDistractionFlash((n) => n + 1); // trigger a brief visual feedback
   }, [markDistraction]);
 
-  // Keyboard shortcut: D marks a distraction (ignored while typing in a field).
+  // Keyboard shortcuts (ignored while typing in a field):
+  //  • D — mark a distraction   • Space — pause / resume
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -355,11 +359,16 @@ export default function SessionPage() {
       if (e.key === "d" || e.key === "D") {
         e.preventDefault();
         handleDistraction();
+      } else if (e.code === "Space") {
+        e.preventDefault();
+        if (!isBreakRef.current) {
+          if (isRunningRef.current) pause(); else start();
+        }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [handleDistraction]);
+  }, [handleDistraction, pause, start]);
 
   // ── Todo ──────────────────────────────────────────────────────────────────
   const handleAddTodo = () => {
@@ -571,89 +580,118 @@ export default function SessionPage() {
 
             {/* Right controls */}
             <div className="flex items-center gap-2">
-              {isTwitchMode && (
-                <a
-                  href={
-                    selectedVodId
-                      ? `https://www.twitch.tv/videos/${selectedVodId}`
-                      : `https://www.twitch.tv/${selectedChannel}`
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/60 hover:text-[#9146ff] hover:border-[#9146ff]/40 text-xs font-medium transition-all"
+              {/* Utility cluster — uniform icon buttons */}
+              <div className="flex items-center gap-1 p-1 rounded-2xl bg-black/50 backdrop-blur-sm border border-white/15">
+                {/* Distraction marker (shortcut: D) */}
+                <button
+                  onClick={handleDistraction}
+                  className="relative w-9 h-9 flex items-center justify-center rounded-xl text-white/75 hover:text-amber-400 hover:bg-amber-500/10 transition-all"
+                  title="Marquer une distraction · touche D"
                 >
-                  <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor">
-                    <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M12 9v4M12 17h.01" strokeLinecap="round" />
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  Twitch
-                </a>
-              )}
-
-              {/* Distraction marker — Pomodoro interruptions (shortcut: D) */}
-              <button
-                onClick={handleDistraction}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/75 hover:text-amber-400 hover:border-amber-500/40 text-xs font-medium transition-all"
-                title="Marquer une distraction (D)"
-              >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path d="M12 9v4M12 17h.01" strokeLinecap="round" />
-                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                {distractionCount > 0 ? distractionCount : "Distraction"}
-              </button>
-
-              {/* Ambiances — soundscape mixer */}
-              <button
-                onClick={() => setShowMixer((v) => !v)}
-                className={cn(
-                  "w-9 h-9 flex items-center justify-center rounded-xl backdrop-blur-sm border text-white/75 hover:text-white transition-all",
-                  showMixer ? "bg-white/20 border-white/40" : "bg-black/60 border-white/20"
-                )}
-                title="Ambiances sonores"
-              >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path d="M9 18V5l12-2v13" strokeLinecap="round" strokeLinejoin="round" />
-                  <circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
-                </svg>
-              </button>
-
-              {/* Volume (YouTube & Twitch only — Spotify has its own) */}
-              {!isSpotifyMode && (
-                <div className="relative flex items-center">
-                  {showVolume && (
-                    <input
-                      type="range"
-                      min={0} max={1} step={0.05}
-                      value={volume}
-                      onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                      className="absolute right-full mr-2 w-20 h-1 accent-white cursor-pointer"
-                    />
+                  {distractionCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-black text-[10px] font-bold flex items-center justify-center tabular-nums">
+                      {distractionCount}
+                    </span>
                   )}
-                  <button
-                    onClick={() => setShowVolume((v) => !v)}
-                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/75 hover:text-white transition-all"
-                    title="Volume"
-                  >
-                    {volume === 0 ? (
-                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                        <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
-                        <line x1="23" y1="9" x2="17" y2="15" strokeLinecap="round" />
-                        <line x1="17" y1="9" x2="23" y2="15" strokeLinecap="round" />
-                      </svg>
-                    ) : (
-                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                        <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" strokeLinecap="round" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              )}
+                  {/* Flash feedback: a floating +1 on each mark */}
+                  {distractionFlash > 0 && (
+                    <span
+                      key={distractionFlash}
+                      className="absolute inset-0 flex items-center justify-center pointer-events-none text-amber-300 text-xs font-bold animate-[distractionPop_0.7s_ease-out_forwards]"
+                    >
+                      +1
+                    </span>
+                  )}
+                </button>
 
-              {/* Pause / Resume — prominent */}
+                {/* Ambiances — soundscape mixer */}
+                <button
+                  onClick={() => { setShowMixer((v) => !v); setShowHelp(false); }}
+                  className={cn(
+                    "w-9 h-9 flex items-center justify-center rounded-xl transition-all",
+                    showMixer ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
+                  )}
+                  title="Ambiances sonores (pluie, vagues…)"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M9 18V5l12-2v13" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+                  </svg>
+                </button>
+
+                {/* Volume (YouTube & Twitch only — Spotify has its own) */}
+                {!isSpotifyMode && (
+                  <div className="relative flex items-center">
+                    {showVolume && (
+                      <input
+                        type="range"
+                        min={0} max={1} step={0.05}
+                        value={volume}
+                        onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                        className="absolute right-full mr-2 w-20 h-1 accent-white cursor-pointer"
+                      />
+                    )}
+                    <button
+                      onClick={() => setShowVolume((v) => !v)}
+                      className="w-9 h-9 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
+                      title="Volume de la vidéo"
+                    >
+                      {volume === 0 ? (
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                          <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
+                          <line x1="23" y1="9" x2="17" y2="15" strokeLinecap="round" />
+                          <line x1="17" y1="9" x2="23" y2="15" strokeLinecap="round" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                          <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" strokeLinecap="round" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Twitch shortcut */}
+                {isTwitchMode && (
+                  <a
+                    href={selectedVodId ? `https://www.twitch.tv/videos/${selectedVodId}` : `https://www.twitch.tv/${selectedChannel}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-9 h-9 flex items-center justify-center rounded-xl text-white/75 hover:text-[#9146ff] hover:bg-[#9146ff]/10 transition-all"
+                    title="Ouvrir sur Twitch"
+                  >
+                    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+                      <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+                    </svg>
+                  </a>
+                )}
+
+                {/* Help / info */}
+                <button
+                  onClick={() => { setShowHelp((v) => !v); setShowMixer(false); }}
+                  className={cn(
+                    "w-9 h-9 flex items-center justify-center rounded-xl transition-all",
+                    showHelp ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
+                  )}
+                  title="Aide & raccourcis"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.7M12 17h.01" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Pause / Resume — primary (shortcut: Espace) */}
               <button
                 onClick={isRunning ? pause : start}
                 className="flex items-center gap-2 px-5 py-2 rounded-full bg-white/20 backdrop-blur-md border border-white/40 text-white text-sm font-semibold transition-all hover:bg-white/30 shadow-lg shadow-black/30"
+                title={isRunning ? "Mettre en pause · Espace" : "Reprendre · Espace"}
               >
                 {isRunning ? (
                   <>
@@ -673,10 +711,11 @@ export default function SessionPage() {
                 )}
               </button>
 
-              {/* Tâches */}
+              {/* Tâches — primary */}
               <button
                 onClick={() => setShowTodos((v) => !v)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/15 backdrop-blur-sm border border-white/30 text-white text-xs font-semibold transition-all hover:bg-white/25"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm border border-white/30 text-white text-xs font-semibold transition-all hover:bg-white/25"
+                title="Afficher / masquer les tâches"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" strokeLinecap="round" />
@@ -686,6 +725,37 @@ export default function SessionPage() {
               </button>
             </div>
           </div>
+
+          {/* ── Help panel ─────────────────────────────────────────────────── */}
+          {showHelp && (
+            <div className="absolute top-20 right-5 w-80 bg-black/85 backdrop-blur-xl rounded-2xl border border-white/15 shadow-2xl shadow-black/80 overflow-hidden z-20">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                <span className="text-xs font-semibold text-white/70 uppercase tracking-widest">Comment ça marche</span>
+                <button onClick={() => setShowHelp(false)} className="text-white/40 hover:text-white transition-colors">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-4 flex flex-col gap-3.5 text-xs">
+                <HelpRow icon="⚠️" title="Distraction (touche D)">
+                  À chaque fois que tu décroches, clique ou appuie sur <b className="text-white/80">D</b> pour la noter. Rien n&apos;est détecté tout seul — c&apos;est toi qui marques. Moins tu en as, meilleur est ton <b className="text-white/80">Focus Score</b> en fin de session.
+                </HelpRow>
+                <HelpRow icon="🎵" title="Ambiances">
+                  Superpose des sons (pluie, vagues, vent…) par-dessus ta musique. Tout démarre à 0 : monte les curseurs pour mixer ton ambiance.
+                </HelpRow>
+                <HelpRow icon="⏯️" title="Pause / Reprise (Espace)">
+                  Met en pause le timer et la vidéo. Le raccourci <b className="text-white/80">Espace</b> fait pareil.
+                </HelpRow>
+                <HelpRow icon="🫧" title="Respiration guidée">
+                  Pendant les pauses, une bulle t&apos;aide à respirer (cycle 4-4-4-4) pour vraiment récupérer.
+                </HelpRow>
+                <HelpRow icon="📝" title="Tâches & post-its">
+                  Coche tes tâches au fil de la session ; ajoute des post-it en bas à gauche pour tes idées.
+                </HelpRow>
+              </div>
+            </div>
+          )}
 
           {/* Tasks panel */}
           {showTodos && (
@@ -748,6 +818,20 @@ export default function SessionPage() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// ─── Help panel row ───────────────────────────────────────────────────────────
+
+function HelpRow({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-2.5">
+      <span className="text-base flex-shrink-0 leading-none mt-0.5">{icon}</span>
+      <div className="min-w-0">
+        <p className="text-white/85 font-semibold text-[11px] mb-0.5">{title}</p>
+        <p className="text-white/45 leading-relaxed text-[11px]">{children}</p>
+      </div>
     </div>
   );
 }

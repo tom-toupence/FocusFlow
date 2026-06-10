@@ -34,6 +34,20 @@ export const useSoundscapeStore = create<SoundscapeState>()(
 
       anyActive: () => Object.values(get().layers).some((v) => (v ?? 0) > 0.01),
     }),
-    { name: "focusflow-soundscape" }
+    {
+      name: "focusflow-soundscape",
+      // Les couches ne sont PAS persistées : chaque session démarre avec 0 ambiance active.
+      // Seules les préférences (volume global, couper en pause) sont mémorisées.
+      partialize: (state) => ({ masterVolume: state.masterVolume, pauseOnBreak: state.pauseOnBreak }),
+      version: 1,
+      // Purge les couches éventuellement déjà sauvegardées par une ancienne version.
+      migrate: (persisted) => {
+        const p = (persisted ?? {}) as { masterVolume?: number; pauseOnBreak?: boolean };
+        return {
+          masterVolume: p.masterVolume ?? 0.7,
+          pauseOnBreak: p.pauseOnBreak ?? false,
+        };
+      },
+    }
   )
 );

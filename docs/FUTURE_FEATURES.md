@@ -13,15 +13,19 @@
 
 ## Vue d'ensemble & priorisation
 
-| # | Feature | Impact | Effort | Dépend de |
-|---|---------|--------|--------|-----------|
-| 1 | Focus Rooms collaboratives (temps réel) | 🔥🔥🔥 | XL | Supabase Realtime |
-| 2 | Dashboard analytique + rapports & export | 🔥🔥 | L | Sync comptes |
-| 3 | Coach IA & découpage de tâches | 🔥🔥🔥 | L | API Claude |
-| 4 | Intégrations agenda/tâches (Calendar, Notion, Todoist) | 🔥🔥 | L | OAuth existant |
-| 5 | Bloqueur de distractions (PWA + extension) | 🔥🔥 | XL | Extension navigateur |
-| 6 | Gamification 2.0 : XP, niveaux, jardin de focus | 🔥🔥 | M | Badges existants |
-| 7 | Marketplace d'ambiances & playlists communautaires | 🔥 | L | Comptes + storage |
+| # | Feature | Impact | Effort | Dépend de | Statut |
+|---|---------|--------|--------|-----------|--------|
+| 1 | Focus Rooms collaboratives (temps réel) | 🔥🔥🔥 | XL | Supabase Realtime | À faire |
+| 2 | Dashboard analytique + rapports & export | 🔥🔥 | L | Sync comptes | ✅ **Livré** (`/insights`) |
+| 3 | Coach IA & découpage de tâches | 🔥🔥🔥 | L | Clé API Claude + Edge Function | Bloqué (credentials) |
+| 4 | Intégrations agenda/tâches (Calendar, Notion, Todoist) | 🔥🔥 | L | OAuth apps | Bloqué (credentials) |
+| 5 | Bloqueur de distractions (PWA + extension) | 🔥🔥 | XL | Extension navigateur | À faire |
+| 6 | Gamification 2.0 : XP, niveaux, jardin de focus | 🔥🔥 | M | Badges existants | ✅ **Livré** (onglet Activité) |
+| 7 | Marketplace d'ambiances & playlists communautaires | 🔥 | L | Comptes + storage | À faire |
+
+> **Livrés** : Dashboard analytique (#2 → page `/insights` : focus par heure/jour, évolution du Focus
+> Score, export CSV/JSON) et Gamification 2.0 (#6 → XP/niveaux, jardin de focus hebdo, défis hebdomadaires).
+> **Bloqués tant que les accès ne sont pas fournis** : Coach IA (#3, clé API Claude), intégrations (#4, apps OAuth).
 
 ---
 

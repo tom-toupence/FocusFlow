@@ -6,6 +6,7 @@ import { useGoalStore, getTodayProgress, GoalUnit } from "@/store/goalStore";
 import { useAchievementsStore } from "@/store/achievementsStore";
 import { ACHIEVEMENTS } from "@/lib/achievements";
 import GoalRing from "@/components/GoalRing";
+import ProgressionPanel from "@/components/ProgressionPanel";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 
@@ -94,6 +95,9 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
   return (
     <section className={cn(embedded ? "pb-8" : "border-t border-foreground/[0.06] py-8 px-6 max-w-7xl mx-auto w-full")}>
       {!embedded && <h2 className="text-sm font-semibold text-foreground/30 uppercase tracking-widest mb-6">Activité</h2>}
+
+      {/* ── Niveau, jardin & défis ────────────────────────────────────────────── */}
+      <ProgressionPanel />
 
       {/* ── Objectif quotidien ────────────────────────────────────────────────── */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-5 bg-foreground/[0.03] border border-foreground/[0.06] rounded-2xl p-5">

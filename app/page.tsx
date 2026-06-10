@@ -1374,9 +1374,20 @@ export default function LandingPage() {
         {/* ── Activité ────────────────────────────────────────────────────────── */}
         {activeTab === "activite" && (
           <>
-            <div className="mb-8">
-              <h1 className="text-3xl font-semibold text-foreground tracking-tight">Activité</h1>
-              <p className="text-foreground/40 mt-1 text-sm">Ton historique de sessions et tes tâches accomplies.</p>
+            <div className="mb-8 flex items-end justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-semibold text-foreground tracking-tight">Activité</h1>
+                <p className="text-foreground/40 mt-1 text-sm">Ton niveau, tes stats et tes tâches accomplies.</p>
+              </div>
+              <button
+                onClick={() => router.push("/insights")}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 text-foreground/60 hover:text-foreground text-xs font-medium transition-all flex-shrink-0"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M3 3v18h18M7 14l4-4 3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Statistiques détaillées
+              </button>
             </div>
             <StatsSection embedded />
             <CompletedTodosBacklog />
