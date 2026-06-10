@@ -18,6 +18,15 @@ import StickyNote from "@/components/StickyNote";
 import SpotifyPlayer from "@/components/SpotifyPlayer";
 import TwitchPlayer from "@/components/TwitchPlayer";
 import TodoStatusDropdown from "@/components/TodoStatusDropdown";
+import SoundscapeMixer from "@/components/SoundscapeMixer";
+import BreathingExercise from "@/components/BreathingExercise";
+import { useSoundscapeStore } from "@/store/soundscapeStore";
+import { usePrefsStore } from "@/store/prefsStore";
+import { useDistractionStore } from "@/store/distractionStore";
+import { useAchievementsStore } from "@/store/achievementsStore";
+import { useGoalStore, getTodayProgress } from "@/store/goalStore";
+import { ACHIEVEMENTS } from "@/lib/achievements";
+import { toast } from "@/components/Toast";
 import { playBreakChime, playWorkChime } from "@/lib/sounds";
 
 // ─── YouTube IFrame API types ─────────────────────────────────────────────────
@@ -67,6 +76,9 @@ export default function SessionPage() {
   const { selectedPlaylistUri, accessToken, playlists: spotifyPlaylists } = useSpotifyStore();
   const { selectedChannel, selectedVodId, accessToken: twitchToken } = useTwitchStore();
   const { record: recordPlay } = usePlayHistoryStore();
+  const { pauseOnBreak } = useSoundscapeStore();
+  const { breathingEnabled } = usePrefsStore();
+  const { sessionCount: distractionCount, markDistraction, resetSession: resetDistractions } = useDistractionStore();
 
   const allVideos = getAllVideos();
   const video = allVideos.find((v) => v.id === selectedVideoId) ?? allVideos[0];
@@ -78,6 +90,7 @@ export default function SessionPage() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevSecondsRef = useRef(secondsLeft);
   const sessionEndedRef = useRef(false);
+  const goalCelebratedRef = useRef(false);
   const playerRef = useRef<YTPlayer | null>(null);
   const playerReadyRef = useRef(false);
   const isBreakRef = useRef(mode !== "work");
@@ -87,6 +100,7 @@ export default function SessionPage() {
   const [mounted, setMounted] = useState(false);
   const [volume, setVolumeState] = useState(0.8);
   const [showVolume, setShowVolume] = useState(false);
+  const [showMixer, setShowMixer] = useState(false);
   const volumeRef = useRef(0.8);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
@@ -114,6 +128,7 @@ export default function SessionPage() {
   useEffect(() => {
     const doneTodoIds = todos.filter((t) => t.status === "done").map((t) => t.id);
     startSession(settings.workDuration, doneTodoIds);
+    resetDistractions();
     start();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -260,6 +275,26 @@ export default function SessionPage() {
     return { type: "youtube" as const, title: video.title, subtitle: video.channel, thumbnailUrl: `https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`, mediaKey: video.youtubeId, date, timestamp: Date.now(), minutes };
   };
 
+  // ── Celebrations: achievements unlocked + daily goal reached ──────────────
+  const celebrateProgress = () => {
+    // Achievements (re-evaluated from fresh stats/history)
+    const newly = useAchievementsStore.getState().sync();
+    for (const id of newly) {
+      const a = ACHIEVEMENTS.find((x) => x.id === id);
+      if (a) toast({ title: "Succès débloqué !", description: a.title, emoji: a.emoji, accent: "amber" });
+    }
+    // Daily goal (only once per session view)
+    if (!goalCelebratedRef.current) {
+      const { unit, target } = useGoalStore.getState();
+      const progress = getTodayProgress(useStatsStore.getState().days, unit, target);
+      if (progress.reached) {
+        goalCelebratedRef.current = true;
+        playWorkChime();
+        toast({ title: "Objectif du jour atteint 🎯", description: "Bravo, continue sur ta lancée !", emoji: "✦", accent: "emerald" });
+      }
+    }
+  };
+
   // ── Session end ───────────────────────────────────────────────────────────
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleSessionEnd = useCallback(() => {
@@ -274,6 +309,7 @@ export default function SessionPage() {
         sessionEndedRef.current = true;
         recordSession(settings.workDuration);
         recordPlay(buildPlayEntry(settings.workDuration));
+        celebrateProgress();
       }
     } else {
       sessionEndedRef.current = false;
@@ -298,9 +334,32 @@ export default function SessionPage() {
         recordPlay(buildPlayEntry(minutesWorked));
       }
     }
+    // Sync achievements so the summary reflects anything just unlocked.
+    useAchievementsStore.getState().sync();
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     router.push("/summary");
   };
+
+  // ── Distraction tracking ──────────────────────────────────────────────────
+  // Faithful to the original Pomodoro Technique: mark every interruption.
+  const handleDistraction = useCallback(() => {
+    if (isBreakRef.current) return; // only count during focus
+    markDistraction();
+  }, [markDistraction]);
+
+  // Keyboard shortcut: D marks a distraction (ignored while typing in a field).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable) return;
+      if (e.key === "d" || e.key === "D") {
+        e.preventDefault();
+        handleDistraction();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleDistraction]);
 
   // ── Todo ──────────────────────────────────────────────────────────────────
   const handleAddTodo = () => {
@@ -418,6 +477,8 @@ export default function SessionPage() {
               style={{ width: `${breakTotal > 0 ? (secondsLeft / breakTotal) * 100 : 0}%`, transition: "width 1s linear" }}
             />
           </div>
+          {/* Guided breathing */}
+          {breathingEnabled && <BreathingExercise accent={isLong ? "sky" : "emerald"} />}
           {/* Buttons */}
           <div className="flex items-center gap-4 z-10">
             <button
@@ -440,8 +501,22 @@ export default function SessionPage() {
               Terminer la session
             </button>
           </div>
+          {/* Breathing toggle */}
+          <button
+            onClick={() => usePrefsStore.getState().setBreathingEnabled(!breathingEnabled)}
+            className="z-10 text-[11px] text-white/30 hover:text-white/60 transition-colors"
+          >
+            {breathingEnabled ? "Masquer la respiration guidée" : "Afficher la respiration guidée"}
+          </button>
         </div>
       )}
+
+      {/* ── Soundscape mixer (always mounted so audio survives panel close) ── */}
+      <SoundscapeMixer
+        open={showMixer}
+        onClose={() => setShowMixer(false)}
+        active={isBreak ? !pauseOnBreak : isRunning}
+      />
 
       {/* ── Sticky notes — portal to escape overflow:hidden ─────────────── */}
       {mounted && createPortal(
@@ -513,6 +588,34 @@ export default function SessionPage() {
                   Twitch
                 </a>
               )}
+
+              {/* Distraction marker — Pomodoro interruptions (shortcut: D) */}
+              <button
+                onClick={handleDistraction}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/75 hover:text-amber-400 hover:border-amber-500/40 text-xs font-medium transition-all"
+                title="Marquer une distraction (D)"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M12 9v4M12 17h.01" strokeLinecap="round" />
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {distractionCount > 0 ? distractionCount : "Distraction"}
+              </button>
+
+              {/* Ambiances — soundscape mixer */}
+              <button
+                onClick={() => setShowMixer((v) => !v)}
+                className={cn(
+                  "w-9 h-9 flex items-center justify-center rounded-xl backdrop-blur-sm border text-white/75 hover:text-white transition-all",
+                  showMixer ? "bg-white/20 border-white/40" : "bg-black/60 border-white/20"
+                )}
+                title="Ambiances sonores"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M9 18V5l12-2v13" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+                </svg>
+              </button>
 
               {/* Volume (YouTube & Twitch only — Spotify has its own) */}
               {!isSpotifyMode && (

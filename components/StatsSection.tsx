@@ -2,6 +2,10 @@
 
 import { useStatsStore, getTodayStats, getWeekStats, getStreak, getLast119Days, getLast7Days, getTotalStats, getBestDay, localToday } from "@/store/statsStore";
 import { usePlayHistoryStore, getTopPlays, PlayType } from "@/store/playHistoryStore";
+import { useGoalStore, getTodayProgress, GoalUnit } from "@/store/goalStore";
+import { useAchievementsStore } from "@/store/achievementsStore";
+import { ACHIEVEMENTS } from "@/lib/achievements";
+import GoalRing from "@/components/GoalRing";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 
@@ -41,9 +45,13 @@ const monthNames = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "S
 export default function StatsSection({ embedded }: { embedded?: boolean }) {
   const { days } = useStatsStore();
   const { entries: historyEntries } = usePlayHistoryStore();
+  const { unit: goalUnit, target: goalTarget, setUnit, setTarget } = useGoalStore();
+  const { unlocked, sync } = useAchievementsStore();
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
+  // Keep badges fresh whenever stats are viewed.
+  useEffect(() => { if (mounted) sync(); }, [mounted, sync]);
   if (!mounted) return null;
   const today = getTodayStats(days);
   const week = getWeekStats(days);
@@ -54,6 +62,8 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
   const calDays = getLast119Days(days);
   const topPlays = getTopPlays(historyEntries);
   const recentPlays = historyEntries.slice(0, 10);
+  const goalProgress = getTodayProgress(days, goalUnit, goalTarget);
+  const goalStep = goalUnit === "minutes" ? 15 : 1;
 
   const maxMinutes7 = Math.max(...last7.map((d) => d.minutes), 1);
 
@@ -84,6 +94,54 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
   return (
     <section className={cn(embedded ? "pb-8" : "border-t border-foreground/[0.06] py-8 px-6 max-w-7xl mx-auto w-full")}>
       {!embedded && <h2 className="text-sm font-semibold text-foreground/30 uppercase tracking-widest mb-6">Activité</h2>}
+
+      {/* ── Objectif quotidien ────────────────────────────────────────────────── */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-5 bg-foreground/[0.03] border border-foreground/[0.06] rounded-2xl p-5">
+        <GoalRing progress={goalProgress} size={108} />
+        <div className="flex-1 flex flex-col gap-3 min-w-0">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Objectif quotidien</p>
+            <p className="text-xs text-foreground/40 mt-0.5">
+              {goalProgress.reached
+                ? "Objectif atteint pour aujourd'hui. Bravo ✦"
+                : "Fixe une cible de focus et garde le cap chaque jour."}
+            </p>
+          </div>
+          {/* Unit toggle */}
+          <div className="flex items-center gap-2">
+            {(["minutes", "pomodoros"] as GoalUnit[]).map((u) => (
+              <button
+                key={u}
+                onClick={() => setUnit(u)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                  goalUnit === u ? "bg-foreground/15 text-foreground" : "bg-foreground/5 text-foreground/40 hover:text-foreground/70"
+                )}
+              >
+                {u === "minutes" ? "Minutes" : "Pomodoros"}
+              </button>
+            ))}
+            {/* Target stepper */}
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                onClick={() => setTarget(goalTarget - goalStep)}
+                className="w-7 h-7 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground/70 flex items-center justify-center transition-colors text-sm"
+              >
+                −
+              </button>
+              <span className="text-sm font-medium text-foreground tabular-nums w-16 text-center">
+                {goalUnit === "minutes" ? `${goalTarget} min` : `${goalTarget} pomo`}
+              </span>
+              <button
+                onClick={() => setTarget(goalTarget + goalStep)}
+                className="w-7 h-7 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground/70 flex items-center justify-center transition-colors text-sm"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* ── Aujourd'hui & semaine ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
@@ -250,6 +308,41 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
           </div>
         </div>
       )}
+
+      {/* ── Succès / Badges ──────────────────────────────────────────────────── */}
+      <div className="mb-8">
+        <div className="flex items-baseline justify-between mb-4">
+          <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest">Succès</p>
+          <span className="text-[10px] text-foreground/25">{Object.keys(unlocked).length}/{ACHIEVEMENTS.length}</span>
+        </div>
+        <div className="grid grid-cols-3 sm:grid-cols-3 gap-2.5">
+          {ACHIEVEMENTS.map((a) => {
+            const isUnlocked = !!unlocked[a.id];
+            return (
+              <div
+                key={a.id}
+                title={a.description}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-xl p-3 border transition-colors min-w-0",
+                  isUnlocked
+                    ? "bg-amber-500/[0.07] border-amber-500/20"
+                    : "bg-foreground/[0.02] border-foreground/[0.06]"
+                )}
+              >
+                <span className={cn("text-xl flex-shrink-0 transition-all", !isUnlocked && "grayscale opacity-30")}>
+                  {a.emoji}
+                </span>
+                <div className="min-w-0">
+                  <p className={cn("text-xs font-semibold truncate", isUnlocked ? "text-foreground" : "text-foreground/40")}>
+                    {a.title}
+                  </p>
+                  <p className="text-[10px] text-foreground/30 leading-tight line-clamp-2">{a.description}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* ── Heatmap calendar ─────────────────────────────────────────────────── */}
       <div>

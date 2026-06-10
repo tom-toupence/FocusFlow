@@ -5,6 +5,9 @@ import { useTimerStore } from "@/store/timerStore";
 import { useSessionStore } from "@/store/sessionStore";
 import { useStatsStore, getTodayStats, getWeekStats, getStreak, getLast119Days } from "@/store/statsStore";
 import { useSessionSummaryStore } from "@/store/sessionSummaryStore";
+import { useGoalStore, getTodayProgress } from "@/store/goalStore";
+import { useDistractionStore, getFocusScore } from "@/store/distractionStore";
+import GoalRing from "@/components/GoalRing";
 import { cn } from "@/lib/utils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -73,6 +76,8 @@ export default function SummaryPage() {
   const { todos } = useSessionStore();
   const { days } = useStatsStore();
   const { startedAt, focusMinutesPerSession, todoDoneIdsAtStart, clearSession } = useSessionSummaryStore();
+  const { unit: goalUnit, target: goalTarget } = useGoalStore();
+  const { sessionCount: distractionCount } = useDistractionStore();
 
   // Session-level stats
   const sessionDurationMs = startedAt ? Date.now() - startedAt : 0;
@@ -86,6 +91,8 @@ export default function SummaryPage() {
   const weekStats = getWeekStats(days);
   const streak = getStreak(days);
   const heatmapData = getLast119Days(days);
+  const goalProgress = getTodayProgress(days, goalUnit, goalTarget);
+  const focusScore = getFocusScore(sessionsCompleted, distractionCount);
 
   // Month labels for heatmap
   const monthLabels: { label: string; col: number }[] = [];
@@ -170,6 +177,21 @@ export default function SummaryPage() {
               accent={todosCompletedThisSession.length > 0 ? "text-sky-300" : "text-foreground"}
             />
           </div>
+          {/* Focus quality — faithful to the Pomodoro interruption count */}
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard
+              label="Focus Score"
+              value={`${focusScore}`}
+              sub={focusScore >= 80 ? "concentration solide" : focusScore >= 50 ? "peut mieux faire" : "beaucoup d'interruptions"}
+              accent={focusScore >= 80 ? "text-emerald-300" : focusScore >= 50 ? "text-amber-300" : "text-red-300"}
+            />
+            <StatCard
+              label="Distractions"
+              value={String(distractionCount)}
+              sub={distractionCount === 0 ? "aucune — impeccable !" : "interruptions notées"}
+              accent={distractionCount === 0 ? "text-emerald-300" : "text-foreground"}
+            />
+          </div>
         </section>
 
         {/* Pomodoro dots */}
@@ -212,6 +234,26 @@ export default function SummaryPage() {
             </div>
           </section>
         )}
+
+        {/* ── Daily goal ────────────────────────────────────────────────────── */}
+        <section className="flex flex-col gap-3">
+          <h2 className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">Objectif du jour</h2>
+          <div className="flex items-center gap-5 px-5 py-4 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.08]">
+            <GoalRing progress={goalProgress} size={104} />
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-semibold text-foreground">
+                {goalProgress.reached ? "Objectif atteint 🎯" : "En route vers ton objectif"}
+              </p>
+              <p className="text-xs text-foreground/40 leading-relaxed">
+                {goalProgress.reached
+                  ? "Tu as rempli ton objectif quotidien. Continue ou repose-toi, tu l'as mérité."
+                  : `Encore ${goalUnit === "minutes"
+                      ? `${Math.max(0, goalTarget - goalProgress.value)} min`
+                      : `${Math.max(0, goalTarget - goalProgress.value)} pomodoro${goalTarget - goalProgress.value !== 1 ? "s" : ""}`} pour atteindre ta cible du jour.`}
+              </p>
+            </div>
+          </div>
+        </section>
 
         {/* ── Historical stats ──────────────────────────────────────────────── */}
         <section className="flex flex-col gap-3">

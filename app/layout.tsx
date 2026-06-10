@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 import "./globals.css";
 import SupabaseProvider from "@/components/SupabaseProvider";
 import AuthGate from "@/components/AuthGate";
+import ToastHost from "@/components/Toast";
 
 const geist = Geist({
   variable: "--font-geist",
@@ -29,6 +30,7 @@ export default function RootLayout({
         <SupabaseProvider>
           <AuthGate>{children}</AuthGate>
         </SupabaseProvider>
+        <ToastHost />
       </body>
     </html>
   );
