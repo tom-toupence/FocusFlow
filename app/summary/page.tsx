@@ -73,7 +73,7 @@ function StatCard({
 
 export default function SummaryPage() {
   const router = useRouter();
-  const { sessionsCompleted, settings, resetAll } = useTimerStore();
+  const { sessionsCompleted, settings, flowMinutesTotal, resetAll } = useTimerStore();
   const { todos } = useSessionStore();
   const { days } = useStatsStore();
   const { startedAt, focusMinutesPerSession, todoDoneIdsAtStart, clearSession } = useSessionSummaryStore();
@@ -82,7 +82,9 @@ export default function SummaryPage() {
 
   // Session-level stats
   const sessionDurationMs = startedAt ? Date.now() - startedAt : 0;
-  const focusMinutesThisSession = sessionsCompleted * focusMinutesPerSession;
+  const focusMinutesThisSession = settings.preset === "flowtime"
+    ? flowMinutesTotal
+    : sessionsCompleted * focusMinutesPerSession;
   const doneIdsAtStart = new Set(todoDoneIdsAtStart);
   const todosCompletedThisSession = todos.filter((t) => t.status === "done" && !doneIdsAtStart.has(t.id));
   const totalTodos = todos.length;

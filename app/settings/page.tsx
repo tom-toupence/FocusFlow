@@ -40,6 +40,18 @@ const presetConfig = [
     ),
   },
   {
+    id: "flowtime" as TimerPreset,
+    label: "Flowtime",
+    sub: "Chrono libre",
+    desc: "Travaille tant que tu es dans le flow. Pause méritée = temps ÷ 5.",
+    icon: (
+      <svg className="w-5 h-5 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+        <path d="M2 12c2-4 4-6 6-6s4 4 6 6 4 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M2 12c2 4 4 6 6 6s4-4 6-6 4-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     id: "custom" as TimerPreset,
     label: "Personnalisé",
     sub: "À toi de définir",
@@ -476,7 +488,7 @@ export default function SettingsPage() {
           {/* Preset selector */}
           <div>
             <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-3">Format Pomodoro</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {presetConfig.map((p) => (
                 <button
                   key={p.id}
@@ -509,13 +521,21 @@ export default function SettingsPage() {
           </div>
 
           {/* Summary */}
-          <div className="flex items-center gap-2 text-xs text-foreground/30">
-            <span>{work} min focus</span>
-            <span>·</span>
-            <span>{shortBreak} min pause</span>
-            <span>·</span>
-            <span>Pause longue après {sessions} sessions</span>
-          </div>
+          {preset === "flowtime" ? (
+            <div className="flex items-center gap-2 text-xs text-foreground/30">
+              <span>Chrono libre, sans limite</span>
+              <span>·</span>
+              <span>Pause méritée = temps travaillé ÷ 5 (2–25 min)</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-xs text-foreground/30">
+              <span>{work} min focus</span>
+              <span>·</span>
+              <span>{shortBreak} min pause</span>
+              <span>·</span>
+              <span>Pause longue après {sessions} sessions</span>
+            </div>
+          )}
 
           {/* Tasks — Kanban */}
           <div>

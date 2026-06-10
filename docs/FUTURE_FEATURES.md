@@ -17,15 +17,18 @@
 |---|---------|--------|--------|-----------|--------|
 | 1 | Focus Rooms collaboratives (temps réel) | 🔥🔥🔥 | XL | Supabase Realtime | À faire |
 | 2 | Dashboard analytique + rapports & export | 🔥🔥 | L | Sync comptes | ✅ **Livré** (`/insights`) |
-| 3 | Coach IA & découpage de tâches | 🔥🔥🔥 | L | Clé API Claude + Edge Function | Bloqué (credentials) |
-| 4 | Intégrations agenda/tâches (Calendar, Notion, Todoist) | 🔥🔥 | L | OAuth apps | Bloqué (credentials) |
+| 3 | Coach IA & découpage de tâches | 🔥🔥🔥 | L | Clé Groq/Gemini (gratuit) | ✅ **Livré** (local + IA) |
+| 4 | Intégrations agenda/tâches (Calendar, Notion, Todoist) | 🔥🔥 | L | OAuth apps | ◐ **Partiel** (export calendrier ICS livré) |
 | 5 | Bloqueur de distractions (PWA + extension) | 🔥🔥 | XL | Extension navigateur | À faire |
 | 6 | Gamification 2.0 : XP, niveaux, jardin de focus | 🔥🔥 | M | Badges existants | ✅ **Livré** (onglet Activité) |
 | 7 | Marketplace d'ambiances & playlists communautaires | 🔥 | L | Comptes + storage | À faire |
 
-> **Livrés** : Dashboard analytique (#2 → page `/insights` : focus par heure/jour, évolution du Focus
-> Score, export CSV/JSON) et Gamification 2.0 (#6 → XP/niveaux, jardin de focus hebdo, défis hebdomadaires).
-> **Bloqués tant que les accès ne sont pas fournis** : Coach IA (#3, clé API Claude), intégrations (#4, apps OAuth).
+> **Livrés** : Dashboard analytique (#2 → `/insights`), Gamification 2.0 (#6), Coach IA (#3 → Groq/Gemini
+> avec repli local), et — session 2026-06-10 — **5 nouvelles grosses features** : mode **Flowtime**,
+> **timer flottant Picture-in-Picture**, **récap hebdo « Wrapped »** (`/wrapped` + carte PNG),
+> **synchro calendrier auto** (flux ICS `webcal://`, iPhone/Google Calendar, partie « Calendar » du #4),
+> **mode Deadline/Sprint** (plan jour-par-jour par le coach + bouton « Go »).
+> Refusées par l'utilisateur (2026-06-10) : Mode Strict, PWA offline, Focus Rooms, Smart Focus, capture rapide.
 
 ---
 

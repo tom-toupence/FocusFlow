@@ -5,7 +5,7 @@ import { persist } from "zustand/middleware";
 
 export type TimerMode = "work" | "short-break" | "long-break";
 
-export type TimerPreset = "classic" | "deep" | "custom";
+export type TimerPreset = "classic" | "deep" | "custom" | "flowtime";
 
 export interface TimerSettings {
   preset: TimerPreset;
@@ -16,10 +16,17 @@ export interface TimerSettings {
 }
 
 export const PRESETS: Record<TimerPreset, Omit<TimerSettings, "preset">> = {
-  classic: { workDuration: 25, shortBreakDuration: 5,  longBreakDuration: 15, sessionsBeforeLongBreak: 4 },
-  deep:    { workDuration: 50, shortBreakDuration: 10, longBreakDuration: 30, sessionsBeforeLongBreak: 3 },
-  custom:  { workDuration: 25, shortBreakDuration: 5,  longBreakDuration: 15, sessionsBeforeLongBreak: 4 },
+  classic:  { workDuration: 25, shortBreakDuration: 5,  longBreakDuration: 15, sessionsBeforeLongBreak: 4 },
+  deep:     { workDuration: 50, shortBreakDuration: 10, longBreakDuration: 30, sessionsBeforeLongBreak: 3 },
+  custom:   { workDuration: 25, shortBreakDuration: 5,  longBreakDuration: 15, sessionsBeforeLongBreak: 4 },
+  // Flowtime: work duration is open-ended; break = elapsed ÷ 5 (durations below are fallbacks)
+  flowtime: { workDuration: 25, shortBreakDuration: 5,  longBreakDuration: 15, sessionsBeforeLongBreak: 4 },
 };
+
+/** Earned break (seconds) for a flowtime stretch: elapsed ÷ 5, clamped 2–25 min. */
+export function flowBreakSeconds(flowSeconds: number): number {
+  return Math.min(25 * 60, Math.max(2 * 60, Math.round(flowSeconds / 5)));
+}
 
 interface TimerState {
   mode: TimerMode;
@@ -27,6 +34,12 @@ interface TimerState {
   isRunning: boolean;
   sessionsCompleted: number;
   settings: TimerSettings;
+
+  // Flowtime: elapsed seconds of the current open-ended work stretch,
+  // total focus minutes banked this session, and the length of the current earned break.
+  flowSeconds: number;
+  flowMinutesTotal: number;
+  flowBreakTotal: number;
 
   applyPreset: (preset: TimerPreset) => void;
   updateSettings: (settings: Partial<TimerSettings>) => void;
@@ -36,6 +49,8 @@ interface TimerState {
   pause: () => void;
   reset: () => void;
   nextSession: (autoStart?: boolean) => void;
+  finishFlow: () => void;
+  accumulateFlow: () => number;
   resetAll: () => void;
 }
 
@@ -59,10 +74,14 @@ export const useTimerStore = create<TimerState>()(
       sessionsCompleted: 0,
       settings: defaultSettings,
 
+      flowSeconds: 0,
+      flowMinutesTotal: 0,
+      flowBreakTotal: 0,
+
       applyPreset: (preset) => {
         const values = PRESETS[preset];
         const merged: TimerSettings = { preset, ...values };
-        set({ settings: merged, mode: "work", secondsLeft: values.workDuration * 60, isRunning: false });
+        set({ settings: merged, mode: "work", secondsLeft: values.workDuration * 60, isRunning: false, flowSeconds: 0 });
       },
 
       updateSettings: (newSettings) => {
@@ -73,11 +92,15 @@ export const useTimerStore = create<TimerState>()(
 
       setMode: (mode) => {
         const { settings } = get();
-        set({ mode, secondsLeft: getDuration(mode, settings), isRunning: false });
+        set({ mode, secondsLeft: getDuration(mode, settings), isRunning: false, flowSeconds: 0 });
       },
 
       tick: () => {
-        const { secondsLeft } = get();
+        const { secondsLeft, mode, settings, flowSeconds } = get();
+        if (settings.preset === "flowtime" && mode === "work") {
+          set({ flowSeconds: flowSeconds + 1 });
+          return;
+        }
         if (secondsLeft > 0) {
           set({ secondsLeft: secondsLeft - 1 });
         } else {
@@ -90,7 +113,7 @@ export const useTimerStore = create<TimerState>()(
 
       reset: () => {
         const { mode, settings } = get();
-        set({ secondsLeft: getDuration(mode, settings), isRunning: false });
+        set({ secondsLeft: getDuration(mode, settings), isRunning: false, flowSeconds: 0 });
       },
 
       nextSession: (autoStart = false) => {
@@ -113,12 +136,46 @@ export const useTimerStore = create<TimerState>()(
           secondsLeft: getDuration(nextMode, settings),
           isRunning: autoStart,
           sessionsCompleted: newSessionsCompleted,
+          flowSeconds: 0,
         });
+      },
+
+      // Flowtime: end the current stretch — bank the minutes and start the earned break.
+      finishFlow: () => {
+        const { settings, sessionsCompleted, flowSeconds, flowMinutesTotal } = get();
+        if (settings.preset !== "flowtime") return;
+        const breakSec = flowBreakSeconds(flowSeconds);
+        set({
+          mode: "short-break",
+          secondsLeft: breakSec,
+          flowBreakTotal: breakSec,
+          isRunning: true,
+          sessionsCompleted: sessionsCompleted + 1,
+          flowMinutesTotal: flowMinutesTotal + Math.round(flowSeconds / 60),
+          flowSeconds: 0,
+        });
+      },
+
+      // Flowtime: bank the current stretch without starting a break (used when leaving
+      // the session mid-flow). Returns the minutes banked.
+      accumulateFlow: () => {
+        const { flowSeconds, flowMinutesTotal } = get();
+        const minutes = Math.round(flowSeconds / 60);
+        set({ flowMinutesTotal: flowMinutesTotal + minutes, flowSeconds: 0 });
+        return minutes;
       },
 
       resetAll: () => {
         const { settings } = get();
-        set({ mode: "work", secondsLeft: getDuration("work", settings), isRunning: false, sessionsCompleted: 0 });
+        set({
+          mode: "work",
+          secondsLeft: getDuration("work", settings),
+          isRunning: false,
+          sessionsCompleted: 0,
+          flowSeconds: 0,
+          flowMinutesTotal: 0,
+          flowBreakTotal: 0,
+        });
       },
     }),
     {

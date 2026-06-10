@@ -12,7 +12,8 @@
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { setCurrentUserId } from "@/lib/authState";
-import { fetchCustomVideos, fetchTodos, fetchWorkSessions, fetchPlaylists, fetchProfile } from "@/lib/db";
+import { fetchCustomVideos, fetchTodos, fetchWorkSessions, fetchPlaylists, fetchProfile, fetchPlanBlocks } from "@/lib/db";
+import { usePlanStore } from "@/store/planStore";
 import { useSessionStore } from "@/store/sessionStore";
 import { usePlaylistStore } from "@/store/playlistStore";
 import { useStatsStore } from "@/store/statsStore";
@@ -53,12 +54,13 @@ export default function SupabaseProvider({ children }: { children: React.ReactNo
         user.email ?? null,
       );
 
-      const [remoteVideos, remoteTodos, remoteSessions, remotePlaylists, remoteProfile] = await Promise.all([
+      const [remoteVideos, remoteTodos, remoteSessions, remotePlaylists, remoteProfile, remoteBlocks] = await Promise.all([
         fetchCustomVideos(userId),
         fetchTodos(userId),
         fetchWorkSessions(userId),
         fetchPlaylists(userId),
         fetchProfile(userId),
+        fetchPlanBlocks(userId),
       ]);
 
       // Load custom profile overrides
@@ -93,6 +95,13 @@ export default function SupabaseProvider({ children }: { children: React.ReactNo
           };
         }
         return { days: merged };
+      });
+
+      // Merge plan blocks : remote wins, on conserve les blocs locaux non encore en DB.
+      usePlanStore.setState((s) => {
+        const remoteIds = new Set(remoteBlocks.map((b) => b.id));
+        const localOnly = s.blocks.filter((b) => !remoteIds.has(b.id));
+        return { blocks: [...remoteBlocks, ...localOnly] };
       });
 
       // Merge playlists : idem.

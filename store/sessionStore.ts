@@ -41,7 +41,8 @@ interface SessionState {
   getAllVideos: () => Video[];
 
   // todos
-  addTodo: (text: string, opts?: AddTodoOptions) => void;
+  /** Adds a task and returns its generated id. */
+  addTodo: (text: string, opts?: AddTodoOptions) => string;
   setTodoStatus: (id: string, status: TodoStatus) => void;
   updateTodo: (id: string, fields: Partial<Pick<Todo, "text" | "priority" | "dueDate" | "pomodoroEstimate">>) => void;
   incrementPomodoro: (id: string) => void;
@@ -106,6 +107,7 @@ export const useSessionStore = create<SessionState>()(
         set((s) => ({ todos: [...s.todos, todo] }));
         const userId = getCurrentUserId();
         if (userId) upsertTodo(userId, todo);
+        return todo.id;
       },
 
       setTodoStatus: (id, status) => {

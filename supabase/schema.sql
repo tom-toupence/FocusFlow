@@ -60,6 +60,41 @@ alter table user_playlists add column if not exists start_video_id text;
 
 alter table user_playlists enable row level security;
 
+-- ─── Planning (time-blocking) + calendar subscription feed ───────────────────
+
+create table if not exists plan_blocks (
+  id            text  primary key,
+  user_id       uuid  references auth.users(id) on delete cascade not null,
+  date          text  not null,          -- YYYY-MM-DD (local)
+  start_min     int   not null,          -- minutes from midnight
+  duration_min  int   not null,
+  label         text  not null default '',
+  done          boolean not null default false,
+  created_at    timestamptz default now()
+);
+
+-- One secret token per user; the public ICS feed route resolves it with the
+-- service role key (server only).
+create table if not exists calendar_feeds (
+  token       text  primary key,
+  user_id     uuid  references auth.users(id) on delete cascade not null unique,
+  created_at  timestamptz default now()
+);
+
+alter table plan_blocks    enable row level security;
+alter table calendar_feeds enable row level security;
+
+-- Postgres n'a pas de "create policy if not exists" : drop + create pour que le
+-- script entier soit ré-exécutable sans erreur sur un projet existant.
+drop policy if exists "own plan blocks" on plan_blocks;
+drop policy if exists "own feed token"  on calendar_feeds;
+drop policy if exists "own videos"      on custom_videos;
+drop policy if exists "own todos"       on todos;
+drop policy if exists "own sessions"    on work_sessions;
+drop policy if exists "own playlists"   on user_playlists;
+
+create policy "own plan blocks" on plan_blocks    for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own feed token"  on calendar_feeds for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own videos"    on custom_videos   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own todos"     on todos            for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own sessions"  on work_sessions    for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

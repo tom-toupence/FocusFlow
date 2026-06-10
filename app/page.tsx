@@ -17,6 +17,7 @@ import TodayDashboard from "@/components/TodayDashboard";
 import ProjectsSection from "@/components/ProjectsSection";
 import WeekPlanner from "@/components/WeekPlanner";
 import RoutinesManager from "@/components/RoutinesManager";
+import SprintWizard from "@/components/SprintWizard";
 import JournalTimeline from "@/components/JournalTimeline";
 import { useProfileStore, resolvedProfile } from "@/store/profileStore";
 
@@ -1488,6 +1489,7 @@ export default function LandingPage() {
               <p className="text-foreground/40 mt-1 text-sm">Projets, planning de la semaine, routines et journal.</p>
             </div>
             <div className="flex flex-col gap-12">
+              <SprintWizard />
               <ProjectsSection />
               <WeekPlanner />
               <RoutinesManager />

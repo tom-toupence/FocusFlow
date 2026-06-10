@@ -7,6 +7,7 @@ import { supabase } from "./supabase";
 import type { Video } from "@/data/videos";
 import type { Todo } from "@/store/sessionStore";
 import type { SavedPlaylist } from "@/store/playlistStore";
+import type { FocusBlock } from "@/store/planStore";
 
 // ─── Custom Videos ────────────────────────────────────────────────────────────
 
@@ -160,6 +161,62 @@ export async function upsertProfile(userId: string, profile: DbProfile): Promise
     updated_at: new Date().toISOString(),
   });
   if (error) console.error("[db] upsertProfile:", error.message);
+}
+
+// ─── Plan Blocks (weekly planning / calendar feed) ────────────────────────────
+
+export async function fetchPlanBlocks(userId: string): Promise<FocusBlock[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("plan_blocks")
+    .select("*")
+    .eq("user_id", userId)
+    .order("date");
+  if (error) { console.error("[db] fetchPlanBlocks:", error.message); return []; }
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    date: r.date,
+    startMin: r.start_min,
+    durationMin: r.duration_min,
+    label: r.label ?? "",
+    done: r.done ?? false,
+  }));
+}
+
+export async function upsertPlanBlock(userId: string, block: FocusBlock): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase.from("plan_blocks").upsert({
+    id: block.id,
+    user_id: userId,
+    date: block.date,
+    start_min: block.startMin,
+    duration_min: block.durationMin,
+    label: block.label,
+    done: block.done,
+  });
+  if (error) console.error("[db] upsertPlanBlock:", error.message);
+}
+
+export async function deletePlanBlock(userId: string, blockId: string): Promise<void> {
+  if (!supabase) return;
+  await supabase.from("plan_blocks").delete().eq("id", blockId).eq("user_id", userId);
+}
+
+// ─── Calendar feed token ──────────────────────────────────────────────────────
+
+/** Returns the user's secret calendar feed token, creating it on first use. */
+export async function getOrCreateCalendarToken(userId: string): Promise<string | null> {
+  if (!supabase) return null;
+  const { data } = await supabase
+    .from("calendar_feeds")
+    .select("token")
+    .eq("user_id", userId)
+    .single();
+  if (data?.token) return data.token;
+  const token = crypto.randomUUID().replace(/-/g, "");
+  const { error } = await supabase.from("calendar_feeds").insert({ token, user_id: userId });
+  if (error) { console.error("[db] getOrCreateCalendarToken:", error.message); return null; }
+  return token;
 }
 
 // ─── Work Sessions (stats) ────────────────────────────────────────────────────

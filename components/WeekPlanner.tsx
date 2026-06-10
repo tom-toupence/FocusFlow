@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePlanStore, weekDates, blocksForDate, plannedMinutes, formatMinOfDay } from "@/store/planStore";
 import { useStatsStore } from "@/store/statsStore";
+import CalendarSync from "@/components/CalendarSync";
 import { cn } from "@/lib/utils";
 
 const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -42,6 +43,7 @@ export default function WeekPlanner() {
           <p className="text-xs text-foreground/40 mt-0.5">Pose tes blocs de focus, compare prévu vs réalisé.</p>
         </div>
         <div className="flex items-center gap-1">
+          <CalendarSync />
           <button onClick={() => setWeekOffset((w) => w - 1)} className="w-7 h-7 rounded-lg bg-foreground/8 hover:bg-foreground/15 text-foreground/60 flex items-center justify-center">‹</button>
           <span className="text-xs text-foreground/50 w-32 text-center">{weekLabel}</span>
           <button onClick={() => setWeekOffset((w) => w + 1)} className="w-7 h-7 rounded-lg bg-foreground/8 hover:bg-foreground/15 text-foreground/60 flex items-center justify-center">›</button>

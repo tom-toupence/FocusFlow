@@ -9,7 +9,10 @@ import { useSessionStore } from "@/store/sessionStore";
 import { useRoutineStore } from "@/store/routineStore";
 import { useProjectStore, getProjectStatus } from "@/store/projectStore";
 import { useJournalStore, MOODS } from "@/store/journalStore";
-import { usePlanStore, blocksForDate, formatMinOfDay } from "@/store/planStore";
+import { usePlanStore, blocksForDate, formatMinOfDay, weekDates } from "@/store/planStore";
+import { useWrappedStore } from "@/store/wrappedStore";
+import { useSprintStore, getSprintStatus } from "@/store/sprintStore";
+import { launchSprintSession } from "@/lib/sprint";
 import { localToday } from "@/store/statsStore";
 import { applyRoutine } from "@/lib/routines";
 import GoalRing from "@/components/GoalRing";
@@ -32,6 +35,8 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
   const { projects, activeProjectId } = useProjectStore();
   const { entries: journal } = useJournalStore();
   const { blocks } = usePlanStore();
+  const { lastSeenWeekStart } = useWrappedStore();
+  const { sprint } = useSprintStore();
 
   const [mounted, setMounted] = useState(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -56,6 +61,11 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
   const hour = new Date().getHours();
   const greeting = hour < 6 ? "Bonne nuit" : hour < 12 ? "Bonjour" : hour < 18 ? "Bon après-midi" : "Bonsoir";
 
+  // Weekly recap banner: last completed week had focus time and hasn't been viewed yet
+  const lastWeek = weekDates(-1);
+  const lastWeekMinutes = lastWeek.reduce((s, d) => s + (days[d]?.minutesWorked ?? 0), 0);
+  const showWrappedBanner = lastWeekMinutes > 0 && lastSeenWeekStart !== lastWeek[0];
+
   // Let the user pick their video / ambiance first (the catalogue routes to /settings on select).
   const startSession = () => onNavigateTab("catalogue");
 
@@ -78,6 +88,21 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
         </button>
       </div>
 
+      {/* Weekly recap banner */}
+      {showWrappedBanner && (
+        <button
+          onClick={() => router.push("/wrapped")}
+          className="flex items-center gap-3 px-5 py-4 rounded-2xl bg-gradient-to-r from-violet-600/20 via-fuchsia-600/10 to-transparent border border-violet-500/25 hover:border-violet-500/50 transition-all text-left group"
+        >
+          <span className="text-2xl">🎉</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-foreground">Ton récap de la semaine est prêt !</p>
+            <p className="text-xs text-foreground/45">Temps de focus, meilleur jour, badges… et une carte à partager.</p>
+          </div>
+          <span className="text-xs text-violet-300 font-medium flex-shrink-0 group-hover:translate-x-0.5 transition-transform">Voir →</span>
+        </button>
+      )}
+
       {/* Top row: goal + stats */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* Goal */}
@@ -96,6 +121,43 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
           <Stat label="Focus aujourd'hui" value={fmtMin(today.minutesWorked)} accent="text-emerald-300" sub={`${today.sessions} session${today.sessions !== 1 ? "s" : ""}`} />
         </div>
       </div>
+
+      {/* Active sprint: today's block + Go */}
+      {sprint && (() => {
+        const st = getSprintStatus(sprint, blocks);
+        return (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 rounded-2xl bg-gradient-to-r from-rose-500/[0.08] to-transparent border border-rose-500/20">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-foreground/40 uppercase tracking-widest mb-0.5">
+                🏃 Sprint · {st.overdue ? "deadline dépassée ⚠️" : `J-${st.daysLeft}`} · {st.blocksDone}/{st.blocksTotal} blocs
+              </p>
+              <p className="text-sm font-medium text-foreground truncate">{sprint.objective}</p>
+              {st.todayBlock ? (
+                <p className="text-xs text-foreground/45 mt-0.5">
+                  Aujourd&apos;hui : {formatMinOfDay(st.todayBlock.startMin)} · {st.todayBlock.durationMin} min
+                  {st.missed > 0 && <span className="text-amber-500/90"> · {st.missed} bloc{st.missed > 1 ? "s" : ""} en retard</span>}
+                </p>
+              ) : (
+                <p className="text-xs text-foreground/45 mt-0.5">
+                  {st.missed > 0 ? `${st.missed} bloc${st.missed > 1 ? "s" : ""} en retard — recalcule depuis l’onglet Organisation` : "Rien de prévu aujourd’hui — repos mérité"}
+                </p>
+              )}
+            </div>
+            {st.todayBlock && (
+              <button
+                onClick={() => {
+                  launchSprintSession(sprint, st.todayBlock!.durationMin);
+                  router.push("/session");
+                }}
+                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-foreground text-background font-semibold text-sm hover:bg-foreground/90 transition-all shadow-lg shadow-black/20 flex-shrink-0"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                Go
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Suggestion */}
       {peakHour !== null && (
@@ -123,7 +185,7 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
           )}
         </div>
         <div className="px-5 py-4 rounded-2xl bg-foreground/[0.03] border border-foreground/[0.06]">
-          <p className="text-xs font-semibold text-foreground/40 uppercase tracking-widest mb-3">Blocs planifiés aujourd'hui</p>
+          <p className="text-xs font-semibold text-foreground/40 uppercase tracking-widest mb-3">Blocs planifiés aujourd&apos;hui</p>
           {todayBlocks.length > 0 ? (
             <div className="flex flex-col gap-1.5">
               {todayBlocks.slice(0, 3).map((b) => (

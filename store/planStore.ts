@@ -2,6 +2,8 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { getCurrentUserId } from "@/lib/authState";
+import { upsertPlanBlock, deletePlanBlock } from "@/lib/db";
 
 export interface FocusBlock {
   id: string;
@@ -14,7 +16,8 @@ export interface FocusBlock {
 
 interface PlanState {
   blocks: FocusBlock[];
-  addBlock: (b: Omit<FocusBlock, "id" | "done">) => void;
+  /** Adds a block and returns its generated id. */
+  addBlock: (b: Omit<FocusBlock, "id" | "done">) => string;
   updateBlock: (id: string, fields: Partial<Omit<FocusBlock, "id">>) => void;
   removeBlock: (id: string) => void;
   toggleDone: (id: string) => void;
@@ -22,12 +25,32 @@ interface PlanState {
 
 export const usePlanStore = create<PlanState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       blocks: [],
-      addBlock: (b) => set((s) => ({ blocks: [...s.blocks, { ...b, id: crypto.randomUUID(), done: false }] })),
-      updateBlock: (id, fields) => set((s) => ({ blocks: s.blocks.map((x) => (x.id === id ? { ...x, ...fields } : x)) })),
-      removeBlock: (id) => set((s) => ({ blocks: s.blocks.filter((x) => x.id !== id) })),
-      toggleDone: (id) => set((s) => ({ blocks: s.blocks.map((x) => (x.id === id ? { ...x, done: !x.done } : x)) })),
+      addBlock: (b) => {
+        const block: FocusBlock = { ...b, id: crypto.randomUUID(), done: false };
+        set((s) => ({ blocks: [...s.blocks, block] }));
+        const userId = getCurrentUserId();
+        if (userId) upsertPlanBlock(userId, block);
+        return block.id;
+      },
+      updateBlock: (id, fields) => {
+        set((s) => ({ blocks: s.blocks.map((x) => (x.id === id ? { ...x, ...fields } : x)) }));
+        const userId = getCurrentUserId();
+        const block = get().blocks.find((x) => x.id === id);
+        if (userId && block) upsertPlanBlock(userId, block);
+      },
+      removeBlock: (id) => {
+        set((s) => ({ blocks: s.blocks.filter((x) => x.id !== id) }));
+        const userId = getCurrentUserId();
+        if (userId) deletePlanBlock(userId, id);
+      },
+      toggleDone: (id) => {
+        set((s) => ({ blocks: s.blocks.map((x) => (x.id === id ? { ...x, done: !x.done } : x)) }));
+        const userId = getCurrentUserId();
+        const block = get().blocks.find((x) => x.id === id);
+        if (userId && block) upsertPlanBlock(userId, block);
+      },
     }),
     { name: "focusflow-plan" }
   )

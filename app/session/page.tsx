@@ -19,6 +19,7 @@ import SpotifyPlayer from "@/components/SpotifyPlayer";
 import TwitchPlayer from "@/components/TwitchPlayer";
 import TodoStatusDropdown from "@/components/TodoStatusDropdown";
 import SoundscapeMixer from "@/components/SoundscapeMixer";
+import PipTimer from "@/components/PipTimer";
 import BreathingExercise from "@/components/BreathingExercise";
 import { useSoundscapeStore } from "@/store/soundscapeStore";
 import { usePrefsStore } from "@/store/prefsStore";
@@ -67,8 +68,10 @@ export default function SessionPage() {
   const router = useRouter();
   const {
     mode, secondsLeft, isRunning, sessionsCompleted, settings,
-    tick, start, pause, nextSession,
+    flowSeconds, flowBreakTotal,
+    tick, start, pause, nextSession, finishFlow, accumulateFlow,
   } = useTimerStore();
+  const isFlowtime = settings.preset === "flowtime";
   const { selectedVideoId, selectedPlaylistId, todos, addTodo, setTodoStatus, getAllVideos } = useSessionStore();
   const { playlists } = usePlaylistStore();
   const { recordSession } = useStatsStore();
@@ -326,13 +329,26 @@ export default function SessionPage() {
     prevSecondsRef.current = secondsLeft;
   }, [secondsLeft, handleSessionEnd]);
 
+  // ── Flowtime: end the stretch and start the earned break ────────────────
+  const handleFlowBreak = () => {
+    const minutes = Math.round(useTimerStore.getState().flowSeconds / 60);
+    if (minutes >= 1) {
+      recordSession(minutes);
+      recordPlay(buildPlayEntry(minutes));
+      useProjectStore.getState().logPomodoro();
+      celebrateProgress();
+    }
+    finishFlow();
+  };
+
   // ── Stop → Summary ────────────────────────────────────────────────────────
   const handleStop = () => {
     pause();
     // Record partial work time if we were mid-session
     if (mode === "work") {
-      const secondsWorked = settings.workDuration * 60 - secondsLeft;
-      const minutesWorked = Math.round(secondsWorked / 60);
+      const minutesWorked = isFlowtime
+        ? accumulateFlow()
+        : Math.round((settings.workDuration * 60 - secondsLeft) / 60);
       if (minutesWorked >= 1) {
         recordSession(minutesWorked);
         recordPlay(buildPlayEntry(minutesWorked));
@@ -389,6 +405,7 @@ export default function SessionPage() {
   };
 
   const progress = (() => {
+    if (isFlowtime && mode === "work") return 0; // open-ended stretch, no fixed total
     const total =
       mode === "work" ? settings.workDuration * 60
       : mode === "short-break" ? settings.shortBreakDuration * 60
@@ -396,10 +413,14 @@ export default function SessionPage() {
     return total > 0 ? 1 - secondsLeft / total : 0;
   })();
 
-  const breakTotal =
-    mode === "long-break"
+  const breakTotal = isFlowtime
+    ? flowBreakTotal
+    : mode === "long-break"
       ? settings.longBreakDuration * 60
       : settings.shortBreakDuration * 60;
+
+  // Flowtime: break earned so far (elapsed ÷ 5, min 2 min)
+  const earnedBreakMin = Math.max(2, Math.round(flowSeconds / 5 / 60));
 
   const pendingTodos = todos.filter((t) => t.status !== "done");
   const doneTodos = todos.filter((t) => t.status === "done");
@@ -567,16 +588,22 @@ export default function SessionPage() {
             {/* Timer — centered */}
             <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5">
               <div className="w-36 h-[2px] bg-white/10 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-white/50 rounded-full"
-                  style={{ width: `${progress * 100}%`, transition: "width 1s linear" }}
-                />
+                {isFlowtime ? (
+                  <div className="h-full w-full bg-white/25 rounded-full animate-pulse" />
+                ) : (
+                  <div
+                    className="h-full bg-white/50 rounded-full"
+                    style={{ width: `${progress * 100}%`, transition: "width 1s linear" }}
+                  />
+                )}
               </div>
               <span className="text-3xl font-light text-white tabular-nums tracking-tight drop-shadow-lg">
-                {formatTime(secondsLeft)}
+                {formatTime(isFlowtime ? flowSeconds : secondsLeft)}
               </span>
               <span className="text-white/30 text-[10px] uppercase tracking-widest">
-                Focus · {sessionsCompleted} session{sessionsCompleted !== 1 ? "s" : ""}
+                {isFlowtime
+                  ? `Flow · pause méritée ≈ ${earnedBreakMin} min`
+                  : `Focus · ${sessionsCompleted} session${sessionsCompleted !== 1 ? "s" : ""}`}
               </span>
             </div>
 
@@ -609,6 +636,9 @@ export default function SessionPage() {
                     </span>
                   )}
                 </button>
+
+                {/* Floating always-on-top mini timer (Document PiP) */}
+                <PipTimer onDistraction={handleDistraction} onFlowBreak={handleFlowBreak} />
 
                 {/* Ambiances — soundscape mixer */}
                 <button
@@ -689,6 +719,21 @@ export default function SessionPage() {
                 </button>
               </div>
 
+              {/* Flowtime: end the stretch and take the earned break */}
+              {isFlowtime && (
+                <button
+                  onClick={handleFlowBreak}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-400/40 text-emerald-200 text-xs font-semibold transition-all hover:bg-emerald-500/30 shadow-lg shadow-black/30"
+                  title={`Terminer ce flow et prendre ${earnedBreakMin} min de pause`}
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" strokeLinecap="round" strokeLinejoin="round" />
+                    <line x1="6" y1="1" x2="6" y2="4" strokeLinecap="round" /><line x1="10" y1="1" x2="10" y2="4" strokeLinecap="round" /><line x1="14" y1="1" x2="14" y2="4" strokeLinecap="round" />
+                  </svg>
+                  Pause méritée ({earnedBreakMin} min)
+                </button>
+              )}
+
               {/* Pause / Resume — primary (shortcut: Espace) */}
               <button
                 onClick={isRunning ? pause : start}
@@ -748,6 +793,9 @@ export default function SessionPage() {
                 </HelpRow>
                 <HelpRow icon="⏯️" title="Pause / Reprise (Espace)">
                   Met en pause le timer et la vidéo. Le raccourci <b className="text-white/80">Espace</b> fait pareil.
+                </HelpRow>
+                <HelpRow icon="🪟" title="Timer flottant">
+                  Détache le timer dans une mini-fenêtre toujours au premier plan, même par-dessus tes autres applis (Chrome/Edge).
                 </HelpRow>
                 <HelpRow icon="🫧" title="Respiration guidée">
                   Pendant les pauses, une bulle t&apos;aide à respirer (cycle 4-4-4-4) pour vraiment récupérer.
