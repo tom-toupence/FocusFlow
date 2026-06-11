@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useSpotifyStore } from "@/store/spotifyStore";
 import { startPlayback, setRepeat, setShuffle as apiSetShuffle, refreshAccessToken } from "@/lib/spotify";
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 // ─── Spotify SDK types ────────────────────────────────────────────────────────
 
 interface SpotifySDKPlayer {
@@ -15,6 +17,8 @@ interface SpotifySDKPlayer {
   nextTrack: () => Promise<void>;
   previousTrack: () => Promise<void>;
   setVolume: (vol: number) => Promise<void>;
+  /** Débloque l'élément audio interne vis-à-vis des politiques d'autoplay (Safari…) */
+  activateElement?: () => Promise<void>;
 }
 
 declare global {
@@ -72,9 +76,9 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
   useEffect(() => { shuffleRef.current = shuffle; }, [shuffle]);
   useEffect(() => { playlistUriRef.current = playlistUri; }, [playlistUri]);
 
-  const getValidToken = async (): Promise<string | null> => {
+  const getValidToken = async (force = false): Promise<string | null> => {
     if (!tokenRef.current) return null;
-    if (expiresAtRef.current && Date.now() < expiresAtRef.current - 60_000) {
+    if (!force && expiresAtRef.current && Date.now() < expiresAtRef.current - 60_000) {
       return tokenRef.current;
     }
     if (!refreshTokenRef.current) { clearAuth(); return null; }
@@ -82,21 +86,65 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
     refreshPromiseRef.current = refreshAccessToken(refreshTokenRef.current).then((result) => {
       refreshPromiseRef.current = null;
       if (!result) { clearAuth(); return null; }
-      updateToken(result.accessToken, result.expiresAt);
+      // Spotify fait tourner les refresh tokens (PKCE) : on persiste le nouveau.
+      updateToken(result.accessToken, result.expiresAt, result.refreshToken);
       tokenRef.current = result.accessToken;
       expiresAtRef.current = result.expiresAt;
+      refreshTokenRef.current = result.refreshToken;
       return result.accessToken;
     });
     return refreshPromiseRef.current;
   };
 
-  // Single entry point for starting/switching playback — ensures correct order:
-  // shuffle → play → repeat (avoids mid-stream track jump caused by late shuffle call)
-  const doPlay = async (token: string, device_id: string, uri: string) => {
-    await apiSetShuffle(token, device_id, shuffleRef.current);
-    await startPlayback(token, device_id, uri);
-    await setRepeat(token, device_id, "context");
-    playlistStartedRef.current = uri;
+  // Single entry point for starting/switching playback.
+  // Le device vient souvent d'être enregistré : Spotify répond 404 pendant
+  // ~1-2 s avant qu'il soit actif → retry avec backoff. Le shuffle ne peut être
+  // appliqué qu'à un device actif, donc on lance la lecture d'abord (avec un
+  // offset aléatoire pour ne pas toujours démarrer sur le 1er titre), puis
+  // shuffle + repeat.
+  const doPlay = async (device_id: string, uri: string): Promise<boolean> => {
+    let token = await getValidToken();
+    if (!token) { setStatus("error"); setErrorMsg("Session Spotify expirée — reconnecte-toi."); return false; }
+
+    let offset: number | undefined;
+    if (shuffleRef.current) {
+      const count = useSpotifyStore.getState().playlists.find((p) => p.uri === uri)?.trackCount ?? 0;
+      if (count > 1) offset = Math.floor(Math.random() * count);
+    }
+
+    let lastStatus = 0;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const res = await startPlayback(token, device_id, uri, offset);
+      if (res.ok) {
+        playlistStartedRef.current = uri;
+        setErrorMsg(null);
+        setStatus("ready");
+        // Best effort une fois le device actif ; ne bloque pas la lecture.
+        apiSetShuffle(token, device_id, shuffleRef.current)
+          .then(() => setRepeat(token!, device_id, "context"))
+          .catch(() => {});
+        return true;
+      }
+      lastStatus = res.status;
+      if (res.status === 401) {
+        // Token révoqué/expiré côté Spotify : refresh forcé puis on retente.
+        token = await getValidToken(true);
+        if (!token) { setStatus("error"); setErrorMsg("Session Spotify expirée — reconnecte-toi."); return false; }
+        continue;
+      }
+      if (res.status === 403) {
+        setStatus("error");
+        setErrorMsg("Spotify Premium est requis pour la lecture intégrée.");
+        return false;
+      }
+      // 404 = device pas encore actif, 5xx/0 = transitoire → on attend et on retente
+      await sleep(400 + attempt * 300);
+    }
+
+    console.error("[Spotify] startPlayback failed, status:", lastStatus);
+    setStatus("error");
+    setErrorMsg("Impossible de lancer la lecture. Vérifie que Spotify n'est pas déjà utilisé ailleurs, puis réessaie.");
+    return false;
   };
 
   const initPlayer = () => {
@@ -117,18 +165,11 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
       deviceIdRef.current = device_id;
       setDeviceId(device_id);
       setStatus("ready");
+      // Débloque l'autoplay (no-op si le navigateur l'autorise déjà)
+      player.activateElement?.().catch(() => {});
 
       if (!shouldPlayRef.current || !playlistUriRef.current) return;
-
-      const token = await getValidToken();
-      if (!token) return;
-
-      try {
-        await doPlay(token, device_id, playlistUriRef.current);
-      } catch (err) {
-        console.error("[Spotify] doPlay error:", err);
-        setErrorMsg("Erreur de lecture");
-      }
+      await doPlay(device_id, playlistUriRef.current);
     });
 
     player.addListener("player_state_changed", (state: unknown) => {
@@ -191,6 +232,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
     let pollInterval: ReturnType<typeof setInterval> | null = null;
 
     if (window.Spotify?.Player) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       initPlayer();
     } else {
       if (!document.querySelector('script[src="https://sdk.scdn.co/spotify-player.js"]')) {
@@ -229,23 +271,24 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
     if (!deviceIdRef.current) return;
 
     setCurrentTrack(null);
-    const device_id = deviceIdRef.current;
-    getValidToken().then(async (token) => {
-      if (!token || !deviceIdRef.current) return;
-      try {
-        await doPlay(token, device_id, playlistUri);
-      } catch (err) {
-        console.error("[Spotify] playlist switch error:", err);
-      }
-    });
+    doPlay(deviceIdRef.current, playlistUri);
   }, [playlistUri]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Play / pause ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!playerRef.current) return;
-    if (shouldPlay) playerRef.current.resume().catch(() => {});
-    else playerRef.current.pause().catch(() => {});
-  }, [shouldPlay]);
+    if (shouldPlay) {
+      // Si la lecture n'a jamais démarré (autoplay bloqué, échec au ready…),
+      // resume() ne ferait rien : on (re)lance la playlist.
+      if (!playlistStartedRef.current && deviceIdRef.current && playlistUriRef.current) {
+        doPlay(deviceIdRef.current, playlistUriRef.current);
+      } else {
+        playerRef.current.resume().catch(() => {});
+      }
+    } else {
+      playerRef.current.pause().catch(() => {});
+    }
+  }, [shouldPlay]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Volume ───────────────────────────────────────────────────────────────
   const handleVolumeChange = (v: number) => {
@@ -284,6 +327,21 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
               <>
                 <p className="text-red-400 text-sm font-medium">Erreur Spotify</p>
                 {errorMsg && <p className="text-red-400/60 text-xs max-w-xs text-center">{errorMsg}</p>}
+                <button
+                  onClick={() => {
+                    setErrorMsg(null);
+                    if (deviceIdRef.current && playlistUriRef.current) {
+                      setStatus("ready");
+                      doPlay(deviceIdRef.current, playlistUriRef.current);
+                    } else {
+                      setStatus("connecting");
+                      playerRef.current?.connect();
+                    }
+                  }}
+                  className="mt-1 px-4 py-1.5 rounded-lg bg-[#1db954]/15 hover:bg-[#1db954]/25 text-[#1db954] text-xs font-semibold transition-all"
+                >
+                  Réessayer
+                </button>
               </>
             ) : (
               <>

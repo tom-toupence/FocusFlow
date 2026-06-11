@@ -102,24 +102,31 @@ export async function handleSpotifyCallback(
 
 export async function refreshAccessToken(
   refreshToken: string
-): Promise<{ accessToken: string; expiresAt: number } | null> {
-  const res = await fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: CLIENT_ID,
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    }),
-  });
+): Promise<{ accessToken: string; expiresAt: number; refreshToken: string } | null> {
+  try {
+    const res = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: CLIENT_ID,
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+      }),
+    });
 
-  if (!res.ok) return null;
-  const data = await res.json();
+    if (!res.ok) return null;
+    const data = await res.json();
 
-  return {
-    accessToken: data.access_token,
-    expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000,
-  };
+    return {
+      accessToken: data.access_token,
+      expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000,
+      // PKCE : Spotify fait tourner les refresh tokens — il FAUT stocker le
+      // nouveau, sinon le refresh suivant échoue et l'utilisateur est déconnecté.
+      refreshToken: data.refresh_token ?? refreshToken,
+    };
+  } catch {
+    return null;
+  }
 }
 
 // ─── API types ────────────────────────────────────────────────────────────────
@@ -176,21 +183,35 @@ export async function fetchMyPlaylists(accessToken: string): Promise<PlaylistsRe
   return { ok: true, playlists };
 }
 
+export interface PlaybackResult {
+  ok: boolean;
+  status: number;
+}
+
 export async function startPlayback(
   accessToken: string,
   deviceId: string,
-  contextUri: string
-): Promise<void> {
+  contextUri: string,
+  offsetPosition?: number
+): Promise<PlaybackResult> {
   const playUrl = new URL("https://api.spotify.com/v1/me/player/play");
   playUrl.searchParams.set("device_id", deviceId);
-  await fetch(playUrl.toString(), {
-    method: "PUT",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ context_uri: contextUri }),
-  });
+  try {
+    const res = await fetch(playUrl.toString(), {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        context_uri: contextUri,
+        ...(offsetPosition !== undefined ? { offset: { position: offsetPosition } } : {}),
+      }),
+    });
+    return { ok: res.ok, status: res.status };
+  } catch {
+    return { ok: false, status: 0 };
+  }
 }
 
 export interface SpotifyProfile {
@@ -220,10 +241,12 @@ export async function setShuffle(
   const url = new URL("https://api.spotify.com/v1/me/player/shuffle");
   url.searchParams.set("state", String(state));
   url.searchParams.set("device_id", deviceId);
-  await fetch(url.toString(), {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  try {
+    await fetch(url.toString(), {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch { /* best effort */ }
 }
 
 export async function setRepeat(
@@ -234,8 +257,10 @@ export async function setRepeat(
   const repeatUrl = new URL("https://api.spotify.com/v1/me/player/repeat");
   repeatUrl.searchParams.set("state", state);
   repeatUrl.searchParams.set("device_id", deviceId);
-  await fetch(repeatUrl.toString(), {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  try {
+    await fetch(repeatUrl.toString(), {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch { /* best effort */ }
 }

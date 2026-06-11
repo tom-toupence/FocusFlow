@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, KeyboardEvent } from "react";
-import TodoStatusDropdown from "@/components/TodoStatusDropdown";
 import { useRouter } from "next/navigation";
 import { useTimerStore, TimerPreset, PRESETS } from "@/store/timerStore";
 import { useSessionStore, Todo, TodoPriority } from "@/store/sessionStore";
@@ -107,6 +106,8 @@ const PRIORITY_DOT: Record<TodoPriority, string> = {
   low:    "bg-foreground/20",
 };
 
+// Une carte = une tâche. Le statut est donné par la colonne : pas de dropdown,
+// juste une action principale pour faire avancer la carte (et supprimer).
 function KanbanCard({
   todo,
   onStatus,
@@ -116,20 +117,95 @@ function KanbanCard({
   onStatus: (s: import("@/store/sessionStore").TodoStatus) => void;
   onDelete: () => void;
 }) {
+  const advance =
+    todo.status === "todo"
+      ? { label: "Commencer", target: "in-progress" as const, cls: "text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20" }
+      : todo.status === "in-progress"
+      ? { label: "Terminer", target: "done" as const, cls: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20" }
+      : { label: "Reprendre", target: "todo" as const, cls: "text-foreground/40 bg-foreground/5 hover:bg-foreground/10" };
+
   return (
-    <div className="group flex items-start gap-2 px-2.5 py-2 rounded-lg bg-foreground/[0.04] border border-foreground/[0.07] hover:border-foreground/15 transition-colors">
-      <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5", PRIORITY_DOT[todo.priority ?? "normal"])} />
-      <span className="flex-1 text-xs text-foreground/75 leading-relaxed min-w-0 break-words">{todo.text}</span>
-      <div className="flex items-center gap-1 flex-shrink-0">
-        <TodoStatusDropdown status={todo.status} onChange={onStatus} />
+    <div className={cn(
+      "group flex flex-col gap-2 px-3 py-2.5 rounded-xl bg-background border border-foreground/[0.08] shadow-sm hover:border-foreground/20 transition-colors",
+      todo.status === "done" && "opacity-60"
+    )}>
+      <div className="flex items-start gap-2">
+        <span className={cn("w-2 h-2 rounded-full flex-shrink-0 mt-1.5", PRIORITY_DOT[todo.priority ?? "normal"])} />
+        <span className={cn(
+          "flex-1 text-sm text-foreground/85 leading-snug min-w-0 break-words",
+          todo.status === "done" && "line-through text-foreground/45"
+        )}>
+          {todo.text}
+        </span>
         <button
           onClick={onDelete}
-          className="opacity-0 group-hover:opacity-100 text-foreground/25 hover:text-foreground/60 transition-all"
+          className="opacity-0 group-hover:opacity-100 text-foreground/25 hover:text-red-400 transition-all flex-shrink-0 mt-0.5"
+          title="Supprimer"
         >
-          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
           </svg>
         </button>
+      </div>
+      <div className="flex items-center gap-2">
+        {(todo.pomodoroEstimate ?? 0) > 0 && (
+          <span className="text-[10px] text-foreground/35 tabular-nums">
+            🍅 {(todo.pomodorosUsed ?? 0) > 0 ? `${todo.pomodorosUsed}/` : ""}{todo.pomodoroEstimate}
+          </span>
+        )}
+        <button
+          onClick={() => onStatus(advance.target)}
+          className={cn("ml-auto text-[11px] font-medium px-2.5 py-1 rounded-lg transition-all", advance.cls)}
+        >
+          {advance.label} →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Colonne du Kanban : panneau teinté + header + liste scrollable
+function KanbanColumn({
+  title,
+  tint,
+  todos,
+  empty,
+  onStatus,
+  onDelete,
+}: {
+  title: string;
+  tint: "neutral" | "amber" | "emerald";
+  todos: Todo[];
+  empty: string;
+  onStatus: (id: string, s: import("@/store/sessionStore").TodoStatus) => void;
+  onDelete: (id: string) => void;
+}) {
+  const styles = {
+    neutral: { panel: "bg-foreground/[0.03] border-foreground/[0.07]", dot: "bg-foreground/30", label: "text-foreground/50" },
+    amber:   { panel: "bg-amber-500/[0.05] border-amber-500/15",        dot: "bg-amber-400",     label: "text-amber-600 dark:text-amber-400" },
+    emerald: { panel: "bg-emerald-500/[0.05] border-emerald-500/15",    dot: "bg-emerald-500",   label: "text-emerald-600 dark:text-emerald-400" },
+  }[tint];
+
+  return (
+    <div className={cn("flex flex-col rounded-2xl border p-3", styles.panel)}>
+      <div className="flex items-center gap-2 mb-2.5 px-1">
+        <span className={cn("w-2 h-2 rounded-full flex-shrink-0", styles.dot)} />
+        <span className={cn("text-xs font-semibold uppercase tracking-wider", styles.label)}>{title}</span>
+        <span className="ml-auto text-xs text-foreground/30 tabular-nums">{todos.length}</span>
+      </div>
+      <div className="flex flex-col gap-2 overflow-y-auto max-h-80 min-h-[72px]">
+        {todos.length === 0 ? (
+          <p className="text-[11px] text-foreground/25 text-center py-6 px-2 leading-relaxed">{empty}</p>
+        ) : (
+          todos.map((todo) => (
+            <KanbanCard
+              key={todo.id}
+              todo={todo}
+              onStatus={(s) => onStatus(todo.id, s)}
+              onDelete={() => onDelete(todo.id)}
+            />
+          ))
+        )}
       </div>
     </div>
   );
@@ -328,7 +404,8 @@ export default function SettingsPage() {
         <div className="w-16" />
       </header>
 
-      <main className="flex-1 flex flex-col lg:flex-row gap-0 max-w-4xl mx-auto w-full px-6 py-8 gap-8">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-8 flex flex-col gap-8">
+        <div className="flex flex-col lg:flex-row gap-8">
         {/* Left: selected content */}
         <div className="w-full lg:w-64 flex-shrink-0">
           <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-3">
@@ -537,13 +614,13 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Tasks — Kanban */}
-          <div>
-            <div className="flex items-baseline gap-2 mb-3">
+        </div>
+        </div>
+
+        {/* Tasks — Kanban (pleine largeur) */}
+        <div>
+            <div className="flex items-baseline gap-2 mb-1">
               <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest">Tâches de la session</p>
-              {todos.length > 0 && (
-                <span className="text-[10px] text-foreground/20">{activeTodos.length} à faire</span>
-              )}
               <button
                 onClick={() => setShowCoach(true)}
                 className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-violet-500 dark:text-violet-300 text-[11px] font-medium transition-all"
@@ -555,6 +632,10 @@ export default function SettingsPage() {
                 Coach
               </button>
             </div>
+            <p className="text-xs text-foreground/35 mb-4 leading-relaxed">
+              Prépare ce que tu vas faire pendant cette session : une carte = une tâche.
+              Fais-les avancer de <span className="text-foreground/55">À faire</span> → <span className="text-amber-500/80">En cours</span> → <span className="text-emerald-500/80">Terminé</span> au fil de la session.
+            </p>
 
             {/* Add task */}
             <div className="flex gap-2 mb-4">
@@ -580,83 +661,37 @@ export default function SettingsPage() {
             {todos.length === 0 ? (
               <p className="text-xs text-foreground/20 text-center py-5">Ajoute des tâches avant de démarrer</p>
             ) : (
-              <div className="grid grid-cols-3 gap-2.5">
-                {/* À faire */}
-                <div>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-foreground/30 flex-shrink-0" />
-                    <span className="text-[10px] font-semibold text-foreground/40 uppercase tracking-wider">À faire</span>
-                    {todos.filter(t => t.status === "todo").length > 0 && (
-                      <span className="ml-auto text-[10px] text-foreground/20">{todos.filter(t => t.status === "todo").length}</span>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto">
-                    {todos.filter(t => t.status === "todo").length === 0 && (
-                      <p className="text-[10px] text-foreground/15 text-center py-3">–</p>
-                    )}
-                    {todos.filter(t => t.status === "todo").map((todo) => (
-                      <KanbanCard
-                        key={todo.id}
-                        todo={todo}
-                        onStatus={(s) => setTodoStatus(todo.id, s)}
-                        onDelete={() => deleteTodo(todo.id)}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* En cours */}
-                <div>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
-                    <span className="text-[10px] font-semibold text-amber-400/70 uppercase tracking-wider">En cours</span>
-                    {todos.filter(t => t.status === "in-progress").length > 0 && (
-                      <span className="ml-auto text-[10px] text-foreground/20">{todos.filter(t => t.status === "in-progress").length}</span>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto">
-                    {todos.filter(t => t.status === "in-progress").length === 0 && (
-                      <p className="text-[10px] text-foreground/15 text-center py-3">–</p>
-                    )}
-                    {todos.filter(t => t.status === "in-progress").map((todo) => (
-                      <KanbanCard
-                        key={todo.id}
-                        todo={todo}
-                        onStatus={(s) => setTodoStatus(todo.id, s)}
-                        onDelete={() => deleteTodo(todo.id)}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Terminées */}
-                <div>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-                    <span className="text-[10px] font-semibold text-emerald-500/70 uppercase tracking-wider">Terminées</span>
-                    {todos.filter(t => t.status === "done").length > 0 && (
-                      <span className="ml-auto text-[10px] text-foreground/20">{todos.filter(t => t.status === "done").length}</span>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto">
-                    {todos.filter(t => t.status === "done").length === 0 && (
-                      <p className="text-[10px] text-foreground/15 text-center py-3">–</p>
-                    )}
-                    {todos.filter(t => t.status === "done").map((todo) => (
-                      <KanbanCard
-                        key={todo.id}
-                        todo={todo}
-                        onStatus={(s) => setTodoStatus(todo.id, s)}
-                        onDelete={() => deleteTodo(todo.id)}
-                      />
-                    ))}
-                  </div>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <KanbanColumn
+                  title="À faire"
+                  tint="neutral"
+                  todos={todos.filter((t) => t.status === "todo")}
+                  empty="Rien en attente"
+                  onStatus={setTodoStatus}
+                  onDelete={deleteTodo}
+                />
+                <KanbanColumn
+                  title="En cours"
+                  tint="amber"
+                  todos={todos.filter((t) => t.status === "in-progress")}
+                  empty="Clique « Commencer » sur une tâche pour la passer ici"
+                  onStatus={setTodoStatus}
+                  onDelete={deleteTodo}
+                />
+                <KanbanColumn
+                  title="Terminé"
+                  tint="emerald"
+                  todos={todos.filter((t) => t.status === "done")}
+                  empty="Les tâches finies arrivent ici"
+                  onStatus={setTodoStatus}
+                  onDelete={deleteTodo}
+                />
               </div>
             )}
           </div>
 
-          {/* Start button */}
+        {/* Start button */}
+        <div className="flex flex-col gap-3">
           <button
             onClick={handleStart}
             className="flex items-center justify-center gap-2 py-3.5 bg-foreground text-background font-semibold text-sm rounded-xl hover:bg-foreground/90 transition-all shadow-lg shadow-black/30"
@@ -668,7 +703,7 @@ export default function SettingsPage() {
           </button>
           <button
             onClick={() => setShowRoutineSave(true)}
-            className="flex items-center justify-center gap-2 -mt-3 text-xs text-foreground/40 hover:text-foreground/70 transition-colors"
+            className="flex items-center justify-center gap-2 text-xs text-foreground/40 hover:text-foreground/70 transition-colors"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" strokeLinecap="round" strokeLinejoin="round" />

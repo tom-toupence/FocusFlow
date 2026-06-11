@@ -27,7 +27,7 @@ interface SpotifyState {
 
   // Actions
   setAuth: (accessToken: string, refreshToken: string, expiresAt: number) => void;
-  updateToken: (accessToken: string, expiresAt: number) => void;
+  updateToken: (accessToken: string, expiresAt: number, refreshToken?: string) => void;
   clearAuth: () => void;
   setPlaylists: (playlists: SpotifyPlaylist[]) => void;
   selectPlaylist: (uri: string | null) => void;
@@ -57,8 +57,8 @@ export const useSpotifyStore = create<SpotifyState>()(
       setAuth: (accessToken, refreshToken, expiresAt) =>
         set({ accessToken, refreshToken, expiresAt }),
 
-      updateToken: (accessToken, expiresAt) =>
-        set({ accessToken, expiresAt }),
+      updateToken: (accessToken, expiresAt, refreshToken) =>
+        set((s) => ({ accessToken, expiresAt, refreshToken: refreshToken ?? s.refreshToken })),
 
       clearAuth: () =>
         set({

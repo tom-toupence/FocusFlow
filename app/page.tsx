@@ -699,7 +699,7 @@ export default function LandingPage() {
         if (!refreshToken) { clearAuth(); return; }
         const result = await refreshAccessToken(refreshToken);
         if (!result) { clearAuth(); return; }
-        updateToken(result.accessToken, result.expiresAt);
+        updateToken(result.accessToken, result.expiresAt, result.refreshToken);
         token = result.accessToken;
       }
 

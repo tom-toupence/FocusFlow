@@ -4,7 +4,6 @@ import { useState, useRef, KeyboardEvent } from "react";
 import { useSessionStore } from "@/store/sessionStore";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
 import TodoStatusDropdown from "@/components/TodoStatusDropdown";
 
 export default function TodoList() {
@@ -77,14 +76,14 @@ export default function TodoList() {
           {pending.map((todo) => (
             <div
               key={todo.id}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/5 group transition-colors"
+              className="flex items-start gap-2 px-3 py-2 rounded-xl hover:bg-white/5 group transition-colors"
             >
               <TodoStatusDropdown
                 status={todo.status}
                 onChange={(s) => setTodoStatus(todo.id, s)}
                 dark
               />
-              <span className="flex-1 text-xs text-white/70 min-w-0 truncate">{todo.text}</span>
+              <span className="flex-1 text-xs text-white/70 min-w-0 break-words leading-relaxed">{todo.text}</span>
               <button
                 onClick={() => deleteTodo(todo.id)}
                 className="opacity-0 group-hover:opacity-100 text-white/25 hover:text-white/60 transition-all flex-shrink-0"
@@ -102,14 +101,14 @@ export default function TodoList() {
               {done.map((todo) => (
                 <div
                   key={todo.id}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/5 group transition-colors opacity-50"
+                  className="flex items-start gap-2 px-3 py-2 rounded-xl hover:bg-white/5 group transition-colors opacity-50"
                 >
                   <TodoStatusDropdown
                     status={todo.status}
                     onChange={(s) => setTodoStatus(todo.id, s)}
                     dark
                   />
-                  <span className="flex-1 text-xs text-white/30 line-through min-w-0 truncate">{todo.text}</span>
+                  <span className="flex-1 text-xs text-white/30 line-through min-w-0 break-words leading-relaxed">{todo.text}</span>
                   <button
                     onClick={() => deleteTodo(todo.id)}
                     className="opacity-0 group-hover:opacity-100 text-white/20 hover:text-white/50 transition-all flex-shrink-0"
