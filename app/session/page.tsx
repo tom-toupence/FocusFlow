@@ -8,7 +8,7 @@ import { useSessionStore } from "@/store/sessionStore";
 import { usePlaylistStore } from "@/store/playlistStore";
 import { useSessionSummaryStore } from "@/store/sessionSummaryStore";
 import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
+import TodoList from "@/components/TodoList";
 import { useStatsStore } from "@/store/statsStore";
 import { useNotesStore } from "@/store/notesStore";
 import { useSpotifyStore } from "@/store/spotifyStore";
@@ -17,7 +17,6 @@ import { usePlayHistoryStore } from "@/store/playHistoryStore";
 import StickyNote from "@/components/StickyNote";
 import SpotifyPlayer from "@/components/SpotifyPlayer";
 import TwitchPlayer from "@/components/TwitchPlayer";
-import TodoStatusDropdown from "@/components/TodoStatusDropdown";
 import SoundscapeMixer from "@/components/SoundscapeMixer";
 import PipTimer from "@/components/PipTimer";
 import BreathingExercise from "@/components/BreathingExercise";
@@ -72,7 +71,7 @@ export default function SessionPage() {
     tick, start, pause, nextSession, finishFlow, accumulateFlow,
   } = useTimerStore();
   const isFlowtime = settings.preset === "flowtime";
-  const { selectedVideoId, selectedPlaylistId, todos, addTodo, setTodoStatus, getAllVideos } = useSessionStore();
+  const { selectedVideoId, selectedPlaylistId, todos, getAllVideos } = useSessionStore();
   const { playlists } = usePlaylistStore();
   const { recordSession } = useStatsStore();
   const { startSession } = useSessionSummaryStore();
@@ -99,7 +98,6 @@ export default function SessionPage() {
   const playerReadyRef = useRef(false);
   const isBreakRef = useRef(mode !== "work");
   const isRunningRef = useRef(isRunning);
-  const [todoInput, setTodoInput] = useState("");
   const [showTodos, setShowTodos] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [volume, setVolumeState] = useState(0.8);
@@ -392,14 +390,6 @@ export default function SessionPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [handleDistraction, pause, start]);
 
-  // ── Todo ──────────────────────────────────────────────────────────────────
-  const handleAddTodo = () => {
-    const t = todoInput.trim();
-    if (!t) return;
-    addTodo(t);
-    setTodoInput("");
-  };
-
   const handleVolumeChange = (v: number) => {
     setVolumeState(v);
     volumeRef.current = v;
@@ -427,7 +417,6 @@ export default function SessionPage() {
   const earnedBreakMin = Math.max(2, Math.round(flowSeconds / 5 / 60));
 
   const pendingTodos = todos.filter((t) => t.status !== "done");
-  const doneTodos = todos.filter((t) => t.status === "done");
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
@@ -811,63 +800,10 @@ export default function SessionPage() {
             </div>
           )}
 
-          {/* Tasks panel */}
+          {/* Tasks panel — mini kanban */}
           {showTodos && (
-            <div className="absolute bottom-6 right-6 w-72 bg-black/85 backdrop-blur-xl rounded-2xl border border-white/15 shadow-2xl shadow-black/80 overflow-hidden z-10">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-                <span className="text-xs font-semibold text-white/70 uppercase tracking-widest">Tâches</span>
-                {todos.length > 0 && (
-                  <span className="text-[11px] text-white/40">{doneTodos.length}/{todos.length} faites</span>
-                )}
-              </div>
-              <div className="max-h-64 overflow-y-auto">
-                {todos.length === 0 && (
-                  <p className="text-white/30 text-xs text-center py-6">Aucune tâche pour cette session</p>
-                )}
-                {pendingTodos.map((todo) => (
-                  <div key={todo.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors">
-                    <TodoStatusDropdown
-                      status={todo.status}
-                      onChange={(s) => setTodoStatus(todo.id, s)}
-                      dark
-                    />
-                    <span className="flex-1 text-sm text-white min-w-0 truncate">{todo.text}</span>
-                  </div>
-                ))}
-                {doneTodos.length > 0 && (
-                  <>
-                    {pendingTodos.length > 0 && <div className="h-px bg-white/[0.08] mx-4 my-1" />}
-                    {doneTodos.map((todo) => (
-                      <div key={todo.id} className="flex items-center gap-3 px-4 py-2.5">
-                        <TodoStatusDropdown
-                          status={todo.status}
-                          onChange={(s) => setTodoStatus(todo.id, s)}
-                          dark
-                        />
-                        <span className="flex-1 text-sm text-white/30 line-through min-w-0 truncate">{todo.text}</span>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-              <div className="border-t border-white/10 px-3 py-2.5 flex gap-2">
-                <Input
-                  value={todoInput}
-                  onChange={(e) => setTodoInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAddTodo()}
-                  placeholder="Nouvelle tâche..."
-                  className="flex-1 h-8 bg-white/8 border-white/15 text-white placeholder:text-white/30 text-sm rounded-lg focus-visible:ring-white/20"
-                />
-                <button
-                  onClick={handleAddTodo}
-                  disabled={!todoInput.trim()}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/15 hover:bg-white/25 disabled:opacity-20 text-white transition-colors flex-shrink-0"
-                >
-                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                    <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </div>
+            <div className="absolute bottom-6 right-6 w-[32rem] max-w-[calc(100vw-3rem)] bg-black/85 backdrop-blur-xl rounded-2xl border border-white/15 shadow-2xl shadow-black/80 z-10 p-4">
+              <TodoList />
             </div>
           )}
         </>

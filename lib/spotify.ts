@@ -233,6 +233,96 @@ export async function getSpotifyProfile(accessToken: string): Promise<SpotifyPro
   };
 }
 
+// ─── Spotify Connect : contrôle à distance (sans SDK) ────────────────────────
+// Utilisé quand le navigateur ne supporte pas le Web Playback SDK (Firefox) :
+// on pilote l'app Spotify ouverte sur un autre appareil (PC, téléphone…).
+
+export interface SpotifyDevice {
+  id: string;
+  name: string;
+  type: string;
+  isActive: boolean;
+  isRestricted: boolean;
+}
+
+interface RawDevice {
+  id: string | null;
+  name: string;
+  type: string;
+  is_active: boolean;
+  is_restricted: boolean;
+}
+
+export async function getDevices(accessToken: string): Promise<SpotifyDevice[]> {
+  try {
+    const res = await fetch("https://api.spotify.com/v1/me/player/devices", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return ((data.devices ?? []) as RawDevice[])
+      .filter((d) => d.id && !d.is_restricted)
+      .map((d) => ({
+        id: d.id as string,
+        name: d.name,
+        type: d.type,
+        isActive: d.is_active,
+        isRestricted: d.is_restricted,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+interface RawTrackItem {
+  name: string;
+  artists?: Array<{ name: string }>;
+  album?: { name?: string; images?: Array<{ url: string }> };
+}
+
+export async function getCurrentlyPlaying(
+  accessToken: string
+): Promise<{ track: SpotifyTrack | null; isPlaying: boolean } | null> {
+  try {
+    const res = await fetch("https://api.spotify.com/v1/me/player/currently-playing", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (res.status === 204) return { track: null, isPlaying: false };
+    if (!res.ok) return null;
+    const data = await res.json();
+    const item = data.item as RawTrackItem | null;
+    return {
+      isPlaying: !!data.is_playing,
+      track: item
+        ? {
+            name: item.name,
+            artist: (item.artists ?? []).map((a) => a.name).join(", "),
+            albumName: item.album?.name,
+            albumArt: item.album?.images?.[0]?.url,
+          }
+        : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function playerCommand(accessToken: string, method: "PUT" | "POST", path: string): Promise<void> {
+  try {
+    await fetch(`https://api.spotify.com/v1/me/player/${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch { /* best effort */ }
+}
+
+export const pausePlayback = (token: string) => playerCommand(token, "PUT", "pause");
+export const resumePlayback = (token: string) => playerCommand(token, "PUT", "play");
+export const skipNext = (token: string) => playerCommand(token, "POST", "next");
+export const skipPrevious = (token: string) => playerCommand(token, "POST", "previous");
+export const setRemoteVolume = (token: string, percent: number) =>
+  playerCommand(token, "PUT", `volume?volume_percent=${Math.round(Math.max(0, Math.min(100, percent)))}`);
+
 export async function setShuffle(
   accessToken: string,
   deviceId: string,
