@@ -2,11 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSpotifyStore } from "@/store/spotifyStore";
-import {
-  startPlayback, setRepeat, setShuffle as apiSetShuffle, refreshAccessToken,
-  getDevices, getCurrentlyPlaying, pausePlayback, resumePlayback, skipNext, skipPrevious, setRemoteVolume,
-  type SpotifyDevice,
-} from "@/lib/spotify";
+import { startPlayback, setRepeat, setShuffle as apiSetShuffle, refreshAccessToken } from "@/lib/spotify";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -60,22 +56,11 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
   const [volume, setVolumeState] = useState(0.8);
   const [showVolume, setShowVolume] = useState(false);
   // Le SDK Spotify n'est officiellement supporté que sur Chrome/Edge/Safari ;
-  // sous Firefox le DRM coupe la lecture après quelques secondes. Dans ce cas
-  // on bascule en mode « télécommande » (Spotify Connect) : on pilote l'app
-  // Spotify ouverte sur un autre appareil via l'API Web.
-  const remoteModeRef = useRef(false);
-  const [remoteDeviceName, setRemoteDeviceName] = useState<string | null>(null);
-  const [remoteDevices, setRemoteDevices] = useState<SpotifyDevice[]>([]);
-  const [showDevicePicker, setShowDevicePicker] = useState(false);
-  // Bandeau « le son sort sur X » visible 6 s après chaque changement d'appareil,
-  // puis réduit à une pastille 📡 discrète.
-  const [showRemoteBanner, setShowRemoteBanner] = useState(false);
+  // sous Firefox le DRM coupe régulièrement la lecture après quelques secondes.
+  const [isFirefox, setIsFirefox] = useState(false);
   useEffect(() => {
-    if (!remoteDeviceName) return;
-    setShowRemoteBanner(true);
-    const id = setTimeout(() => setShowRemoteBanner(false), 6000);
-    return () => clearTimeout(id);
-  }, [remoteDeviceName]);
+    if (typeof navigator !== "undefined" && /firefox/i.test(navigator.userAgent)) setIsFirefox(true);
+  }, []);
 
   // Refs for values used inside SDK callbacks (avoids stale closures)
   const playerRef = useRef<SpotifySDKPlayer | null>(null);
@@ -172,45 +157,6 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
     }
   };
 
-  // ── Mode télécommande (Spotify Connect) ───────────────────────────────────
-  const selectRemoteDevice = async (device: SpotifyDevice) => {
-    deviceIdRef.current = device.id;
-    setDeviceId(device.id);
-    setRemoteDeviceName(device.name);
-    setStatus("ready");
-    // Appareil muet = « j'entends rien » alors que la lecture tourne → on remonte le son.
-    if (device.volumePercent === 0) {
-      const token = await getValidToken();
-      if (token) setRemoteVolume(token, 60);
-    }
-    if (playlistUriRef.current) {
-      playlistStartedRef.current = null;
-      await doPlay(device.id, playlistUriRef.current);
-    }
-  };
-
-  const initRemote = async () => {
-    setStatus("connecting");
-    const token = await getValidToken();
-    if (!token) { setStatus("error"); setErrorMsg("Session Spotify expirée — reconnecte-toi depuis l'accueil."); return; }
-
-    const devices = await getDevices(token);
-    setRemoteDevices(devices);
-    const device = devices.find((d) => d.isActive) ?? devices[0];
-    if (!device) {
-      setStatus("error");
-      setErrorMsg("Firefox ne permet pas la lecture intégrée. Ouvre l'app Spotify sur ton PC ou ton téléphone (lance une musique 2 secondes si besoin), puis clique Réessayer : FocusFlow la pilotera à distance.");
-      return;
-    }
-    await selectRemoteDevice(device);
-  };
-
-  const openDevicePicker = async () => {
-    setShowDevicePicker((v) => !v);
-    const token = await getValidToken();
-    if (token) setRemoteDevices(await getDevices(token));
-  };
-
   const initPlayer = () => {
     if (initCalledRef.current || playerRef.current || !window.Spotify) return;
     initCalledRef.current = true;
@@ -297,23 +243,9 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
     playerRef.current = player;
   };
 
-  // ── SDK init (ou mode télécommande sous Firefox) ─────────────────────────
+  // ── SDK init ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!accessToken) return;
-
-    // Firefox : pas de SDK fiable (DRM) → télécommande Spotify Connect.
-    if (typeof navigator !== "undefined" && /firefox/i.test(navigator.userAgent)) {
-      remoteModeRef.current = true;
-      initRemote();
-      return () => {
-        const t = tokenRef.current;
-        if (t && playlistStartedRef.current) pausePlayback(t);
-        playlistStartedRef.current = null;
-        deviceIdRef.current = null;
-        setDeviceId(null);
-        setCurrentTrack(null);
-      };
-    }
 
     let pollInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -387,40 +319,8 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
     return () => clearInterval(id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Polling télécommande : infos piste + maintien lecture/pause ──────────
-  useEffect(() => {
-    const id = setInterval(async () => {
-      if (!remoteModeRef.current || !deviceIdRef.current) return;
-      if (playInFlightRef.current) return;
-      const token = await getValidToken();
-      if (!token) return;
-      const now = await getCurrentlyPlaying(token);
-      if (!now) return;
-      if (now.track) setCurrentTrack(now.track);
-      if (!playlistStartedRef.current) return;
-      // Le timer fait foi : on remet la lecture distante dans le bon état.
-      if (shouldPlayRef.current && !now.isPlaying) resumePlayback(token);
-      else if (!shouldPlayRef.current && now.isPlaying) pausePlayback(token);
-    }, 5000);
-    return () => clearInterval(id);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   // ── Play / pause ─────────────────────────────────────────────────────────
   useEffect(() => {
-    if (remoteModeRef.current) {
-      if (!playlistStartedRef.current) {
-        if (shouldPlay && deviceIdRef.current && playlistUriRef.current) {
-          doPlay(deviceIdRef.current, playlistUriRef.current);
-        }
-        return;
-      }
-      getValidToken().then((token) => {
-        if (!token) return;
-        if (shouldPlay) resumePlayback(token);
-        else pausePlayback(token);
-      });
-      return;
-    }
     if (!playerRef.current) return;
     if (shouldPlay) {
       // Si la lecture n'a jamais démarré (autoplay bloqué, échec au ready…),
@@ -435,30 +335,10 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
     }
   }, [shouldPlay]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Contrôles (SDK ou télécommande) ───────────────────────────────────────
+  // ── Volume ───────────────────────────────────────────────────────────────
   const handleVolumeChange = (v: number) => {
     setVolumeState(v);
-    if (remoteModeRef.current) {
-      getValidToken().then((token) => { if (token) setRemoteVolume(token, v * 100); });
-    } else {
-      playerRef.current?.setVolume(v).catch(() => {});
-    }
-  };
-
-  const handlePrevTrack = () => {
-    if (remoteModeRef.current) {
-      getValidToken().then((token) => { if (token) skipPrevious(token); });
-    } else {
-      playerRef.current?.previousTrack().catch(() => {});
-    }
-  };
-
-  const handleNextTrack = () => {
-    if (remoteModeRef.current) {
-      getValidToken().then((token) => { if (token) skipNext(token); });
-    } else {
-      playerRef.current?.nextTrack().catch(() => {});
-    }
+    playerRef.current?.setVolume(v).catch(() => {});
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -485,60 +365,12 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
         </div>
       )}
 
-      {remoteDeviceName && status === "ready" && (
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1.5">
-          {showRemoteBanner || showDevicePicker ? (
-            <button
-              onClick={openDevicePicker}
-              className="max-w-md px-4 py-2 rounded-xl bg-[#1db954]/10 border border-[#1db954]/25 backdrop-blur-sm hover:bg-[#1db954]/20 transition-all"
-              title="Changer d'appareil de sortie"
-            >
-              <p className="text-[#1db954] text-xs leading-relaxed text-center">
-                📡 Le son sort sur <strong>{remoteDeviceName}</strong> — clique pour changer d&apos;appareil ▾
-              </p>
-            </button>
-          ) : (
-            <button
-              onClick={openDevicePicker}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-black/40 border border-white/10 backdrop-blur-sm hover:bg-[#1db954]/20 hover:border-[#1db954]/30 transition-all text-sm opacity-50 hover:opacity-100"
-              title={`Le son sort sur ${remoteDeviceName} — changer d'appareil`}
-            >
-              📡
-            </button>
-          )}
-          {showDevicePicker && (
-            <div className="min-w-[240px] rounded-xl bg-black/90 border border-white/15 backdrop-blur-xl shadow-2xl shadow-black/60 overflow-hidden">
-              {remoteDevices.length === 0 ? (
-                <p className="text-white/40 text-xs px-4 py-3 text-center leading-relaxed">
-                  Aucun appareil trouvé.<br />Ouvre l&apos;app Spotify sur ton PC ou ton téléphone.
-                </p>
-              ) : (
-                remoteDevices.map((d) => (
-                  <button
-                    key={d.id}
-                    onClick={() => { setShowDevicePicker(false); selectRemoteDevice(d); }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left hover:bg-white/10 transition-colors"
-                  >
-                    <span className="text-sm flex-shrink-0">
-                      {d.type === "Smartphone" ? "📱" : d.type === "Computer" ? "💻" : "🔊"}
-                    </span>
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-xs text-white/85 truncate">{d.name}</span>
-                      <span className="block text-[10px] text-white/35">
-                        {d.id === deviceIdRef.current ? "Sélectionné" : d.isActive ? "Actif" : "Disponible"}
-                        {d.volumePercent !== null && ` · vol. ${d.volumePercent}%`}
-                      </span>
-                    </span>
-                    {d.id === deviceIdRef.current && (
-                      <svg className="w-3.5 h-3.5 text-[#1db954] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                        <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                  </button>
-                ))
-              )}
-            </div>
-          )}
+      {isFirefox && (
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 max-w-md px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 backdrop-blur-sm">
+          <p className="text-amber-300 text-xs leading-relaxed text-center">
+            ⚠️ Spotify ne supporte pas officiellement <strong>Firefox</strong> pour la lecture intégrée
+            (coupures fréquentes). Utilise <strong>Chrome</strong> ou <strong>Edge</strong> pour une lecture stable.
+          </p>
         </div>
       )}
 
@@ -552,9 +384,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
                 <button
                   onClick={() => {
                     setErrorMsg(null);
-                    if (remoteModeRef.current) {
-                      initRemote();
-                    } else if (deviceIdRef.current && playlistUriRef.current) {
+                    if (deviceIdRef.current && playlistUriRef.current) {
                       setStatus("ready");
                       doPlay(deviceIdRef.current, playlistUriRef.current);
                     } else {
@@ -634,7 +464,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
 
             {/* Previous */}
             <button
-              onClick={handlePrevTrack}
+              onClick={() => playerRef.current?.previousTrack().catch(() => {})}
               className="w-8 h-8 flex items-center justify-center rounded-lg bg-black/50 backdrop-blur-sm border border-white/10 text-white/50 hover:text-white transition-all"
               title="Piste précédente"
             >
@@ -645,7 +475,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
 
             {/* Skip */}
             <button
-              onClick={handleNextTrack}
+              onClick={() => playerRef.current?.nextTrack().catch(() => {})}
               className="w-8 h-8 flex items-center justify-center rounded-lg bg-black/50 backdrop-blur-sm border border-white/10 text-white/50 hover:text-white transition-all"
               title="Piste suivante"
             >
