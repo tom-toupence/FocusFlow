@@ -106,8 +106,8 @@ const PRIORITY_DOT: Record<TodoPriority, string> = {
   low:    "bg-foreground/20",
 };
 
-// Une carte = une tâche. Le statut est donné par la colonne : pas de dropdown,
-// juste une action principale pour faire avancer la carte (et supprimer).
+// Une carte = une tâche. Le statut est donné par la colonne ; la carte peut
+// être déplacée dans les deux sens (← recule, action principale avance).
 function KanbanCard({
   todo,
   onStatus,
@@ -117,12 +117,19 @@ function KanbanCard({
   onStatus: (s: import("@/store/sessionStore").TodoStatus) => void;
   onDelete: () => void;
 }) {
+  const back =
+    todo.status === "in-progress"
+      ? { target: "todo" as const, title: "Remettre à faire" }
+      : todo.status === "done"
+      ? { target: "in-progress" as const, title: "Remettre en cours" }
+      : null;
+
   const advance =
     todo.status === "todo"
-      ? { label: "Commencer", target: "in-progress" as const, cls: "text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20" }
+      ? { label: "Commencer →", target: "in-progress" as const, cls: "text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20" }
       : todo.status === "in-progress"
-      ? { label: "Terminer", target: "done" as const, cls: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20" }
-      : { label: "Reprendre", target: "todo" as const, cls: "text-foreground/40 bg-foreground/5 hover:bg-foreground/10" };
+      ? { label: "Terminer →", target: "done" as const, cls: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20" }
+      : { label: "↺ À faire", target: "todo" as const, cls: "text-foreground/40 bg-foreground/5 hover:bg-foreground/10" };
 
   return (
     <div className={cn(
@@ -147,18 +154,38 @@ function KanbanCard({
           </svg>
         </button>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         {(todo.pomodoroEstimate ?? 0) > 0 && (
           <span className="text-[10px] text-foreground/35 tabular-nums">
             🍅 {(todo.pomodorosUsed ?? 0) > 0 ? `${todo.pomodorosUsed}/` : ""}{todo.pomodoroEstimate}
           </span>
         )}
-        <button
-          onClick={() => onStatus(advance.target)}
-          className={cn("ml-auto text-[11px] font-medium px-2.5 py-1 rounded-lg transition-all", advance.cls)}
-        >
-          {advance.label} →
-        </button>
+        <div className="ml-auto flex items-center gap-1.5">
+          {back && (
+            <button
+              onClick={() => onStatus(back.target)}
+              title={back.title}
+              className="text-[11px] font-medium px-2 py-1 rounded-lg text-foreground/40 bg-foreground/5 hover:bg-foreground/10 hover:text-foreground/70 transition-all"
+            >
+              ←
+            </button>
+          )}
+          {todo.status === "todo" && (
+            <button
+              onClick={() => onStatus("done")}
+              title="Marquer terminé directement"
+              className="text-[11px] font-medium px-2 py-1 rounded-lg text-emerald-600/70 dark:text-emerald-400/70 bg-emerald-500/5 hover:bg-emerald-500/15 transition-all"
+            >
+              ✓
+            </button>
+          )}
+          <button
+            onClick={() => onStatus(advance.target)}
+            className={cn("text-[11px] font-medium px-2.5 py-1 rounded-lg transition-all", advance.cls)}
+          >
+            {advance.label}
+          </button>
+        </div>
       </div>
     </div>
   );

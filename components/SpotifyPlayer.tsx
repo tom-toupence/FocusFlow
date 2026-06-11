@@ -17,6 +17,7 @@ interface SpotifySDKPlayer {
   nextTrack: () => Promise<void>;
   previousTrack: () => Promise<void>;
   setVolume: (vol: number) => Promise<void>;
+  getCurrentState: () => Promise<{ paused: boolean; position: number } | null>;
   /** Débloque l'élément audio interne vis-à-vis des politiques d'autoplay (Safari…) */
   activateElement?: () => Promise<void>;
 }
@@ -54,6 +55,12 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [volume, setVolumeState] = useState(0.8);
   const [showVolume, setShowVolume] = useState(false);
+  // Le SDK Spotify n'est officiellement supporté que sur Chrome/Edge/Safari ;
+  // sous Firefox le DRM coupe régulièrement la lecture après quelques secondes.
+  const [isFirefox, setIsFirefox] = useState(false);
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && /firefox/i.test(navigator.userAgent)) setIsFirefox(true);
+  }, []);
 
   // Refs for values used inside SDK callbacks (avoids stale closures)
   const playerRef = useRef<SpotifySDKPlayer | null>(null);
@@ -68,6 +75,9 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
   const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
   // Tracks which playlistUri was last successfully started — prevents double-start
   const playlistStartedRef = useRef<string | null>(null);
+  // Un seul démarrage de lecture à la fois : les appels concurrents (ready,
+  // shouldPlay, watchdog) provoquaient des skips en cascade.
+  const playInFlightRef = useRef(false);
 
   useEffect(() => { shouldPlayRef.current = shouldPlay; }, [shouldPlay]);
   useEffect(() => { tokenRef.current = accessToken; }, [accessToken]);
@@ -99,52 +109,52 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
   // Single entry point for starting/switching playback.
   // Le device vient souvent d'être enregistré : Spotify répond 404 pendant
   // ~1-2 s avant qu'il soit actif → retry avec backoff. Le shuffle ne peut être
-  // appliqué qu'à un device actif, donc on lance la lecture d'abord (avec un
-  // offset aléatoire pour ne pas toujours démarrer sur le 1er titre), puis
-  // shuffle + repeat.
+  // appliqué qu'à un device actif → lecture d'abord, puis shuffle + repeat.
+  // Sérialisé : un seul démarrage à la fois, sinon chaque appel relance la
+  // playlist et la musique « saute ».
   const doPlay = async (device_id: string, uri: string): Promise<boolean> => {
-    let token = await getValidToken();
-    if (!token) { setStatus("error"); setErrorMsg("Session Spotify expirée — reconnecte-toi."); return false; }
+    if (playInFlightRef.current) return false;
+    playInFlightRef.current = true;
+    try {
+      let token = await getValidToken();
+      if (!token) { setStatus("error"); setErrorMsg("Session Spotify expirée — reconnecte-toi."); return false; }
 
-    let offset: number | undefined;
-    if (shuffleRef.current) {
-      const count = useSpotifyStore.getState().playlists.find((p) => p.uri === uri)?.trackCount ?? 0;
-      if (count > 1) offset = Math.floor(Math.random() * count);
+      let lastStatus = 0;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const res = await startPlayback(token, device_id, uri);
+        if (res.ok) {
+          playlistStartedRef.current = uri;
+          setErrorMsg(null);
+          setStatus("ready");
+          // Best effort une fois le device actif ; ne bloque pas la lecture.
+          apiSetShuffle(token, device_id, shuffleRef.current)
+            .then(() => setRepeat(token!, device_id, "context"))
+            .catch(() => {});
+          return true;
+        }
+        lastStatus = res.status;
+        if (res.status === 401) {
+          // Token révoqué/expiré côté Spotify : refresh forcé puis on retente.
+          token = await getValidToken(true);
+          if (!token) { setStatus("error"); setErrorMsg("Session Spotify expirée — reconnecte-toi."); return false; }
+          continue;
+        }
+        if (res.status === 403) {
+          setStatus("error");
+          setErrorMsg("Spotify Premium est requis pour la lecture intégrée.");
+          return false;
+        }
+        // 404 = device pas encore actif, 5xx/0 = transitoire → on attend et on retente
+        await sleep(400 + attempt * 300);
+      }
+
+      console.error("[Spotify] startPlayback failed, status:", lastStatus);
+      setStatus("error");
+      setErrorMsg("Impossible de lancer la lecture. Vérifie que Spotify n'est pas déjà utilisé ailleurs, puis réessaie.");
+      return false;
+    } finally {
+      playInFlightRef.current = false;
     }
-
-    let lastStatus = 0;
-    for (let attempt = 0; attempt < 6; attempt++) {
-      const res = await startPlayback(token, device_id, uri, offset);
-      if (res.ok) {
-        playlistStartedRef.current = uri;
-        setErrorMsg(null);
-        setStatus("ready");
-        // Best effort une fois le device actif ; ne bloque pas la lecture.
-        apiSetShuffle(token, device_id, shuffleRef.current)
-          .then(() => setRepeat(token!, device_id, "context"))
-          .catch(() => {});
-        return true;
-      }
-      lastStatus = res.status;
-      if (res.status === 401) {
-        // Token révoqué/expiré côté Spotify : refresh forcé puis on retente.
-        token = await getValidToken(true);
-        if (!token) { setStatus("error"); setErrorMsg("Session Spotify expirée — reconnecte-toi."); return false; }
-        continue;
-      }
-      if (res.status === 403) {
-        setStatus("error");
-        setErrorMsg("Spotify Premium est requis pour la lecture intégrée.");
-        return false;
-      }
-      // 404 = device pas encore actif, 5xx/0 = transitoire → on attend et on retente
-      await sleep(400 + attempt * 300);
-    }
-
-    console.error("[Spotify] startPlayback failed, status:", lastStatus);
-    setStatus("error");
-    setErrorMsg("Impossible de lancer la lecture. Vérifie que Spotify n'est pas déjà utilisé ailleurs, puis réessaie.");
-    return false;
   };
 
   const initPlayer = () => {
@@ -155,7 +165,9 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
     const player = new window.Spotify.Player({
       name: "FocusFlow",
       getOAuthToken: (cb) => {
-        getValidToken().then((token) => { if (token) cb(token); });
+        // Toujours répondre au SDK : un callback jamais appelé le laisse bloqué
+        // et la lecture s'arrête au bout de quelques secondes.
+        getValidToken().then((token) => { cb(token ?? tokenRef.current ?? ""); });
       },
       volume,
     });
@@ -169,6 +181,12 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
       player.activateElement?.().catch(() => {});
 
       if (!shouldPlayRef.current || !playlistUriRef.current) return;
+      // Reconnexion d'un device déjà lancé : on reprend, on ne relance pas la
+      // playlist depuis le début (sinon ça « saute » à chaque re-ready).
+      if (playlistStartedRef.current === playlistUriRef.current) {
+        player.resume().catch(() => {});
+        return;
+      }
       await doPlay(device_id, playlistUriRef.current);
     });
 
@@ -232,7 +250,6 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
     let pollInterval: ReturnType<typeof setInterval> | null = null;
 
     if (window.Spotify?.Player) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       initPlayer();
     } else {
       if (!document.querySelector('script[src="https://sdk.scdn.co/spotify-player.js"]')) {
@@ -273,6 +290,34 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
     setCurrentTrack(null);
     doPlay(deviceIdRef.current, playlistUri);
   }, [playlistUri]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Watchdog : auto-réparation des coupures ───────────────────────────────
+  // Certaines configs (Firefox/DRM, device volé par un autre appareil, stall
+  // réseau) coupent la lecture sans erreur. Toutes les 5 s : si le timer
+  // tourne mais que la musique est en pause → resume ; si le device n'est
+  // plus actif → on relance la playlist.
+  useEffect(() => {
+    const id = setInterval(async () => {
+      const player = playerRef.current;
+      if (!player || !shouldPlayRef.current || !playlistStartedRef.current) return;
+      if (playInFlightRef.current) return;
+      try {
+        const state = await player.getCurrentState();
+        if (state === null) {
+          // Device plus actif (lecture transférée / décrochée) → reprendre la main
+          console.warn("[Spotify] watchdog: device inactif, relance de la lecture");
+          if (deviceIdRef.current && playlistUriRef.current) {
+            playlistStartedRef.current = null;
+            await doPlay(deviceIdRef.current, playlistUriRef.current);
+          }
+        } else if (state.paused) {
+          console.warn("[Spotify] watchdog: lecture en pause inattendue, resume");
+          player.resume().catch(() => {});
+        }
+      } catch { /* ignore */ }
+    }, 5000);
+    return () => clearInterval(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Play / pause ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -317,6 +362,15 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
             alt={currentTrack.albumName ?? ""}
             className="w-56 h-56 rounded-2xl shadow-2xl shadow-black/80 object-cover opacity-80"
           />
+        </div>
+      )}
+
+      {isFirefox && (
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 max-w-md px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 backdrop-blur-sm">
+          <p className="text-amber-300 text-xs leading-relaxed text-center">
+            ⚠️ Spotify ne supporte pas officiellement <strong>Firefox</strong> pour la lecture intégrée
+            (coupures fréquentes). Utilise <strong>Chrome</strong> ou <strong>Edge</strong> pour une lecture stable.
+          </p>
         </div>
       )}
 

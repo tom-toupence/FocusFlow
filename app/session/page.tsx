@@ -145,10 +145,14 @@ export default function SessionPage() {
   }, []);
 
   // ── Notifications ────────────────────────────────────────────────────────
+  // Firefox n'autorise requestPermission() que depuis un geste utilisateur →
+  // on attend le premier clic dans la session.
   useEffect(() => {
-    if (typeof window !== "undefined" && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission !== "default") return;
+    const ask = () => { Notification.requestPermission(); };
+    window.addEventListener("pointerdown", ask, { once: true });
+    return () => window.removeEventListener("pointerdown", ask);
   }, []);
 
   // ── YouTube IFrame API ────────────────────────────────────────────────────
