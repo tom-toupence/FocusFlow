@@ -132,10 +132,17 @@ function KanbanCard({
       : { label: "↺ À faire", target: "todo" as const, cls: "text-foreground/40 bg-foreground/5 hover:bg-foreground/10" };
 
   return (
-    <div className={cn(
-      "group flex flex-col gap-2 px-3 py-2.5 rounded-xl bg-background border border-foreground/[0.08] shadow-sm hover:border-foreground/20 transition-colors",
-      todo.status === "done" && "opacity-60"
-    )}>
+    <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", todo.id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      className={cn(
+        "group flex flex-col gap-2 px-3 py-2.5 rounded-xl bg-background border border-foreground/[0.08] shadow-sm hover:border-foreground/20 transition-colors cursor-grab active:cursor-grabbing",
+        todo.status === "done" && "opacity-60"
+      )}
+    >
       <div className="flex items-start gap-2">
         <span className={cn("w-2 h-2 rounded-full flex-shrink-0 mt-1.5", PRIORITY_DOT[todo.priority ?? "normal"])} />
         <span className={cn(
@@ -191,10 +198,12 @@ function KanbanCard({
   );
 }
 
-// Colonne du Kanban : panneau teinté + header + liste scrollable
+// Colonne du Kanban : panneau teinté + header + liste scrollable.
+// Zone de drop : on peut y faire glisser une carte pour changer son statut.
 function KanbanColumn({
   title,
   tint,
+  status,
   todos,
   empty,
   onStatus,
@@ -202,19 +211,32 @@ function KanbanColumn({
 }: {
   title: string;
   tint: "neutral" | "amber" | "emerald";
+  status: import("@/store/sessionStore").TodoStatus;
   todos: Todo[];
   empty: string;
   onStatus: (id: string, s: import("@/store/sessionStore").TodoStatus) => void;
   onDelete: (id: string) => void;
 }) {
+  const [dragOver, setDragOver] = useState(false);
+
   const styles = {
-    neutral: { panel: "bg-foreground/[0.03] border-foreground/[0.07]", dot: "bg-foreground/30", label: "text-foreground/50" },
-    amber:   { panel: "bg-amber-500/[0.05] border-amber-500/15",        dot: "bg-amber-400",     label: "text-amber-600 dark:text-amber-400" },
-    emerald: { panel: "bg-emerald-500/[0.05] border-emerald-500/15",    dot: "bg-emerald-500",   label: "text-emerald-600 dark:text-emerald-400" },
+    neutral: { panel: "bg-foreground/[0.03] border-foreground/[0.07]", dot: "bg-foreground/30", label: "text-foreground/50", over: "border-foreground/40 bg-foreground/[0.07]" },
+    amber:   { panel: "bg-amber-500/[0.05] border-amber-500/15",        dot: "bg-amber-400",     label: "text-amber-600 dark:text-amber-400", over: "border-amber-500/50 bg-amber-500/15" },
+    emerald: { panel: "bg-emerald-500/[0.05] border-emerald-500/15",    dot: "bg-emerald-500",   label: "text-emerald-600 dark:text-emerald-400", over: "border-emerald-500/50 bg-emerald-500/15" },
   }[tint];
 
   return (
-    <div className={cn("flex flex-col rounded-2xl border p-3", styles.panel)}>
+    <div
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOver(true); }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false); }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        const id = e.dataTransfer.getData("text/plain");
+        if (id) onStatus(id, status);
+      }}
+      className={cn("flex flex-col rounded-2xl border p-3 transition-colors", styles.panel, dragOver && styles.over)}
+    >
       <div className="flex items-center gap-2 mb-2.5 px-1">
         <span className={cn("w-2 h-2 rounded-full flex-shrink-0", styles.dot)} />
         <span className={cn("text-xs font-semibold uppercase tracking-wider", styles.label)}>{title}</span>
@@ -692,6 +714,7 @@ export default function SettingsPage() {
                 <KanbanColumn
                   title="À faire"
                   tint="neutral"
+                  status="todo"
                   todos={todos.filter((t) => t.status === "todo")}
                   empty="Rien en attente"
                   onStatus={setTodoStatus}
@@ -700,6 +723,7 @@ export default function SettingsPage() {
                 <KanbanColumn
                   title="En cours"
                   tint="amber"
+                  status="in-progress"
                   todos={todos.filter((t) => t.status === "in-progress")}
                   empty="Clique « Commencer » sur une tâche pour la passer ici"
                   onStatus={setTodoStatus}
@@ -708,6 +732,7 @@ export default function SettingsPage() {
                 <KanbanColumn
                   title="Terminé"
                   tint="emerald"
+                  status="done"
                   todos={todos.filter((t) => t.status === "done")}
                   empty="Les tâches finies arrivent ici"
                   onStatus={setTodoStatus}

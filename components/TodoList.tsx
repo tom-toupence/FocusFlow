@@ -24,10 +24,17 @@ function MiniCard({ todo }: { todo: Todo }) {
   const next = NEXT[todo.status];
 
   return (
-    <div className={cn(
-      "group flex flex-col gap-1.5 px-2.5 py-2 rounded-lg bg-black/40 border border-white/[0.08] hover:border-white/20 transition-colors",
-      todo.status === "done" && "opacity-50"
-    )}>
+    <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", todo.id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      className={cn(
+        "group flex flex-col gap-1.5 px-2.5 py-2 rounded-lg bg-black/40 border border-white/[0.08] hover:border-white/20 transition-colors cursor-grab active:cursor-grabbing",
+        todo.status === "done" && "opacity-50"
+      )}
+    >
       <span className={cn(
         "text-xs min-w-0 break-words leading-relaxed",
         todo.status === "done" ? "text-white/35 line-through" : "text-white/80"
@@ -75,8 +82,9 @@ function MiniCard({ todo }: { todo: Todo }) {
 }
 
 export default function TodoList() {
-  const { todos, addTodo, clearDone } = useSessionStore();
+  const { todos, addTodo, clearDone, setTodoStatus } = useSessionStore();
   const [input, setInput] = useState("");
+  const [dragOver, setDragOver] = useState<TodoStatus | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleAdd = () => {
@@ -141,7 +149,22 @@ export default function TodoList() {
           {SECTIONS.map((section) => {
             const items = todos.filter((t) => t.status === section.status);
             return (
-              <div key={section.status} className={cn("flex flex-col rounded-xl border p-2 min-h-0", section.panel)}>
+              <div
+                key={section.status}
+                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOver(section.status); }}
+                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(null); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOver(null);
+                  const id = e.dataTransfer.getData("text/plain");
+                  if (id) setTodoStatus(id, section.status);
+                }}
+                className={cn(
+                  "flex flex-col rounded-xl border p-2 min-h-0 transition-colors",
+                  section.panel,
+                  dragOver === section.status && "border-white/40 bg-white/[0.08]"
+                )}
+              >
                 <div className="flex items-center gap-1.5 mb-1.5 px-0.5">
                   <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", section.dot)} />
                   <span className={cn("text-[10px] font-semibold uppercase tracking-wider truncate", section.text)}>

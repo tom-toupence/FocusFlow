@@ -8,6 +8,7 @@ import { loginWithSpotify } from "@/lib/spotify";
 import { loginWithTwitch } from "@/lib/twitch";
 import { signOut } from "@/lib/supabase";
 import { upsertProfile } from "@/lib/db";
+import { exportBackup, importBackup } from "@/lib/backup";
 import { getCurrentUserId } from "@/lib/authState";
 import { cn } from "@/lib/utils";
 
@@ -69,6 +70,8 @@ export default function ProfilePanel({ open, onClose }: Props) {
   const [savingName, setSavingName] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const backupFileRef = useRef<HTMLInputElement>(null);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
 
   const isSpotifyConnected = !!spotify.accessToken;
   const isTwitchConnected = !!twitch.accessToken;
@@ -127,6 +130,24 @@ export default function ProfilePanel({ open, onClose }: Props) {
     const userId = getCurrentUserId();
     if (userId) {
       await upsertProfile(userId, { displayName: profile.customDisplayName, avatarData: null });
+    }
+  };
+
+  // ── Backup export / import ─────────────────────────────────────────────────
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const count = importBackup(text);
+      setImportStatus(`✓ ${count} données restaurées — rechargement…`);
+      // Recharge pour que tous les stores Zustand relisent le localStorage importé
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (err) {
+      setImportStatus(`✗ ${err instanceof Error ? err.message : "Import impossible."}`);
+    } finally {
+      if (backupFileRef.current) backupFileRef.current.value = "";
     }
   };
 
@@ -310,6 +331,46 @@ export default function ProfilePanel({ open, onClose }: Props) {
               >
                 Connecter Twitch
               </button>
+            )}
+          </div>
+        </div>
+
+        {/* ── Mes données (export / import localStorage) ───────────────────── */}
+        <div className="p-3 pt-0 space-y-2">
+          <p className="text-[10px] font-semibold text-foreground/30 uppercase tracking-wider px-1">Mes données</p>
+          <div className="rounded-xl p-3 bg-foreground/[0.03] border border-foreground/[0.06]">
+            <p className="text-[11px] text-foreground/40 leading-relaxed mb-2">
+              Sprint, routines, journal, stats… vivent dans ce navigateur.
+              Exporte-les pour les transférer ailleurs.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={exportBackup}
+                className="flex-1 py-1.5 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground/70 hover:text-foreground text-xs font-medium transition-all"
+              >
+                ⬇ Exporter
+              </button>
+              <button
+                onClick={() => backupFileRef.current?.click()}
+                className="flex-1 py-1.5 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground/70 hover:text-foreground text-xs font-medium transition-all"
+              >
+                ⬆ Importer
+              </button>
+              <input
+                ref={backupFileRef}
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={handleImportFile}
+              />
+            </div>
+            {importStatus && (
+              <p className={cn(
+                "text-[11px] mt-2 leading-relaxed",
+                importStatus.startsWith("✓") ? "text-emerald-500" : "text-red-400"
+              )}>
+                {importStatus}
+              </p>
             )}
           </div>
         </div>
