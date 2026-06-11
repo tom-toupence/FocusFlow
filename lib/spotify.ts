@@ -243,6 +243,7 @@ export interface SpotifyDevice {
   type: string;
   isActive: boolean;
   isRestricted: boolean;
+  volumePercent: number | null;
 }
 
 interface RawDevice {
@@ -251,6 +252,7 @@ interface RawDevice {
   type: string;
   is_active: boolean;
   is_restricted: boolean;
+  volume_percent: number | null;
 }
 
 export async function getDevices(accessToken: string): Promise<SpotifyDevice[]> {
@@ -268,6 +270,7 @@ export async function getDevices(accessToken: string): Promise<SpotifyDevice[]> 
         type: d.type,
         isActive: d.is_active,
         isRestricted: d.is_restricted,
+        volumePercent: d.volume_percent,
       }));
   } catch {
     return [];
