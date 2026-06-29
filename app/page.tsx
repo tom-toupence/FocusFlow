@@ -23,6 +23,7 @@ import QueuePanel from "@/components/QueuePanel";
 import AppNav from "@/components/AppNav";
 import { useNavStore, MediaSource } from "@/store/navStore";
 import { useCommandPalette } from "@/components/CommandPalette";
+import Onboarding from "@/components/Onboarding";
 import { useProfileStore, resolvedProfile } from "@/store/profileStore";
 
 const allMoods: VideoMood[] = ["lofi", "jazz", "ambience", "nature", "synthwave", "classical"];
@@ -1494,6 +1495,7 @@ export default function LandingPage() {
       )}
 
       <ProfilePanel open={showProfilePanel} onClose={() => setShowProfilePanel(false)} />
+      <Onboarding />
     </div>
   );
 }

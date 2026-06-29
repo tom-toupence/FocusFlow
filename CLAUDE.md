@@ -26,9 +26,17 @@ ambiances mixables dans une seule expérience bien maintenue.
   `profiles`, `work_sessions`). Tout passe par `lib/db.ts`, qui est **no-op si Supabase non configuré**
   (mode localStorage seul).
 - **YouTube :** IFrame API (embed direct, aucune clé requise pour la lecture).
-  Playlists & mixes (`RD*`) chargés via **`player.loadPlaylist()` dans `onReady`** (jamais `videoId`+`list`
-  combinés dans le constructeur → sinon autoplay aléatoire). Skip via `nextVideo()`/`previousVideo()`,
-  boucle des vraies playlists via `setLoop(true)`. Voir `app/session/page.tsx` (interface `YTPlayer`).
+  - **Vraies playlists** (`PL/OL/UU/FL/LL/RDCLAK`) : `player.loadPlaylist({list, listType})` dans `onReady`
+    + `setLoop(true)` (jamais `videoId`+`list` combinés dans le constructeur → sinon autoplay aléatoire).
+  - **Mixes radio `RD…`** : personnalisés/non embarquables → résolus en liste de videoIds via la route
+    `app/api/youtube/mix` (parse `ytInitialData`), puis joués via **file maison** (cf. ci-dessous).
+  - **File maison** (mixes radio + **File FocusFlow**) : YouTube n'enchaîne pas de façon fiable une liste
+    d'IDs arbitraires en embed → on gère la progression nous-mêmes (`onStateChange` ENDED → `loadVideoById`
+    du suivant ; `queueRef`). Skip via cette file ou `nextVideo()`/`previousVideo()` (vraies playlists).
+- **File FocusFlow :** liste ORDONNÉE de vidéos YouTube choisies par l'utilisateur (titres exacts,
+  contrôle total), seule façon fiable d'avoir SES morceaux (les radios `RD…` étant personnalisées).
+  `store/queueStore.ts` (+ `fetchVideoMeta` oEmbed), UI `components/QueuePanel.tsx` (onglet Bibliothèque),
+  sélection via `sessionStore.selectQueue()` / flag `playQueue`. Lecture = file maison ci-dessus.
 - **Spotify :** OAuth + Web Playback (Premium), helpers dans `lib/spotify.ts`
 - **Twitch :** OAuth + embed live/VOD, helpers dans `lib/twitch.ts` (+ route `app/api/twitch/token`)
 - **Audio :** sons de transition et **ambiances** générés en **Web Audio API** (aucun fichier audio)
@@ -279,9 +287,35 @@ Rooms, Smart Focus, capture rapide. Validées et livrées (build + lint verts à
    `backend-engineer`, `state-architect`, `qa-tester`, `code-reviewer` (cf. section « Équipe d'agents »).
    `AGENTS.md` enrichi avec le guide d'ingénierie + pièges du lecteur YouTube.
 
-> **Plan grosse MAJ « ergonomie »** (validé) : Lot 1 ✅ playlists robustes ; à venir : Lot 2 navigation
-> (sidebar + bottom-nav + ⌘K), Lot 3 lecteur unifié (Now Playing), Lot 4 insights enrichis,
-> Lot 5 onboarding, Lot 6 suggestions intelligentes. Livraison coup par coup.
+> **Plan grosse MAJ « ergonomie »** : **tous les lots livrés** ✅ — Lot 1 playlists robustes ;
+> Lot 1bis File FocusFlow ; Lot 2 navigation (sidebar + bottom-nav + ⌘K, 7→4 sections) ; Lot 3 Now
+> Playing (badge titre/source) ; Lot 4 insights enrichis (XP/niveau + humeur↔focus) ; Lot 5 onboarding ;
+> Lot 6 suggestions intelligentes.
+
+## Journal de session — 2026-06-29 (suite : File FocusFlow + Lot 2 navigation)
+
+- **Mixes radio `RD…` (suite)** : `loadPlaylist([ids])` ET le playerVar `playlist` jouent la 1ʳᵉ vidéo
+  puis repartent en autoplay aléatoire. **Fix définitif** : file maison (`onStateChange` ENDED →
+  `loadVideoById`). ⚠️ Les radios `RD…` restent **personnalisées au compte** → on ne récupère que la
+  version *publique* du mix (titres ≠ ceux du compte). C'est une limite YouTube (aucune API n'expose
+  le contenu d'une radio perso).
+- **File FocusFlow** (réponse au besoin « mes titres exacts ») : `queueStore` + `QueuePanel`
+  (ajout par URL, reorder, skip, boucle) ; lecture 100% contrôlée. Voir section Stack/YouTube.
+- **Lot 2 — refonte navigation** : `navStore` (4 sections) + `AppNav` (sidebar desktop / bottom-nav
+  mobile) + `CommandPalette` ⌘K (global). 7 onglets → 4 destinations ; « Écouter » regroupe les sources.
+  `app/page.tsx` dérive `activeTab` de `navStore` (contenu inchangé). Header allégé (titre de section
+  + bouton ⌘K + profil/thème). Build + tsc verts, lint au niveau baseline.
+- **Lot 3 — Now Playing** : badge réactif (titre + source/position) en haut de la session pour les
+  sources YouTube (file/mix/playlist/vidéo), via `currentTrackIndex` synchronisé avec la file maison.
+  Spotify/Twitch conservent leur UI propre (refactor MediaController complet **non fait** volontairement
+  pour ne pas régresser la lecture média tout juste stabilisée).
+- **Lot 4 — Insights** (`app/insights/page.tsx`) : ajout du **bandeau XP/niveau** (`lib/progression`)
+  et de la section **Humeur ↔ focus** (journal × minutes). Le reste (estimation, heures, jours,
+  Focus Score, semaine) existait déjà.
+- **Lot 5 — Onboarding** : `components/Onboarding.tsx` (overlay 3 étapes ambiance→rythme→lancer),
+  flag `prefs.onboarded`, monté dans `app/page.tsx` (après l'AuthGate).
+- **Lot 6 — Suggestions** : `lib/suggestions.ts` (`topRepeatedVideo`) → carte « Reprendre ta session
+  habituelle » dans `TodayDashboard` (1 clic relance la vidéo la plus jouée).
 
 ## Catalogue vidéos initial
 

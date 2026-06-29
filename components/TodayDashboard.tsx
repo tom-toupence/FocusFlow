@@ -15,6 +15,7 @@ import { useSprintStore, getSprintStatus } from "@/store/sprintStore";
 import { launchSprintSession } from "@/lib/sprint";
 import { localToday } from "@/store/statsStore";
 import { applyRoutine } from "@/lib/routines";
+import { topRepeatedVideo } from "@/lib/suggestions";
 import GoalRing from "@/components/GoalRing";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +31,7 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
   const { unit, target } = useGoalStore();
   const { days } = useStatsStore();
   const { entries } = usePlayHistoryStore();
-  const { todos } = useSessionStore();
+  const { todos, getAllVideos } = useSessionStore();
   const { routines } = useRoutineStore();
   const { projects, activeProjectId } = useProjectStore();
   const { entries: journal } = useJournalStore();
@@ -69,6 +70,16 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
   // Let the user pick their video / ambiance first (the catalogue routes to /settings on select).
   const startSession = () => onNavigateTab("catalogue");
 
+  // Suggestion locale : reprendre la vidéo la plus relancée (cf. lib/suggestions).
+  const suggestion = topRepeatedVideo(entries);
+  const suggestedVideo = suggestion ? getAllVideos().find((v) => v.youtubeId === suggestion.youtubeId) : null;
+  const suggestionTimely = suggestion?.peakHour != null && Math.abs(currentHour - suggestion.peakHour) <= 1;
+  const launchSuggested = () => {
+    if (!suggestedVideo) return;
+    useSessionStore.getState().selectVideo(suggestedVideo.id);
+    router.push("/settings");
+  };
+
   return (
     <div className="flex flex-col gap-6">
       {/* Hero */}
@@ -101,6 +112,28 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
           </div>
           <span className="text-xs text-violet-300 font-medium flex-shrink-0 group-hover:translate-x-0.5 transition-transform">Voir →</span>
         </button>
+      )}
+
+      {/* Suggestion : reprendre la session habituelle */}
+      {suggestedVideo && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 rounded-2xl bg-gradient-to-r from-sky-500/[0.08] to-transparent border border-sky-500/20">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-foreground/40 uppercase tracking-widest mb-0.5">
+              ↻ {suggestionTimely ? "C'est ton heure habituelle" : "Reprendre ta session habituelle"}
+            </p>
+            <p className="text-sm font-medium text-foreground truncate">{suggestedVideo.title}</p>
+            <p className="text-xs text-foreground/45 mt-0.5">
+              Lancée {suggestion!.count} fois{suggestion!.peakHour != null ? ` · souvent vers ${suggestion!.peakHour}h` : ""}
+            </p>
+          </div>
+          <button
+            onClick={launchSuggested}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-foreground text-background font-semibold text-sm hover:bg-foreground/90 transition-all flex-shrink-0"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+            Reprendre
+          </button>
+        </div>
       )}
 
       {/* Top row: goal + stats */}

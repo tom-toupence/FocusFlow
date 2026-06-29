@@ -130,6 +130,8 @@ export default function SessionPage() {
   const [distractionFlash, setDistractionFlash] = useState(0);
   // Mix radio YouTube résolu en liste de videoIds (null = résolution en cours).
   const [mixIds, setMixIds] = useState<string[] | null>(null);
+  // Index réactif de la piste en cours (file maison) → affichage « Now Playing ».
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const volumeRef = useRef(0.8);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
@@ -230,6 +232,7 @@ export default function SessionPage() {
               const q = queueRef.current;
               if (q.ids.length === 0) return;
               q.index = (q.index + 1) % q.ids.length;
+              setCurrentTrackIndex(q.index);
               e.target.loadVideoById(q.ids[q.index]);
             }
           },
@@ -500,6 +503,7 @@ export default function SessionPage() {
       q.index = dir === "next"
         ? (q.index + 1) % q.ids.length
         : (q.index - 1 + q.ids.length) % q.ids.length;
+      setCurrentTrackIndex(q.index);
       playerRef.current.loadVideoById(q.ids[q.index]);
     } else if (dir === "next") {
       playerRef.current.nextVideo();
@@ -507,6 +511,23 @@ export default function SessionPage() {
       playerRef.current.previousVideo();
     }
   };
+
+  // « Now Playing » unifié (sources YouTube). Spotify/Twitch gardent leur propre UI.
+  const nowPlaying: { title: string; sub: string } | null = (() => {
+    if (isSpotifyMode || isTwitchMode) return null;
+    if (isQueueMode) {
+      const it = queueItems[currentTrackIndex];
+      return it ? { title: it.title, sub: `File · ${currentTrackIndex + 1}/${queueItems.length}` } : null;
+    }
+    if (isMix) {
+      const total = mixIds?.length ?? 0;
+      return { title: selectedPlaylist?.title ?? "Mix radio", sub: total ? `Mix · ${currentTrackIndex + 1}/${total}` : "Mix radio" };
+    }
+    if (isPlaylistMode && selectedPlaylist) {
+      return { title: selectedPlaylist.title, sub: "Playlist" };
+    }
+    return { title: video.title, sub: video.channel };
+  })();
 
   const progress = (() => {
     if (isFlowtime && mode === "work") return 0; // open-ended stretch, no fixed total
@@ -676,17 +697,28 @@ export default function SessionPage() {
       {!isBreak && (
         <>
           {/* Top bar */}
-          <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-5 py-4 z-10">
-            {/* Terminer */}
-            <button
-              onClick={handleStop}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/75 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/10 text-xs font-medium transition-all"
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="6" width="12" height="12" rx="1.5" />
-              </svg>
-              Terminer
-            </button>
+          <div className="absolute top-0 left-0 right-0 flex items-start justify-between px-5 py-4 z-10">
+            {/* Terminer + Now Playing */}
+            <div className="flex flex-col items-start gap-2 max-w-[42%]">
+              <button
+                onClick={handleStop}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/75 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/10 text-xs font-medium transition-all"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="6" width="12" height="12" rx="1.5" />
+                </svg>
+                Terminer
+              </button>
+              {nowPlaying && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/50 backdrop-blur-sm border border-white/10 max-w-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0 animate-pulse" />
+                  <div className="min-w-0">
+                    <p className="text-white/85 text-xs font-medium truncate">{nowPlaying.title}</p>
+                    <p className="text-white/35 text-[10px] truncate">{nowPlaying.sub}</p>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Timer — centered */}
             <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5">

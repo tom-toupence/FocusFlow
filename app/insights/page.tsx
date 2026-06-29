@@ -7,7 +7,8 @@ import { usePlayHistoryStore } from "@/store/playHistoryStore";
 import { useDistractionStore, getFocusScore } from "@/store/distractionStore";
 import { useAchievementsStore } from "@/store/achievementsStore";
 import { useSessionStore } from "@/store/sessionStore";
-import { getWeekDetail } from "@/lib/progression";
+import { useJournalStore, MOODS } from "@/store/journalStore";
+import { getWeekDetail, totalXp, getLevelInfo } from "@/lib/progression";
 import { exportStatsCsv, exportHistoryCsv, exportAllJson } from "@/lib/export";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,7 @@ export default function InsightsPage() {
   const { byDate: distractionsByDate } = useDistractionStore();
   const { unlocked } = useAchievementsStore();
   const { todos } = useSessionStore();
+  const { entries: journal } = useJournalStore();
 
   const [mounted, setMounted] = useState(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -82,6 +84,25 @@ export default function InsightsPage() {
   const totalUsed = estimated.reduce((a, t) => a + (t.pomodorosUsed ?? 0), 0);
   const accuracy = totalUsed > 0 ? Math.round((totalEst / totalUsed) * 100) : null;
 
+  // ── XP & niveau (dérivés des stats + succès) ──────────────────────────────
+  const xp = totalXp(days, Object.keys(unlocked).length);
+  const level = getLevelInfo(xp);
+
+  // ── Humeur ↔ focus (journal × minutes du jour) ────────────────────────────
+  const moodAgg: Record<number, { sum: number; count: number }> = {};
+  for (const e of journal) {
+    const min = days[e.date]?.minutesWorked ?? 0;
+    if (!moodAgg[e.mood]) moodAgg[e.mood] = { sum: 0, count: 0 };
+    moodAgg[e.mood].sum += min;
+    moodAgg[e.mood].count++;
+  }
+  const moodRows = MOODS.map((m) => {
+    const agg = moodAgg[m.value];
+    return { ...m, avg: agg ? Math.round(agg.sum / agg.count) : 0, count: agg?.count ?? 0 };
+  });
+  const maxMoodAvg = Math.max(...moodRows.map((r) => r.avg), 1);
+  const hasMoodData = moodRows.some((r) => r.count > 0);
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -105,6 +126,23 @@ export default function InsightsPage() {
           <h1 className="text-3xl font-semibold text-foreground tracking-tight">Tes insights</h1>
           <p className="text-foreground/40 mt-1 text-sm">Comprends quand et comment tu te concentres le mieux.</p>
         </div>
+
+        {/* XP & niveau */}
+        <section className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-gradient-to-r from-violet-600/15 via-fuchsia-600/[0.06] to-transparent border border-violet-500/20">
+          <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-violet-500/15 text-violet-200 flex-shrink-0">
+            <span className="text-xl font-bold tabular-nums">{level.level}</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-sm font-semibold text-foreground">Niveau {level.level} · {level.title}</p>
+              <span className="text-[11px] text-foreground/40 tabular-nums">{level.xpInLevel} / {level.xpForNext} XP</span>
+            </div>
+            <div className="h-2 mt-2 rounded-full bg-foreground/[0.08] overflow-hidden">
+              <div className="h-full rounded-full bg-gradient-to-r from-violet-400 to-fuchsia-400 transition-all" style={{ width: `${Math.round(level.progress * 100)}%` }} />
+            </div>
+            <p className="text-[10px] text-foreground/30 mt-1.5">{xp.toLocaleString("fr-FR")} XP cumulés · sessions, minutes, succès et série.</p>
+          </div>
+        </section>
 
         {/* Highlights */}
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -184,6 +222,33 @@ export default function InsightsPage() {
             </div>
           )}
           <p className="text-[10px] text-foreground/30">Le Focus Score = pomodoros / (pomodoros + distractions) × 100.</p>
+        </section>
+
+        {/* Humeur ↔ focus */}
+        <section className="flex flex-col gap-3">
+          <h2 className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">Humeur et concentration</h2>
+          {!hasMoodData ? (
+            <p className="text-xs text-foreground/30 py-6 text-center">Pas encore de réflexions. Note ton humeur en fin de session (résumé) pour voir le lien avec ton focus.</p>
+          ) : (
+            <>
+              <div className="flex items-end gap-3 h-32 bg-foreground/[0.02] rounded-xl p-3">
+                {moodRows.map((r) => (
+                  <div key={r.value} className="flex-1 flex flex-col items-center justify-end gap-1.5 h-full">
+                    <span className="text-[10px] text-foreground/40 tabular-nums">{r.count > 0 ? fmtMin(r.avg) : ""}</span>
+                    <div className="w-full flex flex-col justify-end flex-1">
+                      <div
+                        title={`${r.label} — ${fmtMin(r.avg)} de focus en moyenne (${r.count} jour${r.count !== 1 ? "s" : ""})`}
+                        className={cn("w-full rounded-md transition-all", r.count > 0 ? "bg-fuchsia-500/50" : "bg-foreground/[0.05]")}
+                        style={{ height: `${r.count > 0 ? Math.max((r.avg / maxMoodAvg) * 100, 6) : 3}%` }}
+                      />
+                    </div>
+                    <span className="text-lg" title={r.label}>{r.emoji}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-foreground/30">Minutes de focus moyennes selon l&apos;humeur notée ce jour-là.</p>
+            </>
+          )}
         </section>
 
         {/* Export */}
