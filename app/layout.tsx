@@ -4,6 +4,7 @@ import "./globals.css";
 import SupabaseProvider from "@/components/SupabaseProvider";
 import AuthGate from "@/components/AuthGate";
 import ToastHost from "@/components/Toast";
+import CommandPalette from "@/components/CommandPalette";
 
 const geist = Geist({
   variable: "--font-geist",
@@ -31,6 +32,7 @@ export default function RootLayout({
           <AuthGate>{children}</AuthGate>
         </SupabaseProvider>
         <ToastHost />
+        <CommandPalette />
       </body>
     </html>
   );

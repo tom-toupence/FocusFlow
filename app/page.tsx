@@ -20,6 +20,9 @@ import RoutinesManager from "@/components/RoutinesManager";
 import SprintWizard from "@/components/SprintWizard";
 import JournalTimeline from "@/components/JournalTimeline";
 import QueuePanel from "@/components/QueuePanel";
+import AppNav from "@/components/AppNav";
+import { useNavStore, MediaSource } from "@/store/navStore";
+import { useCommandPalette } from "@/components/CommandPalette";
 import { useProfileStore, resolvedProfile } from "@/store/profileStore";
 
 const allMoods: VideoMood[] = ["lofi", "jazz", "ambience", "nature", "synthwave", "classical"];
@@ -647,6 +650,31 @@ function TwitchChannelCard({
   );
 }
 
+// Sous-onglet de la section « Écouter » (catalogue / bibliothèque / Spotify / Twitch)
+function MediaTab({ id, label, accent, badge }: { id: MediaSource; label: string; accent?: "spotify" | "twitch"; badge?: string }) {
+  const { mediaSource, openMedia } = useNavStore();
+  const active = mediaSource === id;
+  const activeCls = accent === "spotify" ? "bg-[#1db954]/15 text-[#1db954]"
+    : accent === "twitch" ? "bg-[#9146ff]/15 text-[#9146ff]"
+    : "bg-foreground/15 text-foreground";
+  return (
+    <button
+      onClick={() => openMedia(id)}
+      className={cn(
+        "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5",
+        active ? activeCls : "text-foreground/40 hover:text-foreground/70 bg-foreground/5"
+      )}
+    >
+      {label}
+      {badge && (
+        <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", active ? "bg-black/10" : "bg-foreground/10")}>
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
@@ -669,7 +697,17 @@ export default function LandingPage() {
   const profileState = useProfileStore();
   const profile = resolvedProfile(profileState);
 
-  const [activeTab, setActiveTab] = useState<"aujourdhui" | "catalogue" | "library" | "spotify" | "twitch" | "activite" | "organisation">("aujourdhui");
+  const { section, mediaSource, setSection, openMedia } = useNavStore();
+  const activeTab: "aujourdhui" | "catalogue" | "library" | "spotify" | "twitch" | "activite" | "organisation" =
+    section === "accueil" ? "aujourdhui"
+    : section === "activite" ? "activite"
+    : section === "organisation" ? "organisation"
+    : mediaSource;
+  const sectionTitle =
+    section === "accueil" ? "Aujourd'hui"
+    : section === "ecouter" ? "Écouter"
+    : section === "organisation" ? "Organisation"
+    : "Activité";
   const [twitchInput, setTwitchInput] = useState("");
   const [vodInput, setVodInput] = useState("");
   const [vodError, setVodError] = useState("");
@@ -682,6 +720,7 @@ export default function LandingPage() {
   const [showAddPlaylistModal, setShowAddPlaylistModal] = useState(false);
   const [spotifyLoading, setSpotifyLoading] = useState(false);
   const [spotifyApiError, setSpotifyApiError] = useState<"forbidden" | "error" | null>(null);
+  const [spotifyReloadNonce, setSpotifyReloadNonce] = useState(0);
   const [spotifyAuthError, setSpotifyAuthError] = useState<string | null>(null);
   const [showProfilePanel, setShowProfilePanel] = useState(false);
 
@@ -698,9 +737,9 @@ export default function LandingPage() {
       try { sessionStorage.removeItem("spotify_auth_error"); } catch { /* ignore */ }
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSpotifyAuthError(stored);
-      setActiveTab("spotify");
+      openMedia("spotify");
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Refresh Spotify token if expired, then load playlists when tab opens
   useEffect(() => {
@@ -733,7 +772,7 @@ export default function LandingPage() {
     };
 
     load();
-  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab, spotifyReloadNonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load followed channels when Twitch tab opens
   useEffect(() => {
@@ -843,143 +882,59 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="sticky top-0 z-20 bg-background/90 backdrop-blur-md border-b border-foreground/[0.06] px-6 h-14 flex items-center justify-between">
-        <span className="text-sm font-semibold text-foreground/90 tracking-tight">FocusFlow</span>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowProfilePanel(true)}
-            className="relative w-8 h-8 rounded-full overflow-hidden bg-foreground/10 hover:ring-2 hover:ring-foreground/30 transition-all flex-shrink-0 flex items-center justify-center"
-            title="Mon profil"
-          >
-            {profile.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={profile.avatarUrl} alt={profile.displayName} className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-xs font-semibold text-foreground/60">
-                {profile.displayName.charAt(0).toUpperCase()}
-              </span>
-            )}
-            {(isSpotifyConnected || isTwitchConnected) && (
-              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-background" />
-            )}
-          </button>
-          <ThemeToggle />
-        </div>
-      </header>
+    <div className="min-h-screen bg-background md:flex">
+      <AppNav />
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Header */}
+        <header className="sticky top-0 z-20 bg-background/90 backdrop-blur-md border-b border-foreground/[0.06] px-4 sm:px-6 h-14 flex items-center justify-between">
+          <span className="text-sm font-semibold text-foreground/90 tracking-tight md:hidden">FocusFlow</span>
+          <span className="hidden md:block text-sm font-semibold text-foreground/70 tracking-tight">{sectionTitle}</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => useCommandPalette.getState().setOpen(true)}
+              className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-foreground/5 hover:bg-foreground/10 text-foreground/40 hover:text-foreground/70 text-xs transition-all"
+              title="Recherche rapide"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" strokeLinecap="round" />
+              </svg>
+              <kbd className="text-[10px] border border-foreground/15 rounded px-1">⌘K</kbd>
+            </button>
+            <button
+              onClick={() => setShowProfilePanel(true)}
+              className="relative w-8 h-8 rounded-full overflow-hidden bg-foreground/10 hover:ring-2 hover:ring-foreground/30 transition-all flex-shrink-0 flex items-center justify-center"
+              title="Mon profil"
+            >
+              {profile.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profile.avatarUrl} alt={profile.displayName} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-xs font-semibold text-foreground/60">
+                  {profile.displayName.charAt(0).toUpperCase()}
+                </span>
+              )}
+              {(isSpotifyConnected || isTwitchConnected) && (
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-background" />
+              )}
+            </button>
+            <ThemeToggle />
+          </div>
+        </header>
 
-      <main className="flex-1 px-6 py-8 max-w-7xl mx-auto w-full">
-        {/* Tabs */}
-        <div className="flex gap-1 mb-8 flex-wrap">
-          <button
-            onClick={() => setActiveTab("aujourdhui")}
-            className={cn(
-              "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all",
-              activeTab === "aujourdhui" ? "bg-foreground/15 text-foreground" : "text-foreground/40 hover:text-foreground/70 bg-foreground/5"
-            )}
-          >
-            Aujourd&apos;hui
-          </button>
-          <button
-            onClick={() => setActiveTab("catalogue")}
-            className={cn(
-              "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all",
-              activeTab === "catalogue" ? "bg-foreground/15 text-foreground" : "text-foreground/40 hover:text-foreground/70 bg-foreground/5"
-            )}
-          >
-            Catalogue
-          </button>
-          <button
-            onClick={() => setActiveTab("library")}
-            className={cn(
-              "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5",
-              activeTab === "library" ? "bg-foreground/15 text-foreground" : "text-foreground/40 hover:text-foreground/70 bg-foreground/5"
-            )}
-          >
-            Ma bibliothèque
-            {hasLibraryContent && (
-              <span className={cn(
-                "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
-                activeTab === "library" ? "bg-foreground/20" : "bg-foreground/10"
-              )}>
-                {customVideos.length + playlists.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab("spotify")}
-            className={cn(
-              "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5",
-              activeTab === "spotify"
-                ? "bg-[#1db954]/15 text-[#1db954]"
-                : "text-foreground/40 hover:text-foreground/70 bg-foreground/5"
-            )}
-          >
-            <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor">
-              <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
-            </svg>
-            Spotify
-            {isSpotifyConnected && (
-              <span className={cn(
-                "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
-                activeTab === "spotify" ? "bg-[#1db954]/20" : "bg-[#1db954]/10 text-[#1db954]"
-              )}>
-                Premium
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab("twitch")}
-            className={cn(
-              "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5",
-              activeTab === "twitch"
-                ? "bg-[#9146ff]/15 text-[#9146ff]"
-                : "text-foreground/40 hover:text-foreground/70 bg-foreground/5"
-            )}
-          >
-            <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor">
-              <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
-            </svg>
-            Twitch
-            {selectedChannel && (
-              <span className={cn(
-                "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
-                activeTab === "twitch" ? "bg-[#9146ff]/20" : "bg-[#9146ff]/10 text-[#9146ff]"
-              )}>
-                Live
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab("activite")}
-            className={cn(
-              "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5",
-              activeTab === "activite" ? "bg-foreground/15 text-foreground" : "text-foreground/40 hover:text-foreground/70 bg-foreground/5"
-            )}
-          >
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Activité
-          </button>
-          <button
-            onClick={() => setActiveTab("organisation")}
-            className={cn(
-              "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5",
-              activeTab === "organisation" ? "bg-foreground/15 text-foreground" : "text-foreground/40 hover:text-foreground/70 bg-foreground/5"
-            )}
-          >
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="3" y1="10" x2="21" y2="10" /><line x1="9" y1="4" x2="9" y2="22" strokeLinecap="round" />
-            </svg>
-            Organisation
-          </button>
-        </div>
+        <main className="flex-1 px-4 sm:px-6 py-6 sm:py-8 max-w-6xl mx-auto w-full pb-24 md:pb-10">
+        {/* Sous-sélecteur de sources (section Écouter) */}
+        {section === "ecouter" && (
+          <div className="flex gap-1.5 mb-6 flex-wrap">
+            <MediaTab id="catalogue" label="Catalogue" />
+            <MediaTab id="library" label="Ma bibliothèque" badge={hasLibraryContent ? `${customVideos.length + playlists.length}` : undefined} />
+            <MediaTab id="spotify" label="Spotify" accent="spotify" badge={isSpotifyConnected ? "Premium" : undefined} />
+            <MediaTab id="twitch" label="Twitch" accent="twitch" badge={selectedChannel ? "Live" : undefined} />
+          </div>
+        )}
 
         {/* ── Aujourd'hui ────────────────────────────────────────────────────── */}
         {activeTab === "aujourdhui" && (
-          <TodayDashboard onNavigateTab={(t) => setActiveTab(t)} />
+          <TodayDashboard onNavigateTab={(t) => t === "catalogue" ? openMedia("catalogue") : setSection("organisation")} />
         )}
 
         {/* ── Catalogue ──────────────────────────────────────────────────────── */}
@@ -1234,7 +1189,7 @@ export default function LandingPage() {
               <div className="flex flex-col items-center justify-center py-24 gap-4 text-foreground/25">
                 <p className="text-sm">Erreur lors du chargement des playlists</p>
                 <button
-                  onClick={() => setActiveTab("spotify")}
+                  onClick={() => setSpotifyReloadNonce((n) => n + 1)}
                   className="text-xs text-foreground/30 hover:text-foreground/50 underline"
                 >
                   Réessayer
@@ -1272,7 +1227,7 @@ export default function LandingPage() {
               <div className="flex flex-col items-center justify-center py-24 gap-3 text-foreground/25">
                 <p className="text-sm">Aucune playlist trouvée</p>
                 <button
-                  onClick={() => setActiveTab("spotify")}
+                  onClick={() => setSpotifyReloadNonce((n) => n + 1)}
                   className="text-xs text-foreground/30 hover:text-foreground/50 underline"
                 >
                   Actualiser
@@ -1519,7 +1474,8 @@ export default function LandingPage() {
           </>
         )}
 
-      </main>
+        </main>
+      </div>
 
       {/* Add video modal */}
       {showAddModal && (

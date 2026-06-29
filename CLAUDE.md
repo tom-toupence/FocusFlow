@@ -38,10 +38,21 @@ ambiances mixables dans une seule expérience bien maintenue.
   Sans clé, le coach utilise le **planificateur heuristique local** (`lib/coach.ts`) — toujours gratuit.
 - **Deploy :** Vercel (gratuit)
 
+## Navigation (refonte ergonomie — Lot 2)
+
+Navigation simplifiée à **4 destinations** (au lieu de 7 onglets) via une **nav persistante** :
+**sidebar verticale** (desktop) + **barre d'onglets basse** (mobile) — `components/AppNav.tsx`,
+pilotée par `store/navStore.ts` (`section` : accueil / ecouter / organisation / activite).
+La section **Écouter** regroupe les 4 sources média (Catalogue · Ma bibliothèque · Spotify · Twitch)
+derrière un **sous-sélecteur** (`MediaTab` dans `app/page.tsx`, `navStore.mediaSource`).
+**Palette de commandes ⌘K / Ctrl+K** globale (`components/CommandPalette.tsx`, montée dans `layout.tsx`)
+pour sauter à toute section/action au clavier. `app/page.tsx` dérive l'ancien `activeTab` de `navStore`
+(blocs de contenu inchangés).
+
 ## Flux principal (routes)
 
-`/` (accueil — onglets : **Aujourd'hui** (dashboard, défaut) / Catalogue / Ma bibliothèque / Spotify /
-Twitch / Activité / **Organisation**)
+`/` (accueil — 4 sections : **Aujourd'hui** (dashboard, défaut) / **Écouter** [Catalogue · Bibliothèque ·
+Spotify · Twitch] / **Organisation** / **Activité**)
 → `/settings` (choix du preset Pomodoro + tâches Kanban + Coach + « enregistrer comme routine »)
 → `/session` (plein écran : lecteur + timer + tâches + post-its + ambiances + respiration)
 → `/summary` (résumé + objectif + focus score + **réflexion/journal** + stats)
