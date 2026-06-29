@@ -25,7 +25,10 @@ ambiances mixables dans une seule expérience bien maintenue.
 - **Auth & sync :** Supabase (Google OAuth + tables `custom_videos`, `todos`, `user_playlists`,
   `profiles`, `work_sessions`). Tout passe par `lib/db.ts`, qui est **no-op si Supabase non configuré**
   (mode localStorage seul).
-- **YouTube :** IFrame API (embed direct, aucune clé requise pour la lecture)
+- **YouTube :** IFrame API (embed direct, aucune clé requise pour la lecture).
+  Playlists & mixes (`RD*`) chargés via **`player.loadPlaylist()` dans `onReady`** (jamais `videoId`+`list`
+  combinés dans le constructeur → sinon autoplay aléatoire). Skip via `nextVideo()`/`previousVideo()`,
+  boucle des vraies playlists via `setLoop(true)`. Voir `app/session/page.tsx` (interface `YTPlayer`).
 - **Spotify :** OAuth + Web Playback (Premium), helpers dans `lib/spotify.ts`
 - **Twitch :** OAuth + embed live/VOD, helpers dans `lib/twitch.ts` (+ route `app/api/twitch/token`)
 - **Audio :** sons de transition et **ambiances** générés en **Web Audio API** (aucun fichier audio)
@@ -131,6 +134,24 @@ Focus Rooms (à réessayer ?), Smart Focus IA, capture rapide d'idées.
 - Fonctionne **sans compte** (localStorage) ; Supabase ajoute la sync multi-appareils sans être obligatoire
 - Priorité produit : **timer + lecteur ensemble** dans la même vue plein écran
 
+## Équipe d'agents (`.claude/agents/`)
+
+Des sous-agents spécialisés sont définis pour faire évoluer l'app. À invoquer selon la tâche
+(voir le `description` de chacun) ; **toujours faire relire une feature par `code-reviewer`** avant de la
+considérer terminée.
+
+| Agent | Rôle |
+|-------|------|
+| `product-lead` (opus) | Cadrage produit, découpage roadmap, build-vs-skip (connaît les features refusées) |
+| `frontend-engineer` | UI React/Tailwind, composants, animations, a11y |
+| `backend-engineer` | Routes `app/api/*`, Supabase via `lib/db.ts`, OAuth, coach/sprint IA, ICS, secrets serveur |
+| `state-architect` | Stores Zustand (`persist`/`partialize`/`migrate`) + logique pure `lib/` |
+| `qa-tester` | Validation empirique : typecheck/lint/build + scénarios manuels |
+| `code-reviewer` | Relecture read-only (correction, hydratation, local-first, secrets, conventions) |
+
+Flux type d'une feature : `product-lead` (spec) → `state-architect`/`backend-engineer`/`frontend-engineer`
+(implémentation) → `qa-tester` (validation) → `code-reviewer` (GO/NO-GO).
+
 ## Conventions de code
 
 - Composants **`"use client"`** + Zustand `persist` ; lire un store persisté côté UI via le pattern
@@ -225,6 +246,20 @@ Rooms, Smart Focus, capture rapide. Validées et livrées (build + lint verts à
    **bouton « Go »** : vidéo aléatoire du catalogue dans le mood du coach + preset deep/classic
    selon la durée du bloc → `/session` direct. Recalcul des blocs manqués ; `sessionStore.addTodo`
    retourne l'id.
+
+## Journal de session — 2026-06-29 (fix playlist YouTube + équipe d'agents)
+
+1. **Fix lecture des playlists / mixes YouTube** (`app/session/page.tsx`) : le constructeur passait
+   `videoId` **et** `list` simultanément → le player jouait la vidéo seed puis l'autoplay « vidéos
+   liées » (aléatoire, hors playlist). Symptôme typique sur les **mixes radio `RD*`**. Corrigé en
+   chargeant la playlist via **`player.loadPlaylist({ list, listType:"playlist" })` dans `onReady`**
+   (plus de `videoId`+`list`), avec `setLoop(true)` pour les vraies playlists (les `RD*` sont infinies).
+2. **Skip de titres** : nouveaux boutons précédent/suivant dans le cluster de contrôles de session
+   (visibles en mode playlist), branchés sur `nextVideo()` / `previousVideo()`. Interface `YTPlayer`
+   étendue (`nextVideo`, `previousVideo`, `loadPlaylist`, `setLoop`).
+3. **Équipe d'agents** créée dans `.claude/agents/` : `product-lead`, `frontend-engineer`,
+   `backend-engineer`, `state-architect`, `qa-tester`, `code-reviewer` (cf. section « Équipe d'agents »).
+   `AGENTS.md` enrichi avec le guide d'ingénierie + pièges du lecteur YouTube.
 
 ## Catalogue vidéos initial
 

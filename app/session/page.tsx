@@ -38,6 +38,15 @@ interface YTPlayer {
   destroy: () => void;
   setPlaybackQuality: (q: string) => void;
   setVolume: (v: number) => void;
+  nextVideo: () => void;
+  previousVideo: () => void;
+  loadPlaylist: (opts: {
+    list: string;
+    listType: string;
+    index?: number;
+    startSeconds?: number;
+  }) => void;
+  setLoop: (loop: boolean) => void;
 }
 
 declare global {
@@ -158,37 +167,52 @@ export default function SessionPage() {
   const initPlayer = useCallback(() => {
     if (!window.YT?.Player || playerRef.current) return;
 
-    const onReady = (e: { target: YTPlayer }) => {
-      playerReadyRef.current = true;
-      e.target.setPlaybackQuality("hd1080");
-      e.target.setVolume(Math.round(volumeRef.current * 100));
-      if (!isBreakRef.current && isRunningRef.current) {
-        e.target.playVideo();
-      } else {
-        e.target.pauseVideo();
-      }
-    };
-
     if (isPlaylistMode && selectedPlaylist) {
-      // Les mixes YouTube (RD*) sont des playlists infinies dynamiques :
-      // - ils nécessitent le videoId de départ pour savoir où commencer
-      // - loop:1 est incompatible (YouTube gère la continuité lui-même)
-      const isMix = selectedPlaylist.playlistId.startsWith("RD");
+      // Playlists & mixes YouTube : on NE passe PAS `list`/`videoId` dans les
+      // playerVars du constructeur. Combiner `videoId` + `list` fait que le
+      // player joue la vidéo seed puis enchaîne sur l'autoplay « vidéos liées »
+      // (= aléatoire, hors playlist). La méthode fiable est `loadPlaylist()`
+      // appelée dans `onReady`, qui charge réellement la playlist/radio et
+      // active la navigation next/previous.
+      const playlistId = selectedPlaylist.playlistId;
+      const startIndex = 0;
+      const onReadyPlaylist = (e: { target: YTPlayer }) => {
+        playerReadyRef.current = true;
+        e.target.setPlaybackQuality("hd1080");
+        e.target.setVolume(Math.round(volumeRef.current * 100));
+        e.target.loadPlaylist({
+          list: playlistId,
+          listType: "playlist",
+          index: startIndex,
+        });
+        // Les radios (RD*) sont infinies ; les vraies playlists bouclent en fin de liste
+        if (!playlistId.startsWith("RD")) e.target.setLoop(true);
+        if (isBreakRef.current || !isRunningRef.current) {
+          // loadPlaylist démarre la lecture ; on met en pause si besoin
+          e.target.pauseVideo();
+        }
+      };
       playerRef.current = new window.YT.Player("yt-player", {
-        ...(isMix && selectedPlaylist.startVideoId ? { videoId: selectedPlaylist.startVideoId } : {}),
         playerVars: {
           autoplay: 1,
           mute: 0,
           controls: 0,
           rel: 0,
           modestbranding: 1,
-          listType: "playlist",
-          list: selectedPlaylist.playlistId,
-          ...(isMix ? {} : { loop: 1 }),
         },
-        events: { onReady },
+        events: { onReady: onReadyPlaylist },
       });
     } else {
+      const onReady = (e: { target: YTPlayer }) => {
+        playerReadyRef.current = true;
+        e.target.setPlaybackQuality("hd1080");
+        e.target.setVolume(Math.round(volumeRef.current * 100));
+        if (!isBreakRef.current && isRunningRef.current) {
+          e.target.playVideo();
+        } else {
+          e.target.pauseVideo();
+        }
+      };
       // Mode vidéo unique : loop sur la même vidéo
       playerRef.current = new window.YT.Player("yt-player", {
         videoId: video.youtubeId,
@@ -398,6 +422,12 @@ export default function SessionPage() {
     }
   };
 
+  const skipTrack = (dir: "next" | "prev") => {
+    if (!playerRef.current || !playerReadyRef.current) return;
+    if (dir === "next") playerRef.current.nextVideo();
+    else playerRef.current.previousVideo();
+  };
+
   const progress = (() => {
     if (isFlowtime && mode === "work") return 0; // open-ended stretch, no fixed total
     const total =
@@ -604,6 +634,29 @@ export default function SessionPage() {
             <div className="flex items-center gap-2">
               {/* Utility cluster — uniform icon buttons */}
               <div className="flex items-center gap-1 p-1 rounded-2xl bg-black/50 backdrop-blur-sm border border-white/15">
+                {/* Playlist skip controls (YouTube playlists & mixes only) */}
+                {isPlaylistMode && (
+                  <>
+                    <button
+                      onClick={() => skipTrack("prev")}
+                      className="w-9 h-9 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
+                      title="Titre précédent"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M6 6h2v12H6zM9.5 12l8.5 6V6z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => skipTrack("next")}
+                      className="w-9 h-9 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
+                      title="Titre suivant"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M16 6h2v12h-2zM6 6v12l8.5-6z" />
+                      </svg>
+                    </button>
+                  </>
+                )}
                 {/* Distraction marker (shortcut: D) */}
                 <button
                   onClick={handleDistraction}
