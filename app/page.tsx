@@ -19,6 +19,7 @@ import WeekPlanner from "@/components/WeekPlanner";
 import RoutinesManager from "@/components/RoutinesManager";
 import SprintWizard from "@/components/SprintWizard";
 import JournalTimeline from "@/components/JournalTimeline";
+import QueuePanel from "@/components/QueuePanel";
 import { useProfileStore, resolvedProfile } from "@/store/profileStore";
 
 const allMoods: VideoMood[] = ["lofi", "jazz", "ambience", "nature", "synthwave", "classical"];
@@ -327,7 +328,7 @@ function AddPlaylistModal({ onClose, onAdd }: { onClose: () => void; onAdd: (p: 
                 <path d="M12 9v4M12 17h.01" strokeLinecap="round" />
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <span>Mix radio YouTube détecté : on en reconstruit une version jouable (skip activé). L&apos;ordre peut différer de ce que tu vois connecté à ton compte.</span>
+              <span>Mix radio (RD…) détecté. Ces radios sont <strong>personnalisées à ton compte</strong> : on joue une version publique « titres similaires » (lecture continue + skip), mais les morceaux peuvent différer des tiens. Pour tes titres exacts, crée une vraie playlist YouTube et colle son lien (<strong>list=PL…</strong>).</span>
             </p>
           )}
         </div>
@@ -1058,6 +1059,11 @@ export default function LandingPage() {
                   Playlist
                 </button>
               </div>
+            </div>
+
+            {/* File de lecture FocusFlow — titres exacts contrôlables */}
+            <div className="mb-10">
+              <QueuePanel />
             </div>
 
             {!hasLibraryContent ? (

@@ -30,12 +30,14 @@ export interface AddTodoOptions {
 interface SessionState {
   selectedVideoId: string | null;
   selectedPlaylistId: string | null;
+  playQueue: boolean;          // true = lit la file FocusFlow (voir queueStore)
   customVideos: Video[];
   todos: Todo[];
 
   // video
   selectVideo: (id: string) => void;
   selectPlaylist: (id: string) => void;
+  selectQueue: () => void;
   addCustomVideo: (video: Video) => void;
   removeCustomVideo: (id: string) => void;
   getAllVideos: () => Video[];
@@ -60,11 +62,13 @@ export const useSessionStore = create<SessionState>()(
     (set, get) => ({
       selectedVideoId: "v1",
       selectedPlaylistId: null,
+      playQueue: false,
       customVideos: [],
       todos: [],
 
-      selectVideo: (id) => set({ selectedVideoId: id, selectedPlaylistId: null }),
-      selectPlaylist: (id) => set({ selectedPlaylistId: id, selectedVideoId: null }),
+      selectVideo: (id) => set({ selectedVideoId: id, selectedPlaylistId: null, playQueue: false }),
+      selectPlaylist: (id) => set({ selectedPlaylistId: id, selectedVideoId: null, playQueue: false }),
+      selectQueue: () => set({ playQueue: true, selectedVideoId: null, selectedPlaylistId: null }),
 
       addCustomVideo: (video) => {
         const { customVideos } = get();
@@ -162,6 +166,7 @@ export const useSessionStore = create<SessionState>()(
       partialize: (state) => ({
         selectedVideoId: state.selectedVideoId,
         selectedPlaylistId: state.selectedPlaylistId,
+        playQueue: state.playQueue,
         customVideos: state.customVideos,
         todos: state.todos,
       }),

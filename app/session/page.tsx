@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTimerStore, TimerMode } from "@/store/timerStore";
 import { useSessionStore } from "@/store/sessionStore";
 import { usePlaylistStore, isRadioMix, fetchMixVideoIds } from "@/store/playlistStore";
+import { useQueueStore } from "@/store/queueStore";
 import { useSessionSummaryStore } from "@/store/sessionSummaryStore";
 import { cn } from "@/lib/utils";
 import TodoList from "@/components/TodoList";
@@ -40,6 +41,7 @@ interface YTPlayer {
   setVolume: (v: number) => void;
   nextVideo: () => void;
   previousVideo: () => void;
+  loadVideoById: (id: string) => void;
   loadPlaylist: (
     opts:
       | string[]
@@ -84,8 +86,9 @@ export default function SessionPage() {
     tick, start, pause, nextSession, finishFlow, accumulateFlow,
   } = useTimerStore();
   const isFlowtime = settings.preset === "flowtime";
-  const { selectedVideoId, selectedPlaylistId, todos, getAllVideos } = useSessionStore();
+  const { selectedVideoId, selectedPlaylistId, playQueue, todos, getAllVideos } = useSessionStore();
   const { playlists } = usePlaylistStore();
+  const { items: queueItems } = useQueueStore();
   const { recordSession } = useStatsStore();
   const { startSession } = useSessionSummaryStore();
   const { notes, addNote } = useNotesStore();
@@ -99,7 +102,10 @@ export default function SessionPage() {
   const allVideos = getAllVideos();
   const video = allVideos.find((v) => v.id === selectedVideoId) ?? allVideos[0];
   const selectedPlaylist = playlists.find((p) => p.id === selectedPlaylistId) ?? null;
-  const isPlaylistMode = !!selectedPlaylistId && !!selectedPlaylist;
+  const isQueueMode = playQueue && queueItems.length > 0;
+  const queueIds = isQueueMode ? queueItems.map((i) => i.youtubeId) : [];
+  const queueKey = queueIds.join(","); // dep stable (évite la ré-init à chaque render)
+  const isPlaylistMode = !isQueueMode && !!selectedPlaylistId && !!selectedPlaylist;
   const isMix = isPlaylistMode && !!selectedPlaylist && isRadioMix(selectedPlaylist.playlistId);
   const isSpotifyMode = !!selectedPlaylistUri && !!accessToken;
   const isTwitchMode = !!selectedChannel || !!selectedVodId;
@@ -110,6 +116,9 @@ export default function SessionPage() {
   const goalCelebratedRef = useRef(false);
   const playerRef = useRef<YTPlayer | null>(null);
   const playerReadyRef = useRef(false);
+  // File de lecture maison pour les mixes radio (YouTube n'enchaîne pas une liste
+  // d'IDs arbitraires de façon fiable → on gère nous-mêmes la progression).
+  const queueRef = useRef<{ ids: string[]; index: number }>({ ids: [], index: 0 });
   const isBreakRef = useRef(mode !== "work");
   const isRunningRef = useRef(isRunning);
   const [showTodos, setShowTodos] = useState(true);
@@ -199,47 +208,66 @@ export default function SessionPage() {
   const initPlayer = useCallback(() => {
     if (!window.YT?.Player || playerRef.current) return;
 
-    if (isPlaylistMode && selectedPlaylist) {
-      // Playlists & mixes YouTube : on NE passe PAS `list`/`videoId` dans les
-      // playerVars du constructeur. Combiner `videoId` + `list` fait que le
-      // player joue la vidéo seed puis enchaîne sur l'autoplay « vidéos liées »
-      // (= aléatoire, hors playlist). La méthode fiable est `loadPlaylist()`
-      // appelée dans `onReady`, qui charge réellement la playlist/file et
-      // active la navigation next/previous.
+    // File de lecture maison (mix radio résolu OU file FocusFlow). YouTube
+    // n'enchaîne PAS de façon fiable une liste d'IDs arbitraires en embed (ni
+    // `loadPlaylist([ids])`, ni le playerVar `playlist` : après la 1ʳᵉ, l'autoplay
+    // « vidéos liées » reprend la main = hors liste). On gère donc la progression
+    // NOUS-MÊMES : à la fin d'un titre (état ENDED=0) on charge le suivant.
+    const buildManualQueue = (ids: string[]) => {
+      queueRef.current = { ids, index: 0 };
+      playerRef.current = new window.YT.Player("yt-player", {
+        videoId: ids[0],
+        playerVars: { autoplay: 1, mute: 0, controls: 0, rel: 0, modestbranding: 1 },
+        events: {
+          onReady: (e: { target: YTPlayer }) => {
+            playerReadyRef.current = true;
+            e.target.setPlaybackQuality("hd1080");
+            e.target.setVolume(Math.round(volumeRef.current * 100));
+            if (isBreakRef.current || !isRunningRef.current) e.target.pauseVideo();
+          },
+          onStateChange: (e: { data: number; target: YTPlayer }) => {
+            if (e.data === 0) {
+              const q = queueRef.current;
+              if (q.ids.length === 0) return;
+              q.index = (q.index + 1) % q.ids.length;
+              e.target.loadVideoById(q.ids[q.index]);
+            }
+          },
+        },
+      });
+    };
+
+    if (isQueueMode) {
+      // File FocusFlow : titres exacts choisis par l'utilisateur, dans l'ordre.
+      if (queueIds.length === 0) return;
+      buildManualQueue(queueIds);
+    } else if (isPlaylistMode && selectedPlaylist) {
       const playlistId = selectedPlaylist.playlistId;
       const mix = isRadioMix(playlistId);
       // Mix radio : on attend la résolution serveur (mixIds) avant de créer le player.
       if (mix && mixIds === null) return;
-      const onReadyPlaylist = (e: { target: YTPlayer }) => {
-        playerReadyRef.current = true;
-        e.target.setPlaybackQuality("hd1080");
-        e.target.setVolume(Math.round(volumeRef.current * 100));
-        if (mix) {
-          // File de videoIds résolus → lecture dans l'ordre + skip + loop.
-          if (mixIds && mixIds.length > 0) {
-            e.target.loadPlaylist(mixIds);
-            e.target.setLoop(true);
-          }
-        } else {
-          // Vraie playlist YouTube (PL/OL/UU/FL/LL/RDCLAK) : embarquable directement.
+
+      if (mix) {
+        const ids = mixIds && mixIds.length > 0
+          ? mixIds
+          : (selectedPlaylist.startVideoId ? [selectedPlaylist.startVideoId] : []);
+        if (ids.length === 0) return; // rien à jouer
+        buildManualQueue(ids);
+      } else {
+        // Vraie playlist YouTube (PL/OL/UU/FL/LL/RDCLAK) : embarquable directement.
+        const onReadyPlaylist = (e: { target: YTPlayer }) => {
+          playerReadyRef.current = true;
+          e.target.setPlaybackQuality("hd1080");
+          e.target.setVolume(Math.round(volumeRef.current * 100));
           e.target.loadPlaylist({ list: playlistId, listType: "playlist", index: 0 });
           e.target.setLoop(true);
-        }
-        if (isBreakRef.current || !isRunningRef.current) {
-          // loadPlaylist démarre la lecture ; on met en pause si besoin
-          e.target.pauseVideo();
-        }
-      };
-      playerRef.current = new window.YT.Player("yt-player", {
-        playerVars: {
-          autoplay: 1,
-          mute: 0,
-          controls: 0,
-          rel: 0,
-          modestbranding: 1,
-        },
-        events: { onReady: onReadyPlaylist },
-      });
+          if (isBreakRef.current || !isRunningRef.current) e.target.pauseVideo();
+        };
+        playerRef.current = new window.YT.Player("yt-player", {
+          playerVars: { autoplay: 1, mute: 0, controls: 0, rel: 0, modestbranding: 1 },
+          events: { onReady: onReadyPlaylist },
+        });
+      }
     } else {
       const onReady = (e: { target: YTPlayer }) => {
         playerReadyRef.current = true;
@@ -268,7 +296,7 @@ export default function SessionPage() {
         events: { onReady },
       });
     }
-  }, [video?.youtubeId, isPlaylistMode, selectedPlaylist?.playlistId, mixIds]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [video?.youtubeId, isPlaylistMode, selectedPlaylist?.playlistId, mixIds, isQueueMode, queueKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (isSpotifyMode || isTwitchMode) return;
@@ -338,6 +366,9 @@ export default function SessionPage() {
     if (isTwitchMode) {
       if (selectedVodId) return { type: "twitch-vod" as const, title: `VOD ${selectedVodId}`, subtitle: "Twitch VOD", mediaKey: `vod:${selectedVodId}`, date, timestamp: Date.now(), minutes };
       return { type: "twitch-live" as const, title: selectedChannel ?? "Twitch", subtitle: "Live Twitch", mediaKey: `live:${selectedChannel}`, date, timestamp: Date.now(), minutes };
+    }
+    if (isQueueMode) {
+      return { type: "playlist" as const, title: "File FocusFlow", subtitle: `${queueItems.length} titre${queueItems.length > 1 ? "s" : ""}`, thumbnailUrl: queueItems[0]?.thumbnailUrl, mediaKey: "queue", date, timestamp: Date.now(), minutes };
     }
     if (isPlaylistMode && selectedPlaylist) {
       return { type: "playlist" as const, title: selectedPlaylist.title, subtitle: selectedPlaylist.channelName ?? "YouTube Playlist", thumbnailUrl: selectedPlaylist.thumbnailUrl, mediaKey: `pl:${selectedPlaylist.playlistId}`, date, timestamp: Date.now(), minutes };
@@ -462,8 +493,19 @@ export default function SessionPage() {
 
   const skipTrack = (dir: "next" | "prev") => {
     if (!playerRef.current || !playerReadyRef.current) return;
-    if (dir === "next") playerRef.current.nextVideo();
-    else playerRef.current.previousVideo();
+    if (isMix || isQueueMode) {
+      // File maison : on déplace l'index et on charge le titre correspondant.
+      const q = queueRef.current;
+      if (q.ids.length === 0) return;
+      q.index = dir === "next"
+        ? (q.index + 1) % q.ids.length
+        : (q.index - 1 + q.ids.length) % q.ids.length;
+      playerRef.current.loadVideoById(q.ids[q.index]);
+    } else if (dir === "next") {
+      playerRef.current.nextVideo();
+    } else {
+      playerRef.current.previousVideo();
+    }
   };
 
   const progress = (() => {
@@ -672,8 +714,8 @@ export default function SessionPage() {
             <div className="flex items-center gap-2">
               {/* Utility cluster — uniform icon buttons */}
               <div className="flex items-center gap-1 p-1 rounded-2xl bg-black/50 backdrop-blur-sm border border-white/15">
-                {/* Playlist skip controls (YouTube playlists & mixes only) */}
-                {isPlaylistMode && (
+                {/* Playlist skip controls (YouTube playlists, mixes & file FocusFlow) */}
+                {(isPlaylistMode || isQueueMode) && (
                   <>
                     <button
                       onClick={() => skipTrack("prev")}
