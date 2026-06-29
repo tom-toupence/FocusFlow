@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { VideoMood, moodLabels, moodColors, extractYouTubeId, getVideoColor, Video, defaultVideos } from "@/data/videos";
 import { useSessionStore } from "@/store/sessionStore";
-import { usePlaylistStore, SavedPlaylist, extractPlaylistId, extractFirstVideoId, fetchPlaylistMeta } from "@/store/playlistStore";
+import { usePlaylistStore, SavedPlaylist, extractPlaylistId, extractFirstVideoId, fetchPlaylistMeta, isRadioMix } from "@/store/playlistStore";
 import { useSpotifyStore, SpotifyPlaylist } from "@/store/spotifyStore";
 import { useTwitchStore, extractTwitchVodId, TwitchChannel } from "@/store/twitchStore";
 import { loginWithTwitch, getFollowedChannels, getLiveFollowedStreams, searchChannels, refreshTwitchToken } from "@/lib/twitch";
@@ -257,9 +257,15 @@ function AddPlaylistModal({ onClose, onAdd }: { onClose: () => void; onAdd: (p: 
     if (meta.thumbnailUrl) setThumbnailUrl(meta.thumbnailUrl);
   };
 
+  const mix = playlistId ? isRadioMix(playlistId) : false;
+
   const handleAdd = () => {
     if (!playlistId) {
       setError("URL de playlist YouTube invalide (paramètre list= manquant)");
+      return;
+    }
+    if (mix && !firstVideoId) {
+      setError("Pour un mix radio (RD…), garde la vidéo de départ dans le lien (paramètre v=)");
       return;
     }
     if (!title.trim()) {
@@ -315,6 +321,15 @@ function AddPlaylistModal({ onClose, onAdd }: { onClose: () => void; onAdd: (p: 
             placeholder="https://www.youtube.com/playlist?list=PL..."
             className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-foreground/25 transition-colors"
           />
+          {mix && (
+            <p className="text-amber-400/90 text-xs leading-relaxed flex gap-1.5">
+              <svg className="w-3.5 h-3.5 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M12 9v4M12 17h.01" strokeLinecap="round" />
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>Mix radio YouTube détecté : on en reconstruit une version jouable (skip activé). L&apos;ordre peut différer de ce que tu vois connecté à ton compte.</span>
+            </p>
+          )}
         </div>
 
         {/* Fetch meta button */}

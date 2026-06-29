@@ -251,15 +251,26 @@ Rooms, Smart Focus, capture rapide. Validées et livrées (build + lint verts à
 
 1. **Fix lecture des playlists / mixes YouTube** (`app/session/page.tsx`) : le constructeur passait
    `videoId` **et** `list` simultanément → le player jouait la vidéo seed puis l'autoplay « vidéos
-   liées » (aléatoire, hors playlist). Symptôme typique sur les **mixes radio `RD*`**. Corrigé en
-   chargeant la playlist via **`player.loadPlaylist({ list, listType:"playlist" })` dans `onReady`**
-   (plus de `videoId`+`list`), avec `setLoop(true)` pour les vraies playlists (les `RD*` sont infinies).
-2. **Skip de titres** : nouveaux boutons précédent/suivant dans le cluster de contrôles de session
-   (visibles en mode playlist), branchés sur `nextVideo()` / `previousVideo()`. Interface `YTPlayer`
-   étendue (`nextVideo`, `previousVideo`, `loadPlaylist`, `setLoop`).
-3. **Équipe d'agents** créée dans `.claude/agents/` : `product-lead`, `frontend-engineer`,
+   liées » (aléatoire, hors playlist). Pour les **vraies playlists** (`PL/OL/UU/FL/LL/RDCLAK`) : corrigé
+   via **`player.loadPlaylist({ list, listType:"playlist" })` dans `onReady`** + `setLoop(true)`.
+2. **Mixes radio `RD…` (Lot 1, grosse MAJ)** : ces radios sont **personnalisées et non embarquables**
+   (l'API IFrame renvoie des recommandations génériques ≠ les morceaux). Solution : nouvelle route
+   serveur **`app/api/youtube/mix`** qui fetch la page watch et parse `ytInitialData`
+   (`playlistPanelVideoRenderer.videoId`) → liste ordonnée de videoIds (≈25), sans clé API ni login.
+   Côté session, résolution à chaque démarrage (state local `mixIds`, non persisté = frais) puis lecture
+   comme **file contrôlable** via `loadPlaylist(idsArray)` + `setLoop(true)`. Repli : vidéo de départ en
+   boucle + toast si la résolution échoue. Helpers `isRadioMix()` / `fetchMixVideoIds()` dans
+   `store/playlistStore.ts` ; note honnête dans `AddPlaylistModal` (`app/page.tsx`).
+3. **Skip de titres** : boutons précédent/suivant dans le cluster de contrôles de session (mode
+   playlist), branchés sur `nextVideo()` / `previousVideo()`. Interface `YTPlayer` étendue
+   (`nextVideo`, `previousVideo`, `loadPlaylist` forme objet **ou** tableau, `setLoop`).
+4. **Équipe d'agents** créée dans `.claude/agents/` : `product-lead`, `frontend-engineer`,
    `backend-engineer`, `state-architect`, `qa-tester`, `code-reviewer` (cf. section « Équipe d'agents »).
    `AGENTS.md` enrichi avec le guide d'ingénierie + pièges du lecteur YouTube.
+
+> **Plan grosse MAJ « ergonomie »** (validé) : Lot 1 ✅ playlists robustes ; à venir : Lot 2 navigation
+> (sidebar + bottom-nav + ⌘K), Lot 3 lecteur unifié (Now Playing), Lot 4 insights enrichis,
+> Lot 5 onboarding, Lot 6 suggestions intelligentes. Livraison coup par coup.
 
 ## Catalogue vidéos initial
 

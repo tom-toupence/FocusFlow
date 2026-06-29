@@ -44,6 +44,32 @@ export const usePlaylistStore = create<PlaylistState>()(
   )
 );
 
+// Un « mix radio » YouTube (RD…) est une playlist infinie PERSONNALISÉE, non
+// reproductible en embed via l'API IFrame (le player renvoie des recommandations
+// génériques ≠ les morceaux attendus). On les détecte pour les résoudre côté serveur.
+// Exception : RDCLAK… sont des playlists officielles YouTube Music, embarquables normalement.
+export function isRadioMix(listId: string): boolean {
+  return listId.startsWith("RD") && !listId.startsWith("RDCLAK");
+}
+
+// Résout un mix radio en une liste ordonnée de videoIds via notre route serveur
+// (parse de la page YouTube — aucune clé requise). Retourne [] si échec.
+export async function fetchMixVideoIds(
+  listId: string,
+  seedVideoId?: string
+): Promise<string[]> {
+  try {
+    const params = new URLSearchParams({ list: listId });
+    if (seedVideoId) params.set("seed", seedVideoId);
+    const res = await fetch(`/api/youtube/mix?${params.toString()}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.videoIds) ? data.videoIds : [];
+  } catch {
+    return [];
+  }
+}
+
 // Extrait le playlist ID depuis une URL YouTube (list=PLxxx)
 export function extractPlaylistId(url: string): string | null {
   try {

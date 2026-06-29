@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useTimerStore, TimerMode } from "@/store/timerStore";
 import { useSessionStore } from "@/store/sessionStore";
-import { usePlaylistStore } from "@/store/playlistStore";
+import { usePlaylistStore, isRadioMix, fetchMixVideoIds } from "@/store/playlistStore";
 import { useSessionSummaryStore } from "@/store/sessionSummaryStore";
 import { cn } from "@/lib/utils";
 import TodoList from "@/components/TodoList";
@@ -40,12 +40,16 @@ interface YTPlayer {
   setVolume: (v: number) => void;
   nextVideo: () => void;
   previousVideo: () => void;
-  loadPlaylist: (opts: {
-    list: string;
-    listType: string;
-    index?: number;
-    startSeconds?: number;
-  }) => void;
+  loadPlaylist: (
+    opts:
+      | string[]
+      | {
+          list: string;
+          listType: string;
+          index?: number;
+          startSeconds?: number;
+        }
+  ) => void;
   setLoop: (loop: boolean) => void;
 }
 
@@ -96,6 +100,7 @@ export default function SessionPage() {
   const video = allVideos.find((v) => v.id === selectedVideoId) ?? allVideos[0];
   const selectedPlaylist = playlists.find((p) => p.id === selectedPlaylistId) ?? null;
   const isPlaylistMode = !!selectedPlaylistId && !!selectedPlaylist;
+  const isMix = isPlaylistMode && !!selectedPlaylist && isRadioMix(selectedPlaylist.playlistId);
   const isSpotifyMode = !!selectedPlaylistUri && !!accessToken;
   const isTwitchMode = !!selectedChannel || !!selectedVodId;
 
@@ -114,6 +119,8 @@ export default function SessionPage() {
   const [showMixer, setShowMixer] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [distractionFlash, setDistractionFlash] = useState(0);
+  // Mix radio YouTube résolu en liste de videoIds (null = résolution en cours).
+  const [mixIds, setMixIds] = useState<string[] | null>(null);
   const volumeRef = useRef(0.8);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
@@ -124,6 +131,31 @@ export default function SessionPage() {
   // Keep refs in sync for use inside IFrame API callbacks
   useEffect(() => { isBreakRef.current = isBreak; }, [isBreak]);
   useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
+
+  // ── Résolution des mixes radio YouTube (RD…) ──────────────────────────────
+  // Les radios ne sont pas embarquables : on les résout en liste de videoIds via
+  // /api/youtube/mix, puis on les joue comme une file contrôlable (skip + loop).
+  // Repli sur la vidéo de départ en boucle si la résolution échoue.
+  useEffect(() => {
+    if (!isMix || !selectedPlaylist) return;
+    let cancelled = false;
+    (async () => {
+      const ids = await fetchMixVideoIds(selectedPlaylist.playlistId, selectedPlaylist.startVideoId);
+      if (cancelled) return;
+      if (ids.length > 0) {
+        setMixIds(ids);
+      } else {
+        setMixIds(selectedPlaylist.startVideoId ? [selectedPlaylist.startVideoId] : []);
+        toast({
+          title: "Mix YouTube indisponible",
+          description: "Lecture de la vidéo de départ en boucle.",
+          emoji: "🎧",
+          accent: "amber",
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isMix, selectedPlaylist?.playlistId, selectedPlaylist?.startVideoId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Chime sounds on mode transitions ─────────────────────────────────────
   const prevModeRef = useRef(mode);
@@ -172,21 +204,27 @@ export default function SessionPage() {
       // playerVars du constructeur. Combiner `videoId` + `list` fait que le
       // player joue la vidéo seed puis enchaîne sur l'autoplay « vidéos liées »
       // (= aléatoire, hors playlist). La méthode fiable est `loadPlaylist()`
-      // appelée dans `onReady`, qui charge réellement la playlist/radio et
+      // appelée dans `onReady`, qui charge réellement la playlist/file et
       // active la navigation next/previous.
       const playlistId = selectedPlaylist.playlistId;
-      const startIndex = 0;
+      const mix = isRadioMix(playlistId);
+      // Mix radio : on attend la résolution serveur (mixIds) avant de créer le player.
+      if (mix && mixIds === null) return;
       const onReadyPlaylist = (e: { target: YTPlayer }) => {
         playerReadyRef.current = true;
         e.target.setPlaybackQuality("hd1080");
         e.target.setVolume(Math.round(volumeRef.current * 100));
-        e.target.loadPlaylist({
-          list: playlistId,
-          listType: "playlist",
-          index: startIndex,
-        });
-        // Les radios (RD*) sont infinies ; les vraies playlists bouclent en fin de liste
-        if (!playlistId.startsWith("RD")) e.target.setLoop(true);
+        if (mix) {
+          // File de videoIds résolus → lecture dans l'ordre + skip + loop.
+          if (mixIds && mixIds.length > 0) {
+            e.target.loadPlaylist(mixIds);
+            e.target.setLoop(true);
+          }
+        } else {
+          // Vraie playlist YouTube (PL/OL/UU/FL/LL/RDCLAK) : embarquable directement.
+          e.target.loadPlaylist({ list: playlistId, listType: "playlist", index: 0 });
+          e.target.setLoop(true);
+        }
         if (isBreakRef.current || !isRunningRef.current) {
           // loadPlaylist démarre la lecture ; on met en pause si besoin
           e.target.pauseVideo();
@@ -230,7 +268,7 @@ export default function SessionPage() {
         events: { onReady },
       });
     }
-  }, [video?.youtubeId, isPlaylistMode, selectedPlaylist?.playlistId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [video?.youtubeId, isPlaylistMode, selectedPlaylist?.playlistId, mixIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (isSpotifyMode || isTwitchMode) return;
