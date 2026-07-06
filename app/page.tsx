@@ -27,6 +27,8 @@ import Onboarding from "@/components/Onboarding";
 import { useProfileStore, resolvedProfile } from "@/store/profileStore";
 
 const allMoods: VideoMood[] = ["lofi", "jazz", "ambience", "nature", "synthwave", "classical"];
+// Moods réellement présents dans le catalogue (évite des filtres vides)
+const catalogueMoods: VideoMood[] = allMoods.filter((m) => defaultVideos.some((v) => v.mood === m));
 
 function VideoCard({
   video,
@@ -959,7 +961,7 @@ export default function LandingPage() {
               >
                 Tout
               </button>
-              {allMoods.map((m) => (
+              {catalogueMoods.map((m) => (
                 <button
                   key={m}
                   onClick={() => setActiveFilter(activeFilter === m ? null : m)}

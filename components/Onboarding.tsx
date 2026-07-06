@@ -8,13 +8,11 @@ import { useTimerStore, TimerPreset } from "@/store/timerStore";
 import { usePrefsStore } from "@/store/prefsStore";
 import { cn } from "@/lib/utils";
 
+// Seuls les moods présents dans le catalogue refondu (lofi/ambience/nature)
 const MOOD_OPTIONS: { mood: VideoMood; emoji: string }[] = [
   { mood: "lofi", emoji: "🎧" },
-  { mood: "jazz", emoji: "🎷" },
-  { mood: "nature", emoji: "🌿" },
   { mood: "ambience", emoji: "🌆" },
-  { mood: "synthwave", emoji: "🌌" },
-  { mood: "classical", emoji: "🎻" },
+  { mood: "nature", emoji: "🌿" },
 ];
 
 const PRESET_OPTIONS: { preset: TimerPreset; title: string; desc: string }[] = [

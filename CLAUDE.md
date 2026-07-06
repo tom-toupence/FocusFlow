@@ -317,8 +317,16 @@ Rooms, Smart Focus, capture rapide. Validées et livrées (build + lint verts à
 - **Lot 6 — Suggestions** : `lib/suggestions.ts` (`topRepeatedVideo`) → carte « Reprendre ta session
   habituelle » dans `TodayDashboard` (1 clic relance la vidéo la plus jouée).
 
-## Catalogue vidéos initial
+## Catalogue vidéos (refonte 2026-07-06)
 
-Vidéos lofi/chill de référence (catalogue dans `data/videos.ts`) :
-Lofi Girl (livestream 24/7), Driving in Seoul, Tokyo at Night, Rainy Coffee Shop, Study with Me,
-Chillhop Raccoon — déclinées par mood (lofi, jazz, ambience, nature, synthwave, classical).
+Catalogue recentré sur **2 formats uniquement** : « Study With Me » scéniques (vue sur un beau
+paysage) et **lofi/ambient sur paysages**, avec **dominante Asie** (préférence utilisateur forte) +
+quelques touches Europe. ~55 vidéos dans `data/videos.ts`, **tous les IDs vérifiés via oEmbed**.
+Piliers : Abao in Tokyo (16 SWM), study with japan (Osaka), Hatsu (Tokyo), Sean Study
+(Shanghai/Canton/Londres), Abao Vision (drives lofi Kyoto/Fuji/Tokyo), + Corée (Jeju), Taïwan,
+Hong Kong, Vietnam (Ha Long), Thaïlande, Singapour, Bali, Népal, Guilin. Quelques walks seulement
+(Rambalac Gion/Atami, HK night walk). Moods réellement utilisés : `lofi` / `ambience` / `nature`
+(les chips du catalogue sont dérivées des moods présents via `catalogueMoods` dans `app/page.tsx` ;
+`jazz`/`synthwave`/`classical` restent dans le type pour les vidéos custom). `lib/sprint.ts` et
+`Onboarding.tsx` ne pointent plus que vers des moods présents.
+**Supprimés** : cafés/cheminées/cozy, jazz lounges, city pop/synthwave, NYC/Dubaï, sons purs (vagues).

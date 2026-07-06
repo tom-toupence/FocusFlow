@@ -31,10 +31,11 @@ export interface SprintPlan {
 
 // ── Local fallback ────────────────────────────────────────────────────────────
 
+// Moods limités à ceux présents dans le catalogue refondu (lofi/ambience/nature)
 const MOOD_KEYWORDS: [VideoMood, string[]][] = [
-  ["synthwave", ["cod", "développ", "developp", "programm", "bug", "api", "script", "tech"]],
-  ["classical", ["révis", "examen", "concours", "partiel", "mémoris", "memoris", "math"]],
-  ["jazz", ["écrir", "ecrir", "rédig", "redig", "rapport", "mémoire", "memoire", "article", "lettre"]],
+  ["lofi", ["cod", "développ", "developp", "programm", "bug", "api", "script", "tech"]],
+  ["ambience", ["révis", "examen", "concours", "partiel", "mémoris", "memoris", "math"]],
+  ["ambience", ["écrir", "ecrir", "rédig", "redig", "rapport", "mémoire", "memoire", "article", "lettre"]],
   ["nature", ["lire", "lecture", "réfléch", "reflech", "créati", "creati", "dessin"]],
   ["ambience", ["design", "maquette", "présent", "present", "slide", "organis", "tri", "admin"]],
 ];

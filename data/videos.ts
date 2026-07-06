@@ -11,6 +11,9 @@ export interface Video {
   custom?: boolean;
 }
 
+// Catalogue refondu (2026-07) : uniquement des « Study With Me » scéniques et du
+// lofi/ambient sur beaux paysages (dominante Asie), + quelques walks. Tous les IDs
+// ont été vérifiés embarquables via oEmbed.
 export const defaultVideos: Video[] = [
 
   // ─── Japon — Abao in Tokyo ───────────────────────────────────────────────────
@@ -31,84 +34,66 @@ export const defaultVideos: Video[] = [
   { id: "abao-15", title: "Study With Me — Rainy Night Over the Bay",    channel: "Abao in Tokyo",    youtubeId: "RgQYhSmXAOU", mood: "ambience",  color: "#1a1e3a", country: "Japon" },
   { id: "abao-16", title: "Study With Me — Peaceful Afternoon Tokyo",    channel: "Abao in Tokyo",    youtubeId: "BXDatxhn-B8", mood: "ambience",  color: "#2a2e3a", country: "Japon" },
 
-  // ─── Japon — Rambalac Walks ──────────────────────────────────────────────────
-  { id: "ramb-01", title: "Walking in Tokyo Shibuya at Night",           channel: "Rambalac",         youtubeId: "6qGiXY1SB68", mood: "ambience",  color: "#1a1e2e", country: "Japon" },
-  { id: "ramb-02", title: "Autumn Walk Through Gion, Kyoto",             channel: "Rambalac",         youtubeId: "kd-OLM-6GRE", mood: "nature",    color: "#3a2a1a", country: "Japon" },
-  { id: "ramb-03", title: "Tokyo Tachikawa Evening to Night Walk",       channel: "Rambalac",         youtubeId: "FyNBZCNzBn4", mood: "ambience",  color: "#1e1e2a", country: "Japon" },
-  { id: "ramb-04", title: "Tokyo Snowfall Walk",                         channel: "Rambalac",         youtubeId: "PF-BNCDM9AE", mood: "ambience",  color: "#2a2e3a", country: "Japon" },
-  { id: "ramb-05", title: "Snowfall in Niigata, Japan",                  channel: "Rambalac",         youtubeId: "QNGD12JW5Lk", mood: "nature",    color: "#2e3a3e", country: "Japon" },
-  { id: "ramb-06", title: "Night Tokyo Walk — Hino to Tama",             channel: "Rambalac",         youtubeId: "jFxIaOLdgNM", mood: "ambience",  color: "#1a1a2a", country: "Japon" },
-  { id: "ramb-07", title: "Night Tsukishima Walk, Tokyo",                channel: "Rambalac",         youtubeId: "kEr_lGSdLjI", mood: "ambience",  color: "#1e2a2e", country: "Japon" },
-  { id: "ramb-08", title: "Tokyo Marunouchi Christmas Lights",           channel: "Rambalac",         youtubeId: "yKi3pFNK5TI", mood: "ambience",  color: "#2a1a2e", country: "Japon" },
-  { id: "ramb-09", title: "Tokyo Mitake — Fall Hike in Red & Gold",      channel: "Rambalac",         youtubeId: "I6ZsokzXIo0", mood: "nature",    color: "#3a2e1a", country: "Japon" },
+  // ─── Japon — Study With Me (Osaka & Tokyo) ───────────────────────────────────
+  { id: "swj-01",  title: "Study With Me — Osaka Midnight (4h)",         channel: "study with japan", youtubeId: "gHmq9Xd6qMQ", mood: "ambience",  color: "#1a1e3a", country: "Japon" },
+  { id: "swj-02",  title: "Study With Me — Osaka Sunset (7h)",           channel: "study with japan", youtubeId: "tA33x7DE1j4", mood: "ambience",  color: "#4a2a1e", country: "Japon" },
+  { id: "hatsu-01", title: "Study With Me — Tokyo Night View (1h)",      channel: "Hatsu Tokyo",      youtubeId: "kMCbva2SvMU", mood: "ambience",  color: "#1a1e2e", country: "Japon" },
+  { id: "hatsu-02", title: "Study With Me — Tokyo Skytree Night (2h)",   channel: "Hatsu Tokyo",      youtubeId: "tCAUKfgEBpI", mood: "ambience",  color: "#1e1a3a", country: "Japon" },
+
+  // ─── Japon — Lofi & paysages ─────────────────────────────────────────────────
+  { id: "jplo-01", title: "Kyoto Dawn Drive — Japanese Ambient Lofi",    channel: "Abao Vision",      youtubeId: "cZhR365mLO4", mood: "lofi",      color: "#2a1e2e", country: "Japon" },
+  { id: "jplo-02", title: "Mount Fuji Dusk Drive — 8K Piano",            channel: "Abao Vision",      youtubeId: "TnG89ChN9LQ", mood: "ambience",  color: "#3a1a2a", country: "Japon" },
+  { id: "jplo-03", title: "Mt. Fuji Drive — Calm Lofi & Scenic Road",    channel: "Drive Lo-fi Japan", youtubeId: "YOs-kGN39hM", mood: "lofi",     color: "#2a2e3a", country: "Japon" },
+  { id: "jplo-04", title: "Mount Fuji from the Train Window — Lofi",     channel: "Somewhere Else",   youtubeId: "-Y01AvcZaks", mood: "lofi",      color: "#2e3a3e", country: "Japon" },
+  { id: "jplo-05", title: "fujisan. — Japan Lofi Vibes",                 channel: "The Jazz Hop Café", youtubeId: "RtWgbht6qe8", mood: "lofi",     color: "#1e2a3a", country: "Japon" },
+  { id: "driv-01", title: "Tokyo Night Drive — 8K HDR + Lofi Beats",     channel: "Abao Vision",      youtubeId: "-Xh4BNbxpI8", mood: "lofi",      color: "#1a1e3a", country: "Japon" },
+  { id: "trai-02", title: "Riverside Train in Gifu, Japan — Piano",      channel: "Abao Vision",      youtubeId: "q8nPaqfRm_c", mood: "ambience",  color: "#1e2e2a", country: "Japon" },
+  { id: "trai-06", title: "Lilac Express — Hokkaido Window View",        channel: "Spirit of Japan TV", youtubeId: "0NS8S7AAUIM", mood: "nature",  color: "#2a2e3a", country: "Japon" },
+  { id: "natu-01", title: "Japan 4K — Scenic Relaxation Film",           channel: "Scenic Relaxation", youtubeId: "D48T0wNm96w", mood: "nature",   color: "#1a3a2a", country: "Japon" },
+  { id: "natu-04", title: "Japan Cherry Blossoms 4K HDR — Kawazu",       channel: "Virtual Japan",    youtubeId: "kZN2yTa1HcY", mood: "nature",    color: "#3a1a2a", country: "Japon" },
+
+  // ─── Japon — Walks ───────────────────────────────────────────────────────────
+  { id: "ramb-02", title: "Evening Walk Through Gion, Kyoto",            channel: "Rambalac",         youtubeId: "kd-OLM-6GRE", mood: "nature",    color: "#3a2a1a", country: "Japon" },
   { id: "ramb-10", title: "Blooming Sakura in Atami",                    channel: "Rambalac",         youtubeId: "lKLTjDX7EJo", mood: "nature",    color: "#3a1a2a", country: "Japon" },
 
-  // ─── Japon — Trajets & Paysages ──────────────────────────────────────────────
-  { id: "trai-02", title: "Riverside Train in Gifu, Japan — Piano",      channel: "Train Views",      youtubeId: "q8nPaqfRm_c", mood: "ambience",  color: "#1e2e2a", country: "Japon" },
-  { id: "trai-04", title: "Shinkansen Osaka to Tokyo",                   channel: "Train Views",      youtubeId: "XyGcUXDuXVY", mood: "ambience",  color: "#1a2a2e", country: "Japon" },
-  { id: "trai-05", title: "Tokyo Yurikamome — Side Window View 4K",      channel: "Train Views",      youtubeId: "7iSOMLkFizU", mood: "ambience",  color: "#1e2a3a", country: "Japon" },
-  { id: "trai-06", title: "Lilac Express — Hokkaido Window View",        channel: "Train Views",      youtubeId: "0NS8S7AAUIM", mood: "nature",    color: "#2a2e3a", country: "Japon" },
-  { id: "trai-07", title: "Spirited Away Train Scene — Fake Window",     channel: "Ghibli Vibes",     youtubeId: "pl2-zgZBo5Y", mood: "ambience",  color: "#1a2a3a", country: "Japon" },
-  { id: "natu-01", title: "Japan 4K — Scenic Relaxation Film",           channel: "Scenic Films",     youtubeId: "D48T0wNm96w", mood: "nature",    color: "#1a3a2a", country: "Japon" },
-  { id: "natu-02", title: "Japan in 8K — Land of The Rising Sun",        channel: "Scenic Films",     youtubeId: "G5RpJwCJDqc", mood: "nature",    color: "#2a3a1a", country: "Japon" },
-  { id: "natu-03", title: "Flying Over Japan 4K — Relaxing Music",       channel: "Scenic Films",     youtubeId: "AY5qcIq5u2g", mood: "nature",    color: "#1e3a2e", country: "Japon" },
-  { id: "natu-04", title: "Japan Cherry Blossoms 4K HDR — Kawazu",       channel: "Scenic Films",     youtubeId: "kZN2yTa1HcY", mood: "nature",    color: "#3a1a2a", country: "Japon" },
-  { id: "natu-12", title: "Feeding Deer at Nara Park — Autumn",          channel: "Nomadic Ambience", youtubeId: "XZwNVLGUIDM", mood: "nature",    color: "#2e3a1a", country: "Japon" },
-  { id: "natu-13", title: "Rain Walk in Kyoto, Japan",                   channel: "Nomadic Ambience", youtubeId: "PwpxZXp8z5Y", mood: "ambience",  color: "#1e2e2a", country: "Japon" },
-
-  // ─── Japon — Conduites de nuit / City Pop ────────────────────────────────────
-  { id: "driv-01", title: "Tokyo Night Drive — 8K HDR + Lofi Beats",     channel: "Tokyo Drives",     youtubeId: "-Xh4BNbxpI8", mood: "lofi",      color: "#1a1e3a", country: "Japon" },
-  { id: "driv-02", title: "Tokyo Night Drive — Lofi Hiphop & Chill",     channel: "Tokyo Drives",     youtubeId: "Lcdi9O2XB4E", mood: "lofi",      color: "#1e1a3a", country: "Japon" },
-  { id: "driv-03", title: "Tokyo Night Drive — Citypop & Disco Grooves", channel: "Tokyo Drives",     youtubeId: "byGTaXSZ0nA", mood: "synthwave", color: "#2e1a3b", country: "Japon" },
-  { id: "driv-06", title: "Tokyo Sunset Drive — 80s Japanese City Pop",  channel: "Tokyo Drives",     youtubeId: "dY9wRyyfKRA", mood: "synthwave", color: "#3a2a1e", country: "Japon" },
-  { id: "driv-07", title: "Saturday Night in Tokyo — 80s City Pop",      channel: "Tokyo Drives",     youtubeId: "6e2smNPwxbk", mood: "synthwave", color: "#3a1e2a", country: "Japon" },
-  { id: "driv-08", title: "Rainy Night Walk Shibuya 8K — Calm Piano",    channel: "Tokyo Walks",      youtubeId: "2y2Z06hVmWE", mood: "ambience",  color: "#1a2a2a", country: "Japon" },
-
   // ─── Corée du Sud ────────────────────────────────────────────────────────────
-  { id: "driv-04", title: "Seoul Night Drive — Gangnam 4K HDR + Lofi",   channel: "Seoul Drives",     youtubeId: "40xZVEFVBuE", mood: "lofi",      color: "#1a2a3a", country: "Corée du Sud" },
-  { id: "driv-05", title: "Seoul Night Drive — Downtown Vibes + Lofi",   channel: "Seoul Drives",     youtubeId: "SRpMapyw6Aw", mood: "lofi",      color: "#1e2a3a", country: "Corée du Sud" },
+  { id: "driv-05", title: "Seoul Night Drive — Downtown + Lofi",         channel: "Seoul Walker",     youtubeId: "SRpMapyw6Aw", mood: "lofi",      color: "#1e2a3a", country: "Corée du Sud" },
+  { id: "kr-01",   title: "Jeju Island — Ocean Views + Lofi Beats",      channel: "Coffee Backgrounds", youtubeId: "Hpmr6R8uTU8", mood: "lofi",    color: "#1a2e2e", country: "Corée du Sud" },
 
-  // ─── États-Unis ──────────────────────────────────────────────────────────────
-  { id: "noma-01", title: "Snowfall in New York — Times Square",         channel: "Nomadic Ambience", youtubeId: "2JWKWszOu7g", mood: "ambience",  color: "#1e2a3a", country: "États-Unis" },
-  { id: "noma-02", title: "Snow Walk in Manhattan at Night",             channel: "Nomadic Ambience", youtubeId: "nswBLdiJwMw", mood: "ambience",  color: "#1a2a3e", country: "États-Unis" },
-  { id: "noma-06", title: "New York Penthouse Cityscape View",           channel: "Nomadic Ambience", youtubeId: "PJnXm7opYks", mood: "ambience",  color: "#2a1e2e", country: "États-Unis" },
-  { id: "city-02", title: "New York City Drive — Harlem to SoHo 4K",    channel: "4K Urban Life",    youtubeId: "88ESxZZzY-A", mood: "ambience",  color: "#2a1e2a", country: "États-Unis" },
-  { id: "us-04",   title: "New York Jazz Lounge — Bar Classics",         channel: "Jazz Lounge",      youtubeId: "mM1dIwGO00w", mood: "jazz",      color: "#2e1a1e", country: "États-Unis" },
+  // ─── Chine ───────────────────────────────────────────────────────────────────
+  { id: "cn-01",   title: "Study With Me — Shanghai, The Bund Night (4h)", channel: "Sean Study",     youtubeId: "eusFXcYHGTY", mood: "ambience",  color: "#1a1e3a", country: "Chine" },
+  { id: "cn-02",   title: "Study With Me — Guangzhou Afternoon (4h)",    channel: "Sean Study",       youtubeId: "1Md2UbiiN1U", mood: "ambience",  color: "#2a3e5f", country: "Chine" },
+  { id: "cn-03",   title: "Guilin 4K — Mountains Meet the River",        channel: "Frame Art TV",     youtubeId: "r0LVnW1ekic", mood: "nature",    color: "#1a3a2a", country: "Chine" },
 
-  // ─── Italie ──────────────────────────────────────────────────────────────────
-  { id: "noma-09", title: "Venice Italy Cityscape 8K HDR",               channel: "Nomadic Ambience", youtubeId: "89r4hUMxMtg", mood: "ambience",  color: "#2e2a1e", country: "Italie" },
-  { id: "noma-10", title: "Sea Sounds — Manarola Italy Cliffside",       channel: "Nomadic Ambience", youtubeId: "c1AywfvVmvI", mood: "nature",    color: "#1a2a2e", country: "Italie" },
-  { id: "it-04",   title: "Amalfi Coast Drive — Sunrise 4K",             channel: "Italy Scenic",     youtubeId: "IUN664s7N-c", mood: "nature",    color: "#2a1e1a", country: "Italie" },
+  // ─── Taïwan ──────────────────────────────────────────────────────────────────
+  { id: "tw-01",   title: "Taiwan Nostalgic Lofi — Tainan Lanterns",     channel: "Lofi Tripper Ryo", youtubeId: "nYSi0kgX4xQ", mood: "lofi",      color: "#3a1e2a", country: "Taïwan" },
+  { id: "tw-02",   title: "Midnight in Taipei — Real Life Lofi 4K",      channel: "Walking Around Taiwan", youtubeId: "iSucHjikLuE", mood: "lofi",  color: "#1a1a2a", country: "Taïwan" },
+  { id: "tw-03",   title: "Study With Me — Lofi Beats @ Taipei",         channel: "PT STEM Tutor",    youtubeId: "HtdYFyKRVOI", mood: "lofi",      color: "#1e2a2e", country: "Taïwan" },
 
-  // ─── Norvège ─────────────────────────────────────────────────────────────────
-  { id: "noma-08", title: "Windy Walk — Lofoten, Norway 4K",             channel: "Nomadic Ambience", youtubeId: "cVB07aYcsyY", mood: "nature",    color: "#1a2e2e", country: "Norvège" },
-  { id: "noma-11", title: "Snowstorm Drive — Arctic Circle Norway",      channel: "Nomadic Ambience", youtubeId: "cPz7ZOZNXMA", mood: "ambience",  color: "#2a2e3a", country: "Norvège" },
+  // ─── Hong Kong ───────────────────────────────────────────────────────────────
+  { id: "hk-01",   title: "Hong Kong Late Night Walk — Lofi Vibes",      channel: "MOMA Serenade",    youtubeId: "gg7jX09L05E", mood: "lofi",      color: "#2a1a2e", country: "Hong Kong" },
+  { id: "hk-02",   title: "Hong Kong Night Drive — Neon + Chillhop",     channel: "HK Midnight LoFi", youtubeId: "7nThSsjKi8M", mood: "lofi",      color: "#1e1a3a", country: "Hong Kong" },
 
-  // ─── Suisse ──────────────────────────────────────────────────────────────────
+  // ─── Vietnam ─────────────────────────────────────────────────────────────────
+  { id: "vn-01",   title: "Ha Long Bay — Immersive Vietnam Lofi",        channel: "Asia Lofi Walks",  youtubeId: "oGUutDb2TMo", mood: "lofi",      color: "#1a2e2e", country: "Vietnam" },
+  { id: "vn-02",   title: "Vietnam 4K — Scenic Relaxation Film",         channel: "Scenic Relaxation", youtubeId: "w1ucZCmvO5c", mood: "nature",   color: "#2a3a1a", country: "Vietnam" },
+
+  // ─── Thaïlande · Singapour · Indonésie ──────────────────────────────────────
+  { id: "th-01",   title: "Thailand 4K — Scenic Relaxation Film",        channel: "Scenic Relaxation", youtubeId: "SadzfrxVuF0", mood: "nature",   color: "#1e3a2e", country: "Thaïlande" },
+  { id: "sg-01",   title: "Singapore Lofi Skies — Tropical Chill",       channel: "You Are Here",     youtubeId: "Tn31FGv8l4E", mood: "lofi",      color: "#2e2a1a", country: "Singapour" },
+  { id: "id-01",   title: "Bali 4K — Scenic Relaxation Film",            channel: "Cinematic Relaxation", youtubeId: "Xh9oyZzbjZY", mood: "nature", color: "#2a3a2e", country: "Indonésie" },
+  { id: "id-02",   title: "Work & Study With Me in Bali — Lofi",         channel: "Favorable Background", youtubeId: "6gKkxxC0ywQ", mood: "lofi",   color: "#2e3a1a", country: "Indonésie" },
+
+  // ─── Népal ───────────────────────────────────────────────────────────────────
+  { id: "np-01",   title: "Himalayan Dawn — Nepali Peaceful Lofi",       channel: "Nepal Lofi Station", youtubeId: "a7brjR17Wrc", mood: "lofi",    color: "#3a2e1a", country: "Népal" },
+
+  // ─── Europe & ailleurs (quelques touches) ───────────────────────────────────
+  { id: "gr-01",   title: "Santorini 4K — Lofi Chill BGM",               channel: "4K Serene Earth",  youtubeId: "fxMiz41D1_U", mood: "lofi",      color: "#1a2a3e", country: "Grèce" },
+  { id: "no-01",   title: "Norway Fjords 4K — Peaceful Landscapes",      channel: "Relaxing World",   youtubeId: "MuyczkzKoYw", mood: "nature",    color: "#1a2e2e", country: "Norvège" },
+  { id: "noma-08", title: "Windy Walk — Lofoten, Norway 4K",             channel: "Nomadic Ambience", youtubeId: "cVB07aYcsyY", mood: "nature",    color: "#2a2e3a", country: "Norvège" },
   { id: "noma-07", title: "Autumn Walk — Lauterbrunnen, Switzerland",    channel: "Nomadic Ambience", youtubeId: "u4DUtsiedcA", mood: "nature",    color: "#2a3a1e", country: "Suisse" },
-  { id: "trai-01", title: "Grindelwald to Interlaken — Swiss Train",     channel: "Train Views",      youtubeId: "h0vrvXBLoCU", mood: "nature",    color: "#2a3a2e", country: "Suisse" },
-  { id: "trai-03", title: "Train Through the Swiss Alps — 4K",           channel: "Train Views",      youtubeId: "ADt_RisXY0U", mood: "nature",    color: "#2e3a2a", country: "Suisse" },
-
-  // ─── Émirats Arabes Unis ─────────────────────────────────────────────────────
-  { id: "ae-01",   title: "Dubai Night Drive — Burj Khalifa 4K",          channel: "Dubai Drives",     youtubeId: "bTqVqk7FSmY", mood: "synthwave", color: "#2e2a1a", country: "Émirats" },
-
-  // ─── Cozy / Ambiance (universel) ────────────────────────────────────────────
-  { id: "cafe-01", title: "Cozy Coffee Shop — Smooth Piano Jazz",        channel: "Café Ambience",    youtubeId: "MYPVQccHhAQ", mood: "jazz" },
-  { id: "cafe-02", title: "Rainy Jazz Café — Slow Jazz & Coffee",        channel: "Café Ambience",    youtubeId: "NJuSStkIZBg", mood: "jazz" },
-  { id: "cafe-03", title: "Rainy Night Coffee Shop — Jazz 8 Hours",      channel: "Café Ambience",    youtubeId: "c0_ejQQcrwI", mood: "jazz" },
-  { id: "cafe-04", title: "Cozy Fall Coffee Shop — Jazz & Rain",         channel: "Café Ambience",    youtubeId: "VMAPTo7RVCo", mood: "jazz" },
-  { id: "cafe-05", title: "Ghibli Coffee Shop — Lofi Hip Hop",           channel: "Ghibli Vibes",     youtubeId: "zhDwjnYZiCo", mood: "lofi" },
-  { id: "cafe-07", title: "Rainy Day — 4K Cozy Coffee Shop",             channel: "Café Ambience",    youtubeId: "0L38Z9hIi5s", mood: "jazz" },
-  { id: "cafe-08", title: "Winter Bookstore — Jazz & Fireplace",         channel: "Cozy Ambience",    youtubeId: "HO6cbtdmkIc", mood: "jazz" },
-  { id: "cozy-01", title: "Rain & Thunder — Crackling Fireplace 3H",    channel: "Cozy Sounds",      youtubeId: "3sL0omwElxw", mood: "ambience" },
-  { id: "cozy-02", title: "Relaxing Fireplace 12 Hours (No Music)",     channel: "Cozy Sounds",      youtubeId: "UgHKb_7884o", mood: "ambience" },
-  { id: "cozy-03", title: "Cozy Cabin — Rain & Fireplace at Night",     channel: "Cozy Sounds",      youtubeId: "1RcVIuZ8Wdk", mood: "ambience" },
-  { id: "cozy-05", title: "Rain on Window & Warm Fireplace",            channel: "Cozy Sounds",      youtubeId: "sTGeUZzXSjM", mood: "ambience" },
-  { id: "cozy-06", title: "Blizzard & Fireplace for Sleep",             channel: "Cozy Sounds",      youtubeId: "jK3cMcH9e_c", mood: "ambience" },
-  { id: "natu-06", title: "Ocean Waves — Relaxing Sleep Music",         channel: "Nature Sounds",    youtubeId: "PgkvwG971hw", mood: "nature" },
-  { id: "natu-07", title: "The Most Relaxing Waves Ever",               channel: "Nature Sounds",    youtubeId: "vPhg6sc1Mk4", mood: "nature" },
-  { id: "natu-05", title: "Cherry Blossom — Relaxing Japanese Zen",    channel: "Zen Music",        youtubeId: "oxlaAdCY4jA", mood: "classical" },
-  { id: "city-03", title: "Night Drive Tokyo — City Pop & Lofi Mix",   channel: "Tokyo Drives",     youtubeId: "sfxQRGHJU8M", mood: "synthwave", country: "Japon" },
+  { id: "uk-01",   title: "Study With Me — London, Big Ben Sunset (2h)", channel: "Sean Study",       youtubeId: "p3ynjjRbU9A", mood: "ambience",  color: "#4a2a1e", country: "Royaume-Uni" },
+  { id: "eu-01",   title: "Study With Me — Lake at Sunrise (3h)",        channel: "Celine",           youtubeId: "lu-P1q_4MfQ", mood: "nature",    color: "#2a3a2e" },
 ];
 
 // Couleurs par défaut pour les vidéos sans couleur définie
