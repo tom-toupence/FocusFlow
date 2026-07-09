@@ -3,7 +3,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { TimerPreset } from "@/store/timerStore";
-import type { SoundscapeId } from "@/lib/soundscapes";
 
 export interface RoutineMedia {
   kind: "video" | "playlist" | "spotify" | "twitch-channel" | "twitch-vod";
@@ -20,7 +19,6 @@ export interface Routine {
   shortBreakDuration: number;
   longBreakDuration: number;
   sessionsBeforeLongBreak: number;
-  soundscape: Partial<Record<SoundscapeId, number>>;
   tasks: string[];
   media?: RoutineMedia;
 }

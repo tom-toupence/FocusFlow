@@ -11,7 +11,11 @@ export interface ToastData {
   description?: string;
   emoji?: string;
   accent?: "amber" | "emerald" | "violet" | "sky";
+  /** Sortie en cours : joue l'animation toastOut avant le retrait. */
+  leaving?: boolean;
 }
+
+const LEAVE_MS = 250; // = durée de la keyframe toastOut
 
 interface ToastState {
   toasts: ToastData[];
@@ -19,16 +23,27 @@ interface ToastState {
   dismiss: (id: string) => void;
 }
 
+const markLeaving = (toasts: ToastData[], id: string) =>
+  toasts.map((x) => (x.id === id ? { ...x, leaving: true } : x));
+
 export const useToastStore = create<ToastState>((set) => ({
   toasts: [],
   push: (t) => {
     const id = crypto.randomUUID();
     set((s) => ({ toasts: [...s.toasts, { ...t, id }] }));
     setTimeout(() => {
+      set((s) => ({ toasts: markLeaving(s.toasts, id) }));
+    }, 5000 - LEAVE_MS);
+    setTimeout(() => {
       set((s) => ({ toasts: s.toasts.filter((x) => x.id !== id) }));
     }, 5000);
   },
-  dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((x) => x.id !== id) })),
+  dismiss: (id) => {
+    set((s) => ({ toasts: markLeaving(s.toasts, id) }));
+    setTimeout(() => {
+      set((s) => ({ toasts: s.toasts.filter((x) => x.id !== id) }));
+    }, LEAVE_MS);
+  },
 }));
 
 /** Convenience helper usable from anywhere (callbacks, stores, …). */
@@ -57,7 +72,8 @@ export default function ToastHost() {
           key={t.id}
           onClick={() => dismiss(t.id)}
           className={cn(
-            "pointer-events-auto cursor-pointer flex items-center gap-3 pl-3 pr-5 py-3 rounded-2xl border bg-gradient-to-r to-black/85 bg-black/85 backdrop-blur-xl shadow-2xl shadow-black/60 min-w-[260px] max-w-sm animate-[toastIn_0.25s_ease-out]",
+            "pointer-events-auto cursor-pointer flex items-center gap-3 pl-3 pr-5 py-3 rounded-2xl border bg-gradient-to-r to-black/85 bg-black/85 backdrop-blur-xl shadow-2xl shadow-black/60 min-w-[260px] max-w-sm",
+            t.leaving ? "anim-toast-out" : "anim-toast-in",
             ACCENTS[t.accent ?? "amber"]
           )}
         >

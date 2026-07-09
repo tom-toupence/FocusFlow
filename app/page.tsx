@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { VideoMood, moodLabels, moodColors, extractYouTubeId, getVideoColor, Video, defaultVideos } from "@/data/videos";
 import { useSessionStore } from "@/store/sessionStore";
@@ -21,6 +21,7 @@ import SprintWizard from "@/components/SprintWizard";
 import JournalTimeline from "@/components/JournalTimeline";
 import QueuePanel from "@/components/QueuePanel";
 import AppNav from "@/components/AppNav";
+import AmbientBackdrop from "@/components/AmbientBackdrop";
 import { useNavStore, MediaSource } from "@/store/navStore";
 import { useCommandPalette } from "@/components/CommandPalette";
 import Onboarding from "@/components/Onboarding";
@@ -29,6 +30,9 @@ import { useProfileStore, resolvedProfile } from "@/store/profileStore";
 const allMoods: VideoMood[] = ["lofi", "jazz", "ambience", "nature", "synthwave", "classical"];
 // Moods réellement présents dans le catalogue (évite des filtres vides)
 const catalogueMoods: VideoMood[] = allMoods.filter((m) => defaultVideos.some((v) => v.mood === m));
+
+// Position de chaque section dans la nav (pour la direction du slide de section).
+const SECTION_INDEX: Record<string, number> = { accueil: 0, ecouter: 1, organisation: 2, activite: 3 };
 
 function VideoCard({
   video,
@@ -44,22 +48,41 @@ function VideoCard({
   onRemove?: () => void;
 }) {
   const [imgError, setImgError] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+  // Image déjà en cache : l'événement load peut partir avant l'attache du
+  // handler React → on vérifie `complete` au montage pour ne pas bloquer le skeleton.
+  useEffect(() => {
+    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setImgLoaded(true);
+    }
+  }, []);
 
   return (
     <div
       className={cn(
         "group relative rounded-xl overflow-hidden aspect-video cursor-pointer transition-all duration-200",
+        // Glow teinté de la couleur de la vidéo au survol
+        "hover:shadow-[0_0_20px_-4px_var(--card-glow)]",
         selected ? "ring-2 ring-foreground" : "hover:ring-1 hover:ring-foreground/30"
       )}
+      style={{ "--card-glow": getVideoColor(video) } as React.CSSProperties}
       onClick={onStart}
     >
-      {/* Thumbnail */}
+      {/* Thumbnail (lazy) + skeleton le temps du chargement */}
       {!imgError ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
+          ref={imgRef}
           src={`https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`}
           alt={video.title}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          loading="lazy"
+          onLoad={() => setImgLoaded(true)}
+          className={cn(
+            "w-full h-full object-cover transition-transform duration-300 group-hover:scale-105",
+            !imgLoaded && "opacity-0"
+          )}
           onError={() => setImgError(true)}
         />
       ) : (
@@ -67,6 +90,9 @@ function VideoCard({
           className="w-full h-full transition-transform duration-300 group-hover:scale-105"
           style={{ background: `linear-gradient(135deg, ${getVideoColor(video)} 0%, #0d0d0f 100%)` }}
         />
+      )}
+      {!imgLoaded && !imgError && (
+        <div className="absolute inset-0 anim-skeleton bg-foreground/[0.07]" />
       )}
 
       {/* Base gradient */}
@@ -700,7 +726,7 @@ export default function LandingPage() {
   const profileState = useProfileStore();
   const profile = resolvedProfile(profileState);
 
-  const { section, mediaSource, setSection, openMedia } = useNavStore();
+  const { section, prevSection, mediaSource, setSection, openMedia } = useNavStore();
   const activeTab: "aujourdhui" | "catalogue" | "library" | "spotify" | "twitch" | "activite" | "organisation" =
     section === "accueil" ? "aujourdhui"
     : section === "activite" ? "activite"
@@ -711,6 +737,8 @@ export default function LandingPage() {
     : section === "ecouter" ? "Écouter"
     : section === "organisation" ? "Organisation"
     : "Activité";
+  // Direction du slide entre sections (fade + léger slide directionnel).
+  const sectionDx = SECTION_INDEX[section] >= SECTION_INDEX[prevSection] ? "12px" : "-12px";
   const [twitchInput, setTwitchInput] = useState("");
   const [vodInput, setVodInput] = useState("");
   const [vodError, setVodError] = useState("");
@@ -885,7 +913,8 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background md:flex">
+    <div className="relative isolate min-h-screen bg-background md:flex">
+      <AmbientBackdrop />
       <AppNav />
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Header */}
@@ -934,6 +963,10 @@ export default function LandingPage() {
             <MediaTab id="twitch" label="Twitch" accent="twitch" badge={selectedChannel ? "Live" : undefined} />
           </div>
         )}
+
+        {/* Contenu de section : remonté à chaque changement d'onglet (key) →
+            fade + slide directionnel (neutralisé en reduced-motion) */}
+        <div key={activeTab} className="anim-section-in" style={{ "--section-dx": sectionDx } as React.CSSProperties}>
 
         {/* ── Aujourd'hui ────────────────────────────────────────────────────── */}
         {activeTab === "aujourdhui" && (
@@ -1476,6 +1509,8 @@ export default function LandingPage() {
             </div>
           </>
         )}
+
+        </div>
 
         </main>
       </div>

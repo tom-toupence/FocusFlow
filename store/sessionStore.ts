@@ -60,7 +60,7 @@ function localDate(): string {
 export const useSessionStore = create<SessionState>()(
   persist(
     (set, get) => ({
-      selectedVideoId: "v1",
+      selectedVideoId: defaultVideos[0].id,
       selectedPlaylistId: null,
       playQueue: false,
       customVideos: [],
@@ -86,7 +86,7 @@ export const useSessionStore = create<SessionState>()(
         const { customVideos, selectedVideoId } = get();
         set({
           customVideos: customVideos.filter((v) => v.id !== id),
-          selectedVideoId: selectedVideoId === id ? "v1" : selectedVideoId,
+          selectedVideoId: selectedVideoId === id ? defaultVideos[0].id : selectedVideoId,
         });
         const userId = getCurrentUserId();
         if (userId) deleteCustomVideo(userId, id);

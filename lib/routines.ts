@@ -1,16 +1,15 @@
 "use client";
 
 import { useTimerStore } from "@/store/timerStore";
-import { useSoundscapeStore } from "@/store/soundscapeStore";
 import { useSessionStore } from "@/store/sessionStore";
 import { useSpotifyStore } from "@/store/spotifyStore";
 import { useTwitchStore } from "@/store/twitchStore";
-import type { SoundscapeId } from "@/lib/soundscapes";
+import { defaultVideos } from "@/data/videos";
 import type { Routine } from "@/store/routineStore";
 
 /**
- * Applies a saved routine to the live stores: timer durations, ambient mix, the
- * media selection and a fresh set of template tasks. The caller navigates to
+ * Applies a saved routine to the live stores: timer durations, the media
+ * selection and a fresh set of template tasks. The caller navigates to
  * /settings afterwards to review and start.
  */
 export function applyRoutine(r: Routine) {
@@ -27,13 +26,6 @@ export function applyRoutine(r: Routine) {
     });
   }
 
-  // Ambiances
-  const ss = useSoundscapeStore.getState();
-  ss.reset();
-  for (const [id, v] of Object.entries(r.soundscape)) {
-    if (typeof v === "number") ss.setLayer(id as SoundscapeId, v);
-  }
-
   // Media
   const session = useSessionStore.getState();
   useSpotifyStore.getState().selectPlaylist(null);
@@ -47,17 +39,17 @@ export function applyRoutine(r: Routine) {
         session.selectPlaylist(r.media.ref);
         break;
       case "spotify":
-        session.selectVideo("v1");
+        session.selectVideo(defaultVideos[0].id);
         useSessionStore.setState({ selectedPlaylistId: null });
         useSpotifyStore.getState().selectPlaylist(r.media.ref);
         break;
       case "twitch-channel":
-        session.selectVideo("v1");
+        session.selectVideo(defaultVideos[0].id);
         useSessionStore.setState({ selectedPlaylistId: null });
         useTwitchStore.getState().selectChannel(r.media.ref);
         break;
       case "twitch-vod":
-        session.selectVideo("v1");
+        session.selectVideo(defaultVideos[0].id);
         useSessionStore.setState({ selectedPlaylistId: null });
         useTwitchStore.getState().selectVod(r.media.ref);
         break;
@@ -74,7 +66,6 @@ export function applyRoutine(r: Routine) {
 /** Captures the current live setup into a routine draft (minus id/name/emoji). */
 export function captureCurrentRoutine(): Omit<Routine, "id" | "name" | "emoji"> {
   const { settings } = useTimerStore.getState();
-  const { layers } = useSoundscapeStore.getState();
   const { todos, selectedVideoId, selectedPlaylistId } = useSessionStore.getState();
   const { selectedPlaylistUri } = useSpotifyStore.getState();
   const { selectedChannel, selectedVodId } = useTwitchStore.getState();
@@ -92,7 +83,6 @@ export function captureCurrentRoutine(): Omit<Routine, "id" | "name" | "emoji"> 
     shortBreakDuration: settings.shortBreakDuration,
     longBreakDuration: settings.longBreakDuration,
     sessionsBeforeLongBreak: settings.sessionsBeforeLongBreak,
-    soundscape: { ...layers },
     tasks: todos.filter((t) => t.status !== "done").map((t) => t.text),
     media,
   };

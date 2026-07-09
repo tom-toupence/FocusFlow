@@ -136,10 +136,114 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* ── Teinte d'ambiance (refonte UX) ──────────────────────────────────────
+   --ambient-raw est posée sur <html> par AmbientProvider (couleur de la
+   vidéo/du média sélectionné). Les dérivées se calculent en CSS pur.
+   En pause (data-ambient-phase="break"), la teinte glisse vers une
+   variante plus froide/douce. */
+:root {
+  --ambient-raw: #4a4a55;
+  --ambient: var(--ambient-raw);
+  --ambient-2: color-mix(in oklab, var(--ambient-raw) 65%, #5b6b8f);
+}
+:root[data-ambient-phase="break"] {
+  --ambient: color-mix(in oklab, var(--ambient-raw) 45%, #4a7a96);
+  --ambient-2: color-mix(in oklab, var(--ambient-raw) 30%, #56889c);
+}
+@supports (color: oklch(from red l c h)) {
+  :root {
+    --ambient-2: oklch(from var(--ambient-raw) calc(l + 0.08) c calc(h + 30));
+  }
+  :root[data-ambient-phase="break"] {
+    --ambient: oklch(from var(--ambient-raw) calc(l + 0.03) calc(c * 0.6) 230);
+    --ambient-2: oklch(from var(--ambient-raw) calc(l + 0.1) calc(c * 0.5) 210);
+  }
+}
+
+@keyframes auroraDrift {
+  0%   { transform: translate3d(-6%, -4%, 0) scale(1); }
+  50%  { transform: translate3d(8%, 5%, 0) scale(1.18); }
+  100% { transform: translate3d(-6%, -4%, 0) scale(1); }
+}
+@keyframes ambientFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes ambientBloom {
+  0%   { opacity: 0; }
+  25%  { opacity: 0.22; }
+  100% { opacity: 0; }
+}
+@keyframes eqBar {
+  0%, 100% { transform: scaleY(0.3); }
+  50%      { transform: scaleY(1); }
+}
+@keyframes trackIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes haloPulse {
+  0%   { opacity: 0.35; }
+  35%  { opacity: 0.7; }
+  100% { opacity: 0.35; }
+}
+
+@keyframes sectionIn {
+  from { opacity: 0; transform: translateX(var(--section-dx, 12px)); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes cascadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.anim-section-in  { animation: sectionIn 0.2s ease-out both; }
+/* backwards (pas both) : ne pas « filler » l'état final, sinon l'animation
+   écraserait les transitions opacity/transform de l'auto-hide du chrome */
+.anim-cascade     { animation: cascadeIn 0.45s ease-out backwards; }
+.anim-aurora      { animation: auroraDrift 26s ease-in-out infinite; }
+.anim-aurora-slow { animation: auroraDrift 34s ease-in-out infinite reverse; }
+.anim-ambient-in  { animation: ambientFadeIn 1.4s ease both; }
+.anim-bloom       { opacity: 0; animation: ambientBloom 1.2s ease-out both; }
+.anim-eq          { animation: eqBar 1.2s ease-in-out infinite; transform-origin: bottom; }
+.anim-track-in    { animation: trackIn 0.35s ease-out both; }
+.anim-halo-pulse  { animation: haloPulse 0.9s ease-out; }
+
+/* Onglet caché → les animations d'ambiance ne tournent pas pour rien */
+:root[data-tab-hidden] .anim-aurora,
+:root[data-tab-hidden] .anim-aurora-slow {
+  animation-play-state: paused;
+}
+
+/* Reduced motion : TOUTES les animations décoratives (.anim-*) sont
+   neutralisées ici — une seule place à auditer. Les nouvelles animations
+   décoratives doivent passer par une classe .anim-* listée ci-dessous. */
+@media (prefers-reduced-motion: reduce) {
+  .anim-aurora, .anim-aurora-slow, .anim-ambient-in, .anim-bloom,
+  .anim-eq, .anim-track-in, .anim-halo-pulse,
+  .anim-section-in, .anim-cascade, .anim-skeleton,
+  .anim-toast-in, .anim-toast-out {
+    animation: none !important;
+  }
+}
+
 @keyframes toastIn {
   from { opacity: 0; transform: translateY(-12px) scale(0.96); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+@keyframes toastOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(-12px) scale(0.96); }
+}
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.35; }
+  50%      { opacity: 0.7; }
+}
+.anim-skeleton  { animation: skeletonPulse 1.2s ease-in-out infinite; }
+.anim-toast-in  { animation: toastIn 0.25s ease-out; }
+.anim-toast-out { animation: toastOut 0.25s ease-in forwards; }
 
 @keyframes distractionPop {
   0%   { opacity: 0; transform: translateY(0) scale(0.8); }
@@ -157,6 +261,9 @@
   html {
     @apply font-sans;
   }
+  /* ⚠️ Transition GLOBALE : ne couvre volontairement que les couleurs.
+     Les animations custom doivent rester sur opacity/transform/background-image
+     pour ne pas entrer en conflit avec cette règle. */
   *, *::before, *::after {
     transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
   }

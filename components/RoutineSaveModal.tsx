@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 const EMOJIS = ["⚡", "🌅", "🌙", "📚", "💻", "✍️", "🎯", "🧘", "🔥", "☕"];
 
-/** Captures the current timer/ambiance/media/tasks setup as a reusable routine. */
+/** Captures the current timer/media/tasks setup as a reusable routine. */
 export default function RoutineSaveModal({ onClose }: { onClose: () => void }) {
   const { addRoutine } = useRoutineStore();
   const [name, setName] = useState("");
@@ -31,7 +31,7 @@ export default function RoutineSaveModal({ onClose }: { onClose: () => void }) {
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
           </button>
         </div>
-        <p className="text-[11px] text-foreground/40 -mt-2">Mémorise les durées, l&apos;ambiance, le média et les tâches actuelles pour les relancer en 1 clic.</p>
+        <p className="text-[11px] text-foreground/40 -mt-2">Mémorise les durées, le média et les tâches actuelles pour les relancer en 1 clic.</p>
 
         {saved ? (
           <div className="py-6 flex flex-col items-center gap-2 text-emerald-400">

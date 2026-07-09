@@ -39,7 +39,7 @@ ambiances mixables dans une seule expérience bien maintenue.
   sélection via `sessionStore.selectQueue()` / flag `playQueue`. Lecture = file maison ci-dessus.
 - **Spotify :** OAuth + Web Playback (Premium), helpers dans `lib/spotify.ts`
 - **Twitch :** OAuth + embed live/VOD, helpers dans `lib/twitch.ts` (+ route `app/api/twitch/token`)
-- **Audio :** sons de transition et **ambiances** générés en **Web Audio API** (aucun fichier audio)
+- **Audio :** sons de transition générés en **Web Audio API** (aucun fichier audio)
 - **Notifications :** Web Notifications API
 - **Coach IA (optionnel) :** route serveur `app/api/coach/route.ts` multi-fournisseur **Groq → Gemini → repli local**.
   Clés **uniquement côté serveur** (`GROQ_API_KEY` / `GEMINI_API_KEY`), jamais envoyées au client.
@@ -62,7 +62,7 @@ pour sauter à toute section/action au clavier. `app/page.tsx` dérive l'ancien 
 `/` (accueil — 4 sections : **Aujourd'hui** (dashboard, défaut) / **Écouter** [Catalogue · Bibliothèque ·
 Spotify · Twitch] / **Organisation** / **Activité**)
 → `/settings` (choix du preset Pomodoro + tâches Kanban + Coach + « enregistrer comme routine »)
-→ `/session` (plein écran : lecteur + timer + tâches + post-its + ambiances + respiration)
+→ `/session` (plein écran : lecteur + timer + tâches + post-its + respiration)
 → `/summary` (résumé + objectif + focus score + **réflexion/journal** + stats)
 → `/insights` (statistiques détaillées : focus par heure/jour, évolution du Focus Score, export CSV/JSON)
 → `/wrapped` (récap hebdo « Wrapped » + carte PNG partageable).
@@ -98,9 +98,9 @@ choisir le média, qui enchaîne sur `/settings`. Les **routines** appliquent le
   `lib/wrapped.ts`, `components/WrappedShareCard.tsx`, bannière du lundi via `store/wrappedStore.ts`
 
 **Focus & bien-être (méthode Pomodoro)**
-- **Mixeur d'ambiances** Web Audio (pluie / vagues / vent / bruit blanc / feu, superposables) —
-  `lib/soundscapes.ts`, `store/soundscapeStore.ts`, `components/SoundscapeMixer.tsx`.
-  ⚠️ Les couches **ne sont pas persistées** (`partialize` + `migrate`) : chaque session démarre à 0 ambiance.
+- ~~Mixeur d'ambiances (bruits de fond)~~ **supprimé le 2026-07-09** à la demande de l'utilisateur
+  (feature jugée inutile) : `lib/soundscapes.ts`, `store/soundscapeStore.ts`, `SoundscapeMixer.tsx`
+  effacés ; champ `soundscape` retiré du type `Routine`. Ne pas la re-proposer.
 - **Respiration guidée** box-breathing 4-4-4-4 pendant les pauses — `components/BreathingExercise.tsx`
 - **Objectif quotidien** configurable (minutes **ou** pomodoros) + anneau + célébration —
   `store/goalStore.ts`, `components/GoalRing.tsx`
@@ -188,7 +188,7 @@ focusflow/
 │   ├── layout.tsx              # Layout global (thème, SupabaseProvider, AuthGate, ToastHost)
 │   ├── page.tsx                # Accueil : onglets Aujourd'hui/Catalogue/Biblio/Spotify/Twitch/Activité/Organisation
 │   ├── settings/page.tsx       # Preset Pomodoro + Kanban + Coach + enregistrer routine
-│   ├── session/page.tsx        # Session plein écran (lecteur + timer + tâches + ambiances + respiration + distractions)
+│   ├── session/page.tsx        # Session plein écran (lecteur + timer + tâches + respiration + distractions)
 │   ├── summary/page.tsx        # Résumé + objectif + focus score + réflexion/journal + stats
 │   ├── insights/page.tsx       # Statistiques détaillées + export CSV/JSON
 │   ├── wrapped/page.tsx        # Récap hebdo « Wrapped » + carte PNG
@@ -198,13 +198,13 @@ focusflow/
 │   ├── TodayDashboard.tsx · ProjectsSection.tsx · WeekPlanner.tsx · RoutinesManager.tsx · RoutineSaveModal.tsx
 │   ├── SprintWizard.tsx · CalendarSync.tsx · PipTimer.tsx · WrappedShareCard.tsx
 │   ├── JournalReflection.tsx · JournalTimeline.tsx · CoachModal.tsx · ProgressionPanel.tsx
-│   ├── SoundscapeMixer.tsx · BreathingExercise.tsx · GoalRing.tsx · Toast.tsx · StatsSection.tsx
+│   ├── BreathingExercise.tsx · GoalRing.tsx · Toast.tsx · StatsSection.tsx
 │   ├── StickyNote.tsx · TodoStatusDropdown.tsx · ProfilePanel.tsx · SpotifyPlayer.tsx · TwitchPlayer.tsx · …
 ├── store/                      # Zustand : timer, session, sessionSummary, stats, playHistory, notes,
-│   │                           #   profile, theme, spotify, twitch, playlist, soundscape, goal,
+│   │                           #   profile, theme, spotify, twitch, playlist, goal,
 │   │                           #   achievements, distraction, prefs, routine, project, plan, journal,
 │   │                           #   sprint, wrapped
-├── lib/                        # utils, supabase, db, sounds, soundscapes, achievements, spotify, twitch,
+├── lib/                        # utils, supabase, db, sounds, achievements, spotify, twitch,
 │   │                           #   coach, routines, export, progression, sprint, ics, wrapped
 └── data/
     └── videos.ts               # Catalogue curated + helpers (moods, extraction d'ID YouTube)

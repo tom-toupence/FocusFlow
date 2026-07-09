@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, KeyboardEvent } from "react";
+import { useState, useRef, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useTimerStore, TimerPreset, PRESETS } from "@/store/timerStore";
 import { useSessionStore, Todo, TodoPriority } from "@/store/sessionStore";
@@ -12,6 +12,8 @@ import { getVideoColor } from "@/data/videos";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import CoachModal from "@/components/CoachModal";
+import AmbientBackdrop from "@/components/AmbientBackdrop";
+import { useExpandNavigate } from "@/lib/useExpandNavigate";
 import RoutineSaveModal from "@/components/RoutineSaveModal";
 import { PlannedTask } from "@/lib/coach";
 
@@ -262,6 +264,8 @@ function KanbanColumn({
 
 export default function SettingsPage() {
   const router = useRouter();
+  const expandTo = useExpandNavigate();
+  const previewRef = useRef<HTMLDivElement>(null);
   const { settings, applyPreset, updateSettings, resetAll } = useTimerStore();
   const { selectedVideoId, selectedPlaylistId, getAllVideos } = useSessionStore();
   const { playlists } = usePlaylistStore();
@@ -335,7 +339,8 @@ export default function SettingsPage() {
     }
     useSessionStore.getState().clearDone();
     useNotesStore.getState().clearAll();
-    router.push("/session");
+    // Transition continue : la vignette « s'étend » vers le plein écran.
+    expandTo(previewRef.current, "/session");
   };
 
   type StartMode = "keep" | "reset-inprogress" | "clear-all";
@@ -349,11 +354,12 @@ export default function SettingsPage() {
     useSessionStore.getState().clearDone();
     useNotesStore.getState().clearAll();
     setShowResumeModal(false);
-    router.push("/session");
+    expandTo(previewRef.current, "/session");
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="relative isolate min-h-screen bg-background flex flex-col">
+      <AmbientBackdrop />
 
       {/* ── Coach de planification (local, gratuit) ───────────────────── */}
       {showCoach && <CoachModal onClose={() => setShowCoach(false)} onAdd={handleCoachAdd} />}
@@ -460,7 +466,7 @@ export default function SettingsPage() {
           <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-3">
             {isTwitchMode ? "Stream Twitch" : isSpotifyMode ? "Playlist Spotify" : isPlaylistMode ? "Playlist choisie" : "Vidéo choisie"}
           </p>
-          <div className="rounded-xl overflow-hidden aspect-video relative">
+          <div ref={previewRef} className="rounded-xl overflow-hidden aspect-video relative">
             {isTwitchMode ? (
               <>
                 <div className="w-full h-full bg-gradient-to-br from-[#1a0a3a] to-[#0d0d1a] flex items-center justify-center">
@@ -746,7 +752,7 @@ export default function SettingsPage() {
         <div className="flex flex-col gap-3">
           <button
             onClick={handleStart}
-            className="flex items-center justify-center gap-2 py-3.5 bg-foreground text-background font-semibold text-sm rounded-xl hover:bg-foreground/90 transition-all shadow-lg shadow-black/30"
+            className="flex items-center justify-center gap-2 py-3.5 bg-foreground text-background font-semibold text-sm rounded-xl hover:bg-foreground/90 transition-all shadow-lg shadow-black/30 motion-safe:active:scale-[0.97]"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
               <path d="M8 5v14l11-7z"/>

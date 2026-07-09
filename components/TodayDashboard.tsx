@@ -16,6 +16,11 @@ import { launchSprintSession } from "@/lib/sprint";
 import { localToday } from "@/store/statsStore";
 import { applyRoutine } from "@/lib/routines";
 import { topRepeatedVideo } from "@/lib/suggestions";
+import { useCountUp } from "@/lib/useCountUp";
+import { useSpotifyStore } from "@/store/spotifyStore";
+import { useTwitchStore } from "@/store/twitchStore";
+import { useNotesStore } from "@/store/notesStore";
+import { useTimerStore } from "@/store/timerStore";
 import GoalRing from "@/components/GoalRing";
 import { cn } from "@/lib/utils";
 
@@ -76,8 +81,17 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
   const suggestionTimely = suggestion?.peakHour != null && Math.abs(currentHour - suggestion.peakHour) <= 1;
   const launchSuggested = () => {
     if (!suggestedVideo) return;
+    // « Reprendre » en un clic : dernière ambiance + preset Pomodoro persisté
+    // → session directe, sans repasser par /settings.
+    useSpotifyStore.getState().selectPlaylist(null);
+    useTwitchStore.getState().clear();
     useSessionStore.getState().selectVideo(suggestedVideo.id);
-    router.push("/settings");
+    useSessionStore.getState().clearDone();
+    useNotesStore.getState().clearAll();
+    // Timer neuf : sans ce reset, le mode/temps restant d'une session
+    // précédente (interrompue) survivrait à la navigation SPA.
+    useTimerStore.getState().resetAll();
+    router.push("/session");
   };
 
   return (
@@ -92,7 +106,7 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
         </div>
         <button
           onClick={startSession}
-          className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-foreground text-background font-semibold text-sm hover:bg-foreground/90 transition-all shadow-lg shadow-black/20"
+          className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-foreground text-background font-semibold text-sm hover:bg-foreground/90 transition-all shadow-lg shadow-black/20 motion-safe:active:scale-[0.97]"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
           Démarrer une session
@@ -128,7 +142,7 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
           </div>
           <button
             onClick={launchSuggested}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-foreground text-background font-semibold text-sm hover:bg-foreground/90 transition-all flex-shrink-0"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-foreground text-background font-semibold text-sm hover:bg-foreground/90 transition-all flex-shrink-0 motion-safe:active:scale-[0.97]"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
             Reprendre
@@ -150,8 +164,8 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
         </div>
         {/* Streak + today */}
         <div className="grid grid-cols-2 gap-3 lg:col-span-2">
-          <Stat label="Série" value={`${streak}j`} accent="text-orange-300" sub={streak >= 7 ? "🔥 en feu" : streak > 0 ? "continue" : "démarre"} />
-          <Stat label="Focus aujourd'hui" value={fmtMin(today.minutesWorked)} accent="text-emerald-300" sub={`${today.sessions} session${today.sessions !== 1 ? "s" : ""}`} />
+          <Stat label="Série" num={streak} format={(v) => `${v}j`} accent="text-orange-300" sub={streak >= 7 ? "🔥 en feu" : streak > 0 ? "continue" : "démarre"} />
+          <Stat label="Focus aujourd'hui" num={today.minutesWorked} format={fmtMin} accent="text-emerald-300" sub={`${today.sessions} session${today.sessions !== 1 ? "s" : ""}`} />
         </div>
       </div>
 
@@ -298,11 +312,19 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
   );
 }
 
-function Stat({ label, value, sub, accent }: { label: string; value: string; sub: string; accent: string }) {
+function Stat({ label, num, format, sub, accent }: {
+  label: string;
+  num: number;
+  format: (v: number) => string;
+  sub: string;
+  accent: string;
+}) {
+  // Count-up au montage (le parent est gaté par `mounted` → pas de mismatch).
+  const animated = useCountUp(num);
   return (
     <div className="flex flex-col gap-1 px-5 py-4 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.08]">
       <span className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">{label}</span>
-      <span className={cn("text-2xl font-light tabular-nums tracking-tight", accent)}>{value}</span>
+      <span className={cn("text-2xl font-light tabular-nums tracking-tight", accent)}>{format(Math.round(animated))}</span>
       <span className="text-[11px] text-foreground/30">{sub}</span>
     </div>
   );

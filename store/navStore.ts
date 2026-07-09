@@ -10,6 +10,8 @@ export type MediaSource = "catalogue" | "library" | "spotify" | "twitch";
 
 interface NavState {
   section: NavSection;
+  /** Section précédente — sert à la direction du slide de transition. */
+  prevSection: NavSection;
   mediaSource: MediaSource;
   setSection: (s: NavSection) => void;
   /** Ouvre la section Écouter sur une source précise. */
@@ -19,7 +21,8 @@ interface NavState {
 // Non persisté : on retombe toujours sur « Accueil » au chargement (prévisible).
 export const useNavStore = create<NavState>((set) => ({
   section: "accueil",
+  prevSection: "accueil",
   mediaSource: "catalogue",
-  setSection: (section) => set({ section }),
-  openMedia: (mediaSource) => set({ section: "ecouter", mediaSource }),
+  setSection: (section) => set((st) => ({ section, prevSection: st.section })),
+  openMedia: (mediaSource) => set((st) => ({ section: "ecouter", mediaSource, prevSection: st.section })),
 }));

@@ -5,6 +5,7 @@ import SupabaseProvider from "@/components/SupabaseProvider";
 import AuthGate from "@/components/AuthGate";
 import ToastHost from "@/components/Toast";
 import CommandPalette from "@/components/CommandPalette";
+import AmbientProvider from "@/components/AmbientProvider";
 
 const geist = Geist({
   variable: "--font-geist",
@@ -33,6 +34,7 @@ export default function RootLayout({
         </SupabaseProvider>
         <ToastHost />
         <CommandPalette />
+        <AmbientProvider />
       </body>
     </html>
   );

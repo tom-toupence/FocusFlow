@@ -18,10 +18,11 @@ import { usePlayHistoryStore } from "@/store/playHistoryStore";
 import StickyNote from "@/components/StickyNote";
 import SpotifyPlayer from "@/components/SpotifyPlayer";
 import TwitchPlayer from "@/components/TwitchPlayer";
-import SoundscapeMixer from "@/components/SoundscapeMixer";
 import PipTimer from "@/components/PipTimer";
 import BreathingExercise from "@/components/BreathingExercise";
-import { useSoundscapeStore } from "@/store/soundscapeStore";
+import Equalizer from "@/components/Equalizer";
+import TimerDigits from "@/components/TimerDigits";
+import { useIdleHide } from "@/lib/useIdleHide";
 import { usePrefsStore } from "@/store/prefsStore";
 import { useDistractionStore } from "@/store/distractionStore";
 import { useAchievementsStore } from "@/store/achievementsStore";
@@ -95,7 +96,6 @@ export default function SessionPage() {
   const { selectedPlaylistUri, accessToken, playlists: spotifyPlaylists } = useSpotifyStore();
   const { selectedChannel, selectedVodId, accessToken: twitchToken } = useTwitchStore();
   const { record: recordPlay } = usePlayHistoryStore();
-  const { pauseOnBreak } = useSoundscapeStore();
   const { breathingEnabled } = usePrefsStore();
   const { sessionCount: distractionCount, markDistraction, resetSession: resetDistractions } = useDistractionStore();
 
@@ -125,8 +125,9 @@ export default function SessionPage() {
   const [mounted, setMounted] = useState(false);
   const [volume, setVolumeState] = useState(0.8);
   const [showVolume, setShowVolume] = useState(false);
-  const [showMixer, setShowMixer] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  // Mode ultra-zen : chrome masqué manuellement (touche H)
+  const [zenHidden, setZenHidden] = useState(false);
   const [distractionFlash, setDistractionFlash] = useState(0);
   // Mix radio YouTube résolu en liste de videoIds (null = résolution en cours).
   const [mixIds, setMixIds] = useState<string[] | null>(null);
@@ -169,11 +170,18 @@ export default function SessionPage() {
   }, [isMix, selectedPlaylist?.playlistId, selectedPlaylist?.startVideoId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Chime sounds on mode transitions ─────────────────────────────────────
+  // Fin de pomodoro : bloom doux plein écran de la teinte d'ambiance (une
+  // keyframe one-shot re-déclenchée par `key`), en plus du chime existant.
+  const [bloomKey, setBloomKey] = useState(0);
   const prevModeRef = useRef(mode);
   useEffect(() => {
     if (prevModeRef.current === mode) return;
     if (mode !== "work") {
       playBreakChime();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setBloomKey((k) => k + 1);
+      // La pause sort du mode zen : au retour en focus, le chrome est visible.
+      setZenHidden(false);
     } else {
       playWorkChime();
     }
@@ -475,6 +483,9 @@ export default function SessionPage() {
       if (e.key === "d" || e.key === "D") {
         e.preventDefault();
         handleDistraction();
+      } else if (e.key === "h" || e.key === "H") {
+        e.preventDefault();
+        setZenHidden((v) => !v);
       } else if (e.code === "Space") {
         e.preventDefault();
         if (!isBreakRef.current) {
@@ -549,6 +560,24 @@ export default function SessionPage() {
 
   const pendingTodos = todos.filter((t) => t.status !== "done");
 
+  // ── Auto-masquage du chrome après 4 s d'inactivité (mode zen) ─────────────
+  // Désactivé en pause / break / panneau d'aide ouvert ; la touche H masque
+  // manuellement. Ne reste alors que la vidéo + le timer.
+  const idleHidden = useIdleHide(4000, isRunning && !isBreak && !showHelp && !showTodos);
+  const chromeHidden = !isBreak && (zenHidden || idleHidden);
+  const chromeHideCls = cn(
+    "transition-[opacity,transform] duration-500",
+    chromeHidden && "opacity-0 motion-safe:translate-y-2 pointer-events-none"
+  );
+
+  // Un clic n'importe où réaffiche le chrome masqué manuellement (H).
+  useEffect(() => {
+    if (!zenHidden) return;
+    const restore = () => setZenHidden(false);
+    window.addEventListener("pointerdown", restore);
+    return () => window.removeEventListener("pointerdown", restore);
+  }, [zenHidden]);
+
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
       {/* Audio/video source — YouTube, Spotify, or Twitch */}
@@ -575,6 +604,42 @@ export default function SessionPage() {
       {/* Vignette (work only, not on Twitch to keep natural brightness) */}
       {!isBreak && !isTwitchMode && (
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(0,0,0,0.45)_100%)]" />
+      )}
+
+      {/* Halo d'ambiance discret autour du lecteur (teinte du média) ; le
+          changement de `key` sur skip/fin de titre déclenche une pulsation unique */}
+      {!isBreak && !isTwitchMode && (
+        <div
+          key={`halo-${currentTrackIndex}`}
+          className="absolute inset-0 pointer-events-none anim-halo-pulse"
+          style={{
+            boxShadow: "inset 0 0 160px 20px color-mix(in oklab, var(--ambient) 55%, transparent)",
+            opacity: 0.35,
+          }}
+        />
+      )}
+
+      {/* Bloom doux plein écran à la fin d'un pomodoro (opacité gérée par .anim-bloom) */}
+      {bloomKey > 0 && (
+        <div
+          key={`bloom-${bloomKey}`}
+          className="absolute inset-0 z-30 pointer-events-none anim-bloom"
+          style={{ background: "radial-gradient(ellipse at center, var(--ambient) 0%, transparent 70%)" }}
+        />
+      )}
+
+      {/* Liseré de progression ambiant le long du bord supérieur de l'écran */}
+      {!isBreak && !isFlowtime && (
+        <div className="fixed top-0 inset-x-0 h-[2px] z-30 pointer-events-none">
+          <div
+            className="h-full origin-left"
+            style={{
+              background: "var(--ambient-2)",
+              transform: `scaleX(${progress})`,
+              transition: "transform 1s linear",
+            }}
+          />
+        </div>
       )}
 
       {/* Twitch sub-only fallback banner */}
@@ -604,13 +669,11 @@ export default function SessionPage() {
       {/* ── Break overlay ──────────────────────────────────────────────────── */}
       {isBreak && (
         <div className="absolute inset-0 z-20 bg-[#0a0a0c]/95 flex flex-col items-center justify-center gap-8">
+          {/* Teinte d'ambiance en variante froide (data-ambient-phase="break"
+              posé par AmbientProvider décale --ambient vers le bleu) */}
           <div
-            className={cn(
-              "absolute inset-0 opacity-20 pointer-events-none",
-              isLong
-                ? "bg-[radial-gradient(ellipse_at_center,_#1a3a5f_0%,_transparent_70%)]"
-                : "bg-[radial-gradient(ellipse_at_center,_#1a3b2a_0%,_transparent_70%)]"
-            )}
+            className="absolute inset-0 opacity-20 pointer-events-none"
+            style={{ background: "radial-gradient(ellipse at center, var(--ambient) 0%, transparent 70%)" }}
           />
           {/* Label */}
           <div className="flex flex-col items-center gap-2 z-10">
@@ -667,13 +730,6 @@ export default function SessionPage() {
         </div>
       )}
 
-      {/* ── Soundscape mixer (always mounted so audio survives panel close) ── */}
-      <SoundscapeMixer
-        open={showMixer}
-        onClose={() => setShowMixer(false)}
-        active={isBreak ? !pauseOnBreak : isRunning}
-      />
-
       {/* ── Sticky notes — portal to escape overflow:hidden ─────────────── */}
       {mounted && createPortal(
         <>
@@ -699,7 +755,7 @@ export default function SessionPage() {
           {/* Top bar */}
           <div className="absolute top-0 left-0 right-0 flex items-start justify-between px-5 py-4 z-10">
             {/* Terminer + Now Playing */}
-            <div className="flex flex-col items-start gap-2 max-w-[42%]">
+            <div className={cn("flex flex-col items-start gap-2 max-w-[42%] anim-cascade", chromeHideCls)}>
               <button
                 onClick={handleStop}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/75 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/10 text-xs font-medium transition-all"
@@ -711,8 +767,12 @@ export default function SessionPage() {
               </button>
               {nowPlaying && (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/50 backdrop-blur-sm border border-white/10 max-w-full">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0 animate-pulse" />
-                  <div className="min-w-0">
+                  <Equalizer
+                    playing={isRunning}
+                    mood={!isQueueMode && !isPlaylistMode ? video.mood : undefined}
+                  />
+                  {/* key = index de piste → le titre glisse à chaque changement */}
+                  <div key={currentTrackIndex} className="min-w-0 anim-track-in">
                     <p className="text-white/85 text-xs font-medium truncate">{nowPlaying.title}</p>
                     <p className="text-white/35 text-[10px] truncate">{nowPlaying.sub}</p>
                   </div>
@@ -720,21 +780,34 @@ export default function SessionPage() {
               )}
             </div>
 
-            {/* Timer — centered */}
-            <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5">
+            {/* Timer — centered (reste visible en mode zen) */}
+            <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 anim-cascade [animation-delay:80ms]">
+              {/* Halo d'ambiance discret derrière le timer */}
+              <div
+                className="absolute -inset-x-16 -inset-y-6 -z-10 pointer-events-none rounded-full"
+                style={{
+                  background: "radial-gradient(ellipse at center, color-mix(in oklab, var(--ambient) 60%, transparent) 0%, transparent 70%)",
+                  opacity: 0.45,
+                }}
+              />
               <div className="w-36 h-[2px] bg-white/10 rounded-full overflow-hidden">
                 {isFlowtime ? (
                   <div className="h-full w-full bg-white/25 rounded-full animate-pulse" />
                 ) : (
                   <div
-                    className="h-full bg-white/50 rounded-full"
-                    style={{ width: `${progress * 100}%`, transition: "width 1s linear" }}
+                    className="h-full rounded-full"
+                    style={{
+                      background: "color-mix(in oklab, var(--ambient-2) 45%, white)",
+                      width: `${progress * 100}%`,
+                      transition: "width 1s linear",
+                    }}
                   />
                 )}
               </div>
-              <span className="text-3xl font-light text-white tabular-nums tracking-tight drop-shadow-lg">
-                {formatTime(isFlowtime ? flowSeconds : secondsLeft)}
-              </span>
+              <TimerDigits
+                text={formatTime(isFlowtime ? flowSeconds : secondsLeft)}
+                className="text-3xl font-light text-white tabular-nums tracking-tight drop-shadow-lg"
+              />
               <span className="text-white/30 text-[10px] uppercase tracking-widest">
                 {isFlowtime
                   ? `Flow · pause méritée ≈ ${earnedBreakMin} min`
@@ -743,7 +816,7 @@ export default function SessionPage() {
             </div>
 
             {/* Right controls */}
-            <div className="flex items-center gap-2">
+            <div className={cn("flex items-center gap-2 anim-cascade [animation-delay:160ms]", chromeHideCls)}>
               {/* Utility cluster — uniform icon buttons */}
               <div className="flex items-center gap-1 p-1 rounded-2xl bg-black/50 backdrop-blur-sm border border-white/15">
                 {/* Playlist skip controls (YouTube playlists, mixes & file FocusFlow) */}
@@ -798,21 +871,6 @@ export default function SessionPage() {
                 {/* Floating always-on-top mini timer (Document PiP) */}
                 <PipTimer onDistraction={handleDistraction} onFlowBreak={handleFlowBreak} />
 
-                {/* Ambiances — soundscape mixer */}
-                <button
-                  onClick={() => { setShowMixer((v) => !v); setShowHelp(false); }}
-                  className={cn(
-                    "w-9 h-9 flex items-center justify-center rounded-xl transition-all",
-                    showMixer ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
-                  )}
-                  title="Ambiances sonores (pluie, vagues…)"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                    <path d="M9 18V5l12-2v13" strokeLinecap="round" strokeLinejoin="round" />
-                    <circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
-                  </svg>
-                </button>
-
                 {/* Volume (YouTube & Twitch only — Spotify has its own) */}
                 {!isSpotifyMode && (
                   <div className="relative flex items-center">
@@ -863,7 +921,7 @@ export default function SessionPage() {
 
                 {/* Help / info */}
                 <button
-                  onClick={() => { setShowHelp((v) => !v); setShowMixer(false); }}
+                  onClick={() => setShowHelp((v) => !v)}
                   className={cn(
                     "w-9 h-9 flex items-center justify-center rounded-xl transition-all",
                     showHelp ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
@@ -946,11 +1004,11 @@ export default function SessionPage() {
                 <HelpRow icon="⚠️" title="Distraction (touche D)">
                   À chaque fois que tu décroches, clique ou appuie sur <b className="text-white/80">D</b> pour la noter. Rien n&apos;est détecté tout seul — c&apos;est toi qui marques. Moins tu en as, meilleur est ton <b className="text-white/80">Focus Score</b> en fin de session.
                 </HelpRow>
-                <HelpRow icon="🎵" title="Ambiances">
-                  Superpose des sons (pluie, vagues, vent…) par-dessus ta musique. Tout démarre à 0 : monte les curseurs pour mixer ton ambiance.
-                </HelpRow>
                 <HelpRow icon="⏯️" title="Pause / Reprise (Espace)">
                   Met en pause le timer et la vidéo. Le raccourci <b className="text-white/80">Espace</b> fait pareil.
+                </HelpRow>
+                <HelpRow icon="🌫️" title="Mode zen (touche H)">
+                  Les contrôles s&apos;effacent après 4 s sans bouger la souris — il ne reste que la vidéo et le timer. <b className="text-white/80">H</b> les masque manuellement (re-appuie ou clique pour les réafficher).
                 </HelpRow>
                 <HelpRow icon="🪟" title="Timer flottant">
                   Détache le timer dans une mini-fenêtre toujours au premier plan, même par-dessus tes autres applis (Chrome/Edge).
@@ -967,7 +1025,7 @@ export default function SessionPage() {
 
           {/* Tasks panel — mini kanban */}
           {showTodos && (
-            <div className="absolute bottom-6 right-6 w-[32rem] max-w-[calc(100vw-3rem)] bg-black/85 backdrop-blur-xl rounded-2xl border border-white/15 shadow-2xl shadow-black/80 z-10 p-4">
+            <div className={cn("absolute bottom-6 right-6 w-[32rem] max-w-[calc(100vw-3rem)] bg-black/85 backdrop-blur-xl rounded-2xl border border-white/15 shadow-2xl shadow-black/80 z-10 p-4", chromeHideCls)}>
               <TodoList />
             </div>
           )}

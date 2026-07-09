@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { GoalProgress, goalUnitLabel } from "@/store/goalStore";
+import { useCountUp } from "@/lib/useCountUp";
 
 /** SVG progress ring for the daily focus goal. */
 export default function GoalRing({
@@ -15,8 +16,12 @@ export default function GoalRing({
 }) {
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
-  const offset = circ * (1 - progress.ratio);
-  const pct = Math.round(progress.ratio * 100);
+  // Remplissage animé avec léger overshoot élastique au montage (reduced-motion
+  // → valeur finale directe). Le % au centre suit la même animation.
+  const animatedRatio = useCountUp(progress.ratio, 900, true);
+  const clamped = Math.max(0, Math.min(1, animatedRatio));
+  const offset = circ * (1 - clamped);
+  const pct = Math.round(Math.min(clamped, progress.ratio) * 100);
 
   return (
     <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
@@ -37,7 +42,9 @@ export default function GoalRing({
           strokeDasharray={circ}
           strokeDashoffset={offset}
           className={cn(
-            "transition-all duration-700",
+            // transition-colors seulement : le dashoffset est déjà animé en JS
+            // (useCountUp) — une transition CSS par-dessus le ferait traîner.
+            "transition-colors duration-700",
             progress.reached ? "text-emerald-400" : "text-violet-400"
           )}
         />

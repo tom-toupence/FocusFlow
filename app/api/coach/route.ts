@@ -18,7 +18,8 @@ const GEMINI_KEY = process.env.GEMINI_API_KEY ?? "";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 const MAX_INPUT = 500;
 
-const MOODS = ["lofi", "jazz", "ambience", "nature", "synthwave", "classical"] as const;
+// Seuls les moods réellement présents dans le catalogue refondu (data/videos.ts)
+const MOODS = ["lofi", "ambience", "nature"] as const;
 
 const SYSTEM = `Tu es un coach de productivité expert de la méthode Pomodoro.
 On te donne un objectif. Découpe-le en 3 à 8 tâches CONCRÈTES et ACTIONNABLES, dans l'ordre logique, en français.
@@ -37,7 +38,7 @@ et l'heure de début préférée (en minutes depuis minuit). Construis un plan d
 2. Répartis le travail en blocs de focus jour par jour, de la date de départ jusqu'à la veille ou le jour de la deadline.
    Un bloc par jour maximum, durée entre 25 et 180 minutes, en respectant à peu près le budget quotidien.
    Le label de chaque bloc décrit ce qui sera travaillé ce jour-là. Tu peux sauter des jours si le budget total est faible.
-3. Choisis le mood musical le plus adapté au type de travail parmi : lofi, jazz, ambience, nature, synthwave, classical.
+3. Choisis le mood musical le plus adapté au type de travail parmi : lofi, ambience, nature.
 Réponds UNIQUEMENT avec un objet JSON de la forme :
 {"days":[{"date":"YYYY-MM-DD","startMin":540,"durationMin":50,"label":"..."}],"tasks":[{"text":"...","pomodoroEstimate":2}],"mood":"lofi"}
 Aucun texte en dehors du JSON.`;

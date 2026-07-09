@@ -10,6 +10,7 @@ import { useDistractionStore, getFocusScore } from "@/store/distractionStore";
 import GoalRing from "@/components/GoalRing";
 import JournalReflection from "@/components/JournalReflection";
 import { cn } from "@/lib/utils";
+import { useCountUp } from "@/lib/useCountUp";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -48,22 +49,31 @@ function heatLevel(minutes: number): number {
 }
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
+// (count-up via useCountUp quand une valeur numérique est fournie)
 
 function StatCard({
   label,
   value,
+  num,
+  format,
   sub,
   accent,
 }: {
   label: string;
-  value: string;
+  /** Valeur statique (chaînes composites). Ignorée si `num` est fourni. */
+  value?: string;
+  /** Valeur numérique : affichée avec un count-up au montage. */
+  num?: number;
+  format?: (v: number) => string;
   sub?: string;
   accent?: string;
 }) {
+  const animated = useCountUp(num ?? 0);
+  const display = num != null ? (format ?? String)(Math.round(animated)) : value;
   return (
     <div className="flex flex-col gap-1 px-5 py-4 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.08]">
       <span className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">{label}</span>
-      <span className={cn("text-3xl font-light tabular-nums tracking-tight", accent ?? "text-foreground")}>{value}</span>
+      <span className={cn("text-3xl font-light tabular-nums tracking-tight", accent ?? "text-foreground")}>{display}</span>
       {sub && <span className="text-[11px] text-foreground/30 leading-tight">{sub}</span>}
     </div>
   );
@@ -163,13 +173,14 @@ export default function SummaryPage() {
             />
             <StatCard
               label="Pomodoros"
-              value={String(sessionsCompleted)}
+              num={sessionsCompleted}
               sub={`× ${focusMinutesPerSession} min`}
               accent="text-orange-300"
             />
             <StatCard
               label="Temps de focus"
-              value={formatMinutes(focusMinutesThisSession)}
+              num={focusMinutesThisSession}
+              format={formatMinutes}
               sub="concentration pure"
               accent="text-emerald-300"
             />
@@ -184,13 +195,13 @@ export default function SummaryPage() {
           <div className="grid grid-cols-2 gap-3">
             <StatCard
               label="Focus Score"
-              value={`${focusScore}`}
+              num={focusScore}
               sub={focusScore >= 80 ? "concentration solide" : focusScore >= 50 ? "peut mieux faire" : "beaucoup d'interruptions"}
               accent={focusScore >= 80 ? "text-emerald-300" : focusScore >= 50 ? "text-amber-300" : "text-red-300"}
             />
             <StatCard
               label="Distractions"
-              value={String(distractionCount)}
+              num={distractionCount}
               sub={distractionCount === 0 ? "aucune — impeccable !" : "interruptions notées"}
               accent={distractionCount === 0 ? "text-emerald-300" : "text-foreground"}
             />
