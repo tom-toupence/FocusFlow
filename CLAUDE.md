@@ -351,6 +351,27 @@ Rooms, Smart Focus, capture rapide. Validées et livrées (build + lint verts à
 
 Relecture `code-reviewer` passée (fix du double avancement + bouton boucle masqué en repli natif).
 
+### Correctifs même jour (retours utilisateur)
+
+- **⚠️ La page `/playlist` ne sert PLUS les vidéos** (ytInitialData quasi vide côté serveur,
+  constaté empiriquement 2026-07). Route `app/api/youtube/playlist` réécrite en 2 temps :
+  **flux RSS** `feeds/videos.xml?playlist_id=…` (≤15 titres, donne une seed fiable) puis
+  **page watch `?v=<seed>&list=…`** → `playlistPanelVideoRenderer` (≤200 titres). Le client passe
+  `startVideoId` comme seed si connu. Les mixes RD marchent toujours via la page watch
+  (mon test « cassé » utilisait un live comme seed — cas particulier).
+- **« + Playlist » (extras)** : `SavedPlaylist.extraVideos` — titres recommandés ajoutés par
+  l'utilisateur à une playlist (une playlist YouTube n'étant pas modifiable, ils sont **joués à la
+  suite** des titres résolus en session). Actions `addExtraVideo`/`removeExtraVideo`
+  (sync via `upsertPlaylist`). **⚠️ SQL requis** : `alter table user_playlists add column if not
+  exists extra_videos jsonb default '[]'::jsonb;` — sans la colonne, l'upsert échoue (log) et la
+  sync des playlists ne passe plus, le local reste OK.
+- **Modal « Voir les titres »** enrichi : titres résolus (+ File), extras (retirables), section
+  **« Recommandations liées »** (mix RD semé sur le 1er titre) avec + Playlist / + File.
+- **Splash interactif** : Paper Shaders **remplacé par un shader WebGL2 maison** (zéro dépendance,
+  `@paper-design/shaders-react` désinstallé) — vagues ambiantes, **la déformation suit la souris**
+  (lerp), **clic = onde de choc** (anneau amorti, 8 max) puis fondu après 750 ms ; auto-fondu après
+  3,5 s d'inactivité (réarmé au mouvement) ; touche = skip immédiat. Repli statique conservé.
+
 ## Catalogue vidéos (refonte 2026-07-06)
 
 Catalogue recentré sur **2 formats uniquement** : « Study With Me » scéniques (vue sur un beau

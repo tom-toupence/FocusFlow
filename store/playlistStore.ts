@@ -12,12 +12,18 @@ export interface SavedPlaylist {
   title: string;
   channelName?: string;
   thumbnailUrl?: string;
+  // Titres ajoutés PAR L'UTILISATEUR à cette playlist (recommandations « + Playlist »).
+  // On ne peut pas modifier une playlist YouTube : ces extras sont joués à la
+  // suite des titres résolus de la playlist.
+  extraVideos?: { id: string; title: string }[];
 }
 
 interface PlaylistState {
   playlists: SavedPlaylist[];
   addPlaylist: (p: Omit<SavedPlaylist, "id">) => void;
   removePlaylist: (id: string) => void;
+  addExtraVideo: (playlistId: string, video: { id: string; title: string }) => void;
+  removeExtraVideo: (playlistId: string, videoId: string) => void;
 }
 
 export const usePlaylistStore = create<PlaylistState>()(
@@ -38,6 +44,31 @@ export const usePlaylistStore = create<PlaylistState>()(
         set((s) => ({ playlists: s.playlists.filter((p) => p.id !== id) }));
         const userId = getCurrentUserId();
         if (userId) deletePlaylist(userId, id);
+      },
+      addExtraVideo: (playlistId, video) => {
+        let updated: SavedPlaylist | undefined;
+        set((s) => ({
+          playlists: s.playlists.map((p) => {
+            if (p.id !== playlistId) return p;
+            if ((p.extraVideos ?? []).some((v) => v.id === video.id)) return p;
+            updated = { ...p, extraVideos: [...(p.extraVideos ?? []), video] };
+            return updated;
+          }),
+        }));
+        const userId = getCurrentUserId();
+        if (userId && updated) upsertPlaylist(userId, updated);
+      },
+      removeExtraVideo: (playlistId, videoId) => {
+        let updated: SavedPlaylist | undefined;
+        set((s) => ({
+          playlists: s.playlists.map((p) => {
+            if (p.id !== playlistId) return p;
+            updated = { ...p, extraVideos: (p.extraVideos ?? []).filter((v) => v.id !== videoId) };
+            return updated;
+          }),
+        }));
+        const userId = getCurrentUserId();
+        if (userId && updated) upsertPlaylist(userId, updated);
       },
     }),
     { name: "focusflow-playlists" }
@@ -77,10 +108,13 @@ export async function fetchMixVideos(
 // Résout une vraie playlist YouTube (PL/OL/UU/FL/…) en liste ordonnée de vidéos
 // { id, title } via notre route serveur. Retourne [] si échec (→ repli natif).
 export async function fetchPlaylistVideos(
-  listId: string
+  listId: string,
+  seedVideoId?: string
 ): Promise<{ id: string; title: string }[]> {
   try {
-    const res = await fetch(`/api/youtube/playlist?list=${encodeURIComponent(listId)}`);
+    const params = new URLSearchParams({ list: listId });
+    if (seedVideoId) params.set("seed", seedVideoId);
+    const res = await fetch(`/api/youtube/playlist?${params.toString()}`);
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data.videos) ? data.videos : [];

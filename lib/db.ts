@@ -112,6 +112,7 @@ export async function fetchPlaylists(userId: string): Promise<SavedPlaylist[]> {
     title: r.title,
     channelName: r.channel_name ?? undefined,
     thumbnailUrl: r.thumbnail_url ?? undefined,
+    extraVideos: Array.isArray(r.extra_videos) ? r.extra_videos : undefined,
   }));
 }
 
@@ -125,6 +126,9 @@ export async function upsertPlaylist(userId: string, playlist: SavedPlaylist): P
     title: playlist.title,
     channel_name: playlist.channelName ?? null,
     thumbnail_url: playlist.thumbnailUrl ?? null,
+    // Nécessite la colonne jsonb `extra_videos` (voir SQL dans CLAUDE.md) ;
+    // sans elle l'upsert échoue → log seulement, le local reste la source.
+    extra_videos: playlist.extraVideos ?? [],
   });
   if (error) console.error("[db] upsertPlaylist:", error.message);
 }

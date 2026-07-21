@@ -206,10 +206,16 @@ export default function SessionPage() {
     if (!isPlaylistMode || isMix || !selectedPlaylist) return;
     let cancelled = false;
     (async () => {
-      const videos = await fetchPlaylistVideos(selectedPlaylist.playlistId);
+      const videos = await fetchPlaylistVideos(selectedPlaylist.playlistId, selectedPlaylist.startVideoId);
       if (cancelled) return;
-      setTrackTitles((prev) => ({ ...prev, ...Object.fromEntries(videos.map((v) => [v.id, v.title])) }));
-      setPlaylistTracks(videos);
+      // Titres ajoutés par l'utilisateur (« + Playlist » dans Découvrir/modal),
+      // joués à la suite de la playlist (dédupliqués).
+      const extras = (selectedPlaylist.extraVideos ?? []).filter(
+        (e) => !videos.some((v) => v.id === e.id)
+      );
+      const all = videos.length > 0 ? [...videos, ...extras] : extras;
+      setTrackTitles((prev) => ({ ...prev, ...Object.fromEntries(all.map((v) => [v.id, v.title])) }));
+      setPlaylistTracks(all);
     })();
     return () => { cancelled = true; };
   }, [isPlaylistMode, isMix, selectedPlaylist?.playlistId]); // eslint-disable-line react-hooks/exhaustive-deps
