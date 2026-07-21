@@ -368,9 +368,14 @@ Relecture `code-reviewer` passée (fix du double avancement + bouton boucle masq
 - **Modal « Voir les titres »** enrichi : titres résolus (+ File), extras (retirables), section
   **« Recommandations liées »** (mix RD semé sur le 1er titre) avec + Playlist / + File.
 - **Splash interactif** : Paper Shaders **remplacé par un shader WebGL2 maison** (zéro dépendance,
-  `@paper-design/shaders-react` désinstallé) — vagues ambiantes, **la déformation suit la souris**
-  (lerp), **clic = onde de choc** (anneau amorti, 8 max) puis fondu après 750 ms ; auto-fondu après
-  3,5 s d'inactivité (réarmé au mouvement) ; touche = skip immédiat. Repli statique conservé.
+  `@paper-design/shaders-react` désinstallé) — vagues ambiantes lentes, **clic = onde de choc**
+  (anneau amorti, 8 max) puis fondu après 750 ms ; auto-fondu après 3,5 s ; touche = skip.
+  **Pas de suivi de souris** (retiré à la demande de l'utilisateur : l'eau reste calme, seul le
+  curseur natif bouge). Repli statique conservé (reduced-motion / pas de WebGL2).
+- **« Voir les titres » déplacé** : le bouton était dans l'overlay « Démarrer » de la carte
+  playlist (`aspect-video` étroite) → clipé, et le clic retombait sur la carte = lancement de
+  session. Il est maintenant un **bouton d'angle dédié en haut à droite** (icône liste, toujours
+  visible, à côté du badge « Playlist »).
 
 ## Catalogue vidéos (refonte 2026-07-06)
 

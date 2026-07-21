@@ -20,6 +20,7 @@ precision highp float;
 uniform sampler2D u_tex;
 uniform vec2 u_res;
 uniform float u_time;
+uniform vec2 u_mouse;
 uniform vec4 u_ripples[${MAX_RIPPLES}]; // xy = centre (px), z = temps de départ (<0 = inactif)
 out vec4 outColor;
 
@@ -33,6 +34,14 @@ void main() {
     sin(uv.y * 14.0 + u_time * 0.9) + 0.6 * sin(uv.y * 31.0 - u_time * 0.5),
     cos(uv.x * 11.0 - u_time * 0.7) + 0.6 * cos(uv.x * 27.0 + u_time * 0.4)
   );
+
+  // La vague suit la souris : bosse radiale ondulante autour du curseur (qui est
+  // masqué — c'est cette déformation qui matérialise la position du pointeur).
+  float md = distance(p, u_mouse);
+  float sigma = u_res.y * 0.17;
+  float infl = exp(-md * md / (2.0 * sigma * sigma));
+  vec2 mdir = md > 0.5 ? (p - u_mouse) / md : vec2(0.0);
+  disp += mdir * infl * 0.020 * sin(md * 0.042 - u_time * 3.0);
 
   // Ondes de choc des clics : anneau amorti qui s'élargit
   for (int i = 0; i < ${MAX_RIPPLES}; i++) {
@@ -94,6 +103,8 @@ export default function SplashIntro() {
   // Ondes de choc actives : [x, y, startTime, 0] × MAX_RIPPLES (pixels canvas).
   const ripplesRef = useRef(new Float32Array(MAX_RIPPLES * 4).fill(-1));
   const rippleCursorRef = useRef(0);
+  // Position lissée du pointeur (x/y suivent tx/ty avec un léger retard).
+  const mouseRef = useRef({ x: -9999, y: -9999, tx: -9999, ty: -9999 });
 
   const armIdle = () => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -139,6 +150,7 @@ export default function SplashIntro() {
 
     const uRes = gl.getUniformLocation(prog, "u_res");
     const uTime = gl.getUniformLocation(prog, "u_time");
+    const uMouse = gl.getUniformLocation(prog, "u_mouse");
     const uRipples = gl.getUniformLocation(prog, "u_ripples");
     gl.uniform2f(uRes, w, h);
 
@@ -163,15 +175,26 @@ export default function SplashIntro() {
     let raf = 0;
     const frame = (now: number) => {
       const t = (now - start) / 1000;
+      // La vague suit la souris avec un léger retard (lerp) → elle « traîne ».
+      const m = mouseRef.current;
+      m.x += (m.tx - m.x) * 0.12;
+      m.y += (m.ty - m.y) * 0.12;
       gl.uniform1f(uTime, t);
+      gl.uniform2f(uMouse, m.x * dpr, (window.innerHeight - m.y) * dpr);
       gl.uniform4fv(uRipples, ripplesRef.current);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
 
-    // Interactions (attachées à window : l'overlay couvre tout l'écran).
-    // Pas de suivi de souris : l'eau reste calme tant qu'on ne clique pas.
+    // Interactions (attachées à window : l'overlay couvre tout l'écran)
+    const onMove = (e: PointerEvent) => {
+      const m = mouseRef.current;
+      if (m.tx < -999) { m.x = e.clientX; m.y = e.clientY; } // 1er mouvement : pas de saut
+      m.tx = e.clientX;
+      m.ty = e.clientY;
+      armIdle();
+    };
     const onClick = (e: PointerEvent) => {
       if (phaseRef.current !== "show") return;
       const i = rippleCursorRef.current % MAX_RIPPLES;
@@ -185,11 +208,13 @@ export default function SplashIntro() {
       setTimeout(() => { if (phaseRef.current === "show") setPhase("fading"); }, CLICK_FADE_MS);
     };
     const onKey = () => { if (phaseRef.current === "show") setPhase("fading"); };
+    window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerdown", onClick);
     window.addEventListener("keydown", onKey);
 
     return () => {
       cancelAnimationFrame(raf);
+      window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerdown", onClick);
       window.removeEventListener("keydown", onKey);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -210,7 +235,9 @@ export default function SplashIntro() {
     <div
       aria-hidden
       className={cn(
-        "fixed inset-0 z-[200] bg-[#0a0a0c] flex items-center justify-center select-none transition-opacity ease-out",
+        // `cursor-none` : le pointeur système est masqué — c'est la déformation
+        // de l'eau qui matérialise sa position.
+        "fixed inset-0 z-[200] bg-[#0a0a0c] flex items-center justify-center select-none cursor-none transition-opacity ease-out",
         phase === "fading" ? "opacity-0 duration-700 pointer-events-none" : "opacity-100 duration-300"
       )}
     >
