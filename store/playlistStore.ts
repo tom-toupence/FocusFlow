@@ -52,19 +52,38 @@ export function isRadioMix(listId: string): boolean {
   return listId.startsWith("RD") && !listId.startsWith("RDCLAK");
 }
 
-// Résout un mix radio en une liste ordonnée de videoIds via notre route serveur
-// (parse de la page YouTube — aucune clé requise). Retourne [] si échec.
-export async function fetchMixVideoIds(
+// Résout un mix radio en une liste ordonnée de videoIds (+ titres connus) via
+// notre route serveur (parse de la page YouTube — aucune clé requise).
+// Retourne { ids: [] } si échec.
+export async function fetchMixVideos(
   listId: string,
   seedVideoId?: string
-): Promise<string[]> {
+): Promise<{ ids: string[]; titles: Record<string, string> }> {
   try {
     const params = new URLSearchParams({ list: listId });
     if (seedVideoId) params.set("seed", seedVideoId);
     const res = await fetch(`/api/youtube/mix?${params.toString()}`);
+    if (!res.ok) return { ids: [], titles: {} };
+    const data = await res.json();
+    return {
+      ids: Array.isArray(data.videoIds) ? data.videoIds : [],
+      titles: data.titles && typeof data.titles === "object" ? data.titles : {},
+    };
+  } catch {
+    return { ids: [], titles: {} };
+  }
+}
+
+// Résout une vraie playlist YouTube (PL/OL/UU/FL/…) en liste ordonnée de vidéos
+// { id, title } via notre route serveur. Retourne [] si échec (→ repli natif).
+export async function fetchPlaylistVideos(
+  listId: string
+): Promise<{ id: string; title: string }[]> {
+  try {
+    const res = await fetch(`/api/youtube/playlist?list=${encodeURIComponent(listId)}`);
     if (!res.ok) return [];
     const data = await res.json();
-    return Array.isArray(data.videoIds) ? data.videoIds : [];
+    return Array.isArray(data.videos) ? data.videos : [];
   } catch {
     return [];
   }

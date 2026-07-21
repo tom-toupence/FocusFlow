@@ -7,10 +7,12 @@ import { NextRequest, NextResponse } from "next/server";
 // If no key is set, or every provider fails (quota, network…), the client falls
 // back to the local heuristic planner (lib/coach.ts, lib/sprint.ts) — always €0.
 //
-// Two request shapes:
+// Three request shapes:
 //   { objective }                            → task breakdown (original coach)
 //   { type: "sprint", objective, deadline,
 //     dailyMinutes, startDate, startMin }    → day-by-day sprint plan
+//   { type: "music", titles: string[] }      → refined YouTube search queries
+//                                              for the Discover recommendations
 
 const GROQ_KEY = process.env.GROQ_API_KEY ?? "";
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
@@ -42,6 +44,14 @@ et l'heure de début préférée (en minutes depuis minuit). Construis un plan d
 Réponds UNIQUEMENT avec un objet JSON de la forme :
 {"days":[{"date":"YYYY-MM-DD","startMin":540,"durationMin":50,"label":"..."}],"tasks":[{"text":"...","pomodoroEstimate":2}],"mood":"lofi"}
 Aucun texte en dehors du JSON.`;
+
+const SYSTEM_MUSIC = `Tu es un expert en musique de concentration sur YouTube (lofi, ambient, study with me, paysages sonores).
+On te donne une liste de titres de vidéos récemment écoutées par l'utilisateur pendant ses sessions de focus.
+Déduis-en 3 à 4 THÈMES distincts qui lui plairaient (lieux, ambiances, genres proches mais pas identiques),
+et pour chaque thème construis une requête de recherche YouTube en anglais visant des vidéos LONGUES (mixes, study with me, ambiances).
+Réponds UNIQUEMENT avec un objet JSON de la forme :
+{"queries":[{"label":"Kyoto pluie","query":"rainy kyoto lofi ambient mix"}]}
+label = thème court en français, query = requête YouTube en anglais. Aucun texte hors du JSON.`;
 
 interface Task { text: string; pomodoroEstimate: number; }
 interface SprintDay { date: string; startMin: number; durationMin: number; label: string; }
@@ -107,6 +117,26 @@ function sanitizeSprint(raw: string | undefined, startDate: string, deadline: st
   return { days, tasks, mood };
 }
 
+/** Parses + sanitizes the music discovery queries (or null if unusable). */
+function sanitizeMusicQueries(raw: string | undefined): { label: string; query: string }[] | null {
+  if (!raw) return null;
+  let parsed: { queries?: unknown };
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const list = Array.isArray(parsed.queries) ? (parsed.queries as { label?: unknown; query?: unknown }[]) : [];
+  const queries = list
+    .filter((q) => q && typeof q.label === "string" && typeof q.query === "string" && q.query.trim().length >= 3)
+    .slice(0, 4)
+    .map((q) => ({
+      label: String(q.label).trim().slice(0, 40),
+      query: String(q.query).trim().slice(0, 80),
+    }));
+  return queries.length > 0 ? queries : null;
+}
+
 // ── Groq (OpenAI-compatible) ─────────────────────────────────────────────────────
 async function callGroq(system: string, user: string): Promise<ChatResult> {
   try {
@@ -148,6 +178,21 @@ const GEMINI_TASKS_SCHEMA = {
     },
   },
   required: ["tasks"],
+};
+
+const GEMINI_MUSIC_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    queries: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: { label: { type: "STRING" }, query: { type: "STRING" } },
+        required: ["label", "query"],
+      },
+    },
+  },
+  required: ["queries"],
 };
 
 const GEMINI_SPRINT_SCHEMA = {
@@ -226,6 +271,36 @@ export async function POST(request: NextRequest) {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  }
+
+  // ── Music discovery queries ────────────────────────────────────────────────
+  if (body.type === "music") {
+    const titles = (Array.isArray((body as { titles?: unknown }).titles) ? ((body as { titles: unknown[] }).titles) : [])
+      .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+      .slice(0, 20)
+      .map((t) => t.trim().slice(0, 120));
+    if (titles.length === 0) return NextResponse.json({ error: "empty" }, { status: 400 });
+
+    const user = `Titres écoutés récemment :\n${titles.map((t) => `- ${t}`).join("\n")}`;
+    let lastMusic: ChatResult | null = null;
+    for (const provider of [
+      GROQ_KEY ? () => callGroq(SYSTEM_MUSIC, user) : null,
+      GEMINI_KEY ? () => callGemini(SYSTEM_MUSIC, user, GEMINI_MUSIC_SCHEMA) : null,
+    ]) {
+      if (!provider) continue;
+      const result = await provider();
+      if (result.ok) {
+        const queries = sanitizeMusicQueries(result.raw);
+        if (queries) return NextResponse.json({ queries, source: "ai" });
+        lastMusic = { ok: false, status: 502, detail: "unparseable" };
+      } else {
+        lastMusic = result;
+      }
+    }
+    return NextResponse.json(
+      { error: "upstream", status: lastMusic?.ok === false ? lastMusic.status : 502, detail: lastMusic?.ok === false ? lastMusic.detail : "" },
+      { status: 502 }
+    );
   }
 
   const objective = String(body.objective ?? "").trim().slice(0, MAX_INPUT);

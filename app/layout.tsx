@@ -6,6 +6,7 @@ import AuthGate from "@/components/AuthGate";
 import ToastHost from "@/components/Toast";
 import CommandPalette from "@/components/CommandPalette";
 import AmbientProvider from "@/components/AmbientProvider";
+import SplashIntro from "@/components/SplashIntro";
 
 const geist = Geist({
   variable: "--font-geist",
@@ -35,6 +36,7 @@ export default function RootLayout({
         <ToastHost />
         <CommandPalette />
         <AmbientProvider />
+        <SplashIntro />
       </body>
     </html>
   );

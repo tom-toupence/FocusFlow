@@ -5,8 +5,9 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useTimerStore, TimerMode } from "@/store/timerStore";
 import { useSessionStore } from "@/store/sessionStore";
-import { usePlaylistStore, isRadioMix, fetchMixVideoIds } from "@/store/playlistStore";
+import { usePlaylistStore, isRadioMix, fetchMixVideos, fetchPlaylistVideos } from "@/store/playlistStore";
 import { useQueueStore } from "@/store/queueStore";
+import { usePlaybackPrefsStore } from "@/store/playbackPrefsStore";
 import { useSessionSummaryStore } from "@/store/sessionSummaryStore";
 import { cn } from "@/lib/utils";
 import TodoList from "@/components/TodoList";
@@ -71,6 +72,16 @@ function formatTime(s: number) {
   return `${m}:${sec}`;
 }
 
+// Fisher-Yates en gardant la 1ʳᵉ piste en tête (celle en cours de lecture).
+function shuffleKeepFirst(ids: string[]): string[] {
+  const [first, ...rest] = ids;
+  for (let i = rest.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [rest[i], rest[j]] = [rest[j], rest[i]];
+  }
+  return [first, ...rest];
+}
+
 const breakLabel: Record<TimerMode, string> = {
   work: "",
   "short-break": "Pause courte",
@@ -131,9 +142,27 @@ export default function SessionPage() {
   const [distractionFlash, setDistractionFlash] = useState(0);
   // Mix radio YouTube résolu en liste de videoIds (null = résolution en cours).
   const [mixIds, setMixIds] = useState<string[] | null>(null);
+  // Vraie playlist PL… résolue en pistes { id, title } (null = résolution en
+  // cours ; [] = échec → repli lecteur natif YouTube).
+  const [playlistTracks, setPlaylistTracks] = useState<{ id: string; title: string }[] | null>(null);
   // Index réactif de la piste en cours (file maison) → affichage « Now Playing ».
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+  // Id de la piste courante + taille de la file (miroirs réactifs de queueRef,
+  // qui peut être réordonnée par le shuffle ou étendue par les recos de fin).
+  const [currentTrackId, setCurrentTrackId] = useState<string | null>(null);
+  const [queueTotal, setQueueTotal] = useState(0);
   const volumeRef = useRef(0.8);
+  // Titres connus des pistes de la file maison (videoId → titre).
+  const [trackTitles, setTrackTitles] = useState<Record<string, string>>({});
+  // Ordre d'origine de la file (pour désactiver le shuffle proprement).
+  const originalOrderRef = useRef<string[]>([]);
+  // Préférences de lecture (shuffle / boucle) — refs pour les callbacks IFrame.
+  const { shuffle, loop } = usePlaybackPrefsStore();
+  const shuffleRef = useRef(shuffle);
+  const loopRef = useRef(loop);
+  useEffect(() => { loopRef.current = loop; }, [loop]);
+  // Garde anti-doublon : une seule résolution de « titres similaires » en vol.
+  const fetchingMoreRef = useRef(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
@@ -152,9 +181,10 @@ export default function SessionPage() {
     if (!isMix || !selectedPlaylist) return;
     let cancelled = false;
     (async () => {
-      const ids = await fetchMixVideoIds(selectedPlaylist.playlistId, selectedPlaylist.startVideoId);
+      const { ids, titles } = await fetchMixVideos(selectedPlaylist.playlistId, selectedPlaylist.startVideoId);
       if (cancelled) return;
       if (ids.length > 0) {
+        setTrackTitles((prev) => ({ ...prev, ...titles }));
         setMixIds(ids);
       } else {
         setMixIds(selectedPlaylist.startVideoId ? [selectedPlaylist.startVideoId] : []);
@@ -168,6 +198,21 @@ export default function SessionPage() {
     })();
     return () => { cancelled = true; };
   }, [isMix, selectedPlaylist?.playlistId, selectedPlaylist?.startVideoId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Résolution des vraies playlists (PL/OL/UU/FL/…) ───────────────────────
+  // On récupère la liste ordonnée { id, title } côté serveur pour jouer via la
+  // file maison (shuffle, titre exact, recos de fin). [] = échec → repli natif.
+  useEffect(() => {
+    if (!isPlaylistMode || isMix || !selectedPlaylist) return;
+    let cancelled = false;
+    (async () => {
+      const videos = await fetchPlaylistVideos(selectedPlaylist.playlistId);
+      if (cancelled) return;
+      setTrackTitles((prev) => ({ ...prev, ...Object.fromEntries(videos.map((v) => [v.id, v.title])) }));
+      setPlaylistTracks(videos);
+    })();
+    return () => { cancelled = true; };
+  }, [isPlaylistMode, isMix, selectedPlaylist?.playlistId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Chime sounds on mode transitions ─────────────────────────────────────
   // Fin de pomodoro : bloom doux plein écran de la teinte d'ambiance (une
@@ -223,10 +268,24 @@ export default function SessionPage() {
     // `loadPlaylist([ids])`, ni le playerVar `playlist` : après la 1ʳᵉ, l'autoplay
     // « vidéos liées » reprend la main = hors liste). On gère donc la progression
     // NOUS-MÊMES : à la fin d'un titre (état ENDED=0) on charge le suivant.
+    const advance = (target: YTPlayer) => {
+      const q = queueRef.current;
+      q.index = (q.index + 1) % q.ids.length;
+      setCurrentTrackIndex(q.index);
+      setCurrentTrackId(q.ids[q.index] ?? null);
+      setQueueTotal(q.ids.length);
+      target.loadVideoById(q.ids[q.index]);
+    };
+
     const buildManualQueue = (ids: string[]) => {
-      queueRef.current = { ids, index: 0 };
+      originalOrderRef.current = [...ids];
+      const order = shuffleRef.current ? shuffleKeepFirst(ids) : [...ids];
+      queueRef.current = { ids: order, index: 0 };
+      setCurrentTrackIndex(0);
+      setCurrentTrackId(order[0] ?? null);
+      setQueueTotal(order.length);
       playerRef.current = new window.YT.Player("yt-player", {
-        videoId: ids[0],
+        videoId: order[0],
         playerVars: { autoplay: 1, mute: 0, controls: 0, rel: 0, modestbranding: 1 },
         events: {
           onReady: (e: { target: YTPlayer }) => {
@@ -236,13 +295,36 @@ export default function SessionPage() {
             if (isBreakRef.current || !isRunningRef.current) e.target.pauseVideo();
           },
           onStateChange: (e: { data: number; target: YTPlayer }) => {
-            if (e.data === 0) {
-              const q = queueRef.current;
-              if (q.ids.length === 0) return;
-              q.index = (q.index + 1) % q.ids.length;
-              setCurrentTrackIndex(q.index);
-              e.target.loadVideoById(q.ids[q.index]);
+            if (e.data !== 0) return;
+            const q = queueRef.current;
+            if (q.ids.length === 0) return;
+            // Fin de file sans boucle : on enchaîne sur des titres similaires
+            // (mix RD du dernier titre) au lieu de reboucler. Échec → boucle.
+            if (q.index >= q.ids.length - 1 && !loopRef.current) {
+              // Résolution déjà en vol → ENDED redondant, on l'ignore (sinon
+              // double avancement quand la requête se termine).
+              if (fetchingMoreRef.current) return;
+              fetchingMoreRef.current = true;
+              const lastId = q.ids[q.index];
+              fetchMixVideos(`RD${lastId}`, lastId).then(({ ids: recIds, titles }) => {
+                fetchingMoreRef.current = false;
+                const fresh = recIds.filter((id) => id !== lastId && !q.ids.includes(id));
+                if (fresh.length > 0) {
+                  setTrackTitles((prev) => ({ ...prev, ...titles }));
+                  q.ids.push(...fresh);
+                  originalOrderRef.current.push(...fresh);
+                  toast({
+                    title: "Fin de la liste",
+                    description: "La lecture continue avec des titres similaires.",
+                    emoji: "🎧",
+                    accent: "emerald",
+                  });
+                }
+                advance(e.target);
+              });
+              return;
             }
+            advance(e.target);
           },
         },
       });
@@ -264,8 +346,14 @@ export default function SessionPage() {
           : (selectedPlaylist.startVideoId ? [selectedPlaylist.startVideoId] : []);
         if (ids.length === 0) return; // rien à jouer
         buildManualQueue(ids);
+      } else if (playlistTracks === null) {
+        // Vraie playlist : on attend la résolution serveur avant de créer le player.
+        return;
+      } else if (playlistTracks.length > 0) {
+        // Playlist résolue → file maison (shuffle, titre exact, recos de fin).
+        buildManualQueue(playlistTracks.map((t) => t.id));
       } else {
-        // Vraie playlist YouTube (PL/OL/UU/FL/LL/RDCLAK) : embarquable directement.
+        // Repli : résolution échouée → lecteur natif YouTube (PL/OL/UU/FL/LL/RDCLAK).
         const onReadyPlaylist = (e: { target: YTPlayer }) => {
           playerReadyRef.current = true;
           e.target.setPlaybackQuality("hd1080");
@@ -307,7 +395,33 @@ export default function SessionPage() {
         events: { onReady },
       });
     }
-  }, [video?.youtubeId, isPlaylistMode, selectedPlaylist?.playlistId, mixIds, isQueueMode, queueKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [video?.youtubeId, isPlaylistMode, selectedPlaylist?.playlistId, mixIds, playlistTracks, isQueueMode, queueKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Shuffle togglable en cours de lecture ─────────────────────────────────
+  // ON : mélange les pistes restantes (piste courante en tête). OFF : retour à
+  // l'ordre d'origine, en repositionnant l'index sur la piste courante.
+  useEffect(() => {
+    if (shuffleRef.current === shuffle) return;
+    shuffleRef.current = shuffle;
+    const q = queueRef.current;
+    if (q.ids.length <= 1) return;
+    const currentId = q.ids[q.index];
+    if (shuffle) {
+      const rest = q.ids.filter((id) => id !== currentId);
+      for (let i = rest.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rest[i], rest[j]] = [rest[j], rest[i]];
+      }
+      q.ids = [currentId, ...rest];
+      q.index = 0;
+    } else {
+      q.ids = [...originalOrderRef.current];
+      q.index = Math.max(0, q.ids.indexOf(currentId));
+    }
+    setCurrentTrackIndex(q.index);
+    setCurrentTrackId(q.ids[q.index] ?? null);
+    setQueueTotal(q.ids.length);
+  }, [shuffle]);
 
   useEffect(() => {
     if (isSpotifyMode || isTwitchMode) return;
@@ -497,17 +611,31 @@ export default function SessionPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [handleDistraction, pause, start]);
 
+  // Auto-masquage du panneau de volume après 2,5 s sans interaction.
+  const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const armVolumeHide = useCallback(() => {
+    if (volumeHideTimerRef.current) clearTimeout(volumeHideTimerRef.current);
+    volumeHideTimerRef.current = setTimeout(() => setShowVolume(false), 2500);
+  }, []);
+  useEffect(() => {
+    return () => { if (volumeHideTimerRef.current) clearTimeout(volumeHideTimerRef.current); };
+  }, []);
+
   const handleVolumeChange = (v: number) => {
     setVolumeState(v);
     volumeRef.current = v;
+    armVolumeHide();
     if (!isSpotifyMode && !isTwitchMode && playerRef.current && playerReadyRef.current) {
       playerRef.current.setVolume(Math.round(v * 100));
     }
   };
 
+  // File maison active (mix radio, File FocusFlow, ou playlist résolue).
+  const usesManualQueue = isQueueMode || isMix || (isPlaylistMode && (playlistTracks?.length ?? 0) > 0);
+
   const skipTrack = (dir: "next" | "prev") => {
     if (!playerRef.current || !playerReadyRef.current) return;
-    if (isMix || isQueueMode) {
+    if (usesManualQueue) {
       // File maison : on déplace l'index et on charge le titre correspondant.
       const q = queueRef.current;
       if (q.ids.length === 0) return;
@@ -515,6 +643,8 @@ export default function SessionPage() {
         ? (q.index + 1) % q.ids.length
         : (q.index - 1 + q.ids.length) % q.ids.length;
       setCurrentTrackIndex(q.index);
+      setCurrentTrackId(q.ids[q.index] ?? null);
+      setQueueTotal(q.ids.length);
       playerRef.current.loadVideoById(q.ids[q.index]);
     } else if (dir === "next") {
       playerRef.current.nextVideo();
@@ -526,16 +656,20 @@ export default function SessionPage() {
   // « Now Playing » unifié (sources YouTube). Spotify/Twitch gardent leur propre UI.
   const nowPlaying: { title: string; sub: string } | null = (() => {
     if (isSpotifyMode || isTwitchMode) return null;
+    // La file maison peut avoir été réordonnée (shuffle) ou étendue (recos de
+    // fin) : currentTrackId / queueTotal sont les miroirs réactifs de queueRef.
     if (isQueueMode) {
-      const it = queueItems[currentTrackIndex];
-      return it ? { title: it.title, sub: `File · ${currentTrackIndex + 1}/${queueItems.length}` } : null;
+      const it = queueItems.find((i) => i.youtubeId === currentTrackId) ?? queueItems[currentTrackIndex];
+      const title = it?.title ?? (currentTrackId ? trackTitles[currentTrackId] : undefined);
+      return title ? { title, sub: `File · ${currentTrackIndex + 1}/${Math.max(queueTotal, queueItems.length)}` } : null;
     }
     if (isMix) {
-      const total = mixIds?.length ?? 0;
-      return { title: selectedPlaylist?.title ?? "Mix radio", sub: total ? `Mix · ${currentTrackIndex + 1}/${total}` : "Mix radio" };
+      const title = (currentTrackId && trackTitles[currentTrackId]) || selectedPlaylist?.title || "Mix radio";
+      return { title, sub: queueTotal ? `Mix · ${currentTrackIndex + 1}/${queueTotal}` : "Mix radio" };
     }
     if (isPlaylistMode && selectedPlaylist) {
-      return { title: selectedPlaylist.title, sub: "Playlist" };
+      const title = (currentTrackId && trackTitles[currentTrackId]) || selectedPlaylist.title;
+      return { title, sub: queueTotal ? `${selectedPlaylist.title} · ${currentTrackIndex + 1}/${queueTotal}` : "Playlist" };
     }
     return { title: video.title, sub: video.channel };
   })();
@@ -840,6 +974,40 @@ export default function SessionPage() {
                         <path d="M16 6h2v12h-2zM6 6v12l8.5-6z" />
                       </svg>
                     </button>
+                    {/* Lecture aléatoire (file maison uniquement ; `mounted`
+                        évite le flash avant réhydratation du store persisté) */}
+                    {mounted && usesManualQueue && (
+                      <button
+                        onClick={() => usePlaybackPrefsStore.getState().toggleShuffle()}
+                        className={cn(
+                          "w-9 h-9 flex items-center justify-center rounded-xl transition-all",
+                          shuffle ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
+                        )}
+                        title={shuffle ? "Lecture aléatoire activée" : "Activer la lecture aléatoire"}
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                          <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    )}
+                    {/* Boucle : off = fin de liste → titres similaires. Masqué en
+                        repli lecteur natif (setLoop(true) câblé, non pilotable). */}
+                    {mounted && usesManualQueue && (
+                    <button
+                      onClick={() => usePlaybackPrefsStore.getState().toggleLoop()}
+                      className={cn(
+                        "w-9 h-9 flex items-center justify-center rounded-xl transition-all",
+                        loop ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
+                      )}
+                      title={loop ? "Boucle activée" : "Boucle désactivée — la fin de liste enchaîne sur des titres similaires"}
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                        <path d="M17 1l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M21 13v2a4 4 0 0 1-4 4H3" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                    )}
                   </>
                 )}
                 {/* Distraction marker (shortcut: D) */}
@@ -874,17 +1042,30 @@ export default function SessionPage() {
                 {/* Volume (YouTube & Twitch only — Spotify has its own) */}
                 {!isSpotifyMode && (
                   <div className="relative flex items-center">
-                    {showVolume && (
+                    {/* Panneau vertical sous le bouton — toujours monté pour une vraie
+                        transition CSS (fondu + glissement), auto-masqué après 2,5 s. */}
+                    <div
+                      onPointerMove={armVolumeHide}
+                      className={cn(
+                        "absolute top-full right-0 mt-2 w-9 h-28 flex items-center justify-center rounded-xl bg-black/70 backdrop-blur-sm border border-white/15 shadow-lg shadow-black/40 transition-[opacity,transform] duration-300",
+                        showVolume
+                          ? "opacity-100 translate-y-0"
+                          : "opacity-0 -translate-y-1 pointer-events-none"
+                      )}
+                    >
                       <input
                         type="range"
                         min={0} max={1} step={0.05}
                         value={volume}
                         onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                        className="absolute right-full mr-2 w-20 h-1 accent-white cursor-pointer"
+                        tabIndex={showVolume ? 0 : -1}
+                        aria-label="Volume de la vidéo"
+                        className="h-20 accent-white cursor-pointer"
+                        style={{ writingMode: "vertical-lr", direction: "rtl" }}
                       />
-                    )}
+                    </div>
                     <button
-                      onClick={() => setShowVolume((v) => !v)}
+                      onClick={() => setShowVolume((v) => { const next = !v; if (next) armVolumeHide(); return next; })}
                       className="w-9 h-9 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
                       title="Volume de la vidéo"
                     >

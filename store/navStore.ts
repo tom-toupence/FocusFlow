@@ -3,10 +3,10 @@
 import { create } from "zustand";
 
 // Navigation simplifiée : 4 destinations de premier niveau au lieu de 7 onglets.
-// « Écouter » regroupe les 4 sources média (catalogue / bibliothèque / Spotify / Twitch)
-// derrière un sous-sélecteur, pour réduire la charge cognitive.
+// « Écouter » regroupe les sources média (catalogue / bibliothèque / découvrir /
+// Spotify / Twitch) derrière un sous-sélecteur, pour réduire la charge cognitive.
 export type NavSection = "accueil" | "ecouter" | "organisation" | "activite";
-export type MediaSource = "catalogue" | "library" | "spotify" | "twitch";
+export type MediaSource = "catalogue" | "library" | "discover" | "spotify" | "twitch";
 
 interface NavState {
   section: NavSection;

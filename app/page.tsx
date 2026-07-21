@@ -25,6 +25,8 @@ import AmbientBackdrop from "@/components/AmbientBackdrop";
 import { useNavStore, MediaSource } from "@/store/navStore";
 import { useCommandPalette } from "@/components/CommandPalette";
 import Onboarding from "@/components/Onboarding";
+import PlaylistTracksModal from "@/components/PlaylistTracksModal";
+import DiscoverPanel from "@/components/DiscoverPanel";
 import { useProfileStore, resolvedProfile } from "@/store/profileStore";
 
 const allMoods: VideoMood[] = ["lofi", "jazz", "ambience", "nature", "synthwave", "classical"];
@@ -412,11 +414,13 @@ function PlaylistCard({
   selected,
   onStart,
   onRemove,
+  onShowTracks,
 }: {
   playlist: SavedPlaylist;
   selected: boolean;
   onStart: () => void;
   onRemove: () => void;
+  onShowTracks: () => void;
 }) {
   const [imgError, setImgError] = useState(false);
 
@@ -457,6 +461,12 @@ function PlaylistCard({
           </svg>
         </div>
         <span className="text-white text-xs font-semibold tracking-wide">Démarrer</span>
+        <button
+          onClick={(e) => { e.stopPropagation(); onShowTracks(); }}
+          className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white/80 hover:text-white text-[11px] font-medium transition-all"
+        >
+          Voir les titres
+        </button>
       </div>
 
       {/* Info (hidden on hover) */}
@@ -727,7 +737,7 @@ export default function LandingPage() {
   const profile = resolvedProfile(profileState);
 
   const { section, prevSection, mediaSource, setSection, openMedia } = useNavStore();
-  const activeTab: "aujourdhui" | "catalogue" | "library" | "spotify" | "twitch" | "activite" | "organisation" =
+  const activeTab: "aujourdhui" | MediaSource | "activite" | "organisation" =
     section === "accueil" ? "aujourdhui"
     : section === "activite" ? "activite"
     : section === "organisation" ? "organisation"
@@ -749,6 +759,8 @@ export default function LandingPage() {
   const [activeFilter, setActiveFilter] = useState<VideoMood | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAddPlaylistModal, setShowAddPlaylistModal] = useState(false);
+  // Playlist dont on visualise les titres (modal « Voir les titres »).
+  const [tracksPlaylist, setTracksPlaylist] = useState<SavedPlaylist | null>(null);
   const [spotifyLoading, setSpotifyLoading] = useState(false);
   const [spotifyApiError, setSpotifyApiError] = useState<"forbidden" | "error" | null>(null);
   const [spotifyReloadNonce, setSpotifyReloadNonce] = useState(0);
@@ -959,6 +971,7 @@ export default function LandingPage() {
           <div className="flex gap-1.5 mb-6 flex-wrap">
             <MediaTab id="catalogue" label="Catalogue" />
             <MediaTab id="library" label="Ma bibliothèque" badge={hasLibraryContent ? `${customVideos.length + playlists.length}` : undefined} />
+            <MediaTab id="discover" label="Découvrir" />
             <MediaTab id="spotify" label="Spotify" accent="spotify" badge={isSpotifyConnected ? "Premium" : undefined} />
             <MediaTab id="twitch" label="Twitch" accent="twitch" badge={selectedChannel ? "Live" : undefined} />
           </div>
@@ -1105,6 +1118,7 @@ export default function LandingPage() {
                           selected={selectedPlaylistId === playlist.id}
                           onStart={() => handleStartPlaylist(playlist.id)}
                           onRemove={() => removePlaylist(playlist.id)}
+                          onShowTracks={() => setTracksPlaylist(playlist)}
                         />
                       ))}
                     </div>
@@ -1114,6 +1128,10 @@ export default function LandingPage() {
             )}
           </>
         )}
+
+        {/* ── Découvrir — recommandations ─────────────────────────────────────── */}
+        {activeTab === "discover" && <DiscoverPanel />}
+
         {/* ── Spotify ─────────────────────────────────────────────────────────── */}
         {activeTab === "spotify" && (
           <>
@@ -1524,6 +1542,10 @@ export default function LandingPage() {
       )}
 
       {/* Add playlist modal */}
+      {tracksPlaylist && (
+        <PlaylistTracksModal playlist={tracksPlaylist} onClose={() => setTracksPlaylist(null)} />
+      )}
+
       {showAddPlaylistModal && (
         <AddPlaylistModal
           onClose={() => setShowAddPlaylistModal(false)}

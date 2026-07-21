@@ -61,6 +61,7 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
     { id: "ecouter", label: "Écouter", hint: "Catalogue & sources", keywords: "ecouter musique media son", run: goSection("ecouter") },
     { id: "catalogue", label: "Catalogue", hint: "Vidéos lofi/chill", keywords: "catalogue ambiance lofi videos", run: goMedia("catalogue") },
     { id: "library", label: "Ma bibliothèque", hint: "Vidéos, playlists & file", keywords: "bibliotheque library file queue playlist perso", run: goMedia("library") },
+    { id: "discover", label: "Découvrir", hint: "Recommandations", keywords: "decouvrir discover recommandations suggestions recos", run: goMedia("discover") },
     { id: "spotify", label: "Spotify", keywords: "spotify musique premium", run: goMedia("spotify") },
     { id: "twitch", label: "Twitch", keywords: "twitch live stream vod", run: goMedia("twitch") },
     { id: "organisation", label: "Organisation", hint: "Projets, planning, routines", keywords: "organisation projets planning routines sprint journal", run: goSection("organisation") },

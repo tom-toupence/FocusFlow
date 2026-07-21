@@ -317,6 +317,40 @@ Rooms, Smart Focus, capture rapide. Validées et livrées (build + lint verts à
 - **Lot 6 — Suggestions** : `lib/suggestions.ts` (`topRepeatedVideo`) → carte « Reprendre ta session
   habituelle » dans `TodayDashboard` (1 clic relance la vidéo la plus jouée).
 
+## Journal de session — 2026-07-21 (volume · shuffle/loop · Découvrir · splash)
+
+1. **Volume auto-hide** (`app/session/page.tsx`) : panneau **vertical sous le bouton** (dropdown),
+   toujours monté (transition CSS opacity/translate propre), auto-masqué après 2,5 s sans
+   interaction (`armVolumeHide`), `tabIndex=-1` quand caché.
+2. **Playlists PL… résolues en file maison** : nouvelle route `app/api/youtube/playlist`
+   (parse `playlistVideoRenderer` → `{videos:[{id,title}]}`, ~100 premiers titres) ; helpers de
+   parsing partagés extraits dans **`lib/ytParse.ts`** (mix/route.ts refactoré, renvoie aussi les
+   `titles`). En session : playlist résolue → `buildManualQueue` (comme mixes/file), **repli
+   lecteur natif** si la résolution échoue. « Now Playing » affiche le **titre réel** de la piste
+   (states `trackTitles`/`currentTrackId`/`queueTotal` — pas de refs au render, règle
+   `react-hooks/refs`). Modal **« Voir les titres »** sur les cartes playlist
+   (`components/PlaylistTracksModal.tsx`) avec ajout par titre à la File (pas de reorder par
+   playlist : l'ordre custom passe par la File FocusFlow, décision assumée).
+3. **Shuffle + boucle** : `store/playbackPrefsStore.ts` (`focusflow-playback`, loop true par défaut).
+   Boutons dans le cluster session (file maison uniquement, gate `mounted`). Shuffle Fisher-Yates
+   togglable en cours de lecture (piste courante en tête, dé-shuffle → ordre d'origine).
+   **Loop off** : fin de file → append d'un **mix RD du dernier titre** (dédupliqué) + toast
+   « titres similaires » ; garde anti-double-avancement sur les ENDED redondants (`fetchingMoreRef`).
+4. **Onglet « Découvrir »** (5ᵉ source de Écouter, `navStore.mediaSource="discover"` + ⌘K) :
+   `components/DiscoverPanel.tsx` — sections « Parce que tu as écouté X » (mix RD du top média) et
+   « Autour de tes thèmes » (nouvelle route `app/api/youtube/search`, parse `videoRenderer`, filtre
+   < 10 min). Mots-clés extraits localement des titres écoutés (`lib/recommendations.ts`,
+   stopwords FR/EN), affinés par le **coach IA si clé** (`app/api/coach` étendu `{type:"music"}`
+   → `{queries:[{label,query}]}`). Cartes : Lire (→ ajoute en custom + `/settings`) / + File /
+   + Bibliothèque. Vidéos déjà connues exclues.
+5. **Splash d'arrivée** (`components/SplashIntro.tsx`, monté dans `layout.tsx`) : wordmark
+   « FocusFlow » dessiné en canvas → texture du shader **Water** de
+   **`@paper-design/shaders-react`** (WebGL, Apache 2.0, gratuit) — effet goutte d'eau/caustiques,
+   ~2,8 s puis fondu ; skip clic/touche ; joué à **chaque chargement complet** (pas en nav SPA) ;
+   repli statique si `prefers-reduced-motion` ou WebGL2 absent.
+
+Relecture `code-reviewer` passée (fix du double avancement + bouton boucle masqué en repli natif).
+
 ## Catalogue vidéos (refonte 2026-07-06)
 
 Catalogue recentré sur **2 formats uniquement** : « Study With Me » scéniques (vue sur un beau
