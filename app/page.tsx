@@ -461,12 +461,6 @@ function PlaylistCard({
           </svg>
         </div>
         <span className="text-white text-xs font-semibold tracking-wide">Démarrer</span>
-        <button
-          onClick={(e) => { e.stopPropagation(); onShowTracks(); }}
-          className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white/80 hover:text-white text-[11px] font-medium transition-all"
-        >
-          Voir les titres
-        </button>
       </div>
 
       {/* Info (hidden on hover) */}
@@ -477,8 +471,24 @@ function PlaylistCard({
         )}
       </div>
 
-      {/* Playlist badge */}
-      <div className="absolute top-2 right-2">
+      {/* Badge + accès aux titres (bouton dédié hors de l'overlay « Démarrer »,
+          qui est trop à l'étroit sur une carte de cette taille) */}
+      <div className="absolute top-2 right-2 flex items-center gap-1.5">
+        <button
+          onClick={(e) => { e.stopPropagation(); onShowTracks(); }}
+          className="w-6 h-6 flex items-center justify-center rounded-md backdrop-blur-sm bg-black/60 text-white/70 hover:text-white hover:bg-black/80 transition-all"
+          title="Voir les titres & recommandations"
+          aria-label="Voir les titres de la playlist"
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <line x1="8" y1="6" x2="21" y2="6" strokeLinecap="round" />
+            <line x1="8" y1="12" x2="21" y2="12" strokeLinecap="round" />
+            <line x1="8" y1="18" x2="14" y2="18" strokeLinecap="round" />
+            <circle cx="4" cy="6" r="1" fill="currentColor" stroke="none" />
+            <circle cx="4" cy="12" r="1" fill="currentColor" stroke="none" />
+            <circle cx="4" cy="18" r="1" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
         <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-violet-500/30 text-violet-200">
           Playlist
         </span>
