@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useProjectStore, getProjectStatus, PROJECT_COLORS } from "@/store/projectStore";
+import { useNavStore } from "@/store/navStore";
 import { cn } from "@/lib/utils";
 
 export default function ProjectsSection() {
@@ -11,6 +12,12 @@ export default function ProjectsSection() {
   const [deadline, setDeadline] = useState("");
   const [budget, setBudget] = useState(20);
   const [color, setColor] = useState(PROJECT_COLORS[0]);
+
+  // Ouvre directement le formulaire si le bouton global « ＋ Créer → Projet » a été utilisé.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (useNavStore.getState().consumeCreate("project")) setOpen(true);
+  }, []);
 
   const create = () => {
     if (!name.trim()) return;

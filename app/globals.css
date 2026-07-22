@@ -197,7 +197,10 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.anim-section-in  { animation: sectionIn 0.2s ease-out both; }
+/* `backwards` (pas `both`) : un fill-mode `both` conserverait un transform
+   permanent → le wrapper deviendrait containing block des overlays `fixed`
+   descendants (modals ancrés sur la colonne au lieu du viewport). */
+.anim-section-in  { animation: sectionIn 0.2s ease-out backwards; }
 /* backwards (pas both) : ne pas « filler » l'état final, sinon l'animation
    écraserait les transitions opacity/transform de l'auto-hide du chrome */
 .anim-cascade     { animation: cascadeIn 0.45s ease-out backwards; }

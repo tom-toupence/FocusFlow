@@ -3,6 +3,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { localToday } from "@/store/statsStore";
+import { getCurrentUserId } from "@/lib/authState";
+import { upsertProject, deleteProject } from "@/lib/db";
 
 export interface Project {
   id: string;
@@ -33,22 +35,28 @@ export const useProjectStore = create<ProjectState>()(
       projects: [],
       activeProjectId: null,
 
-      addProject: (p) =>
-        set((s) => ({
-          projects: [
-            ...s.projects,
-            { ...p, id: crypto.randomUUID(), pomodorosDone: 0, createdAt: localToday() },
-          ],
-        })),
+      addProject: (p) => {
+        const project: Project = { ...p, id: crypto.randomUUID(), pomodorosDone: 0, createdAt: localToday() };
+        set((s) => ({ projects: [...s.projects, project] }));
+        const userId = getCurrentUserId();
+        if (userId) upsertProject(userId, project);
+      },
 
-      updateProject: (id, fields) =>
-        set((s) => ({ projects: s.projects.map((x) => (x.id === id ? { ...x, ...fields } : x)) })),
+      updateProject: (id, fields) => {
+        set((s) => ({ projects: s.projects.map((x) => (x.id === id ? { ...x, ...fields } : x)) }));
+        const userId = getCurrentUserId();
+        const updated = get().projects.find((x) => x.id === id);
+        if (userId && updated) upsertProject(userId, updated);
+      },
 
-      removeProject: (id) =>
+      removeProject: (id) => {
         set((s) => ({
           projects: s.projects.filter((x) => x.id !== id),
           activeProjectId: s.activeProjectId === id ? null : s.activeProjectId,
-        })),
+        }));
+        const userId = getCurrentUserId();
+        if (userId) deleteProject(userId, id);
+      },
 
       setActiveProject: (id) => set({ activeProjectId: id }),
 
@@ -58,6 +66,9 @@ export const useProjectStore = create<ProjectState>()(
         set((s) => ({
           projects: s.projects.map((x) => (x.id === target ? { ...x, pomodorosDone: x.pomodorosDone + 1 } : x)),
         }));
+        const userId = getCurrentUserId();
+        const updated = get().projects.find((x) => x.id === target);
+        if (userId && updated) upsertProject(userId, updated);
       },
     }),
     { name: "focusflow-projects" }

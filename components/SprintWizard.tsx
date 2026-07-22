@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { useNavStore } from "@/store/navStore";
 import { useSprintStore, getSprintStatus } from "@/store/sprintStore";
 import { usePlanStore, formatMinOfDay } from "@/store/planStore";
 import { localToday } from "@/store/statsStore";
@@ -27,6 +29,12 @@ export default function SprintWizard() {
   const [startTime, setStartTime] = useState("09:00");
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState<SprintPlan | null>(null);
+
+  // Ouvre directement l'assistant si le bouton global « ＋ Créer → Sprint deadline » a été utilisé.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (useNavStore.getState().consumeCreate("sprint")) setOpen(true);
+  }, []);
 
   const startMin = (() => {
     const [h, m] = startTime.split(":").map(Number);
@@ -142,8 +150,9 @@ export default function SprintWizard() {
         </button>
       </div>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-background/70 backdrop-blur-sm" onClick={() => setOpen(false)}>
+      {/* Portal : le wrapper de section animé (transform) piègerait le `fixed`. */}
+      {open && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm" onClick={() => setOpen(false)}>
           <div
             className="bg-background border border-foreground/10 rounded-2xl shadow-2xl shadow-black/20 w-full max-w-lg p-6 flex flex-col gap-4 max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
@@ -253,7 +262,8 @@ export default function SprintWizard() {
               Annuler
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </section>
   );

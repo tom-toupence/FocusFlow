@@ -27,7 +27,15 @@ import { useCommandPalette } from "@/components/CommandPalette";
 import Onboarding from "@/components/Onboarding";
 import PlaylistTracksModal from "@/components/PlaylistTracksModal";
 import DiscoverPanel from "@/components/DiscoverPanel";
+import LocalPlaylistModal from "@/components/LocalPlaylistModal";
+import { useLocalPlaylistStore, LocalPlaylist } from "@/store/localPlaylistStore";
+import { playLocalPlaylist } from "@/lib/playback";
 import { useProfileStore, resolvedProfile } from "@/store/profileStore";
+import SubTabs from "@/components/SubTabs";
+import CreateMenu from "@/components/CreateMenu";
+import { InsightsContent } from "@/app/insights/page";
+import { WrappedContent } from "@/app/wrapped/page";
+import { OrgTab, ActivityTab } from "@/store/navStore";
 
 const allMoods: VideoMood[] = ["lofi", "jazz", "ambience", "nature", "synthwave", "classical"];
 // Moods réellement présents dans le catalogue (évite des filtres vides)
@@ -511,6 +519,164 @@ function PlaylistCard({
   );
 }
 
+// ─── Playlist locale (Ma bibliothèque) ─────────────────────────────────────────
+
+function LocalPlaylistCard({
+  playlist,
+  onOpen,
+  onPlay,
+  onRename,
+  onDelete,
+}: {
+  playlist: LocalPlaylist;
+  onOpen: () => void;
+  onPlay: () => void;
+  onRename: (name: string) => void;
+  onDelete: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState(playlist.name);
+  const thumbs = playlist.tracks.slice(0, 4).map((t) => t.thumbnailUrl ?? `https://img.youtube.com/vi/${t.youtubeId}/mqdefault.jpg`);
+
+  const commitRename = () => {
+    const name = nameDraft.trim();
+    if (name) onRename(name);
+    setRenaming(false);
+  };
+
+  return (
+    <div className="group relative rounded-xl overflow-hidden aspect-video cursor-pointer transition-all duration-200 hover:ring-1 hover:ring-foreground/30 bg-foreground/5" onClick={onOpen}>
+      {/* Mosaïque des 4 premières miniatures (ou fond dégradé si vide) */}
+      {thumbs.length > 0 ? (
+        <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="overflow-hidden bg-foreground/10">
+              {thumbs[i] && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={thumbs[i]} alt="" className="w-full h-full object-cover" loading="lazy" />
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="w-full h-full bg-gradient-to-br from-emerald-900/60 to-teal-900/60 flex items-center justify-center">
+          <svg className="w-8 h-8 text-white/20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+            <path d="M9 18V5l12-2v13" strokeLinecap="round" strokeLinejoin="round" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+          </svg>
+        </div>
+      )}
+
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent" />
+
+      {/* Nom + compteur, renommage inline */}
+      <div className="absolute bottom-0 left-0 right-0 p-2.5" onClick={(e) => renaming && e.stopPropagation()}>
+        {renaming ? (
+          <input
+            autoFocus
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onBlur={commitRename}
+            onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") { setNameDraft(playlist.name); setRenaming(false); } }}
+            className="w-full bg-black/60 border border-white/20 rounded-lg px-2 py-1 text-xs text-white focus:outline-none"
+          />
+        ) : (
+          <>
+            <p className="text-white text-xs font-medium leading-tight truncate">{playlist.name}</p>
+            <p className="text-white/50 text-[10px] mt-0.5">{playlist.tracks.length} titre{playlist.tracks.length > 1 ? "s" : ""}</p>
+          </>
+        )}
+      </div>
+
+      {/* Play button (visible au survol / toujours sur tactile) */}
+      {playlist.tracks.length > 0 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onPlay(); }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 hidden sm:flex"
+          title="Lire"
+        >
+          <svg className="w-4 h-4 text-black ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+        </button>
+      )}
+
+      {/* Menu ⋯ */}
+      <div className="absolute top-2 right-2">
+        <button
+          onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+          className="w-6 h-6 flex items-center justify-center rounded-md backdrop-blur-sm bg-black/60 text-white/70 hover:text-white hover:bg-black/80 transition-all"
+          title="Options"
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg>
+        </button>
+        {menuOpen && (
+          <>
+            <div className="fixed inset-0 z-[129]" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} />
+            <div
+              className="absolute z-[130] right-0 top-full mt-1 w-40 bg-card border border-foreground/10 rounded-xl shadow-2xl p-1 flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => { setNameDraft(playlist.name); setRenaming(true); setMenuOpen(false); }}
+                className="text-left px-3 py-2 rounded-lg text-xs text-foreground/80 hover:bg-foreground/[0.06] transition-colors"
+              >
+                Renommer
+              </button>
+              <button
+                onClick={() => { onDelete(); setMenuOpen(false); }}
+                className="text-left px-3 py-2 rounded-lg text-xs text-red-400 hover:bg-red-500/10 transition-colors"
+              >
+                Supprimer
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NewLocalPlaylistModal({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string) => void }) {
+  const [name, setName] = useState("");
+  const handleCreate = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    onCreate(trimmed);
+  };
+  return (
+    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-sm bg-card border border-foreground/10 rounded-2xl shadow-2xl p-5 flex flex-col gap-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Nouvelle playlist</h2>
+          <button onClick={onClose} className="text-foreground/40 hover:text-foreground transition-colors">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); }}
+          placeholder="Nom de la playlist…"
+          className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-foreground/25 transition-colors"
+        />
+        <button
+          onClick={handleCreate}
+          disabled={!name.trim()}
+          className="py-2.5 bg-foreground text-background font-semibold text-sm rounded-xl hover:bg-foreground/90 disabled:opacity-30 transition-all"
+        >
+          Créer
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function CompletedTodosBacklog() {
   const { todos, deleteTodo } = useSessionStore();
   const [mounted, setMounted] = useState(false);
@@ -730,6 +896,7 @@ export default function LandingPage() {
   const router = useRouter();
   const { selectedVideoId, selectedPlaylistId, customVideos, addCustomVideo, removeCustomVideo } = useSessionStore();
   const { playlists, addPlaylist, removePlaylist } = usePlaylistStore();
+  const { playlists: localPlaylists, createPlaylist: createLocalPlaylist, renamePlaylist: renameLocalPlaylist, deletePlaylist: deleteLocalPlaylist } = useLocalPlaylistStore();
   const {
     accessToken, refreshToken, expiresAt,
     playlists: spotifyPlaylists, selectedPlaylistUri, isPremium,
@@ -746,7 +913,7 @@ export default function LandingPage() {
   const profileState = useProfileStore();
   const profile = resolvedProfile(profileState);
 
-  const { section, prevSection, mediaSource, setSection, openMedia } = useNavStore();
+  const { section, prevSection, mediaSource, orgTab, activityTab, setSection, openMedia, openOrg, openActivity } = useNavStore();
   const activeTab: "aujourdhui" | MediaSource | "activite" | "organisation" =
     section === "accueil" ? "aujourdhui"
     : section === "activite" ? "activite"
@@ -771,6 +938,9 @@ export default function LandingPage() {
   const [showAddPlaylistModal, setShowAddPlaylistModal] = useState(false);
   // Playlist dont on visualise les titres (modal « Voir les titres »).
   const [tracksPlaylist, setTracksPlaylist] = useState<SavedPlaylist | null>(null);
+  // Playlist locale ouverte (modal dédié) + mini-modal de création.
+  const [openLocalPlaylistId, setOpenLocalPlaylistId] = useState<string | null>(null);
+  const [showNewLocalPlaylistModal, setShowNewLocalPlaylistModal] = useState(false);
   const [spotifyLoading, setSpotifyLoading] = useState(false);
   const [spotifyApiError, setSpotifyApiError] = useState<"forbidden" | "error" | null>(null);
   const [spotifyReloadNonce, setSpotifyReloadNonce] = useState(0);
@@ -778,7 +948,7 @@ export default function LandingPage() {
   const [showProfilePanel, setShowProfilePanel] = useState(false);
 
   const catalogueVideos = activeFilter ? defaultVideos.filter((v) => v.mood === activeFilter) : defaultVideos;
-  const hasLibraryContent = customVideos.length > 0 || playlists.length > 0;
+  const hasLibraryContent = customVideos.length > 0 || playlists.length > 0 || localPlaylists.length > 0;
   const isSpotifyConnected = !!accessToken;
 
   // Surface a Spotify authorization error (e.g. user not added to the dev-mode app)
@@ -954,6 +1124,7 @@ export default function LandingPage() {
               </svg>
               <kbd className="text-[10px] border border-foreground/15 rounded px-1">⌘K</kbd>
             </button>
+            <CreateMenu />
             <button
               onClick={() => setShowProfilePanel(true)}
               className="relative w-8 h-8 rounded-full overflow-hidden bg-foreground/10 hover:ring-2 hover:ring-foreground/30 transition-all flex-shrink-0 flex items-center justify-center"
@@ -980,8 +1151,8 @@ export default function LandingPage() {
         {section === "ecouter" && (
           <div className="flex gap-1.5 mb-6 flex-wrap">
             <MediaTab id="catalogue" label="Catalogue" />
-            <MediaTab id="library" label="Ma bibliothèque" badge={hasLibraryContent ? `${customVideos.length + playlists.length}` : undefined} />
             <MediaTab id="discover" label="Découvrir" />
+            <MediaTab id="library" label="Ma bibliothèque" badge={hasLibraryContent ? `${customVideos.length + playlists.length + localPlaylists.length}` : undefined} />
             <MediaTab id="spotify" label="Spotify" accent="spotify" badge={isSpotifyConnected ? "Premium" : undefined} />
             <MediaTab id="twitch" label="Twitch" accent="twitch" badge={selectedChannel ? "Live" : undefined} />
           </div>
@@ -1048,31 +1219,9 @@ export default function LandingPage() {
         {/* ── Bibliothèque ───────────────────────────────────────────────────── */}
         {activeTab === "library" && (
           <>
-            <div className="flex items-end justify-between mb-8">
-              <div>
-                <h1 className="text-3xl font-semibold text-foreground tracking-tight">Ma bibliothèque</h1>
-                <p className="text-foreground/40 mt-1 text-sm">Tes vidéos et playlists personnelles, sauvegardées sur ton compte.</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-foreground/5 hover:bg-foreground/10 text-foreground/50 hover:text-foreground text-xs font-medium transition-all"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                    <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  Vidéo
-                </button>
-                <button
-                  onClick={() => setShowAddPlaylistModal(true)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-foreground/5 hover:bg-foreground/10 text-foreground/50 hover:text-foreground text-xs font-medium transition-all"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                    <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  Playlist
-                </button>
-              </div>
+            <div className="mb-8">
+              <h1 className="text-3xl font-semibold text-foreground tracking-tight">Ma bibliothèque</h1>
+              <p className="text-foreground/40 mt-1 text-sm">Ta file, tes playlists et tes vidéos personnelles, sauvegardées sur ton compte.</p>
             </div>
 
             {/* File de lecture FocusFlow — titres exacts contrôlables */}
@@ -1080,62 +1229,91 @@ export default function LandingPage() {
               <QueuePanel />
             </div>
 
-            {!hasLibraryContent ? (
-              <div className="flex flex-col items-center justify-center py-24 gap-4 text-foreground/25">
-                <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                  <path d="M19 11H5m14 0a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2m14 0V9a2 2 0 0 0-2-2M5 11V9a2 2 0 0 1 2-2m0 0V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2M7 7h10" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <p className="text-sm">Ta bibliothèque est vide</p>
-                <div className="flex gap-2">
-                  <button onClick={() => setShowAddModal(true)} className="px-4 py-2 rounded-xl bg-foreground/5 hover:bg-foreground/10 text-foreground/40 hover:text-foreground text-xs font-medium transition-all">
-                    Ajouter une vidéo
-                  </button>
-                  <button onClick={() => setShowAddPlaylistModal(true)} className="px-4 py-2 rounded-xl bg-foreground/5 hover:bg-foreground/10 text-foreground/40 hover:text-foreground text-xs font-medium transition-all">
-                    Ajouter une playlist
-                  </button>
-                </div>
+            {/* Mes playlists — collections locales, nommées, créées depuis AddToMenu */}
+            <section className="mb-10">
+              <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-4">Mes playlists</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                <button
+                  onClick={() => setShowNewLocalPlaylistModal(true)}
+                  className="aspect-video rounded-xl border-2 border-dashed border-foreground/15 hover:border-foreground/30 flex flex-col items-center justify-center gap-1.5 text-foreground/30 hover:text-foreground/60 transition-all"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span className="text-[11px] font-medium">Nouvelle playlist</span>
+                </button>
+                {localPlaylists.map((p) => (
+                  <LocalPlaylistCard
+                    key={p.id}
+                    playlist={p}
+                    onOpen={() => setOpenLocalPlaylistId(p.id)}
+                    onPlay={() => { if (playLocalPlaylist(p.id)) router.push("/settings"); }}
+                    onRename={(name) => renameLocalPlaylist(p.id, name)}
+                    onDelete={() => deleteLocalPlaylist(p.id)}
+                  />
+                ))}
               </div>
-            ) : (
-              <div className="flex flex-col gap-10">
-                {/* Custom videos */}
-                {customVideos.length > 0 && (
-                  <section>
-                    <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-4">Vidéos</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                      {customVideos.map((video) => (
-                        <VideoCard
-                          key={video.id}
-                          video={video}
-                          selected={selectedVideoId === video.id}
-                          isCustom={true}
-                          onStart={() => handleStart(video.id)}
-                          onRemove={() => removeCustomVideo(video.id)}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                )}
+            </section>
 
-                {/* Playlists */}
-                {playlists.length > 0 && (
-                  <section>
-                    <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-4">Playlists</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                      {playlists.map((playlist) => (
-                        <PlaylistCard
-                          key={playlist.id}
-                          playlist={playlist}
-                          selected={selectedPlaylistId === playlist.id}
-                          onStart={() => handleStartPlaylist(playlist.id)}
-                          onRemove={() => removePlaylist(playlist.id)}
-                          onShowTracks={() => setTracksPlaylist(playlist)}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                )}
+            {/* Playlists YouTube — playlists/mixes YouTube référencées (pas modifiables) */}
+            <section className="mb-10">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest">Playlists YouTube</p>
+                <button
+                  onClick={() => setShowAddPlaylistModal(true)}
+                  className="text-xs text-foreground/40 hover:text-foreground transition-colors flex items-center gap-1"
+                >
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M12 5v14M5 12h14" strokeLinecap="round" /></svg>
+                  Ajouter
+                </button>
               </div>
-            )}
+              {playlists.length === 0 ? (
+                <p className="text-sm text-foreground/25">Aucune playlist YouTube ajoutée.</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                  {playlists.map((playlist) => (
+                    <PlaylistCard
+                      key={playlist.id}
+                      playlist={playlist}
+                      selected={selectedPlaylistId === playlist.id}
+                      onStart={() => handleStartPlaylist(playlist.id)}
+                      onRemove={() => removePlaylist(playlist.id)}
+                      onShowTracks={() => setTracksPlaylist(playlist)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Vidéos */}
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest">Vidéos</p>
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="text-xs text-foreground/40 hover:text-foreground transition-colors flex items-center gap-1"
+                >
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M12 5v14M5 12h14" strokeLinecap="round" /></svg>
+                  Ajouter
+                </button>
+              </div>
+              {customVideos.length === 0 ? (
+                <p className="text-sm text-foreground/25">Aucune vidéo ajoutée.</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                  {customVideos.map((video) => (
+                    <VideoCard
+                      key={video.id}
+                      video={video}
+                      selected={selectedVideoId === video.id}
+                      isCustom={true}
+                      onStart={() => handleStart(video.id)}
+                      onRemove={() => removeCustomVideo(video.id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
           </>
         )}
 
@@ -1501,23 +1679,27 @@ export default function LandingPage() {
         {/* ── Activité ────────────────────────────────────────────────────────── */}
         {activeTab === "activite" && (
           <>
-            <div className="mb-8 flex items-end justify-between gap-4">
-              <div>
-                <h1 className="text-3xl font-semibold text-foreground tracking-tight">Activité</h1>
-                <p className="text-foreground/40 mt-1 text-sm">Ton niveau, tes stats et tes tâches accomplies.</p>
-              </div>
-              <button
-                onClick={() => router.push("/insights")}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 text-foreground/60 hover:text-foreground text-xs font-medium transition-all flex-shrink-0"
-              >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path d="M3 3v18h18M7 14l4-4 3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Statistiques détaillées
-              </button>
+            <div className="mb-8">
+              <h1 className="text-3xl font-semibold text-foreground tracking-tight">Activité</h1>
+              <p className="text-foreground/40 mt-1 text-sm">Ton niveau, tes stats et ton récap hebdo.</p>
             </div>
-            <StatsSection embedded />
-            <CompletedTodosBacklog />
+            <SubTabs<ActivityTab>
+              tabs={[
+                { id: "apercu", label: "Aperçu" },
+                { id: "stats", label: "Statistiques" },
+                { id: "wrapped", label: "Wrapped" },
+              ]}
+              active={activityTab}
+              onSelect={openActivity}
+            />
+            {activityTab === "apercu" && (
+              <>
+                <StatsSection embedded />
+                <CompletedTodosBacklog />
+              </>
+            )}
+            {activityTab === "stats" && <InsightsContent />}
+            {activityTab === "wrapped" && <WrappedContent />}
           </>
         )}
 
@@ -1526,15 +1708,30 @@ export default function LandingPage() {
           <>
             <div className="mb-8">
               <h1 className="text-3xl font-semibold text-foreground tracking-tight">Organisation</h1>
-              <p className="text-foreground/40 mt-1 text-sm">Projets, planning de la semaine, routines et journal.</p>
+              <p className="text-foreground/40 mt-1 text-sm">
+                {orgTab === "projets" && "Suis tes gros objectifs et le rythme à tenir."}
+                {orgTab === "planning" && "Planifie ta semaine en blocs de focus."}
+                {orgTab === "sprint" && "Un objectif, une deadline, un plan généré pour toi."}
+                {orgTab === "routines" && "Relance en un clic tes sessions favorites."}
+                {orgTab === "journal" && "Note ton humeur et ce qui a marché (ou pas)."}
+              </p>
             </div>
-            <div className="flex flex-col gap-12">
-              <SprintWizard />
-              <ProjectsSection />
-              <WeekPlanner />
-              <RoutinesManager />
-              <JournalTimeline />
-            </div>
+            <SubTabs<OrgTab>
+              tabs={[
+                { id: "projets", label: "Projets" },
+                { id: "planning", label: "Planning" },
+                { id: "sprint", label: "Sprint" },
+                { id: "routines", label: "Routines" },
+                { id: "journal", label: "Journal" },
+              ]}
+              active={orgTab}
+              onSelect={openOrg}
+            />
+            {orgTab === "projets" && <ProjectsSection />}
+            {orgTab === "planning" && <WeekPlanner />}
+            {orgTab === "sprint" && <SprintWizard />}
+            {orgTab === "routines" && <RoutinesManager />}
+            {orgTab === "journal" && <JournalTimeline />}
           </>
         )}
 
@@ -1560,6 +1757,23 @@ export default function LandingPage() {
         <AddPlaylistModal
           onClose={() => setShowAddPlaylistModal(false)}
           onAdd={(p) => { addPlaylist(p); setShowAddPlaylistModal(false); }}
+        />
+      )}
+
+      {/* Playlist locale ouverte */}
+      {openLocalPlaylistId && (
+        <LocalPlaylistModal playlistId={openLocalPlaylistId} onClose={() => setOpenLocalPlaylistId(null)} />
+      )}
+
+      {/* Création d'une playlist locale vide */}
+      {showNewLocalPlaylistModal && (
+        <NewLocalPlaylistModal
+          onClose={() => setShowNewLocalPlaylistModal(false)}
+          onCreate={(name) => {
+            const id = createLocalPlaylist(name);
+            setShowNewLocalPlaylistModal(false);
+            setOpenLocalPlaylistId(id);
+          }}
         />
       )}
 

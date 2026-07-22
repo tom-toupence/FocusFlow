@@ -45,13 +45,21 @@ Réponds UNIQUEMENT avec un objet JSON de la forme :
 {"days":[{"date":"YYYY-MM-DD","startMin":540,"durationMin":50,"label":"..."}],"tasks":[{"text":"...","pomodoroEstimate":2}],"mood":"lofi"}
 Aucun texte en dehors du JSON.`;
 
-const SYSTEM_MUSIC = `Tu es un expert en musique de concentration sur YouTube (lofi, ambient, study with me, paysages sonores).
-On te donne une liste de titres de vidéos récemment écoutées par l'utilisateur pendant ses sessions de focus.
-Déduis-en 3 à 4 THÈMES distincts qui lui plairaient (lieux, ambiances, genres proches mais pas identiques),
-et pour chaque thème construis une requête de recherche YouTube en anglais visant des vidéos LONGUES (mixes, study with me, ambiances).
+const SYSTEM_MUSIC = `Tu es un expert musical qui connaît parfaitement YouTube (lofi, ambient, OST, openings, mixes, study with me).
+On te donne des titres (et parfois des chaînes) de vidéos écoutées par l'utilisateur pendant ses sessions de focus.
+INTERPRÈTE ce que ces titres révèlent — ne te contente PAS des mots des titres :
+- identifie les UNIVERS (anime, jeu vidéo, film, série), les GENRES musicaux, les ARTISTES, les langues ;
+- GÉNÉRALISE : un titre d'anime → propose d'autres musiques d'anime (autres œuvres, openings, OST), pas seulement le même animé ;
+  un artiste → d'autres artistes du même genre ; un jeu → d'autres OST de jeux ; un lieu → d'autres ambiances comparables.
+Produis 3 à 5 THÈMES distincts et variés. Pour chacun : une requête de recherche YouTube en anglais qui vise des
+mixes/compilations (formats longs adaptés au focus), et une courte raison en français expliquant le lien avec ses écoutes.
 Réponds UNIQUEMENT avec un objet JSON de la forme :
-{"queries":[{"label":"Kyoto pluie","query":"rainy kyoto lofi ambient mix"}]}
-label = thème court en français, query = requête YouTube en anglais. Aucun texte hors du JSON.`;
+{"queries":[{"label":"Openings d'anime","query":"anime openings compilation mix","reason":"tu écoutes des OST d'anime"}]}
+label = thème court en français, query = requête YouTube en anglais, reason = ≤ 90 caractères en français. Aucun texte hors du JSON.`;
+
+const SYSTEM_MUSIC_PLAYLIST = `Les titres fournis appartiennent à UNE playlist de l'utilisateur (son nom est donné).
+Propose 2 à 3 requêtes de recherche YouTube (anglais) pour trouver des titres qui s'intégreraient naturellement à CETTE
+playlist : même ambiance, même univers, même genre. La reason (français, ≤ 90 car.) explique la cohérence avec la playlist.`;
 
 interface Task { text: string; pomodoroEstimate: number; }
 interface SprintDay { date: string; startMin: number; durationMin: number; label: string; }
@@ -118,7 +126,7 @@ function sanitizeSprint(raw: string | undefined, startDate: string, deadline: st
 }
 
 /** Parses + sanitizes the music discovery queries (or null if unusable). */
-function sanitizeMusicQueries(raw: string | undefined): { label: string; query: string }[] | null {
+function sanitizeMusicQueries(raw: string | undefined): { label: string; query: string; reason?: string }[] | null {
   if (!raw) return null;
   let parsed: { queries?: unknown };
   try {
@@ -126,13 +134,14 @@ function sanitizeMusicQueries(raw: string | undefined): { label: string; query: 
   } catch {
     return null;
   }
-  const list = Array.isArray(parsed.queries) ? (parsed.queries as { label?: unknown; query?: unknown }[]) : [];
+  const list = Array.isArray(parsed.queries) ? (parsed.queries as { label?: unknown; query?: unknown; reason?: unknown }[]) : [];
   const queries = list
     .filter((q) => q && typeof q.label === "string" && typeof q.query === "string" && q.query.trim().length >= 3)
-    .slice(0, 4)
+    .slice(0, 5)
     .map((q) => ({
       label: String(q.label).trim().slice(0, 40),
       query: String(q.query).trim().slice(0, 80),
+      ...(typeof q.reason === "string" && q.reason.trim() ? { reason: q.reason.trim().slice(0, 90) } : {}),
     }));
   return queries.length > 0 ? queries : null;
 }
@@ -187,7 +196,7 @@ const GEMINI_MUSIC_SCHEMA = {
       type: "ARRAY",
       items: {
         type: "OBJECT",
-        properties: { label: { type: "STRING" }, query: { type: "STRING" } },
+        properties: { label: { type: "STRING" }, query: { type: "STRING" }, reason: { type: "STRING" } },
         required: ["label", "query"],
       },
     },
@@ -275,17 +284,31 @@ export async function POST(request: NextRequest) {
 
   // ── Music discovery queries ────────────────────────────────────────────────
   if (body.type === "music") {
-    const titles = (Array.isArray((body as { titles?: unknown }).titles) ? ((body as { titles: unknown[] }).titles) : [])
-      .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
-      .slice(0, 20)
-      .map((t) => t.trim().slice(0, 120));
+    const b = body as { titles?: unknown; channels?: unknown; moods?: unknown; scope?: unknown; playlistName?: unknown };
+    const cleanList = (v: unknown, max: number, len: number) =>
+      (Array.isArray(v) ? v : [])
+        .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+        .slice(0, max)
+        .map((t) => t.trim().slice(0, len));
+    const titles = cleanList(b.titles, 20, 120);
     if (titles.length === 0) return NextResponse.json({ error: "empty" }, { status: 400 });
+    const channels = cleanList(b.channels, 15, 80);
+    const moods = cleanList(b.moods, 6, 20);
+    const isPlaylistScope = b.scope === "playlist";
+    const playlistName = typeof b.playlistName === "string" ? b.playlistName.trim().slice(0, 80) : "";
 
-    const user = `Titres écoutés récemment :\n${titles.map((t) => `- ${t}`).join("\n")}`;
+    const system = isPlaylistScope ? `${SYSTEM_MUSIC}\n\n${SYSTEM_MUSIC_PLAYLIST}` : SYSTEM_MUSIC;
+    const user = [
+      isPlaylistScope && playlistName ? `Playlist : « ${playlistName} »` : null,
+      `Titres écoutés récemment :\n${titles.map((t) => `- ${t}`).join("\n")}`,
+      channels.length > 0 ? `Chaînes : ${channels.join(" · ")}` : null,
+      moods.length > 0 ? `Ambiances de sa bibliothèque : ${moods.join(", ")}` : null,
+    ].filter(Boolean).join("\n\n");
+
     let lastMusic: ChatResult | null = null;
     for (const provider of [
-      GROQ_KEY ? () => callGroq(SYSTEM_MUSIC, user) : null,
-      GEMINI_KEY ? () => callGemini(SYSTEM_MUSIC, user, GEMINI_MUSIC_SCHEMA) : null,
+      GROQ_KEY ? () => callGroq(system, user) : null,
+      GEMINI_KEY ? () => callGemini(system, user, GEMINI_MUSIC_SCHEMA) : null,
     ]) {
       if (!provider) continue;
       const result = await provider();

@@ -8,6 +8,8 @@ import type { Video } from "@/data/videos";
 import type { Todo } from "@/store/sessionStore";
 import type { SavedPlaylist } from "@/store/playlistStore";
 import type { FocusBlock } from "@/store/planStore";
+import type { Project } from "@/store/projectStore";
+import type { LocalPlaylist } from "@/store/localPlaylistStore";
 
 // ─── Custom Videos ────────────────────────────────────────────────────────────
 
@@ -136,6 +138,111 @@ export async function upsertPlaylist(userId: string, playlist: SavedPlaylist): P
 export async function deletePlaylist(userId: string, playlistId: string): Promise<void> {
   if (!supabase) return;
   await supabase.from("user_playlists").delete().eq("id", playlistId).eq("user_id", userId);
+}
+
+// ─── Projects ─────────────────────────────────────────────────────────────────
+
+export async function fetchProjects(userId: string): Promise<Project[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at");
+  if (error) { console.error("[db] fetchProjects:", error.message); return []; }
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    color: r.color,
+    deadline: r.deadline ?? null,
+    pomodoroBudget: r.pomodoro_budget ?? 0,
+    pomodorosDone: r.pomodoros_done ?? 0,
+    createdAt: r.created_at_local ?? "",
+  }));
+}
+
+export async function upsertProject(userId: string, p: Project): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase.from("projects").upsert({
+    id: p.id,
+    user_id: userId,
+    name: p.name,
+    color: p.color,
+    deadline: p.deadline,
+    pomodoro_budget: p.pomodoroBudget,
+    pomodoros_done: p.pomodorosDone,
+    created_at_local: p.createdAt,
+  });
+  if (error) console.error("[db] upsertProject:", error.message);
+}
+
+export async function deleteProject(userId: string, projectId: string): Promise<void> {
+  if (!supabase) return;
+  await supabase.from("projects").delete().eq("id", projectId).eq("user_id", userId);
+}
+
+// ─── Playlists locales (créées dans l'app) ────────────────────────────────────
+
+export async function fetchLocalPlaylists(userId: string): Promise<LocalPlaylist[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("local_playlists")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at");
+  if (error) { console.error("[db] fetchLocalPlaylists:", error.message); return []; }
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    tracks: Array.isArray(r.tracks) ? r.tracks : [],
+    createdAt: Number(r.created_at) || 0,
+    updatedAt: Number(r.updated_at) || 0,
+  }));
+}
+
+export async function upsertLocalPlaylist(userId: string, p: LocalPlaylist): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase.from("local_playlists").upsert({
+    id: p.id,
+    user_id: userId,
+    name: p.name,
+    tracks: p.tracks,
+    created_at: p.createdAt,
+    updated_at: p.updatedAt,
+  });
+  if (error) console.error("[db] upsertLocalPlaylist:", error.message);
+}
+
+export async function deleteLocalPlaylist(userId: string, playlistId: string): Promise<void> {
+  if (!supabase) return;
+  await supabase.from("local_playlists").delete().eq("id", playlistId).eq("user_id", userId);
+}
+
+// ─── User state (KV jsonb pour les petits stores) ─────────────────────────────
+// Une seule table pour synchroniser routines, journal, objectif, historique de
+// lecture, distractions, succès, sprint — merge par type côté client (stateSync).
+
+export async function fetchUserState(userId: string): Promise<Record<string, { value: unknown; updatedAt: number }>> {
+  if (!supabase) return {};
+  const { data, error } = await supabase
+    .from("user_state")
+    .select("key, value, updated_at")
+    .eq("user_id", userId);
+  if (error) { console.error("[db] fetchUserState:", error.message); return {}; }
+  const result: Record<string, { value: unknown; updatedAt: number }> = {};
+  for (const r of data ?? []) {
+    result[r.key] = { value: r.value, updatedAt: Number(r.updated_at) || 0 };
+  }
+  return result;
+}
+
+export async function upsertUserState(userId: string, key: string, value: unknown): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase.from("user_state").upsert(
+    { user_id: userId, key, value, updated_at: Date.now() },
+    { onConflict: "user_id,key" }
+  );
+  if (error) console.error("[db] upsertUserState:", error.message);
 }
 
 // ─── User Profile ─────────────────────────────────────────────────────────────

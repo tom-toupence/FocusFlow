@@ -36,6 +36,29 @@ function Panel({
 
 export default function WrappedPage() {
   const router = useRouter();
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="h-14 flex items-center px-6 border-b border-foreground/[0.06]">
+        <button
+          onClick={() => router.push("/")}
+          className="flex items-center gap-1.5 text-sm text-foreground/40 hover:text-foreground/80 transition-colors"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Retour
+        </button>
+        <span className="text-sm font-semibold text-foreground/80 tracking-tight mx-auto">Ma semaine</span>
+        <div className="w-16" />
+      </header>
+
+      <WrappedContent />
+    </div>
+  );
+}
+
+export function WrappedContent() {
   const [mounted, setMounted] = useState(false);
   const [weekOffset, setWeekOffset] = useState(-1);
 
@@ -62,46 +85,34 @@ export default function WrappedPage() {
     ? MOODS[Math.min(4, Math.max(0, Math.round(data.avgMood) - 1))].emoji
     : null;
 
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="h-14 flex items-center px-6 border-b border-foreground/[0.06]">
-        <button
-          onClick={() => router.push("/")}
-          className="flex items-center gap-1.5 text-sm text-foreground/40 hover:text-foreground/80 transition-colors"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Retour
-        </button>
-        <span className="text-sm font-semibold text-foreground/80 tracking-tight mx-auto">Ma semaine</span>
-        <div className="flex items-center gap-1 text-xs">
-          <button
-            onClick={() => setWeekOffset(-1)}
-            className={cn("px-2.5 py-1 rounded-lg transition-colors", weekOffset === -1 ? "bg-foreground/10 text-foreground" : "text-foreground/35 hover:text-foreground/60")}
-          >
-            Passée
-          </button>
-          <button
-            onClick={() => setWeekOffset(0)}
-            className={cn("px-2.5 py-1 rounded-lg transition-colors", weekOffset === 0 ? "bg-foreground/10 text-foreground" : "text-foreground/35 hover:text-foreground/60")}
-          >
-            En cours
-          </button>
-        </div>
-      </header>
+  if (!data) return null;
 
-      {!data ? null : (
+  return (
         <main className="max-w-3xl mx-auto px-6 py-10 flex flex-col gap-6">
           {/* Title */}
-          <div>
-            <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-1">
-              {weekOffset === -1 ? "Ta semaine passée" : "Semaine en cours"} · {wrappedWeekLabel(data)}
-            </p>
-            <h1 className="text-3xl font-light text-foreground tracking-tight">
-              {data.minutes > 0 ? "Voilà ce que tu as accompli ✨" : "Une semaine calme…"}
-            </h1>
+          <div className="flex items-end justify-between gap-4 flex-wrap">
+            <div>
+              <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-1">
+                {weekOffset === -1 ? "Ta semaine passée" : "Semaine en cours"} · {wrappedWeekLabel(data)}
+              </p>
+              <h1 className="text-3xl font-light text-foreground tracking-tight">
+                {data.minutes > 0 ? "Voilà ce que tu as accompli ✨" : "Une semaine calme…"}
+              </h1>
+            </div>
+            <div className="flex items-center gap-1 text-xs">
+              <button
+                onClick={() => setWeekOffset(-1)}
+                className={cn("px-2.5 py-1 rounded-lg transition-colors", weekOffset === -1 ? "bg-foreground/10 text-foreground" : "text-foreground/35 hover:text-foreground/60")}
+              >
+                Passée
+              </button>
+              <button
+                onClick={() => setWeekOffset(0)}
+                className={cn("px-2.5 py-1 rounded-lg transition-colors", weekOffset === 0 ? "bg-foreground/10 text-foreground" : "text-foreground/35 hover:text-foreground/60")}
+              >
+                En cours
+              </button>
+            </div>
           </div>
 
           {/* Hero + grid */}
@@ -188,7 +199,5 @@ export default function WrappedPage() {
             <p className="text-[11px] text-foreground/25">Image 1080×1350 générée en local — rien n&apos;est envoyé en ligne.</p>
           </div>
         </main>
-      )}
-    </div>
   );
 }

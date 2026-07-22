@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { useRouter } from "next/navigation";
-import { useNavStore, NavSection, MediaSource } from "@/store/navStore";
+import { useNavStore, NavSection, MediaSource, OrgTab, ActivityTab } from "@/store/navStore";
 import { cn } from "@/lib/utils";
 
 // État d'ouverture partagé : ⌘K (clavier) + bouton header peuvent tous deux l'ouvrir.
@@ -53,7 +53,10 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
 
   const goSection = (s: NavSection) => () => { useNavStore.getState().setSection(s); router.push("/"); onClose(); };
   const goMedia = (m: MediaSource) => () => { useNavStore.getState().openMedia(m); router.push("/"); onClose(); };
+  const goOrg = (t: OrgTab) => () => { useNavStore.getState().openOrg(t); router.push("/"); onClose(); };
+  const goActivity = (t: ActivityTab) => () => { useNavStore.getState().openActivity(t); router.push("/"); onClose(); };
   const goRoute = (path: string) => () => { router.push(path); onClose(); };
+  const create = (k: "project" | "sprint") => () => { useNavStore.getState().requestCreate(k); router.push("/"); onClose(); };
 
   const commands: Command[] = [
     { id: "start", label: "Démarrer une session", hint: "Choisir une ambiance", keywords: "demarrer session focus pomodoro play lancer", run: goMedia("catalogue") },
@@ -65,7 +68,17 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
     { id: "spotify", label: "Spotify", keywords: "spotify musique premium", run: goMedia("spotify") },
     { id: "twitch", label: "Twitch", keywords: "twitch live stream vod", run: goMedia("twitch") },
     { id: "organisation", label: "Organisation", hint: "Projets, planning, routines", keywords: "organisation projets planning routines sprint journal", run: goSection("organisation") },
+    { id: "projets", label: "Projets", hint: "Organisation", keywords: "projets deadlines budget pomodoros organisation", run: goOrg("projets") },
+    { id: "planning", label: "Planning de la semaine", hint: "Organisation", keywords: "planning semaine time-blocking blocs organisation", run: goOrg("planning") },
+    { id: "sprint", label: "Sprint", hint: "Organisation", keywords: "sprint deadline objectif organisation", run: goOrg("sprint") },
+    { id: "routines", label: "Routines", hint: "Organisation", keywords: "routines sessions favorites organisation", run: goOrg("routines") },
+    { id: "journal", label: "Journal", hint: "Organisation", keywords: "journal humeur reflexion organisation", run: goOrg("journal") },
+    { id: "create-project", label: "Créer un projet", hint: "Formulaire prêt", keywords: "creer nouveau projet", run: create("project") },
+    { id: "create-sprint", label: "Créer un sprint", hint: "Formulaire prêt", keywords: "creer nouveau sprint deadline", run: create("sprint") },
+    { id: "create-playlist", label: "Créer une playlist", hint: "Depuis Ma bibliothèque", keywords: "creer nouvelle playlist locale musique", run: goMedia("library") },
     { id: "activite", label: "Activité", hint: "Stats & progression", keywords: "activite stats progression badges", run: goSection("activite") },
+    { id: "stats", label: "Statistiques", hint: "Activité", keywords: "insights stats graphiques export activite", run: goActivity("stats") },
+    { id: "wrapped-tab", label: "Wrapped", hint: "Activité", keywords: "wrapped recap semaine partage activite", run: goActivity("wrapped") },
     { id: "settings", label: "Réglages", hint: "Preset & tâches", keywords: "reglages settings preset taches kanban coach", run: goRoute("/settings") },
     { id: "insights", label: "Statistiques détaillées", keywords: "insights stats graphiques export", run: goRoute("/insights") },
     { id: "wrapped", label: "Récap hebdo", keywords: "wrapped recap semaine partage", run: goRoute("/wrapped") },

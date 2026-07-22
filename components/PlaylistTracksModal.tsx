@@ -8,16 +8,21 @@ import {
   fetchMixVideos,
   usePlaylistStore,
 } from "@/store/playlistStore";
-import { useQueueStore } from "@/store/queueStore";
-import { toast } from "@/components/Toast";
-import { cn } from "@/lib/utils";
+import { LocalTrack } from "@/store/localPlaylistStore";
+import { fetchAiQueries, fetchSearchVideos } from "@/lib/recommendations";
+import AddToMenu from "@/components/AddToMenu";
 
 interface Track { id: string; title: string; }
 
+function toLocalTrack(t: Track): LocalTrack {
+  return { youtubeId: t.id, title: t.title, thumbnailUrl: `https://img.youtube.com/vi/${t.id}/mqdefault.jpg` };
+}
+
 // Visualisation des titres d'une playlist sauvegardée (résolution serveur, comme
-// en session) + recommandations liées. « + Playlist » ajoute un titre recommandé
-// aux extras de la playlist (joués à sa suite — on ne peut pas modifier une
-// playlist YouTube elle-même) ; « + File » l'ajoute à la File FocusFlow.
+// en session) + recommandations liées. Le menu « ＋ » (AddToMenu, identique
+// partout dans le volet musique) gère file/bibliothèque/playlists locales ;
+// « Cette playlist » ajoute un titre recommandé aux extras de la playlist
+// (joués à sa suite — on ne peut pas modifier une playlist YouTube elle-même).
 export default function PlaylistTracksModal({
   playlist,
   onClose,
@@ -27,8 +32,6 @@ export default function PlaylistTracksModal({
 }) {
   const [tracks, setTracks] = useState<Track[] | null>(null);
   const [recs, setRecs] = useState<Track[] | null>(null);
-  const queueItems = useQueueStore((s) => s.items);
-  const addToQueue = useQueueStore((s) => s.addItem);
   // Version vivante de la playlist (extras mis à jour en direct).
   const live = usePlaylistStore((s) => s.playlists.find((p) => p.id === playlist.id)) ?? playlist;
   const extras = live.extraVideos ?? [];
@@ -45,12 +48,35 @@ export default function PlaylistTracksModal({
       if (cancelled) return;
       setTracks(result);
 
-      // Recommandations : mix radio YouTube semé sur le 1er titre de la playlist.
+      // Recommandations : le coach IA propose des titres cohérents avec CETTE
+      // playlist (interprétation univers/genre) ; repli = mix RD du 1er titre.
+      const known = new Set(result.map((t) => t.id));
+      const aiQueries = result.length > 0
+        ? await fetchAiQueries({
+            titles: result.slice(0, 20).map((t) => t.title),
+            scope: "playlist",
+            playlistName: playlist.title,
+          })
+        : null;
+      if (cancelled) return;
+      if (aiQueries && aiQueries.length > 0) {
+        const found = (await Promise.all(aiQueries.slice(0, 2).map((q) => fetchSearchVideos(q.query)))).flat();
+        if (cancelled) return;
+        const seen = new Set<string>();
+        const merged = found.filter((v) => {
+          if (known.has(v.id) || seen.has(v.id)) return false;
+          seen.add(v.id);
+          return true;
+        }).slice(0, 8);
+        if (merged.length > 0) {
+          setRecs(merged.map((v) => ({ id: v.id, title: v.title })));
+          return;
+        }
+      }
       const seed = result[0]?.id ?? playlist.startVideoId;
       if (!seed) { setRecs([]); return; }
       const { ids, titles } = await fetchMixVideos(`RD${seed}`, seed);
       if (cancelled) return;
-      const known = new Set(result.map((t) => t.id));
       setRecs(
         ids
           .filter((id) => id !== seed && !known.has(id))
@@ -59,21 +85,7 @@ export default function PlaylistTracksModal({
       );
     })();
     return () => { cancelled = true; };
-  }, [playlist.playlistId, playlist.startVideoId]);
-
-  const handleAddQueue = (t: Track) => {
-    addToQueue({
-      youtubeId: t.id,
-      title: t.title,
-      thumbnailUrl: `https://img.youtube.com/vi/${t.id}/mqdefault.jpg`,
-    });
-    toast({ title: "Ajouté à la file", description: t.title, emoji: "🎵", accent: "emerald" });
-  };
-
-  const handleAddToPlaylist = (t: Track) => {
-    addExtraVideo(live.id, t);
-    toast({ title: "Ajouté à la playlist", description: `${t.title} sera joué à la suite de « ${live.title} ».`, emoji: "🎶", accent: "emerald" });
-  };
+  }, [playlist.playlistId, playlist.startVideoId, playlist.title]);
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4" onClick={onClose}>
@@ -113,12 +125,7 @@ export default function PlaylistTracksModal({
             <div className="flex flex-col gap-1">
               {tracks.map((t, idx) => (
                 <TrackRow key={t.id} track={t} index={idx + 1}>
-                  <ActionButton
-                    disabled={queueItems.some((i) => i.youtubeId === t.id)}
-                    labelOn="Dans la file"
-                    labelOff="+ File"
-                    onClick={() => handleAddQueue(t)}
-                  />
+                  <AddToMenu track={toLocalTrack(t)} />
                 </TrackRow>
               ))}
             </div>
@@ -157,17 +164,9 @@ export default function PlaylistTracksModal({
                   const added = extras.some((e) => e.id === t.id);
                   return (
                     <TrackRow key={t.id} track={t}>
-                      <ActionButton
-                        disabled={added}
-                        labelOn="Ajouté"
-                        labelOff="+ Playlist"
-                        onClick={() => handleAddToPlaylist(t)}
-                      />
-                      <ActionButton
-                        disabled={queueItems.some((i) => i.youtubeId === t.id)}
-                        labelOn="Dans la file"
-                        labelOff="+ File"
-                        onClick={() => handleAddQueue(t)}
+                      <AddToMenu
+                        track={toLocalTrack(t)}
+                        extra={{ label: "Cette playlist", added, onAdd: () => addExtraVideo(live.id, t) }}
                       />
                     </TrackRow>
                   );
@@ -181,7 +180,7 @@ export default function PlaylistTracksModal({
   );
 }
 
-function TrackRow({ track, index, children }: { track: Track; index?: number; children: React.ReactNode }) {
+export function TrackRow({ track, index, children }: { track: Track; index?: number; children: React.ReactNode }) {
   return (
     <div className="group flex items-center gap-3 px-2 py-1.5 rounded-xl hover:bg-foreground/[0.04] transition-colors">
       {index !== undefined && (
@@ -194,22 +193,5 @@ function TrackRow({ track, index, children }: { track: Track; index?: number; ch
       <p className="flex-1 min-w-0 text-sm text-foreground/85 truncate">{track.title}</p>
       <div className="flex items-center gap-1 flex-shrink-0">{children}</div>
     </div>
-  );
-}
-
-function ActionButton({ disabled, labelOn, labelOff, onClick }: { disabled: boolean; labelOn: string; labelOff: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all",
-        disabled
-          ? "text-foreground/25 bg-foreground/5 cursor-default"
-          : "text-foreground/60 hover:text-foreground bg-foreground/5 hover:bg-foreground/10"
-      )}
-    >
-      {disabled ? labelOn : labelOff}
-    </button>
   );
 }

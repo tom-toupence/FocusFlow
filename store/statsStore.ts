@@ -2,6 +2,8 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { getCurrentUserId } from "@/lib/authState";
+import { upsertWorkSession } from "@/lib/db";
 
 export interface DayStats {
   date: string; // "YYYY-MM-DD" local time
@@ -44,16 +46,16 @@ export const useStatsStore = create<StatsState>()(
         const key = localToday();
         const { days } = get();
         const existing = days[key] ?? { date: key, sessions: 0, minutesWorked: 0 };
-        set({
-          days: {
-            ...days,
-            [key]: {
-              ...existing,
-              sessions: existing.sessions + 1,
-              minutesWorked: existing.minutesWorked + Math.max(1, minutesWorked),
-            },
-          },
-        });
+        const updated = {
+          ...existing,
+          sessions: existing.sessions + 1,
+          minutesWorked: existing.minutesWorked + Math.max(1, minutesWorked),
+        };
+        set({ days: { ...days, [key]: updated } });
+        // Sync multi-appareils : sans cet upsert, la table reste vide et le
+        // merge au login (SupabaseProvider) n'a rien à récupérer.
+        const userId = getCurrentUserId();
+        if (userId) upsertWorkSession(userId, key, updated.sessions, updated.minutesWorked);
       },
     }),
     { name: "focusflow-stats" }

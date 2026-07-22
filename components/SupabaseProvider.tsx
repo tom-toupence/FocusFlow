@@ -12,8 +12,11 @@
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { setCurrentUserId } from "@/lib/authState";
-import { fetchCustomVideos, fetchTodos, fetchWorkSessions, fetchPlaylists, fetchProfile, fetchPlanBlocks, upsertPlanBlock } from "@/lib/db";
+import { fetchCustomVideos, fetchTodos, fetchWorkSessions, fetchPlaylists, fetchProfile, fetchPlanBlocks, upsertPlanBlock, fetchProjects, upsertProject, fetchLocalPlaylists, upsertLocalPlaylist } from "@/lib/db";
+import { useLocalPlaylistStore } from "@/store/localPlaylistStore";
+import { applyRemoteState } from "@/lib/stateSync";
 import { usePlanStore } from "@/store/planStore";
+import { useProjectStore } from "@/store/projectStore";
 import { useSessionStore } from "@/store/sessionStore";
 import { usePlaylistStore } from "@/store/playlistStore";
 import { useStatsStore } from "@/store/statsStore";
@@ -54,13 +57,14 @@ export default function SupabaseProvider({ children }: { children: React.ReactNo
         user.email ?? null,
       );
 
-      const [remoteVideos, remoteTodos, remoteSessions, remotePlaylists, remoteProfile, remoteBlocks] = await Promise.all([
+      const [remoteVideos, remoteTodos, remoteSessions, remotePlaylists, remoteProfile, remoteBlocks, remoteProjects] = await Promise.all([
         fetchCustomVideos(userId),
         fetchTodos(userId),
         fetchWorkSessions(userId),
         fetchPlaylists(userId),
         fetchProfile(userId),
         fetchPlanBlocks(userId),
+        fetchProjects(userId),
       ]);
 
       // Load custom profile overrides
@@ -112,6 +116,32 @@ export default function SupabaseProvider({ children }: { children: React.ReactNo
         const localOnly = s.playlists.filter((p) => !remoteIds.has(p.id));
         return { playlists: [...remotePlaylists, ...localOnly] };
       });
+
+      // Merge projets : remote wins, on conserve et pousse les locaux non en DB.
+      useProjectStore.setState((s) => {
+        const remoteIds = new Set(remoteProjects.map((p) => p.id));
+        const localOnly = s.projects.filter((p) => !remoteIds.has(p.id));
+        for (const p of localOnly) upsertProject(userId, p);
+        return { projects: [...remoteProjects, ...localOnly] };
+      });
+
+      // Merge playlists locales : la plus récemment modifiée gagne par id,
+      // on conserve et pousse les locales inconnues du remote.
+      const remoteLocalPlaylists = await fetchLocalPlaylists(userId);
+      useLocalPlaylistStore.setState((s) => {
+        const remoteById = new Map(remoteLocalPlaylists.map((p) => [p.id, p]));
+        const merged = s.playlists.map((local) => {
+          const remote = remoteById.get(local.id);
+          if (!remote) { upsertLocalPlaylist(userId, local); return local; }
+          remoteById.delete(local.id);
+          return remote.updatedAt >= local.updatedAt ? remote : local;
+        });
+        return { playlists: [...merged, ...remoteById.values()] };
+      });
+
+      // Petits stores (routines, journal, objectif, historique, distractions,
+      // succès, sprint) : table KV user_state + subscriptions de push.
+      await applyRemoteState(userId);
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {

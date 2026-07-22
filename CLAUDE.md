@@ -370,8 +370,9 @@ Relecture `code-reviewer` passée (fix du double avancement + bouton boucle masq
 - **Splash interactif** : Paper Shaders **remplacé par un shader WebGL2 maison** (zéro dépendance,
   `@paper-design/shaders-react` désinstallé) — vagues ambiantes lentes, **clic = onde de choc**
   (anneau amorti, 8 max) puis fondu après 750 ms ; auto-fondu après 3,5 s ; touche = skip.
-  **Pas de suivi de souris** (retiré à la demande de l'utilisateur : l'eau reste calme, seul le
-  curseur natif bouge). Repli statique conservé (reduced-motion / pas de WebGL2).
+  **La déformation suit la souris** (lerp) et le **curseur système est masqué** (`cursor-none`) :
+  c'est l'ondulation de l'eau qui matérialise la position du pointeur.
+  Repli statique conservé (reduced-motion / pas de WebGL2).
 - **« Voir les titres » déplacé** : le bouton était dans l'overlay « Démarrer » de la carte
   playlist (`aspect-video` étroite) → clipé, et le clic retombait sur la carte = lancement de
   session. Il est maintenant un **bouton d'angle dédié en haut à droite** (icône liste, toujours
@@ -390,3 +391,80 @@ Hong Kong, Vietnam (Ha Long), Thaïlande, Singapour, Bali, Népal, Guilin. Quelq
 `jazz`/`synthwave`/`classical` restent dans le type pour les vidéos custom). `lib/sprint.ts` et
 `Onboarding.tsx` ne pointent plus que vers des moods présents.
 **Supprimés** : cafés/cheminées/cozy, jazz lounges, city pop/synthwave, NYC/Dubaï, sons purs (vagues).
+
+## Journal de session — 2026-07-22 (refonte UX musique, lots 6-8 : AddToMenu, Découvrir, playlists locales)
+
+Suite du plan « Refonte UX musique » (lots 6/6bis/7/8, fondations `localPlaylistStore`/`lib/playback.ts`
+déjà livrées) :
+
+1. **`components/AddToMenu.tsx`** (nouveau) : menu « ＋ » réutilisable partout dans le volet musique
+   (Découvrir, recherche, titres de playlist) — Lire (optionnel) · File d'attente · Ma bibliothèque ·
+   Ajouter à une playlist locale (avec coches « déjà ajouté ») · Nouvelle playlist… (nom inline, créer
+   + ajouter en un geste). Popover desktop / bottom-sheet mobile, toasts systématiques. Lit lui-même
+   `queueStore`/`sessionStore`/`localPlaylistStore` pour ses états.
+2. **Découvrir refondu** (`DiscoverPanel.tsx`) : cartes avec actions **toujours visibles** (miniature
+   cliquable + `[▶ Lire] [AddToMenu]` sous le titre, plus d'overlay hover-only) ; **recherche intégrée**
+   en tête (`fetchSearchVideos`, debounce 400 ms) qui bascule le panneau en mode résultats ; état vide
+   (aucun historique + pas de recherche) avec **chips de thèmes cliquables** (Lofi, Anime OST, Piano,
+   Game OST, Study with me) qui remplissent la recherche.
+3. **`PlaylistTracksModal.tsx`** : les 3 catégories de lignes (titres résolus, extras, recommandations
+   liées) utilisent désormais `AddToMenu` ; les recos gardent l'entrée contextuelle « Cette playlist »
+   (extras via `addExtraVideo`). `TrackRow` exporté.
+4. **`QueuePanel.tsx`** : renommé « Ma file de lecture » → **« File d'attente »** (sous-texte : « Lue en
+   session — remplacée quand tu lances une playlist. ») + bouton **« Sauvegarder en playlist »**
+   (prompt inline → `createPlaylist` + `addTrack` par titre + toast).
+5. **`components/LocalPlaylistModal.tsx`** (nouveau, clone structurel de `PlaylistTracksModal`) : nom
+   éditable inline (crayon), bouton **▶ Lire** (`playLocalPlaylist`), titres avec ↑/↓/retirer, état vide
+   pédagogique. Section « Recommandations pour cette playlist » ajoutée au lot 9 (cf. entrée suivante).
+6. **Bibliothèque restructurée** (`app/page.tsx`) : ordre des onglets Écouter =
+   **Catalogue | Découvrir | Ma bibliothèque | Spotify | Twitch** ; badge bibliothèque =
+   `customVideos + playlists + localPlaylists`. 4 blocs toujours visibles : **File d'attente** ·
+   **Mes playlists** (grille, carte « ＋ Nouvelle playlist » en tête + `LocalPlaylistCard` — mosaïque
+   4 miniatures, ▶ au survol, menu ⋯ renommer/supprimer inline) · **Playlists YouTube** (renommée,
+   ex-« Playlists ») · **Vidéos**. Chaque section a son propre bouton « Ajouter » et son propre état
+   vide (fini le grand écran bloquant « bibliothèque vide »). `NewLocalPlaylistModal` (mini-modal nom
+   seul) + `LocalPlaylistModal` montés en bas de page (`openLocalPlaylistId`).
+7. **CommandPalette** : entrée « Créer une playlist » (ouvre Ma bibliothèque, où la carte de création
+   est visible).
+
+`npx tsc --noEmit` et `npm run build` verts.
+
+## Journal de session — 2026-07-22 (suite : lots 1-5 & 9 — modals, splash, SYNC, IA globale, coach 2.0)
+
+1. **Fix modals** : `.anim-section-in` passé de `both` à `backwards` (globals.css) — un fill-mode `both`
+   conservait un `transform` permanent sur le wrapper de section → les overlays `fixed` descendants
+   (SprintWizard, CalendarSync) s'ancraient sur la colonne centrale (fond « bizarre » avec bande claire).
+   Les deux modals passent aussi par **`createPortal(document.body)`** + scrim `bg-black/70` harmonisé.
+   ⚠️ Règle : tout nouveau modal DANS une section de `app/page.tsx` doit être portalé ou hoisté.
+2. **Splash — vague de révélation** (`SplashIntro.tsx`) : canvas WebGL2 en `alpha:true`, phases
+   `show → revealing → fading → done`. Clic = onde de choc puis (450 ms après) **révélation circulaire
+   depuis le clic** (uniform `u_reveal`/`u_revealCenter`, bord ondulant par modulation angulaire,
+   alpha prémultiplié → le site apparaît DANS le cercle), puis fondu court du résidu. Touche/idle 3,5 s
+   = révélation depuis le centre. Replis conservés.
+3. **SYNC MULTI-APPAREILS (gros morceau)** — cause racine des stats absentes sur un autre PC :
+   `recordSession` n'appelait JAMAIS `upsertWorkSession` (table vide → merge login no-op). Corrigé.
+   - `projectStore` synchronisé (nouvelle table `projects`, upsert dans add/update/logPomodoro).
+   - **`lib/stateSync.ts`** : table KV **`user_state`** (jsonb par clé) pour routines / journal / goal /
+     play_history / distractions / achievements / sprint. Merge par type au login (union par id pour les
+     listes, max par date pour les compteurs, remote-wins pour les objets), puis `store.subscribe` →
+     push debouncé 2 s. Flag `applying` anti-boucle. `notesStore`/`prefsStore` volontairement locaux.
+   - **`supabase/schema.sql` réécrit COMPLET et idempotent** : corrige l'existant (table `profiles`
+     absente !, colonnes `todos` manquantes → upserts qui échouaient en silence, `extra_videos`) +
+     nouvelles tables `projects`, `user_state`, `local_playlists`, RLS partout. À ré-exécuter tel quel.
+4. **Refonte IA globale** : `navStore` étendu (`orgTab`, `activityTab`, `pendingCreate`/`requestCreate`/
+   `consumeCreate`) ; **`SubTabs`** générique ; **Organisation en sous-onglets** (Projets | Planning |
+   Sprint | Routines | Journal — fini le scroll fourre-tout) ; **Activité = hub** (Aperçu | Statistiques |
+   Wrapped — contenus extraits en `InsightsContent`/`WrappedContent`, routes /insights et /wrapped
+   conservées en wrappers) ; **bouton global « ＋ Créer »** dans le header (`CreateMenu.tsx` : Session /
+   Projet / Sprint / Bloc planning / Tâche / Routine — ouvre directement le bon formulaire via
+   `pendingCreate`) ; CommandPalette enrichie (sous-onglets + créations).
+5. **Playlists locales** : `store/localPlaylistStore.ts` (+ table `local_playlists`, merge updatedAt par
+   id dans SupabaseProvider), lecture via `lib/playback.ts::playLocalPlaylist` (charge la File d'attente
+   + `selectQueue()` — zéro changement dans `/session`).
+6. **Coach musical 2.0** (`/api/coach` type "music") : prompt d'**interprétation** (univers anime/jeu/
+   film, genres, artistes — généraliser, pas répéter), sortie `{label, query, reason?}` (max 5, reason
+   ≤ 90 car. affichée + badge « ✦ IA » dans Découvrir), entrée enrichie `{titles, channels?, moods?,
+   scope?: "playlist", playlistName?}`. `lib/recommendations.ts` : `fetchAiQueries(input, {force})` avec
+   **cache sessionStorage 30 min** (quota), `buildLocalQueries` enrichi (dictionnaire d'univers regex +
+   tokens des chaînes). **Recos par playlist** (PlaylistTracksModal + LocalPlaylistModal) : coach scope
+   playlist → 2 recherches fusionnées, repli mix RD du 1er titre.
