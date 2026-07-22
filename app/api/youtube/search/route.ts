@@ -22,7 +22,9 @@ export interface SearchVideo {
 }
 
 const cache = makeTtlCache<SearchVideo[]>(15 * 60 * 1000);
-const MIN_LENGTH_SECONDS = 10 * 60;
+// Durée minimale PAR DÉFAUT (recos = formats longs) ; la recherche directe
+// passe min=0 pour trouver aussi des morceaux de 3-4 min.
+const DEFAULT_MIN_LENGTH_SECONDS = 10 * 60;
 
 // "1:23:45" / "12:34" → secondes ; null si non parsable (ex. live).
 function parseLength(text: string): number | null {
@@ -37,8 +39,13 @@ export async function GET(request: NextRequest) {
   if (q.length < 2) {
     return NextResponse.json({ error: "invalid_query", videos: [] }, { status: 400 });
   }
+  const minParam = Number(request.nextUrl.searchParams.get("min"));
+  const minLength = Number.isFinite(minParam)
+    ? Math.max(0, Math.min(3600, Math.round(minParam)))
+    : DEFAULT_MIN_LENGTH_SECONDS;
 
-  const cached = cache.get(q.toLowerCase());
+  const cacheKey = `${q.toLowerCase()}|${minLength}`;
+  const cached = cache.get(cacheKey);
   if (cached) {
     return NextResponse.json({ videos: cached, cached: true });
   }
@@ -61,8 +68,8 @@ export async function GET(request: NextRequest) {
       const title = ytText(r.title);
       if (!title) continue;
       const lengthSeconds = parseLength(ytText((r.lengthText as unknown) ?? {}));
-      // Format long uniquement (les lives — sans durée — sont acceptés).
-      if (lengthSeconds !== null && lengthSeconds < MIN_LENGTH_SECONDS) continue;
+      // Filtre de durée (les lives — sans durée — sont acceptés).
+      if (lengthSeconds !== null && lengthSeconds < minLength) continue;
       videos.push({
         id: r.videoId as string,
         title,
@@ -71,7 +78,7 @@ export async function GET(request: NextRequest) {
       });
       if (videos.length >= 12) break;
     }
-    cache.set(q.toLowerCase(), videos);
+    cache.set(cacheKey, videos);
     return NextResponse.json({ videos });
   } catch {
     return NextResponse.json({ error: "exception", videos: [] }, { status: 200 });

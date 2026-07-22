@@ -70,7 +70,9 @@ export function buildLocalQueries(titles: string[], channels: string[] = []): Re
     .map(([w]) => w)
     .slice(0, 4);
 
-  const ANCHORS = ["lofi ambient mix", "study with me", "ambient music long", "lofi playlist"];
+  // Ancres NEUTRES : on cible des formats longs sans imposer un genre — si
+  // l'utilisateur écoute autre chose que du lofi, ses thèmes restent les siens.
+  const ANCHORS = ["music mix", "playlist", "compilation", "mix"];
   for (const [i, w] of top.entries()) {
     if (queries.length >= 4) break;
     queries.push({ label: capitalize(w), query: `${w} ${ANCHORS[i % ANCHORS.length]}` });
@@ -148,9 +150,13 @@ export async function fetchAiQueries(input: AiQueryInput, opts?: { force?: boole
 }
 
 // Recherche YouTube via notre route serveur (parse, sans clé). [] si échec.
-export async function fetchSearchVideos(query: string): Promise<RecVideo[]> {
+// minSeconds : 0 = tout (recherche directe de morceaux), défaut serveur = 600 s
+// (recommandations → formats longs adaptés au focus).
+export async function fetchSearchVideos(query: string, minSeconds?: number): Promise<RecVideo[]> {
   try {
-    const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(query)}`);
+    const params = new URLSearchParams({ q: query });
+    if (minSeconds !== undefined) params.set("min", String(minSeconds));
+    const res = await fetch(`/api/youtube/search?${params.toString()}`);
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data.videos) ? data.videos : [];

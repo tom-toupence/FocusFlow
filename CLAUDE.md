@@ -468,3 +468,9 @@ déjà livrées) :
    **cache sessionStorage 30 min** (quota), `buildLocalQueries` enrichi (dictionnaire d'univers regex +
    tokens des chaînes). **Recos par playlist** (PlaylistTracksModal + LocalPlaylistModal) : coach scope
    playlist → 2 recherches fusionnées, repli mix RD du 1er titre.
+7. **Correctifs recherche/recos (retour utilisateur)** : la route `/api/youtube/search` accepte un
+   param `min` (durée minimale en s, défaut 600) — la **recherche directe de Découvrir passe `min=0`**
+   pour trouver des morceaux de 3-4 min (le filtre 10 min ne vaut que pour les recos). Les **ancres du
+   repli local** de `buildLocalQueries` sont désormais **neutres** (« music mix », « playlist »…) au
+   lieu de coller « lofi » à tous les thèmes — le lofi n'apparaît que via le dictionnaire d'univers ou
+   le repli sans historique.

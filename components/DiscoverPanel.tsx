@@ -126,7 +126,8 @@ export default function DiscoverPanel() {
     setSearchLoading(true);
     let cancelled = false;
     const timer = setTimeout(async () => {
-      const results = await fetchSearchVideos(q);
+      // Recherche directe : toutes durées (une musique fait souvent 3-4 min).
+      const results = await fetchSearchVideos(q, 0);
       if (cancelled) return;
       setSearchResults(results);
       setSearchLoading(false);
