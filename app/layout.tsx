@@ -8,6 +8,7 @@ import CommandPalette from "@/components/CommandPalette";
 import AmbientProvider from "@/components/AmbientProvider";
 import SplashIntro from "@/components/SplashIntro";
 import FriendsDrawer from "@/components/FriendsDrawer";
+import FriendsLayoutShell from "@/components/FriendsLayoutShell";
 
 const geist = Geist({
   variable: "--font-geist",
@@ -40,7 +41,9 @@ export default function RootLayout({
       </head>
       <body className="min-h-full antialiased">
         <SupabaseProvider>
-          <AuthGate>{children}</AuthGate>
+          <AuthGate>
+            <FriendsLayoutShell>{children}</FriendsLayoutShell>
+          </AuthGate>
         </SupabaseProvider>
         <ToastHost />
         <CommandPalette />

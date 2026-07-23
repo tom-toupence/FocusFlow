@@ -23,8 +23,10 @@ ambiances mixables dans une seule expérience bien maintenue.
 - **Styles :** Tailwind CSS **v4** (tokens `foreground`/`background`/`card`, helper `cn()` dans `lib/utils`)
 - **State :** Zustand **v5** + middleware `persist` (une clé `focusflow-*` par store)
 - **Auth & sync :** Supabase (Google OAuth + tables `custom_videos`, `todos`, `user_playlists`,
-  `profiles`, `work_sessions`). Tout passe par `lib/db.ts`, qui est **no-op si Supabase non configuré**
-  (mode localStorage seul).
+  `profiles`, `work_sessions`, `projects`, `user_state`, `local_playlists`, + amis `public_profiles`/
+  `friendships`/`friend_stats`). Tout passe par `lib/db.ts`/`lib/friends.ts`, **no-op si Supabase non
+  configuré** (mode localStorage seul). ⚠️ Au **changement de compte** sur un navigateur, le localStorage
+  est purgé avant merge (`resetLocalDataIfAccountChanged`) — sinon contamination entre comptes.
 - **YouTube :** IFrame API (embed direct, aucune clé requise pour la lecture).
   - **Vraies playlists** (`PL/OL/UU/FL/LL/RDCLAK`) : `player.loadPlaylist({list, listType})` dans `onReady`
     + `setLoop(true)` (jamais `videoId`+`list` combinés dans le constructeur → sinon autoplay aléatoire).
@@ -377,6 +379,42 @@ Relecture `code-reviewer` passée (fix du double avancement + bouton boucle masq
   playlist (`aspect-video` étroite) → clipé, et le clic retombait sur la carte = lancement de
   session. Il est maintenant un **bouton d'angle dédié en haut à droite** (icône liste, toujours
   visible, à côté du badge « Playlist »).
+
+## Journal de session — 2026-07-23 (système d'amis + fix contamination comptes)
+
+**Système d'amis** (online-only, drawer latéral droit façon launcher Riot/Fortnite) :
+- **Drawer global** `components/FriendsDrawer.tsx` (monté dans `layout.tsx`) : languette bord droit +
+  panneau qui glisse, **ouvert par défaut sur desktop** (effet au montage, `matchMedia ≥768px`), fermé
+  sur mobile ; **masqué sur `/session`** (« sauf pendant la vidéo ») et si `!supabase`. Store
+  `store/friendsDrawerStore.ts` (ouvrable aussi via CreateMenu, ⌘K, lien `?add=<code>`).
+- **Contenu** `components/FriendsPanel.tsx` : leaderboard hebdo (moi + amis, tri minutes/pomodoros/série),
+  bloc « en focus maintenant » (temps réel), demandes reçues, ajout par code, mon code + « copier le lien ».
+- **Données** : 3 tables Supabase (`public_profiles` identité+code, `friendships` graphe, `friend_stats`
+  agrégats partagés + statut focus). RLS **lecture croisée amis** via fonctions `is_friend`/`has_link`
+  (SECURITY DEFINER, anti-récursion). Confidentialité stricte : les amis ne voient QUE des agrégats +
+  « en focus » ; jamais le contenu/tâches/journal/projets (restés own-row).
+- **RPC SECURITY DEFINER** (anti-énumération/usurpation) : `ensure_public_profile`, `send_friend_request`
+  (code = capability, requester forcé serveur), **`accept_friend_request`** (⚠️ pas d'UPDATE direct sur
+  `friendships` — sinon on pouvait forger une amitié « accepted » sans consentement et lire les stats de
+  la victime, faille trouvée en revue). `invite_code` masqué au niveau **colonne** (grant SELECT partiel).
+- **Présence** : `friend_stats.in_focus`/`focus_heartbeat` posés au montage de `/session` + heartbeat 60 s
+  + cleanup ; ami « en focus » si heartbeat < 2 min (`isActivelyFocusing`). **Realtime** `postgres_changes`
+  sur `friend_stats` (respecte la RLS) → leaderboard + présence en direct. `lib/friends.ts` (accès no-op
+  sans Supabase), `store/friendsStore.ts` (publie mes agrégats via subscribe stats/succès, débounce ;
+  `initFriends`/`teardownFriends` au login/logout dans `SupabaseProvider`).
+- ⚠️ **SQL requis** : ré-exécuter `supabase/schema.sql` (bloc friends inclus) **et** activer Realtime sur
+  `friend_stats` (le script tente `alter publication supabase_realtime add table friend_stats`, sinon
+  Database > Replication à la main). Clés client = anon key + RLS uniquement.
+
+**Fix contamination multi-comptes (bug signalé : mêmes stats/playlists entre 2 comptes)** :
+Cause = le `localStorage` (stores `focusflow-*`) est partagé par tous les comptes du navigateur et n'était
+jamais purgé au changement de compte → le merge au login (`Math.max`/union par id) **conservait** les
+données du compte précédent. Fix dans `SupabaseProvider.tsx::resetLocalDataIfAccountChanged` : au login,
+si un **autre** propriétaire (`focusflow-data-owner`) détenait le local, on **vide TOUS les stores
+synchronisés** (stats, projets, vidéos custom, todos, playlists YouTube + locales, planning + les petits
+via `resetPersonalStores`) **avant** le merge distant, et on coupe les subs amis. **1ʳᵉ connexion (pas de
+propriétaire) → pas de purge** (les données anonymes rejoignent le compte, local-first voulu).
+`lib/stateSync.ts` : logique de propriétaire retirée (centralisée dans le provider), expose `resetPersonalStores()`.
 
 ## Journal de session — 2026-07-23 (responsivité mobile complète)
 
