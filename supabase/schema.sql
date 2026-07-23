@@ -211,6 +211,17 @@ create table if not exists friend_stats (
   updated_at        bigint  not null default 0
 );
 
+-- Présence étendue (ajouts idempotents pour les bases déjà créées) :
+--  · online / online_heartbeat = « application ouverte » (n'importe quelle page),
+--    distinct de in_focus (= dans une session). Un ami est en ligne si son
+--    heartbeat online est frais (< 90 s).
+--  · activity = ce que l'ami fait, EN CLAIR et éphémère (type de séance + titre
+--    écouté), p.ex. « En focus · Lofi Girl ». Rien de persistant, jamais de
+--    contenu privé (tâches/journal/projets restent own-row).
+alter table friend_stats add column if not exists online           boolean not null default false;
+alter table friend_stats add column if not exists online_heartbeat bigint  not null default 0;
+alter table friend_stats add column if not exists activity         text;
+
 -- Helpers SECURITY DEFINER : contournent la RLS de `friendships` à l'intérieur →
 -- évitent la récursion de policy et permettent la lecture croisée.
 -- is_friend = amitié ACCEPTÉE (pour les stats) ; has_link = lien quelconque
@@ -395,10 +406,44 @@ begin
 end;
 $$;
 
--- Realtime : diffuse les changements de friend_stats (la RLS SELECT ci-dessus
--- garantit qu'on ne reçoit que les lignes d'amis) → leaderboard + « en focus »
--- en direct. À défaut, activer manuellement dans Database > Replication.
+-- ─── Messagerie directe entre amis (chat façon launcher) ─────────────────────
+-- Confidentialité : un message n'est lisible QUE par ses deux interlocuteurs, et
+-- on ne peut écrire qu'à un ami accepté (is_friend). Pas d'historique exposé à
+-- des tiers, pas d'annuaire.
+create table if not exists friend_messages (
+  id           uuid   primary key default gen_random_uuid(),
+  sender_id    uuid   not null references auth.users(id) on delete cascade,
+  recipient_id uuid   not null references auth.users(id) on delete cascade,
+  body         text   not null check (char_length(body) between 1 and 2000),
+  created_at   bigint not null default 0,
+  read_at      bigint not null default 0
+);
+create index if not exists friend_messages_pair_idx      on friend_messages (sender_id, recipient_id, created_at);
+create index if not exists friend_messages_recipient_idx on friend_messages (recipient_id, read_at);
+
+alter table friend_messages enable row level security;
+drop policy if exists "read own messages" on friend_messages;
+drop policy if exists "send to friends"   on friend_messages;
+drop policy if exists "mark read"          on friend_messages;
+-- Lecture : uniquement l'expéditeur ou le destinataire.
+create policy "read own messages" on friend_messages for select
+  using (auth.uid() = sender_id or auth.uid() = recipient_id);
+-- Envoi : je dois être l'expéditeur ET ami accepté du destinataire.
+create policy "send to friends" on friend_messages for insert
+  with check (auth.uid() = sender_id and public.is_friend(recipient_id));
+-- Marquer lu : le destinataire met à jour read_at de ses messages reçus.
+create policy "mark read" on friend_messages for update
+  using (auth.uid() = recipient_id) with check (auth.uid() = recipient_id);
+
+-- Realtime : diffuse les changements de friend_stats ET de friend_messages (la
+-- RLS SELECT ci-dessus garantit qu'on ne reçoit que les lignes qui nous
+-- concernent) → leaderboard + « en focus »/présence + chat en direct. À défaut,
+-- activer manuellement dans Database > Replication.
 do $$ begin
   alter publication supabase_realtime add table friend_stats;
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  alter publication supabase_realtime add table friend_messages;
 exception when duplicate_object then null;
 end $$;

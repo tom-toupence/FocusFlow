@@ -257,7 +257,8 @@ export default function SessionPage() {
     const beat = setInterval(() => upsertMyFriendStats({ focusHeartbeat: Date.now() }), 60_000);
     return () => {
       clearInterval(beat);
-      upsertMyFriendStats({ inFocus: false });
+      // Sortie de session : plus « en focus » ni d'activité en clair.
+      upsertMyFriendStats({ inFocus: false, activity: null });
     };
   }, []);
 
@@ -693,6 +694,16 @@ export default function SessionPage() {
     }
     return { title: video.title, sub: video.channel };
   })();
+
+  // ── Activité en clair pour les amis (rich presence) ───────────────────────
+  // « En focus · <titre écouté> » / « En pause » / « Flowtime · … ». Éphémère,
+  // publiée dans friend_stats.activity ; effacée à la sortie de session.
+  const activityKind = mode !== "work" ? "En pause" : isFlowtime ? "Flowtime" : "En focus";
+  const activityMedia = isSpotifyMode ? "Spotify" : isTwitchMode ? "Twitch" : nowPlaying?.title ?? "";
+  const activityLabel = activityMedia ? `${activityKind} · ${activityMedia}` : activityKind;
+  useEffect(() => {
+    upsertMyFriendStats({ activity: activityLabel });
+  }, [activityLabel]);
 
   const progress = (() => {
     if (isFlowtime && mode === "work") return 0; // open-ended stretch, no fixed total

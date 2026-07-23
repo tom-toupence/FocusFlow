@@ -10,6 +10,7 @@ import { useStatsStore } from "@/store/statsStore";
 import { useAchievementsStore } from "@/store/achievementsStore";
 import { getWeekDetail, totalXp, getLevelInfo } from "@/lib/progression";
 import { getStreak } from "@/store/statsStore";
+import { initChat, teardownChat } from "@/store/chatStore";
 
 // Store du système d'amis (ONLINE-ONLY). Non persisté : reconstruit au login.
 // Publie MES agrégats via une subscription aux stats (pattern lib/stateSync),
@@ -94,6 +95,9 @@ export async function initFriends(displayName: string, avatarUrl: string | null)
       refreshTimer = setTimeout(() => useFriendsStore.getState().refresh(), 400);
     });
   }
+
+  // Chat : charge les non-lus + écoute les nouveaux messages en temps réel.
+  initChat();
 }
 
 /** Arrêt à la déconnexion. */
@@ -102,5 +106,6 @@ export function teardownFriends(): void {
   realtimeUnsub?.(); realtimeUnsub = null;
   if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; }
   if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null; }
+  teardownChat();
   useFriendsStore.setState({ friends: [], pending: [], myInvite: null, loaded: false });
 }

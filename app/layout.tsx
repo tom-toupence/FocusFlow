@@ -9,6 +9,7 @@ import AmbientProvider from "@/components/AmbientProvider";
 import SplashIntro from "@/components/SplashIntro";
 import FriendsDrawer from "@/components/FriendsDrawer";
 import FriendsLayoutShell from "@/components/FriendsLayoutShell";
+import PresenceProvider from "@/components/PresenceProvider";
 
 const geist = Geist({
   variable: "--font-geist",
@@ -48,6 +49,7 @@ export default function RootLayout({
         <ToastHost />
         <CommandPalette />
         <AmbientProvider />
+        <PresenceProvider />
         <FriendsDrawer />
         <SplashIntro />
       </body>

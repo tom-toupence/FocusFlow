@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase, signInWithGoogle } from "@/lib/supabase";
 import { useProfileStore, resolvedProfile } from "@/store/profileStore";
 import { useFriendsStore, computeMyAggregate } from "@/store/friendsStore";
+import { useChatStore } from "@/store/chatStore";
 import {
-  sendFriendRequest, acceptRequest, removeFriendship, isActivelyFocusing,
-  ensureMyProfile, SendResult,
+  sendFriendRequest, removeFriendship, isActivelyFocusing, isOnline,
+  ensureMyProfile, SendResult, Friend,
 } from "@/lib/friends";
 import { toast } from "@/components/Toast";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,11 @@ const SEND_MESSAGES: Record<SendResult, { title: string; accent: "emerald" | "am
   error: { title: "Erreur — réessaie", accent: "amber" },
 };
 
-function Avatar({ url, name, size = 34, focusing = false }: { url: string | null; name: string; size?: number; focusing?: boolean }) {
+type Presence = "focus" | "online" | "offline";
+
+function Avatar({ url, name, size = 34, focusing = false, status }: { url: string | null; name: string; size?: number; focusing?: boolean; status?: Presence }) {
+  // Rétrocompat : `focusing` = point vert pulsé ; sinon `status` pilote le point.
+  const dot: Presence | null = focusing ? "focus" : status ?? null;
   return (
     <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
       <div className="w-full h-full rounded-full overflow-hidden bg-foreground/10 flex items-center justify-center ring-1 ring-foreground/[0.06]">
@@ -40,8 +45,14 @@ function Avatar({ url, name, size = 34, focusing = false }: { url: string | null
           <span className="text-xs font-semibold text-foreground/60">{name.charAt(0).toUpperCase()}</span>
         )}
       </div>
-      {focusing && (
+      {dot === "focus" && (
         <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-background animate-pulse" title="En focus" />
+      )}
+      {dot === "online" && (
+        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-background" title="En ligne" />
+      )}
+      {dot === "offline" && (
+        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-foreground/25 border-2 border-background" title="Hors ligne" />
       )}
     </div>
   );
@@ -67,7 +78,9 @@ export default function FriendsPanel() {
   const email = useProfileStore((s) => s.googleEmail);
   const profileState = useProfileStore();
   const me = resolvedProfile(profileState);
-  const { friends, pending, myInvite, refresh, setMyInvite } = useFriendsStore();
+  const { friends, myInvite, refresh, setMyInvite } = useFriendsStore();
+  const unread = useChatStore((s) => s.unread);
+  const openChat = useChatStore((s) => s.openChat);
   const [sort, setSort] = useState<SortKey>("minutes");
   const [code, setCode] = useState("");
   const [sending, setSending] = useState(false);
@@ -103,6 +116,18 @@ export default function FriendsPanel() {
   }, [myAgg, friends, sort, me.displayName, me.avatarUrl, now]);
 
   const focusingFriends = friends.filter((f) => isActivelyFocusing(f.stats, now));
+
+  // Regroupement façon launcher : en focus → en ligne → hors ligne.
+  const groups = useMemo(() => {
+    const focus: Friend[] = [], online: Friend[] = [], offline: Friend[] = [];
+    for (const f of friends) {
+      if (isActivelyFocusing(f.stats, now)) focus.push(f);
+      else if (isOnline(f.stats, now)) online.push(f);
+      else offline.push(f);
+    }
+    return { focus, online, offline };
+  }, [friends, now]);
+  const onlineTotal = groups.focus.length + groups.online.length;
 
   // ── Garde-fous online-only ────────────────────────────────────────────────
   if (!supabase) {
@@ -190,27 +215,6 @@ export default function FriendsPanel() {
         </div>
       </div>
 
-      {/* ── Demandes reçues ───────────────────────────────────────────────── */}
-      {pending.length > 0 && (
-        <div>
-          <SectionLabel>Demandes · {pending.length}</SectionLabel>
-          <div className="flex flex-col gap-1.5">
-            {pending.map((p) => (
-              <div key={p.friendshipId} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-foreground/[0.03] border border-foreground/[0.07]">
-                <Avatar url={p.avatarUrl} name={p.displayName} size={30} />
-                <p className="flex-1 min-w-0 text-[13px] font-medium text-foreground truncate">{p.displayName}</p>
-                <button onClick={async () => { if (await acceptRequest(p.friendshipId)) { toast({ title: "Ami ajouté 🎉", accent: "emerald" }); refresh(); } }} className="w-7 h-7 flex items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 hover:bg-emerald-500/25 transition-all" title="Accepter">
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                </button>
-                <button onClick={async () => { if (await removeFriendship(p.friendshipId)) refresh(); }} className="w-7 h-7 flex items-center justify-center rounded-lg bg-foreground/5 text-foreground/40 hover:text-foreground/70 transition-all" title="Refuser">
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* ── Classement ────────────────────────────────────────────────────── */}
       <div>
         <SectionLabel
@@ -248,23 +252,61 @@ export default function FriendsPanel() {
         )}
       </div>
 
-      {/* ── Mes amis ──────────────────────────────────────────────────────── */}
+      {/* ── Mes amis (groupés par présence, cliquables → chat) ────────────── */}
       {friends.length > 0 && (
         <div>
-          <SectionLabel>Mes amis · {friends.length}</SectionLabel>
-          <div className="flex flex-col gap-0.5">
-            {friends.map((f) => (
-              <div key={f.userId} className="group flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-foreground/[0.03] transition-colors">
-                <Avatar url={f.avatarUrl} name={f.displayName} size={28} focusing={isActivelyFocusing(f.stats, now)} />
-                <p className="flex-1 min-w-0 text-[13px] text-foreground/85 truncate">{f.displayName}</p>
-                <button onClick={async () => { if (await removeFriendship(f.friendshipId)) { toast({ title: "Ami retiré", accent: "amber" }); refresh(); } }} className="sm:opacity-0 sm:group-hover:opacity-100 text-foreground/30 hover:text-red-400 transition-all p-1.5 -m-1 flex-shrink-0" title="Retirer">
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
-                </button>
-              </div>
-            ))}
+          <SectionLabel>
+            Mes amis · {friends.length}
+            {onlineTotal > 0 && <span className="text-emerald-500 dark:text-emerald-400 normal-case tracking-normal"> · {onlineTotal} en ligne</span>}
+          </SectionLabel>
+          <div className="flex flex-col gap-2">
+            {groups.focus.length > 0 && (
+              <FriendGroup label="En focus" count={groups.focus.length}>
+                {groups.focus.map((f) => <FriendRow key={f.userId} f={f} status="focus" unread={unread[f.userId] ?? 0} onOpen={() => openChat(f.userId)} onRemove={async () => { if (await removeFriendship(f.friendshipId)) { toast({ title: "Ami retiré", accent: "amber" }); refresh(); } }} />)}
+              </FriendGroup>
+            )}
+            {groups.online.length > 0 && (
+              <FriendGroup label="En ligne" count={groups.online.length}>
+                {groups.online.map((f) => <FriendRow key={f.userId} f={f} status="online" unread={unread[f.userId] ?? 0} onOpen={() => openChat(f.userId)} onRemove={async () => { if (await removeFriendship(f.friendshipId)) { toast({ title: "Ami retiré", accent: "amber" }); refresh(); } }} />)}
+              </FriendGroup>
+            )}
+            {groups.offline.length > 0 && (
+              <FriendGroup label="Hors ligne" count={groups.offline.length} dim>
+                {groups.offline.map((f) => <FriendRow key={f.userId} f={f} status="offline" unread={unread[f.userId] ?? 0} onOpen={() => openChat(f.userId)} onRemove={async () => { if (await removeFriendship(f.friendshipId)) { toast({ title: "Ami retiré", accent: "amber" }); refresh(); } }} />)}
+              </FriendGroup>
+            )}
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function FriendGroup({ label, count, dim, children }: { label: string; count: number; dim?: boolean; children: React.ReactNode }) {
+  return (
+    <div className={cn(dim && "opacity-70")}>
+      <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-foreground/30 px-1 mb-1">{label} · {count}</p>
+      <div className="flex flex-col gap-0.5">{children}</div>
+    </div>
+  );
+}
+
+function FriendRow({ f, status, unread, onOpen, onRemove }: { f: Friend; status: Presence; unread: number; onOpen: () => void; onRemove: () => void }) {
+  const sub = status === "focus" ? (f.stats?.activity || "En focus") : status === "online" ? "En ligne" : "Hors ligne";
+  const subColor = status === "focus" ? "text-emerald-500 dark:text-emerald-400" : status === "online" ? "text-emerald-500/70 dark:text-emerald-400/70" : "text-foreground/30";
+  return (
+    <div className="group flex items-center gap-2.5 pl-2 pr-1.5 py-1.5 rounded-xl hover:bg-foreground/[0.04] transition-colors cursor-pointer" onClick={onOpen} title={`Discuter avec ${f.displayName}`}>
+      <Avatar url={f.avatarUrl} name={f.displayName} size={30} status={status} />
+      <div className="flex-1 min-w-0">
+        <p className={cn("text-[13px] truncate", status === "offline" ? "text-foreground/55" : "text-foreground/90 font-medium")}>{f.displayName}</p>
+        <p className={cn("text-[10px] truncate", subColor)}>{sub}</p>
+      </div>
+      {unread > 0 && (
+        <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-sky-500 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{unread > 9 ? "9+" : unread}</span>
+      )}
+      <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="sm:opacity-0 sm:group-hover:opacity-100 text-foreground/25 hover:text-red-400 transition-all p-1.5 -m-0.5 flex-shrink-0" title="Retirer">
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
+      </button>
     </div>
   );
 }

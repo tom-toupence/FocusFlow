@@ -11,6 +11,8 @@ import { getCurrentUserId } from "@/lib/authState";
 // Un ami « en focus » n'est considéré actif que si son heartbeat est récent
 // (tolérance à une fermeture d'onglet brutale qui laisserait in_focus=true).
 export const FOCUS_STALE_MS = 2 * 60 * 1000;
+// « En ligne » = application ouverte (heartbeat online frais). Battement ~45 s.
+export const ONLINE_STALE_MS = 90 * 1000;
 
 export interface MyInvite {
   username: string;
@@ -27,6 +29,9 @@ export interface FriendStats {
   inFocus: boolean;
   focusStartedAt: number;
   focusHeartbeat: number;
+  online: boolean;
+  onlineHeartbeat: number;
+  activity: string | null;
 }
 
 export interface Friend {
@@ -51,6 +56,13 @@ export function isActivelyFocusing(s: FriendStats | null, now: number = Date.now
   return !!s && s.inFocus && now - s.focusHeartbeat < FOCUS_STALE_MS;
 }
 
+/** true si un ami a l'application ouverte (heartbeat online frais). */
+export function isOnline(s: FriendStats | null, now: number = Date.now()): boolean {
+  if (!s) return false;
+  if (isActivelyFocusing(s, now)) return true; // en focus ⇒ forcément en ligne
+  return s.online && now - s.onlineHeartbeat < ONLINE_STALE_MS;
+}
+
 function statsFromRow(r: Record<string, unknown> | null | undefined): FriendStats | null {
   if (!r) return null;
   return {
@@ -63,6 +75,9 @@ function statsFromRow(r: Record<string, unknown> | null | undefined): FriendStat
     inFocus: !!r.in_focus,
     focusStartedAt: Number(r.focus_started_at) || 0,
     focusHeartbeat: Number(r.focus_heartbeat) || 0,
+    online: !!r.online,
+    onlineHeartbeat: Number(r.online_heartbeat) || 0,
+    activity: (r.activity as string) || null,
   };
 }
 
@@ -183,6 +198,7 @@ export async function fetchFriendsAndRequests(): Promise<{ friends: Friend[]; pe
 export async function upsertMyFriendStats(partial: Partial<{
   weekMinutes: number; weekSessions: number; streak: number; level: number; xp: number; badges: number;
   inFocus: boolean; focusStartedAt: number; focusHeartbeat: number;
+  online: boolean; onlineHeartbeat: number; activity: string | null;
 }>): Promise<void> {
   if (!supabase) return;
   const me = getCurrentUserId();
@@ -197,8 +213,110 @@ export async function upsertMyFriendStats(partial: Partial<{
   if (partial.inFocus !== undefined) row.in_focus = partial.inFocus;
   if (partial.focusStartedAt !== undefined) row.focus_started_at = partial.focusStartedAt;
   if (partial.focusHeartbeat !== undefined) row.focus_heartbeat = partial.focusHeartbeat;
+  if (partial.online !== undefined) row.online = partial.online;
+  if (partial.onlineHeartbeat !== undefined) row.online_heartbeat = partial.onlineHeartbeat;
+  if (partial.activity !== undefined) row.activity = partial.activity ? partial.activity.slice(0, 120) : null;
   const { error } = await supabase.from("friend_stats").upsert(row, { onConflict: "user_id" });
   if (error) console.error("[friends] upsertMyFriendStats:", error.message);
+}
+
+// ── Chat (messagerie directe entre amis) ─────────────────────────────────────
+
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  recipientId: string;
+  body: string;
+  createdAt: number;
+  readAt: number;
+}
+
+function msgFromRow(r: Record<string, unknown>): ChatMessage {
+  return {
+    id: String(r.id),
+    senderId: String(r.sender_id),
+    recipientId: String(r.recipient_id),
+    body: String(r.body ?? ""),
+    createdAt: Number(r.created_at) || 0,
+    readAt: Number(r.read_at) || 0,
+  };
+}
+
+/** Charge la conversation (ordre chronologique) avec un ami. */
+export async function fetchConversation(friendId: string, limit = 100): Promise<ChatMessage[]> {
+  if (!supabase) return [];
+  const me = getCurrentUserId();
+  if (!me) return [];
+  const { data, error } = await supabase
+    .from("friend_messages")
+    .select("*")
+    .or(`and(sender_id.eq.${me},recipient_id.eq.${friendId}),and(sender_id.eq.${friendId},recipient_id.eq.${me})`)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) { console.error("[friends] fetchConversation:", error.message); return []; }
+  return (data ?? []).map(msgFromRow).reverse();
+}
+
+/** Envoie un message à un ami. Retourne le message inséré (avec son id serveur). */
+export async function sendMessage(recipientId: string, body: string): Promise<ChatMessage | null> {
+  if (!supabase) return null;
+  const me = getCurrentUserId();
+  if (!me) return null;
+  const text = body.trim().slice(0, 2000);
+  if (!text) return null;
+  const { data, error } = await supabase
+    .from("friend_messages")
+    .insert({ sender_id: me, recipient_id: recipientId, body: text, created_at: Date.now() })
+    .select()
+    .single();
+  if (error) { console.error("[friends] sendMessage:", error.message); return null; }
+  return msgFromRow(data);
+}
+
+/** Marque comme lus les messages reçus d'un ami. */
+export async function markConversationRead(friendId: string): Promise<void> {
+  if (!supabase) return;
+  const me = getCurrentUserId();
+  if (!me) return;
+  const { error } = await supabase
+    .from("friend_messages")
+    .update({ read_at: Date.now() })
+    .eq("recipient_id", me)
+    .eq("sender_id", friendId)
+    .eq("read_at", 0);
+  if (error) console.error("[friends] markConversationRead:", error.message);
+}
+
+/** Compte les messages non lus par expéditeur. */
+export async function fetchUnreadCounts(): Promise<Record<string, number>> {
+  if (!supabase) return {};
+  const me = getCurrentUserId();
+  if (!me) return {};
+  const { data, error } = await supabase
+    .from("friend_messages")
+    .select("sender_id")
+    .eq("recipient_id", me)
+    .eq("read_at", 0);
+  if (error) { console.error("[friends] fetchUnreadCounts:", error.message); return {}; }
+  const counts: Record<string, number> = {};
+  for (const r of (data ?? []) as { sender_id: string }[]) counts[r.sender_id] = (counts[r.sender_id] ?? 0) + 1;
+  return counts;
+}
+
+/**
+ * S'abonne aux nouveaux messages (INSERT). La RLS ne diffuse que les messages
+ * dont je suis expéditeur ou destinataire. Renvoie une fonction de désabonnement.
+ */
+export function subscribeMessages(onInsert: (m: ChatMessage) => void): () => void {
+  const sb = supabase;
+  if (!sb) return () => {};
+  const channel = sb
+    .channel("friend_messages_changes")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "friend_messages" }, (payload) => {
+      onInsert(msgFromRow(payload.new as Record<string, unknown>));
+    })
+    .subscribe();
+  return () => { sb.removeChannel(channel); };
 }
 
 /**
