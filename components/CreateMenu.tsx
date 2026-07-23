@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useNavStore } from "@/store/navStore";
+import { useFriendsDrawer } from "@/store/friendsDrawerStore";
 import { cn } from "@/lib/utils";
 
 interface CreateEntry {
@@ -81,6 +82,17 @@ function useCreateEntries(close: () => void): CreateEntry[] {
         </svg>
       ),
       run: () => { useNavStore.getState().openOrg("routines"); close(); },
+    },
+    {
+      id: "friend",
+      label: "Ajouter un ami",
+      sub: "Ouvrir le panneau des amis pour coller un code",
+      icon: (
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" strokeLinecap="round" strokeLinejoin="round" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+      run: () => { useFriendsDrawer.getState().setOpen(true); close(); },
     },
   ];
 }

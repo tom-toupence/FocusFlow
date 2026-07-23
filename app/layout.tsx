@@ -7,6 +7,7 @@ import ToastHost from "@/components/Toast";
 import CommandPalette from "@/components/CommandPalette";
 import AmbientProvider from "@/components/AmbientProvider";
 import SplashIntro from "@/components/SplashIntro";
+import FriendsDrawer from "@/components/FriendsDrawer";
 
 const geist = Geist({
   variable: "--font-geist",
@@ -44,6 +45,7 @@ export default function RootLayout({
         <ToastHost />
         <CommandPalette />
         <AmbientProvider />
+        <FriendsDrawer />
         <SplashIntro />
       </body>
     </html>

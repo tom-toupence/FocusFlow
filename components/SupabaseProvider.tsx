@@ -20,7 +20,8 @@ import { useProjectStore } from "@/store/projectStore";
 import { useSessionStore } from "@/store/sessionStore";
 import { usePlaylistStore } from "@/store/playlistStore";
 import { useStatsStore } from "@/store/statsStore";
-import { useProfileStore } from "@/store/profileStore";
+import { useProfileStore, resolvedProfile } from "@/store/profileStore";
+import { initFriends, teardownFriends } from "@/store/friendsStore";
 import { useSpotifyStore } from "@/store/spotifyStore";
 import { useTwitchStore } from "@/store/twitchStore";
 
@@ -142,6 +143,12 @@ export default function SupabaseProvider({ children }: { children: React.ReactNo
       // Petits stores (routines, journal, objectif, historique, distractions,
       // succès, sprint) : table KV user_state + subscriptions de push.
       await applyRemoteState(userId);
+
+      // Système d'amis (online-only) : identité publique + publication des
+      // agrégats + écoute Realtime. Après applyRemoteState pour que les stats
+      // mergées soient publiées. Nom/avatar depuis le profil résolu.
+      const prof = resolvedProfile(useProfileStore.getState());
+      initFriends(prof.displayName, prof.avatarUrl);
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -152,6 +159,7 @@ export default function SupabaseProvider({ children }: { children: React.ReactNo
         syncedUserId = null;
         setCurrentUserId(null);
         useProfileStore.getState().clear();
+        teardownFriends();
       }
     });
 

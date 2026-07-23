@@ -32,6 +32,7 @@ import { useProjectStore } from "@/store/projectStore";
 import { ACHIEVEMENTS } from "@/lib/achievements";
 import { toast } from "@/components/Toast";
 import { playBreakChime, playWorkChime } from "@/lib/sounds";
+import { upsertMyFriendStats } from "@/lib/friends";
 
 // ─── YouTube IFrame API types ─────────────────────────────────────────────────
 
@@ -246,6 +247,19 @@ export default function SessionPage() {
     resetDistractions();
     start();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Présence « en focus » pour les amis (online-only, no-op sans compte) ──
+  // in_focus=true au montage + heartbeat toutes les 60 s ; cleanup au démontage
+  // (couvre Terminer/navigation). Les amis voient le statut via Realtime.
+  useEffect(() => {
+    const now = Date.now();
+    upsertMyFriendStats({ inFocus: true, focusStartedAt: now, focusHeartbeat: now });
+    const beat = setInterval(() => upsertMyFriendStats({ focusHeartbeat: Date.now() }), 60_000);
+    return () => {
+      clearInterval(beat);
+      upsertMyFriendStats({ inFocus: false });
+    };
+  }, []);
 
   // ── Fullscreen ───────────────────────────────────────────────────────────
   useEffect(() => {
