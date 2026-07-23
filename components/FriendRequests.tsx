@@ -28,9 +28,8 @@ export default function FriendRequests() {
     return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey, true); };
   }, [open]);
 
-  // Si plus aucune demande, on referme le popover.
-  useEffect(() => { if (pending.length === 0) setOpen(false); }, [pending.length]);
-
+  // Le popover ne s'affiche que si `count > 0` (garde de rendu) → pas besoin de
+  // le fermer explicitement quand la dernière demande est traitée.
   const count = pending.length;
 
   const accept = async (id: string) => {

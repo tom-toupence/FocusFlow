@@ -540,3 +540,34 @@ déjà livrées) :
    repli local** de `buildLocalQueries` sont désormais **neutres** (« music mix », « playlist »…) au
    lieu de coller « lofi » à tous les thèmes — le lofi n'apparaît que via le dictionnaire d'univers ou
    le repli sans historique.
+
+## Journal de session — 2026-07-24 (amis : présence « en ligne », rich presence, chat, cloche LoL)
+
+Extension du système d'amis (toujours **online-only / anon key + RLS**, aucun secret client) :
+
+1. **Présence « en ligne » globale** (distincte de « en focus ») : `components/PresenceProvider.tsx`
+   (monté dans `layout.tsx`) publie un heartbeat `online`/`online_heartbeat` toutes les **45 s** tant
+   que l'app est ouverte (n'importe quelle page) + `online:false` au `pagehide`/démontage. Un ami est
+   « en ligne » si `online && heartbeat < 90 s` (`isOnline()` dans `lib/friends.ts`, focus ⇒ en ligne).
+2. **Rich presence (ce qu'il fait / écoute)** : nouveau champ `friend_stats.activity` (texte **en clair,
+   éphémère** — jamais persisté, jamais de contenu privé). Publié par `/session` :
+   `« En focus · <titre écouté> »` / `« En pause »` / `« Flowtime · … »` / `« … · Spotify/Twitch »`,
+   **effacé à la sortie** (`activity:null` dans le cleanup de présence). Affiché sous le nom de l'ami.
+3. **Chat direct entre amis** : table `friend_messages` (RLS : lisible par les 2 interlocuteurs
+   seulement ; **INSERT gated par `is_friend`** → on ne peut écrire qu'à un ami ; UPDATE `read_at` par le
+   destinataire), **Realtime** dessus. `lib/friends.ts` (`fetchConversation`/`sendMessage`/
+   `markConversationRead`/`fetchUnreadCounts`/`subscribeMessages`), `store/chatStore.ts` (1 conversation
+   ouverte, `unread` par ami, `initChat`/`teardownChat` branchés dans `initFriends`/`teardownFriends`).
+   UI `components/FriendChat.tsx` : fenêtre qui glisse par-dessus le panneau (bulles moi/lui, statut live,
+   envoi Enter). Badge non-lus (bleu ciel) sur chaque ami + sur la languette.
+4. **Cloche de demandes façon League of Legends** : `components/FriendRequests.tsx` (cloche + pastille
+   rouge dans l'en-tête du drawer → popover Accepter/Refuser). L'ancien bloc inline « Demandes reçues »
+   du panneau est **retiré** (tout passe par la cloche).
+5. **Liste d'amis refondue (launcher)** : `FriendsPanel` groupe les amis **En focus → En ligne → Hors
+   ligne**, chaque rangée **cliquable → ouvre le chat**, affiche l'activité en clair + le badge non-lus.
+   En-tête du drawer : « N en ligne » + cloche.
+
+> ⚠️ **SQL requis** : ré-exécuter `supabase/schema.sql` (ajoute les colonnes `online/online_heartbeat/
+> activity` à `friend_stats` — `add column if not exists` — et la table `friend_messages` + RLS) **et**
+> activer **Realtime sur `friend_messages`** (le script tente `alter publication supabase_realtime add
+> table friend_messages`, sinon Database > Replication à la main).

@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useChatStore } from "@/store/chatStore";
 import { useFriendsStore } from "@/store/friendsStore";
 import { isActivelyFocusing, isOnline } from "@/lib/friends";
-import { getCurrentUserId } from "@/lib/authState";
 import { cn } from "@/lib/utils";
 
 // Fenêtre de conversation (glisse par-dessus le panneau Amis, façon launcher).
@@ -20,7 +19,6 @@ export default function FriendChat() {
 
   const [draft, setDraft] = useState("");
   const [now, setNow] = useState(() => Date.now());
-  const [meId] = useState(() => getCurrentUserId());
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -96,7 +94,10 @@ export default function FriendChat() {
           </div>
         ) : (
           messages.map((m, i) => {
-            const mine = m.senderId === meId;
+            // Conversation 1-à-1 : un message est « à moi » dès que son émetteur
+            // n'est pas l'ami. Robuste même si l'auth n'est pas encore résolue
+            // (évite les bulles toutes de la même couleur au 1er rendu).
+            const mine = m.senderId !== openFriendId;
             const prev = messages[i - 1];
             const grouped = prev && prev.senderId === m.senderId && m.createdAt - prev.createdAt < 5 * 60 * 1000;
             return (

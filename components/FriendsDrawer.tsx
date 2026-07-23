@@ -76,13 +76,13 @@ export default function FriendsDrawer() {
 
   return (
     <>
-      {/* Languette d'ouverture (bord droit) — masquée quand le tiroir est ouvert */}
+      {/* Languette d'ouverture (bord droit) — pastille de statut, masquée à l'ouverture */}
       <button
         onClick={toggle}
         aria-label="Ouvrir le panneau des amis"
         className={cn(
-          "fixed right-0 top-1/2 -translate-y-1/2 z-[55] flex flex-col items-center gap-1 pl-2 pr-1.5 py-3 rounded-l-xl bg-background/90 backdrop-blur-md border border-r-0 border-foreground/10 shadow-lg text-foreground/60 hover:text-foreground hover:pr-2.5 transition-all",
-          open && "opacity-0 pointer-events-none"
+          "group fixed right-0 top-1/2 -translate-y-1/2 z-[55] flex flex-col items-center gap-1.5 pl-2.5 pr-2 py-3.5 rounded-l-2xl bg-background/80 backdrop-blur-md border border-r-0 border-foreground/10 shadow-lg shadow-black/10 text-foreground/55 hover:text-foreground hover:pr-3 transition-all duration-200",
+          open && "opacity-0 pointer-events-none translate-x-2"
         )}
       >
         <span className="relative">
@@ -90,9 +90,9 @@ export default function FriendsDrawer() {
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" strokeLinecap="round" strokeLinejoin="round" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           {notif > 0 ? (
-            <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">{notif}</span>
+            <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-background">{notif}</span>
           ) : unreadTotal > 0 ? (
-            <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-sky-500 text-white text-[9px] font-bold flex items-center justify-center">{unreadTotal > 9 ? "9+" : unreadTotal}</span>
+            <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-sky-500 text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-background">{unreadTotal > 9 ? "9+" : unreadTotal}</span>
           ) : onlineCount > 0 ? (
             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-background" />
           ) : null}
@@ -105,21 +105,21 @@ export default function FriendsDrawer() {
       <div
         onClick={() => setOpen(false)}
         className={cn(
-          "md:hidden fixed inset-0 z-[59] bg-black/40 transition-opacity",
+          "md:hidden fixed inset-0 z-[59] bg-black/40 backdrop-blur-[2px] transition-opacity duration-300",
           open ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
       />
 
-      {/* Panneau */}
+      {/* Panneau — carte flottante arrondie (marges) pour un rendu intégré/moins carré */}
       <aside
         className={cn(
-          "fixed top-0 right-0 z-[60] h-full w-[300px] max-w-[calc(100vw-1rem)] flex flex-col bg-background border-l border-foreground/10 shadow-2xl shadow-black/30 md:shadow-none transition-transform duration-300 ease-out",
-          open ? "translate-x-0" : "translate-x-full"
+          "fixed top-2 right-2 bottom-2 z-[60] w-[300px] max-w-[calc(100vw-1rem)] flex flex-col rounded-2xl bg-background border border-foreground/[0.09] shadow-2xl shadow-black/25 overflow-hidden transition-all duration-300 ease-out",
+          open ? "translate-x-0 opacity-100" : "translate-x-[calc(100%+0.75rem)] opacity-0 pointer-events-none"
         )}
       >
-        <div className="flex items-center justify-between px-3 h-14 border-b border-foreground/[0.08] flex-shrink-0">
-          <div className="flex items-center gap-2 pl-1 min-w-0">
-            <h2 className="text-sm font-semibold text-foreground">Amis</h2>
+        <div className="flex items-center justify-between pl-4 pr-2 h-14 flex-shrink-0 border-b border-foreground/[0.05]">
+          <div className="flex items-center gap-2 min-w-0">
+            <h2 className="text-[15px] font-semibold text-foreground tracking-tight">Amis</h2>
             {onlineCount > 0 && (
               <span className="flex items-center gap-1 text-[10px] text-emerald-500 dark:text-emerald-400 truncate">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />{onlineCount} en ligne
@@ -128,8 +128,9 @@ export default function FriendsDrawer() {
           </div>
           <div className="flex items-center gap-0.5 flex-shrink-0">
             <FriendRequests />
-            <button onClick={() => setOpen(false)} aria-label="Fermer" className="w-8 h-8 flex items-center justify-center rounded-lg text-foreground/40 hover:text-foreground hover:bg-foreground/5 transition-all">
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
+            {/* Repli (chevron) plutôt qu'une croix : on « range » le panneau sur le côté */}
+            <button onClick={() => setOpen(false)} aria-label="Réduire le panneau" className="w-8 h-8 flex items-center justify-center rounded-lg text-foreground/40 hover:text-foreground hover:bg-foreground/5 transition-all">
+              <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
           </div>
         </div>

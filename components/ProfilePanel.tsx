@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useProfileStore, resolvedProfile } from "@/store/profileStore";
 import { useSpotifyStore } from "@/store/spotifyStore";
 import { useTwitchStore } from "@/store/twitchStore";
@@ -159,11 +160,16 @@ export default function ProfilePanel({ open, onClose }: Props) {
     // AuthGate will redirect to login screen after signOut
   };
 
-  return (
-    <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
+  // Modale CENTRÉE (portalée dans body) : passe au-dessus du tiroir Amis (z-60)
+  // et reste pleinement cliquable, quel que soit l'état du drawer.
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[120] flex items-start sm:items-center justify-center p-4 pt-16 sm:pt-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
       <div
-        className="fixed right-3 left-3 sm:left-auto sm:right-4 top-[60px] z-50 w-auto sm:w-[300px] max-h-[calc(100vh-76px)] overflow-y-auto bg-background border border-foreground/[0.09] rounded-2xl shadow-2xl shadow-black/20 flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm max-h-[calc(100vh-2rem)] overflow-y-auto bg-background border border-foreground/[0.09] rounded-2xl shadow-2xl shadow-black/30 flex flex-col anim-section-in"
       >
         {/* ── Profile section ─────────────────────────────────────────────── */}
         <div className="p-4 border-b border-foreground/[0.06]">
@@ -394,6 +400,7 @@ export default function ProfilePanel({ open, onClose }: Props) {
           </button>
         </div>
       </div>
-    </>
+    </div>,
+    document.body
   );
 }
