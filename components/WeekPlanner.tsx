@@ -37,12 +37,12 @@ export default function WeekPlanner() {
 
   return (
     <section>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <h2 className="text-sm font-semibold text-foreground">Planning de la semaine</h2>
           <p className="text-xs text-foreground/40 mt-0.5">Pose tes blocs de focus, compare prévu vs réalisé.</p>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0">
           <CalendarSync />
           <button onClick={() => setWeekOffset((w) => w - 1)} className="w-7 h-7 rounded-lg bg-foreground/8 hover:bg-foreground/15 text-foreground/60 flex items-center justify-center">‹</button>
           <span className="text-xs text-foreground/50 w-32 text-center">{weekLabel}</span>
@@ -83,7 +83,7 @@ export default function WeekPlanner() {
                     </button>
                     <span className="text-foreground/40 tabular-nums">{formatMinOfDay(b.startMin)}</span>
                     <span className={cn("flex-1 truncate", b.done ? "text-foreground/40 line-through" : "text-foreground/75")}>{b.label || "Focus"}</span>
-                    <button onClick={() => removeBlock(b.id)} className="opacity-0 group-hover:opacity-100 text-foreground/30 hover:text-red-400 flex-shrink-0">×</button>
+                    <button onClick={() => removeBlock(b.id)} className="sm:opacity-0 sm:group-hover:opacity-100 text-foreground/50 sm:text-foreground/30 hover:text-red-400 flex-shrink-0 px-1.5 -mx-1 text-base leading-none">×</button>
                   </div>
                 ))}
               </div>

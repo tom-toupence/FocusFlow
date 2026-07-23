@@ -176,7 +176,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
       </div>
 
       {/* ── All-time ──────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-3 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
         <div className="bg-foreground/[0.03] border border-foreground/[0.06] rounded-xl px-4 py-3 flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
             <svg className="w-4 h-4 text-foreground/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -319,7 +319,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
           <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest">Succès</p>
           <span className="text-[10px] text-foreground/25">{Object.keys(unlocked).length}/{ACHIEVEMENTS.length}</span>
         </div>
-        <div className="grid grid-cols-3 sm:grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
           {ACHIEVEMENTS.map((a) => {
             const isUnlocked = !!unlocked[a.id];
             return (

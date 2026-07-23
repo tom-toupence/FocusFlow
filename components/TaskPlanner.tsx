@@ -245,7 +245,7 @@ function TaskRow({ todo }: { todo: Todo }) {
 
       <button
         onClick={() => deleteTodo(todo.id)}
-        className="opacity-0 group-hover:opacity-100 text-foreground/25 hover:text-red-400 transition-all flex-shrink-0 mt-0.5"
+        className="sm:opacity-0 sm:group-hover:opacity-100 text-foreground/40 sm:text-foreground/25 hover:text-red-400 transition-all flex-shrink-0 mt-0.5 p-1 -m-1"
       >
         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
           <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />

@@ -68,7 +68,7 @@ export default function JournalTimeline() {
                   {e.blockers && <p className="text-sm text-foreground/50 leading-snug">⚡ {e.blockers}</p>}
                   {!e.wentWell && !e.blockers && <p className="text-xs text-foreground/30 italic mt-0.5">Pas de note</p>}
                 </div>
-                <button onClick={() => removeEntry(e.id)} className={cn("opacity-0 group-hover:opacity-100 text-foreground/20 hover:text-red-400 transition-all flex-shrink-0")}>
+                <button onClick={() => removeEntry(e.id)} className={cn("sm:opacity-0 sm:group-hover:opacity-100 text-foreground/40 sm:text-foreground/20 hover:text-red-400 transition-all flex-shrink-0 p-1 -m-1")}>
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
                 </button>
               </div>

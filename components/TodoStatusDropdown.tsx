@@ -60,7 +60,9 @@ export default function TodoStatusDropdown({ status, onChange, dark = false }: P
   const dropStyle = rect ? (() => {
     const spaceBelow = window.innerHeight - rect.bottom;
     const top = spaceBelow > 140 ? rect.bottom + 4 : rect.top - 4 - 112;
-    return { top, left: rect.left };
+    // Clamp au bord droit du viewport (menu ~140px) → pas de débordement mobile.
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - 148));
+    return { top, left };
   })() : null;
 
   return (

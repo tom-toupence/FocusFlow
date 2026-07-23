@@ -178,7 +178,7 @@ export default function CoachModal({
               </p>
             </div>
 
-            <div className="flex flex-col gap-1.5 overflow-y-auto -mx-1 px-1">
+            <div className="flex flex-col gap-1.5 overflow-y-auto min-h-0 flex-1 -mx-1 px-1">
               {tasks.map((t) => (
                 <div
                   key={t.id}

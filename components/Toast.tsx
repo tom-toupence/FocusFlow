@@ -72,7 +72,7 @@ export default function ToastHost() {
           key={t.id}
           onClick={() => dismiss(t.id)}
           className={cn(
-            "pointer-events-auto cursor-pointer flex items-center gap-3 pl-3 pr-5 py-3 rounded-2xl border bg-gradient-to-r to-black/85 bg-black/85 backdrop-blur-xl shadow-2xl shadow-black/60 min-w-[260px] max-w-sm",
+            "pointer-events-auto cursor-pointer flex items-center gap-3 pl-3 pr-5 py-3 rounded-2xl border bg-gradient-to-r to-black/85 bg-black/85 backdrop-blur-xl shadow-2xl shadow-black/60 min-w-0 max-w-[min(24rem,calc(100vw-2rem))] sm:min-w-[260px]",
             t.leaving ? "anim-toast-out" : "anim-toast-in",
             ACCENTS[t.accent ?? "amber"]
           )}

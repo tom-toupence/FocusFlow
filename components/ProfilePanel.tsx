@@ -163,8 +163,7 @@ export default function ProfilePanel({ open, onClose }: Props) {
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div
-        className="fixed right-4 top-[60px] z-50 bg-background border border-foreground/[0.09] rounded-2xl shadow-2xl shadow-black/20 overflow-hidden flex flex-col"
-        style={{ width: 300 }}
+        className="fixed right-3 left-3 sm:left-auto sm:right-4 top-[60px] z-50 w-auto sm:w-[300px] max-h-[calc(100vh-76px)] overflow-y-auto bg-background border border-foreground/[0.09] rounded-2xl shadow-2xl shadow-black/20 flex flex-col"
       >
         {/* ── Profile section ─────────────────────────────────────────────── */}
         <div className="p-4 border-b border-foreground/[0.06]">

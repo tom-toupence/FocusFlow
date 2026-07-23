@@ -784,7 +784,7 @@ export default function SessionPage() {
 
       {/* Twitch sub-only fallback banner */}
       {isTwitchMode && !isBreak && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
+        <div className="absolute bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-10 px-3 max-w-full">
           <a
             href={
               selectedVodId
@@ -808,7 +808,7 @@ export default function SessionPage() {
 
       {/* ── Break overlay ──────────────────────────────────────────────────── */}
       {isBreak && (
-        <div className="absolute inset-0 z-20 bg-[#0a0a0c]/95 flex flex-col items-center justify-center gap-8">
+        <div className="absolute inset-0 z-20 bg-[#0a0a0c]/95 flex flex-col items-center justify-center gap-5 sm:gap-8 px-4 py-6 overflow-y-auto">
           {/* Teinte d'ambiance en variante froide (data-ambient-phase="break"
               posé par AmbientProvider décale --ambient vers le bleu) */}
           <div
@@ -820,13 +820,13 @@ export default function SessionPage() {
             <div className={cn("text-xs font-semibold uppercase tracking-[0.2em]", isLong ? "text-sky-400" : "text-emerald-400")}>
               {breakLabel[mode]}
             </div>
-            <h1 className="text-5xl font-thin text-white/90 tracking-tight">Repose-toi</h1>
-            <p className="text-white/30 text-sm mt-1">
+            <h1 className="text-4xl sm:text-5xl font-thin text-white/90 tracking-tight">Repose-toi</h1>
+            <p className="text-white/30 text-sm mt-1 text-center">
               Session {sessionsCompleted} terminée — bien joué.
             </p>
           </div>
           {/* Countdown */}
-          <div className={cn("text-8xl font-extralight tabular-nums tracking-tighter z-10", isLong ? "text-sky-300" : "text-emerald-300")}>
+          <div className={cn("text-6xl sm:text-8xl font-extralight tabular-nums tracking-tighter z-10", isLong ? "text-sky-300" : "text-emerald-300")}>
             {formatTime(secondsLeft)}
           </div>
           {/* Progress bar */}
@@ -839,7 +839,7 @@ export default function SessionPage() {
           {/* Guided breathing */}
           {breathingEnabled && <BreathingExercise accent={isLong ? "sky" : "emerald"} />}
           {/* Buttons */}
-          <div className="flex items-center gap-4 z-10">
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 z-10">
             <button
               onClick={() => nextSession(true)}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/50 hover:text-white text-xs font-medium transition-all"
@@ -877,7 +877,7 @@ export default function SessionPage() {
           <button
             onClick={addNote}
             title="Ajouter un post-it"
-            className="fixed bottom-6 left-6 z-[100] flex items-center gap-2 px-3 py-2 rounded-xl bg-black/70 backdrop-blur-sm border border-white/25 text-white/75 hover:text-white hover:bg-black/80 text-xs font-medium transition-all"
+            className="fixed bottom-20 md:bottom-6 left-3 md:left-6 z-[100] flex items-center gap-2 px-3 py-2 rounded-xl bg-black/70 backdrop-blur-sm border border-white/25 text-white/75 hover:text-white hover:bg-black/80 text-xs font-medium transition-all"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round" />
@@ -892,10 +892,12 @@ export default function SessionPage() {
       {/* ── Work screen overlay ─────────────────────────────────────────────── */}
       {!isBreak && (
         <>
-          {/* Top bar */}
-          <div className="absolute top-0 left-0 right-0 flex items-start justify-between px-5 py-4 z-10">
+          {/* Top bar — sur mobile le timer n'est plus centré en absolu (il
+              passerait sous les autres blocs) : il devient le 2e élément flex,
+              aligné à droite, et les contrôles migrent en barre basse. */}
+          <div className="absolute top-0 left-0 right-0 flex items-start justify-between gap-2 px-3 md:px-5 py-3 md:py-4 z-10">
             {/* Terminer + Now Playing */}
-            <div className={cn("flex flex-col items-start gap-2 max-w-[42%] anim-cascade", chromeHideCls)}>
+            <div className={cn("flex flex-col items-start gap-2 max-w-[calc(100%-9rem)] md:max-w-[42%] anim-cascade", chromeHideCls)}>
               <button
                 onClick={handleStop}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/75 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/10 text-xs font-medium transition-all"
@@ -920,8 +922,8 @@ export default function SessionPage() {
               )}
             </div>
 
-            {/* Timer — centered (reste visible en mode zen) */}
-            <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 anim-cascade [animation-delay:80ms]">
+            {/* Timer — centré en absolu sur desktop, en flux à droite sur mobile */}
+            <div className="flex-shrink-0 md:absolute md:left-1/2 md:-translate-x-1/2 flex flex-col items-center gap-1.5 anim-cascade [animation-delay:80ms]">
               {/* Halo d'ambiance discret derrière le timer */}
               <div
                 className="absolute -inset-x-16 -inset-y-6 -z-10 pointer-events-none rounded-full"
@@ -930,7 +932,7 @@ export default function SessionPage() {
                   opacity: 0.45,
                 }}
               />
-              <div className="w-36 h-[2px] bg-white/10 rounded-full overflow-hidden">
+              <div className="w-24 md:w-36 h-[2px] bg-white/10 rounded-full overflow-hidden">
                 {isFlowtime ? (
                   <div className="h-full w-full bg-white/25 rounded-full animate-pulse" />
                 ) : (
@@ -946,7 +948,7 @@ export default function SessionPage() {
               </div>
               <TimerDigits
                 text={formatTime(isFlowtime ? flowSeconds : secondsLeft)}
-                className="text-3xl font-light text-white tabular-nums tracking-tight drop-shadow-lg"
+                className="text-2xl md:text-3xl font-light text-white tabular-nums tracking-tight drop-shadow-lg"
               />
               <span className="text-white/30 text-[10px] uppercase tracking-widest">
                 {isFlowtime
@@ -955,16 +957,25 @@ export default function SessionPage() {
               </span>
             </div>
 
-            {/* Right controls */}
-            <div className={cn("flex items-center gap-2 anim-cascade [animation-delay:160ms]", chromeHideCls)}>
-              {/* Utility cluster — uniform icon buttons */}
-              <div className="flex items-center gap-1 p-1 rounded-2xl bg-black/50 backdrop-blur-sm border border-white/15">
+            {/* Contrôles — à droite de la top bar sur desktop, barre fixe en bas
+                du viewport sur mobile (atteignable au pouce, safe-area iOS). */}
+            <div
+              className={cn(
+                "fixed bottom-0 inset-x-0 z-20 flex items-center gap-2 px-3 py-2 bg-black/60 backdrop-blur-md border-t border-white/10 pb-[max(0.5rem,env(safe-area-inset-bottom))]",
+                "md:static md:z-auto md:bg-transparent md:backdrop-blur-none md:border-0 md:p-0 md:pb-0",
+                "anim-cascade [animation-delay:160ms]",
+                chromeHideCls
+              )}
+            >
+              {/* Utility cluster — icônes uniformes ; scroll horizontal sur mobile
+                  pour que Pause/Tâches restent toujours accessibles. */}
+              <div className="flex-1 min-w-0 overflow-x-auto md:flex-none md:overflow-visible flex items-center gap-1 p-1 rounded-2xl bg-black/50 backdrop-blur-sm border border-white/15">
                 {/* Playlist skip controls (YouTube playlists, mixes & file FocusFlow) */}
                 {(isPlaylistMode || isQueueMode) && (
                   <>
                     <button
                       onClick={() => skipTrack("prev")}
-                      className="w-9 h-9 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
+                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
                       title="Titre précédent"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -973,7 +984,7 @@ export default function SessionPage() {
                     </button>
                     <button
                       onClick={() => skipTrack("next")}
-                      className="w-9 h-9 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
+                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
                       title="Titre suivant"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -986,7 +997,7 @@ export default function SessionPage() {
                       <button
                         onClick={() => usePlaybackPrefsStore.getState().toggleShuffle()}
                         className={cn(
-                          "w-9 h-9 flex items-center justify-center rounded-xl transition-all",
+                          "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl transition-all",
                           shuffle ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
                         )}
                         title={shuffle ? "Lecture aléatoire activée" : "Activer la lecture aléatoire"}
@@ -1002,7 +1013,7 @@ export default function SessionPage() {
                     <button
                       onClick={() => usePlaybackPrefsStore.getState().toggleLoop()}
                       className={cn(
-                        "w-9 h-9 flex items-center justify-center rounded-xl transition-all",
+                        "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl transition-all",
                         loop ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
                       )}
                       title={loop ? "Boucle activée" : "Boucle désactivée — la fin de liste enchaîne sur des titres similaires"}
@@ -1019,7 +1030,7 @@ export default function SessionPage() {
                 {/* Distraction marker (shortcut: D) */}
                 <button
                   onClick={handleDistraction}
-                  className="relative w-9 h-9 flex items-center justify-center rounded-xl text-white/75 hover:text-amber-400 hover:bg-amber-500/10 transition-all"
+                  className="relative w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-amber-400 hover:bg-amber-500/10 transition-all"
                   title="Marquer une distraction · touche D"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -1047,16 +1058,17 @@ export default function SessionPage() {
 
                 {/* Volume (YouTube & Twitch only — Spotify has its own) */}
                 {!isSpotifyMode && (
-                  <div className="relative flex items-center">
-                    {/* Panneau vertical sous le bouton — toujours monté pour une vraie
-                        transition CSS (fondu + glissement), auto-masqué après 2,5 s. */}
+                  <div className="relative flex items-center flex-shrink-0">
+                    {/* Panneau vertical — toujours monté pour une vraie transition
+                        CSS, auto-masqué après 2,5 s. S'ouvre VERS LE HAUT sur
+                        mobile (la barre de contrôles est en bas de l'écran). */}
                     <div
                       onPointerMove={armVolumeHide}
                       className={cn(
-                        "absolute top-full right-0 mt-2 w-9 h-28 flex items-center justify-center rounded-xl bg-black/70 backdrop-blur-sm border border-white/15 shadow-lg shadow-black/40 transition-[opacity,transform] duration-300",
+                        "absolute bottom-full mb-2 md:bottom-auto md:top-full md:mb-0 md:mt-2 right-0 w-9 h-28 flex items-center justify-center rounded-xl bg-black/70 backdrop-blur-sm border border-white/15 shadow-lg shadow-black/40 transition-[opacity,transform] duration-300",
                         showVolume
                           ? "opacity-100 translate-y-0"
-                          : "opacity-0 -translate-y-1 pointer-events-none"
+                          : "opacity-0 translate-y-1 md:-translate-y-1 pointer-events-none"
                       )}
                     >
                       <input
@@ -1072,7 +1084,7 @@ export default function SessionPage() {
                     </div>
                     <button
                       onClick={() => setShowVolume((v) => { const next = !v; if (next) armVolumeHide(); return next; })}
-                      className="w-9 h-9 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
+                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
                       title="Volume de la vidéo"
                     >
                       {volume === 0 ? (
@@ -1097,7 +1109,7 @@ export default function SessionPage() {
                     href={selectedVodId ? `https://www.twitch.tv/videos/${selectedVodId}` : `https://www.twitch.tv/${selectedChannel}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-9 h-9 flex items-center justify-center rounded-xl text-white/75 hover:text-[#9146ff] hover:bg-[#9146ff]/10 transition-all"
+                    className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-[#9146ff] hover:bg-[#9146ff]/10 transition-all"
                     title="Ouvrir sur Twitch"
                   >
                     <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
@@ -1110,7 +1122,7 @@ export default function SessionPage() {
                 <button
                   onClick={() => setShowHelp((v) => !v)}
                   className={cn(
-                    "w-9 h-9 flex items-center justify-center rounded-xl transition-all",
+                    "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl transition-all",
                     showHelp ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
                   )}
                   title="Aide & raccourcis"
@@ -1126,21 +1138,22 @@ export default function SessionPage() {
               {isFlowtime && (
                 <button
                   onClick={handleFlowBreak}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-400/40 text-emerald-200 text-xs font-semibold transition-all hover:bg-emerald-500/30 shadow-lg shadow-black/30"
+                  className="flex-shrink-0 flex items-center gap-2 px-3 md:px-4 py-2 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-400/40 text-emerald-200 text-xs font-semibold transition-all hover:bg-emerald-500/30 shadow-lg shadow-black/30"
                   title={`Terminer ce flow et prendre ${earnedBreakMin} min de pause`}
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" strokeLinecap="round" strokeLinejoin="round" />
                     <line x1="6" y1="1" x2="6" y2="4" strokeLinecap="round" /><line x1="10" y1="1" x2="10" y2="4" strokeLinecap="round" /><line x1="14" y1="1" x2="14" y2="4" strokeLinecap="round" />
                   </svg>
-                  Pause méritée ({earnedBreakMin} min)
+                  <span className="hidden sm:inline">Pause méritée ({earnedBreakMin} min)</span>
+                  <span className="sm:hidden">{earnedBreakMin} min</span>
                 </button>
               )}
 
               {/* Pause / Resume — primary (shortcut: Espace) */}
               <button
                 onClick={isRunning ? pause : start}
-                className="flex items-center gap-2 px-5 py-2 rounded-full bg-white/20 backdrop-blur-md border border-white/40 text-white text-sm font-semibold transition-all hover:bg-white/30 shadow-lg shadow-black/30"
+                className="flex-shrink-0 flex items-center gap-2 px-4 md:px-5 py-2.5 md:py-2 rounded-full bg-white/20 backdrop-blur-md border border-white/40 text-white text-sm font-semibold transition-all hover:bg-white/30 shadow-lg shadow-black/30"
                 title={isRunning ? "Mettre en pause · Espace" : "Reprendre · Espace"}
               >
                 {isRunning ? (
@@ -1164,21 +1177,28 @@ export default function SessionPage() {
               {/* Tâches — primary */}
               <button
                 onClick={() => setShowTodos((v) => !v)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm border border-white/30 text-white text-xs font-semibold transition-all hover:bg-white/25"
+                className="flex-shrink-0 relative flex items-center gap-1.5 px-3 md:px-4 py-2.5 md:py-2 rounded-full bg-white/15 backdrop-blur-sm border border-white/30 text-white text-xs font-semibold transition-all hover:bg-white/25"
                 title="Afficher / masquer les tâches"
               >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <svg className="w-4 h-4 md:w-3.5 md:h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" strokeLinecap="round" />
                   <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                {pendingTodos.length > 0 ? `${pendingTodos.length} tâche${pendingTodos.length > 1 ? "s" : ""}` : "Tâches"}
+                {/* Libellé complet sur desktop ; sur mobile un simple compteur
+                    (la place est réservée à Pause, l'action primaire). */}
+                <span className="hidden md:inline">
+                  {pendingTodos.length > 0 ? `${pendingTodos.length} tâche${pendingTodos.length > 1 ? "s" : ""}` : "Tâches"}
+                </span>
+                {pendingTodos.length > 0 && (
+                  <span className="md:hidden tabular-nums">{pendingTodos.length}</span>
+                )}
               </button>
             </div>
           </div>
 
           {/* ── Help panel ─────────────────────────────────────────────────── */}
           {showHelp && (
-            <div className="absolute top-20 right-5 w-80 bg-black/85 backdrop-blur-xl rounded-2xl border border-white/15 shadow-2xl shadow-black/80 overflow-hidden z-20">
+            <div className="absolute top-20 right-3 md:right-5 w-80 max-w-[calc(100vw-1.5rem)] max-h-[60vh] overflow-y-auto bg-black/85 backdrop-blur-xl rounded-2xl border border-white/15 shadow-2xl shadow-black/80 z-30">
               <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
                 <span className="text-xs font-semibold text-white/70 uppercase tracking-widest">Comment ça marche</span>
                 <button onClick={() => setShowHelp(false)} className="text-white/40 hover:text-white transition-colors">
@@ -1212,7 +1232,13 @@ export default function SessionPage() {
 
           {/* Tasks panel — mini kanban */}
           {showTodos && (
-            <div className={cn("absolute bottom-6 right-6 w-[32rem] max-w-[calc(100vw-3rem)] bg-black/85 backdrop-blur-xl rounded-2xl border border-white/15 shadow-2xl shadow-black/80 z-10 p-4", chromeHideCls)}>
+            <div className={cn(
+              // Mobile : pleine largeur au-dessus de la barre de contrôles.
+              "absolute inset-x-3 bottom-[4.5rem] max-h-[55vh] overflow-y-auto",
+              "md:inset-x-auto md:right-6 md:bottom-6 md:w-[32rem] md:max-w-[calc(100vw-3rem)] md:max-h-none md:overflow-visible",
+              "bg-black/85 backdrop-blur-xl rounded-2xl border border-white/15 shadow-2xl shadow-black/80 z-10 p-4",
+              chromeHideCls
+            )}>
               <TodoList />
             </div>
           )}

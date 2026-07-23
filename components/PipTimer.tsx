@@ -99,7 +99,7 @@ export default function PipTimer({
       <button
         onClick={() => (pipWindow ? close() : open())}
         className={cn(
-          "w-9 h-9 flex items-center justify-center rounded-xl transition-all",
+          "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl transition-all",
           pipWindow ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10",
           !supported && "hidden"
         )}

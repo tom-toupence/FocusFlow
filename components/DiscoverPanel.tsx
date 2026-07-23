@@ -163,7 +163,7 @@ export default function DiscoverPanel() {
     <div className="flex flex-col gap-8">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold text-foreground tracking-tight">Découvrir</h1>
+          <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">Découvrir</h1>
           <p className="text-foreground/40 mt-1 text-sm">
             Des recommandations basées sur ce que tu écoutes, ou cherche directement un titre.
           </p>

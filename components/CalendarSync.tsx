@@ -69,8 +69,8 @@ export default function CalendarSync() {
 
       {/* Portal : le wrapper de section animé (transform) piègerait le `fixed`. */}
       {open && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm" onClick={() => setOpen(false)}>
-          <div className="bg-background border border-foreground/10 rounded-2xl shadow-2xl shadow-black/20 w-full max-w-md p-6 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-sm" onClick={() => setOpen(false)}>
+          <div className="bg-background border border-foreground/10 rounded-2xl shadow-2xl shadow-black/20 w-full max-w-md max-h-[85vh] overflow-y-auto p-5 sm:p-6 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
             <div>
               <h2 className="text-sm font-semibold text-foreground">📅 Synchro automatique du planning</h2>
               <p className="text-xs text-foreground/45 mt-1 leading-relaxed">

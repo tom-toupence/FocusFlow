@@ -44,7 +44,7 @@ function MiniCard({ todo }: { todo: Todo }) {
       <div className="flex items-center gap-0.5">
         <button
           onClick={() => deleteTodo(todo.id)}
-          className="w-5 h-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 text-white/25 hover:text-red-400 transition-all"
+          className="w-6 h-6 sm:w-5 sm:h-5 flex items-center justify-center rounded sm:opacity-0 sm:group-hover:opacity-100 text-white/40 sm:text-white/25 hover:text-red-400 transition-all"
           title="Supprimer"
         >
           <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -145,7 +145,7 @@ export default function TodoList() {
           Aucune tâche — profite du flow ✌
         </p>
       ) : (
-        <div className="grid grid-cols-3 gap-2 flex-1 min-h-0">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 min-h-0">
           {SECTIONS.map((section) => {
             const items = todos.filter((t) => t.status === section.status);
             return (

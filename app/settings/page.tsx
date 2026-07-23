@@ -155,7 +155,7 @@ function KanbanCard({
         </span>
         <button
           onClick={onDelete}
-          className="opacity-0 group-hover:opacity-100 text-foreground/25 hover:text-red-400 transition-all flex-shrink-0 mt-0.5"
+          className="sm:opacity-0 sm:group-hover:opacity-100 text-foreground/40 sm:text-foreground/25 hover:text-red-400 transition-all flex-shrink-0 mt-0.5 p-1 -m-1"
           title="Supprimer"
         >
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>

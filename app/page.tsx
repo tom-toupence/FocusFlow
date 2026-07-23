@@ -138,7 +138,7 @@ function VideoCard({
       {isCustom && onRemove && (
         <button
           onClick={(e) => { e.stopPropagation(); onRemove(); }}
-          className="absolute top-2 left-2 w-5 h-5 rounded-full bg-black/60 text-white/60 hover:text-white opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
+          className="absolute top-2 left-2 w-6 h-6 sm:w-5 sm:h-5 rounded-full bg-black/60 text-white/70 hover:text-white sm:opacity-0 sm:group-hover:opacity-100 transition-all flex items-center justify-center"
           title="Supprimer"
         >
           <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
@@ -189,12 +189,12 @@ function AddVideoModal({ onClose, onAdd }: { onClose: () => void; onAdd: (video:
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
       <div
-        className="w-full max-w-md bg-card border border-foreground/10 rounded-2xl shadow-2xl p-5 flex flex-col gap-4"
+        className="w-full max-w-md max-h-[85vh] overflow-y-auto bg-card border border-foreground/10 rounded-2xl shadow-2xl p-5 flex flex-col gap-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">Ajouter une vidéo</h2>
-          <button onClick={onClose} className="text-foreground/40 hover:text-foregroundtransition-colors">
+          <button onClick={onClose} className="text-foreground/40 hover:text-foreground transition-colors">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
             </svg>
@@ -330,7 +330,7 @@ function AddPlaylistModal({ onClose, onAdd }: { onClose: () => void; onAdd: (p: 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
       <div
-        className="w-full max-w-md bg-card border border-foreground/10 rounded-2xl shadow-2xl p-5 flex flex-col gap-4"
+        className="w-full max-w-md max-h-[85vh] overflow-y-auto bg-card border border-foreground/10 rounded-2xl shadow-2xl p-5 flex flex-col gap-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -593,7 +593,7 @@ function LocalPlaylistCard({
       {playlist.tracks.length > 0 && (
         <button
           onClick={(e) => { e.stopPropagation(); onPlay(); }}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 hidden sm:flex"
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-lg sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200"
           title="Lire"
         >
           <svg className="w-4 h-4 text-black ml-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
@@ -722,7 +722,7 @@ function CompletedTodosBacklog() {
                   <span className="flex-1 text-xs text-foreground/35 line-through">{t.text}</span>
                   <button
                     onClick={() => deleteTodo(t.id)}
-                    className="opacity-0 group-hover:opacity-100 text-foreground/20 hover:text-foreground/50 transition-all"
+                    className="sm:opacity-0 sm:group-hover:opacity-100 text-foreground/40 sm:text-foreground/20 hover:text-foreground/50 transition-all p-1 -m-1"
                   >
                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                       <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
@@ -1116,13 +1116,14 @@ export default function LandingPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => useCommandPalette.getState().setOpen(true)}
-              className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-foreground/5 hover:bg-foreground/10 text-foreground/40 hover:text-foreground/70 text-xs transition-all"
+              className="flex items-center gap-2 w-8 h-8 justify-center sm:w-auto sm:h-auto sm:px-2.5 sm:py-1.5 rounded-lg bg-foreground/5 hover:bg-foreground/10 text-foreground/40 hover:text-foreground/70 text-xs transition-all"
               title="Recherche rapide"
+              aria-label="Recherche rapide"
             >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-4 h-4 sm:w-3.5 sm:h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" strokeLinecap="round" />
               </svg>
-              <kbd className="text-[10px] border border-foreground/15 rounded px-1">⌘K</kbd>
+              <kbd className="hidden sm:inline text-[10px] border border-foreground/15 rounded px-1">⌘K</kbd>
             </button>
             <CreateMenu />
             <button
@@ -1172,7 +1173,7 @@ export default function LandingPage() {
           <>
             <div className="flex items-end justify-between mb-8">
               <div>
-                <h1 className="text-3xl font-semibold text-foreground tracking-tight">Choisis ton ambiance</h1>
+                <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">Choisis ton ambiance</h1>
                 <p className="text-foreground/40 mt-1 text-sm">Passe ta souris sur une vidéo et clique Démarrer.</p>
               </div>
             </div>
@@ -1220,7 +1221,7 @@ export default function LandingPage() {
         {activeTab === "library" && (
           <>
             <div className="mb-8">
-              <h1 className="text-3xl font-semibold text-foreground tracking-tight">Ma bibliothèque</h1>
+              <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">Ma bibliothèque</h1>
               <p className="text-foreground/40 mt-1 text-sm">Ta file, tes playlists et tes vidéos personnelles, sauvegardées sur ton compte.</p>
             </div>
 
@@ -1324,7 +1325,7 @@ export default function LandingPage() {
         {activeTab === "spotify" && (
           <>
             <div className="mb-8">
-              <h1 className="text-3xl font-semibold text-foreground tracking-tight flex items-center gap-3">
+              <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight flex items-center gap-3">
                 Spotify
                 <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#1db954]" fill="currentColor">
                   <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
@@ -1495,7 +1496,7 @@ export default function LandingPage() {
           <>
             <div className="flex items-end justify-between mb-8">
               <div>
-                <h1 className="text-3xl font-semibold text-foreground tracking-tight flex items-center gap-3">
+                <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight flex items-center gap-3">
                   Twitch
                   <svg viewBox="0 0 24 24" className="w-7 h-7 text-[#9146ff]" fill="currentColor">
                     <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
@@ -1680,7 +1681,7 @@ export default function LandingPage() {
         {activeTab === "activite" && (
           <>
             <div className="mb-8">
-              <h1 className="text-3xl font-semibold text-foreground tracking-tight">Activité</h1>
+              <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">Activité</h1>
               <p className="text-foreground/40 mt-1 text-sm">Ton niveau, tes stats et ton récap hebdo.</p>
             </div>
             <SubTabs<ActivityTab>
@@ -1707,7 +1708,7 @@ export default function LandingPage() {
         {activeTab === "organisation" && (
           <>
             <div className="mb-8">
-              <h1 className="text-3xl font-semibold text-foreground tracking-tight">Organisation</h1>
+              <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">Organisation</h1>
               <p className="text-foreground/40 mt-1 text-sm">
                 {orgTab === "projets" && "Suis tes gros objectifs et le rythme à tenir."}
                 {orgTab === "planning" && "Planifie ta semaine en blocs de focus."}

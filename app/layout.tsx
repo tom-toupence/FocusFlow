@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import SupabaseProvider from "@/components/SupabaseProvider";
@@ -12,6 +12,14 @@ const geist = Geist({
   variable: "--font-geist",
   subsets: ["latin"],
 });
+
+// `viewport-fit=cover` active env(safe-area-inset-*) sur iPhone à encoche —
+// AppNav/CreateMenu/AddToMenu s'en servent déjà pour leurs bottom-bars.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   title: "FocusFlow — Pomodoro + Lofi",

@@ -378,6 +378,34 @@ Relecture `code-reviewer` passée (fix du double avancement + bouton boucle masq
   session. Il est maintenant un **bouton d'angle dédié en haut à droite** (icône liste, toujours
   visible, à côté du badge « Playlist »).
 
+## Journal de session — 2026-07-23 (responsivité mobile complète)
+
+Passe complète de responsivité tactile (viewport 375-430 px). Le hub/pages secondaires étaient déjà
+largement responsives (grilles `grid-cols-2 sm:…`, bottom-nav `AppNav`, bottom-sheets AddToMenu/CreateMenu) ;
+le chantier a porté sur la **session** (le seul écran cassé) et les **fonctionnalités tactiles**.
+
+1. **Infra** : `export const viewport` avec **`viewportFit: "cover"`** (`app/layout.tsx`) — active les
+   `env(safe-area-inset-*)` déjà codés (iPhone à encoche). Toast clampé `max-w-[min(24rem,calc(100vw-2rem))]`.
+2. **Session mobile** (`app/session/page.tsx`, uniquement layout, zéro logique) : le **timer sort de son
+   centrage absolu** sous `md` (passe en flux à droite de la top bar) ; les **contrôles migrent en barre
+   fixe en bas** de l'écran (`fixed bottom-0 md:static`, `overflow-x-auto` des icônes, `pb-[max(...,safe-area)]`) —
+   Pause/Tâches toujours atteignables au pouce ; volume s'ouvre **vers le haut** sur mobile ; panneaux
+   tâches/aide en pleine largeur + scroll ; post-it/bandeau Twitch remontés au-dessus de la barre ; overlay
+   de pause scrollable + tailles réduites.
+3. **Tactile** (le seul vrai code) : **`StickyNote`** migré souris → **Pointer Events** (`setPointerCapture`,
+   `touch-action:none`) → déplaçable au doigt, + clamp au viewport au montage (récupère les post-its « perdus »).
+   Toutes les suppressions **hover-only** (`opacity-0 group-hover`) passées en **`sm:opacity-0 sm:group-hover`**
+   (visibles par défaut sur mobile) : WeekPlanner, JournalTimeline, TaskPlanner, TodoList, backlog, cartes
+   vidéo/playlist, settings kanban ; bouton ▶ des LocalPlaylistCard idem. **Palette ⌘K** accessible sur mobile
+   (bouton loupe du header en icône seule). **TodoStatusDropdown** clampé au bord droit.
+4. **Modals** : `max-h-[85vh] overflow-y-auto` sur AddVideo/AddPlaylist/CalendarSync ; **ProfilePanel** pleine
+   largeur + scroll sous `sm` ; **kanban** (`TodoList`, settings) et grille date/heure du **SprintWizard**
+   empilés en 1 colonne sur mobile ; entête **WeekPlanner** en `flex-col sm:flex-row` ; CoachModal liste `flex-1 min-h-0`.
+5. **Finitions** : titres `text-2xl sm:text-3xl` ; grilles Succès/All-time de `StatsSection` en `grid-cols-2/1 sm:grid-cols-3`.
+
+Pattern tactile-safe retenu : `sm:opacity-0 sm:group-hover:opacity-100` + Pointer Events (jamais `draggable`
+HTML5 ni events souris seuls). `md:` partout = desktop strictement inchangé. tsc/build verts.
+
 ## Catalogue vidéos (refonte 2026-07-06)
 
 Catalogue recentré sur **2 formats uniquement** : « Study With Me » scéniques (vue sur un beau
