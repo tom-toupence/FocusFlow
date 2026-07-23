@@ -25,6 +25,12 @@ export default function FriendsDrawer() {
   const focusingCount = friends.filter((f) => isActivelyFocusing(f.stats)).length;
   const notif = pending.length; // demandes reçues = pastille d'alerte
 
+  // Ouvert par défaut sur desktop (façon launcher) ; fermé sur mobile pour ne
+  // pas masquer l'écran. Une seule fois au montage (SSR-safe → pas de mismatch).
+  useEffect(() => {
+    if (window.matchMedia("(min-width: 768px)").matches) useFriendsDrawer.getState().setOpen(true);
+  }, []);
+
   // Rafraîchit à l'ouverture (le Realtime maintient ensuite à jour).
   useEffect(() => { if (open && email) refresh(); }, [open, email, refresh]);
 
@@ -83,20 +89,20 @@ export default function FriendsDrawer() {
         <span className="text-[9px] font-semibold tracking-tight [writing-mode:vertical-rl] rotate-180">Amis</span>
       </button>
 
-      {/* Scrim : sombre sur mobile, transparent (clic = fermer) sur desktop */}
+      {/* Scrim mobile uniquement (dim + clic = fermer). Sur desktop, pas de
+          scrim : le tiroir cohabite avec le contenu, qui reste cliquable. */}
       <div
         onClick={() => setOpen(false)}
         className={cn(
-          "fixed inset-0 z-[59] transition-opacity",
-          open ? "opacity-100" : "opacity-0 pointer-events-none",
-          "bg-black/40 sm:bg-transparent"
+          "md:hidden fixed inset-0 z-[59] bg-black/40 transition-opacity",
+          open ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
       />
 
       {/* Panneau */}
       <aside
         className={cn(
-          "fixed top-0 right-0 z-[60] h-full w-[360px] max-w-[calc(100vw-1rem)] flex flex-col bg-background border-l border-foreground/10 shadow-2xl shadow-black/30 transition-transform duration-300 ease-out",
+          "fixed top-0 right-0 z-[60] h-full w-[300px] max-w-[calc(100vw-1rem)] flex flex-col bg-background border-l border-foreground/10 shadow-2xl shadow-black/30 transition-transform duration-300 ease-out",
           open ? "translate-x-0" : "translate-x-full"
         )}
       >

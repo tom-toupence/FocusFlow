@@ -260,15 +260,20 @@ drop policy if exists "update own stats"             on friend_stats;
 
 -- public_profiles : lisible par soi OU par un lien (pending/accepted) — permet
 -- d'afficher le nom d'un demandeur en attente. Pas de SELECT global → pas
--- d'énumération de l'annuaire ; la résolution de code passe par le RPC.
+-- d'énumération de l'annuaire. Écriture réservée aux RPC (SECURITY DEFINER) :
+-- aucune policy insert/update → pas d'écriture directe (username/code contrôlés).
 create policy "read own or friend profile" on public_profiles for select using (auth.uid() = id or public.has_link(id));
-create policy "insert own profile"          on public_profiles for insert with check (auth.uid() = id);
-create policy "update own profile pub"      on public_profiles for update using (auth.uid() = id) with check (auth.uid() = id);
 
--- friendships : chacun voit/gère ses propres relations. INSERT réservé au RPC
--- (aucune policy insert → les inserts directs sont refusés).
+-- invite_code est une CAPABILITY secrète : masquée au niveau colonne. Seul le
+-- propriétaire la récupère via ensure_public_profile (SECURITY DEFINER, qui
+-- bypasse ce grant). Les amis/liens ne lisent que les colonnes d'identité.
+revoke select on public_profiles from anon, authenticated;
+grant select (id, username, display_name, avatar_url, updated_at) on public_profiles to authenticated;
+
+-- friendships : chacun voit/gère ses propres relations. INSERT (send_friend_request)
+-- et UPDATE (accept_friend_request) réservés aux RPC → aucune policy insert/update
+-- (empêche de forger un statut « accepted » sans consentement du destinataire).
 create policy "read own friendships" on friendships for select using (auth.uid() = requester_id or auth.uid() = addressee_id);
-create policy "accept friendships"   on friendships for update using (auth.uid() = addressee_id) with check (auth.uid() = addressee_id);
 create policy "delete friendships"   on friendships for delete using (auth.uid() = requester_id or auth.uid() = addressee_id);
 
 -- friend_stats : lisible par soi OU par un ami accepté ; écrit uniquement par soi.
@@ -367,6 +372,26 @@ begin
   insert into friendships (requester_id, addressee_id, status, created_at)
   values (me, target, 'pending', (extract(epoch from now()) * 1000)::bigint);
   return 'sent';
+end;
+$$;
+
+-- Accepte une demande reçue. SEUL le destinataire (addressee) peut passer une
+-- relation `pending` → `accepted`. Empêche de forger une amitié acceptée sans
+-- consentement (aucune policy UPDATE directe sur friendships).
+create or replace function public.accept_friend_request(p_friendship_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then raise exception 'not_authenticated'; end if;
+  update friendships
+     set status = 'accepted'
+   where id = p_friendship_id
+     and addressee_id = auth.uid()
+     and status = 'pending';
+  if not found then raise exception 'not_found_or_not_pending'; end if;
 end;
 $$;
 

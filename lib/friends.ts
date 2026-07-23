@@ -97,10 +97,11 @@ export async function sendFriendRequest(code: string): Promise<SendResult> {
   return (typeof data === "string" ? data : "error") as SendResult;
 }
 
-/** Accepte une demande reçue (l'utilisateur courant est l'addressee). */
+/** Accepte une demande reçue. Passe par un RPC : seul l'addressee peut sceller
+ *  l'amitié (aucun UPDATE direct sur friendships → pas d'amitié forgée). */
 export async function acceptRequest(friendshipId: string): Promise<boolean> {
   if (!supabase) return false;
-  const { error } = await supabase.from("friendships").update({ status: "accepted" }).eq("id", friendshipId);
+  const { error } = await supabase.rpc("accept_friend_request", { p_friendship_id: friendshipId });
   if (error) { console.error("[friends] acceptRequest:", error.message); return false; }
   return true;
 }

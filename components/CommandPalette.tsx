@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { useRouter } from "next/navigation";
 import { useNavStore, NavSection, MediaSource, OrgTab, ActivityTab } from "@/store/navStore";
+import { useFriendsDrawer } from "@/store/friendsDrawerStore";
 import { cn } from "@/lib/utils";
 
 // État d'ouverture partagé : ⌘K (clavier) + bouton header peuvent tous deux l'ouvrir.
@@ -57,6 +58,7 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
   const goActivity = (t: ActivityTab) => () => { useNavStore.getState().openActivity(t); router.push("/"); onClose(); };
   const goRoute = (path: string) => () => { router.push(path); onClose(); };
   const create = (k: "project" | "sprint") => () => { useNavStore.getState().requestCreate(k); router.push("/"); onClose(); };
+  const openFriends = () => { useFriendsDrawer.getState().setOpen(true); onClose(); };
 
   const commands: Command[] = [
     { id: "start", label: "Démarrer une session", hint: "Choisir une ambiance", keywords: "demarrer session focus pomodoro play lancer", run: goMedia("catalogue") },
@@ -79,6 +81,7 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
     { id: "activite", label: "Activité", hint: "Stats & progression", keywords: "activite stats progression badges", run: goSection("activite") },
     { id: "stats", label: "Statistiques", hint: "Activité", keywords: "insights stats graphiques export activite", run: goActivity("stats") },
     { id: "wrapped-tab", label: "Wrapped", hint: "Activité", keywords: "wrapped recap semaine partage activite", run: goActivity("wrapped") },
+    { id: "friends", label: "Amis", hint: "Panneau latéral", keywords: "amis friends leaderboard classement focus", run: openFriends },
     { id: "settings", label: "Réglages", hint: "Preset & tâches", keywords: "reglages settings preset taches kanban coach", run: goRoute("/settings") },
     { id: "insights", label: "Statistiques détaillées", keywords: "insights stats graphiques export", run: goRoute("/insights") },
     { id: "wrapped", label: "Récap hebdo", keywords: "wrapped recap semaine partage", run: goRoute("/wrapped") },

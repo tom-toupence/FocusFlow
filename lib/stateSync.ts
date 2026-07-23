@@ -55,30 +55,24 @@ function asArray<T>(v: unknown): T[] {
   return Array.isArray(v) ? (v as T[]) : [];
 }
 
-// Garde-fou poste partagé : si un AUTRE compte se connecte sur ce navigateur,
-// on vide les stores personnels avant le merge — sinon le journal/l'historique
-// du compte précédent serait unioné puis poussé dans user_state du nouveau
-// compte (même pattern que le clearAuth Spotify/Twitch de SupabaseProvider).
-const OWNER_KEY = "focusflow-sync-owner";
-
-function resetPersonalStoresIfOwnerChanged(userId: string) {
-  try {
-    const prev = localStorage.getItem(OWNER_KEY);
-    if (prev && prev !== userId) {
-      useRoutineStore.setState({ routines: [] });
-      useJournalStore.setState({ entries: [] });
-      usePlayHistoryStore.setState({ entries: [] });
-      useDistractionStore.setState({ byDate: {} });
-      useAchievementsStore.setState({ unlocked: {} });
-      useSprintStore.setState({ sprint: null });
-    }
-    localStorage.setItem(OWNER_KEY, userId);
-  } catch { /* localStorage indisponible */ }
+/**
+ * Vide les petits stores personnels (routines, journal, objectif, historique,
+ * distractions, succès, sprint). Appelé par SupabaseProvider AVANT tout merge
+ * quand un AUTRE compte se connecte sur ce navigateur — sinon les données du
+ * compte précédent seraient unionées puis poussées dans le nouveau compte.
+ */
+export function resetPersonalStores() {
+  useRoutineStore.setState({ routines: [] });
+  useJournalStore.setState({ entries: [] });
+  usePlayHistoryStore.setState({ entries: [] });
+  useDistractionStore.setState({ byDate: {} });
+  useAchievementsStore.setState({ unlocked: {} });
+  useGoalStore.setState({ unit: "minutes", target: 120 });
+  useSprintStore.setState({ sprint: null });
 }
 
 /** Merge l'état distant dans les stores puis pousse l'état résultant. */
 export async function applyRemoteState(userId: string): Promise<void> {
-  resetPersonalStoresIfOwnerChanged(userId);
   const remote = await fetchUserState(userId);
   applying = true;
   try {

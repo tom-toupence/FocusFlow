@@ -14,7 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { setCurrentUserId } from "@/lib/authState";
 import { fetchCustomVideos, fetchTodos, fetchWorkSessions, fetchPlaylists, fetchProfile, fetchPlanBlocks, upsertPlanBlock, fetchProjects, upsertProject, fetchLocalPlaylists, upsertLocalPlaylist } from "@/lib/db";
 import { useLocalPlaylistStore } from "@/store/localPlaylistStore";
-import { applyRemoteState } from "@/lib/stateSync";
+import { applyRemoteState, resetPersonalStores } from "@/lib/stateSync";
 import { usePlanStore } from "@/store/planStore";
 import { useProjectStore } from "@/store/projectStore";
 import { useSessionStore } from "@/store/sessionStore";
@@ -29,6 +29,40 @@ import { useTwitchStore } from "@/store/twitchStore";
 // (React Strict Mode double-mount, token refresh, etc.)
 let syncedUserId: string | null = null;
 
+// Propriétaire des données locales sur CE navigateur. Sert à détecter un
+// changement de compte pour purger le localStorage avant de merger le distant.
+const DATA_OWNER_KEY = "focusflow-data-owner";
+
+/**
+ * Changement de compte sur ce navigateur → on VIDE tous les stores synchronisés
+ * (leurs données `focusflow-*` en localStorage) AVANT de fetcher/merger le
+ * distant. Sinon le compte B hérite des stats/playlists/vidéos/… du compte A
+ * (le merge `Math.max`/union par id conserverait les données locales de A).
+ * Ne réinitialise QUE sur un vrai changement de propriétaire : une 1ʳᵉ connexion
+ * (aucun propriétaire enregistré) conserve les données locales anonymes → elles
+ * rejoignent le compte (comportement local-first voulu). Les setState ci-dessous
+ * n'écrivent RIEN en base (pas d'appel aux actions de sync).
+ */
+function resetLocalDataIfAccountChanged(userId: string): boolean {
+  let changed = false;
+  try {
+    const prev = localStorage.getItem(DATA_OWNER_KEY);
+    changed = !!prev && prev !== userId;
+    if (changed) {
+      useStatsStore.setState({ days: {} });
+      useProjectStore.setState({ projects: [], activeProjectId: null });
+      useSessionStore.setState({ customVideos: [], todos: [], selectedPlaylistId: null, playQueue: false });
+      usePlaylistStore.setState({ playlists: [] });
+      useLocalPlaylistStore.setState({ playlists: [] });
+      usePlanStore.setState({ blocks: [] });
+      resetPersonalStores();
+      teardownFriends(); // coupe les subscriptions/Realtime du compte précédent
+    }
+    localStorage.setItem(DATA_OWNER_KEY, userId);
+  } catch { /* localStorage indisponible */ }
+  return changed;
+}
+
 export default function SupabaseProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!supabase) return;
@@ -37,6 +71,9 @@ export default function SupabaseProvider({ children }: { children: React.ReactNo
       // Ne syncer qu'une seule fois par utilisateur par session browser
       if (syncedUserId === userId) return;
       syncedUserId = userId;
+
+      // AVANT tout merge : purge le localStorage si un autre compte l'a rempli.
+      resetLocalDataIfAccountChanged(userId);
 
       // Clear Spotify / Twitch if they were connected by a different user
       const spotify = useSpotifyStore.getState();
