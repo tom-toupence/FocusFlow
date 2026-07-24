@@ -40,13 +40,16 @@ function capitalize(w: string): string {
 
 // Mini-dictionnaire d'univers : détection locale de thèmes non littéraux
 // (le repli sans IA doit rester digne — ex. titres d'anime → « anime music »).
+// Requêtes NEUTRES sur la durée : on ne force PAS "mix"/"compilation" (sinon
+// YouTube ne renvoie que des vidéos d'1 h). On cible le STYLE ; toutes durées
+// passent (titres individuels courts comme longues ambiances).
 const UNIVERSE_RULES: { re: RegExp; label: string; query: string }[] = [
-  { re: /\b(anime|opening|op\s?\d|ending|naruto|ghibli|shippuden|one\s?piece|jujutsu|evangelion)\b/i, label: "Musiques d'anime", query: "anime ost openings mix" },
-  { re: /\b(game|gaming|zelda|final fantasy|nier|minecraft|hollow knight|undertale|skyrim|ost)\b/i, label: "OST de jeux vidéo", query: "video game ost relaxing mix" },
-  { re: /\b(piano|classical|chopin|debussy|einaudi)\b/i, label: "Piano", query: "calm piano focus mix" },
-  { re: /\b(jazz|saxo|swing|bossa)\b/i, label: "Jazz", query: "smooth jazz instrumental mix" },
-  { re: /\b(synthwave|retrowave|cyberpunk|vaporwave)\b/i, label: "Synthwave", query: "synthwave chill mix" },
-  { re: /\b(rain|pluie|thunder|storm)\b/i, label: "Pluie & orage", query: "rain ambience lofi mix" },
+  { re: /\b(anime|opening|op\s?\d|ending|naruto|ghibli|shippuden|one\s?piece|jujutsu|evangelion)\b/i, label: "Musiques d'anime", query: "best anime openings ost" },
+  { re: /\b(game|gaming|zelda|final fantasy|nier|minecraft|hollow knight|undertale|skyrim|ost)\b/i, label: "OST de jeux vidéo", query: "video game ost soundtrack" },
+  { re: /\b(piano|classical|chopin|debussy|einaudi)\b/i, label: "Piano", query: "piano music" },
+  { re: /\b(jazz|saxo|swing|bossa)\b/i, label: "Jazz", query: "smooth jazz instrumental" },
+  { re: /\b(synthwave|retrowave|cyberpunk|vaporwave)\b/i, label: "Synthwave", query: "synthwave" },
+  { re: /\b(rain|pluie|thunder|storm)\b/i, label: "Pluie & orage", query: "rain ambience" },
 ];
 
 // Requêtes locales : détection d'univers + thèmes récurrents des titres/chaînes.
@@ -70,17 +73,17 @@ export function buildLocalQueries(titles: string[], channels: string[] = []): Re
     .map(([w]) => w)
     .slice(0, 4);
 
-  // Ancres NEUTRES : on cible des formats longs sans imposer un genre — si
-  // l'utilisateur écoute autre chose que du lofi, ses thèmes restent les siens.
-  const ANCHORS = ["music mix", "playlist", "compilation", "mix"];
-  for (const [i, w] of top.entries()) {
+  // Ancre légère : juste "music" pour cadrer sur de la musique, SANS forcer un
+  // format long (pas de "mix"/"compilation"/"playlist") → toutes durées passent,
+  // titres individuels courts inclus. Le thème (token) reste celui de l'utilisateur.
+  for (const w of top) {
     if (queries.length >= 4) break;
-    queries.push({ label: capitalize(w), query: `${w} ${ANCHORS[i % ANCHORS.length]}` });
+    queries.push({ label: capitalize(w), query: `${w} music` });
   }
   // Repli sans historique : thèmes du catalogue (lofi paysages / study with me).
   if (queries.length === 0) {
     return [
-      { label: "Lofi", query: "lofi ambient mix landscape" },
+      { label: "Lofi", query: "lofi ambient landscape" },
       { label: "Study With Me", query: "study with me scenic view" },
     ];
   }
@@ -99,8 +102,10 @@ export interface AiQueryInput {
 // revient sur l'onglet. « Actualiser » passe force=true.
 const AI_CACHE_TTL = 30 * 60 * 1000;
 
+// v2 = requêtes sans anchor de format long (toutes durées) → invalide l'ancien
+// cache qui contenait des requêtes "mix/compilation" (vidéos d'1 h).
 function aiCacheKey(input: AiQueryInput): string {
-  return `focusflow-ai-queries:${input.scope ?? "global"}:${input.playlistName ?? ""}:${input.titles.slice(0, 8).join("|")}`;
+  return `focusflow-ai-queries:v2:${input.scope ?? "global"}:${input.playlistName ?? ""}:${input.titles.slice(0, 8).join("|")}`;
 }
 
 // Requêtes affinées par le coach IA (Groq → Gemini) — le coach INTERPRÈTE les
@@ -150,8 +155,8 @@ export async function fetchAiQueries(input: AiQueryInput, opts?: { force?: boole
 }
 
 // Recherche YouTube via notre route serveur (parse, sans clé). [] si échec.
-// minSeconds : 0 = tout (recherche directe de morceaux), défaut serveur = 600 s
-// (recommandations → formats longs adaptés au focus).
+// minSeconds : 0 = toutes durées (recommandations ET recherche directe — on ne
+// force plus de format long). Défaut serveur = 600 s si le param est omis.
 export async function fetchSearchVideos(query: string, minSeconds?: number): Promise<RecVideo[]> {
   try {
     const params = new URLSearchParams({ q: query });

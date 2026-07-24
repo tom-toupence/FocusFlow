@@ -45,16 +45,19 @@ Réponds UNIQUEMENT avec un objet JSON de la forme :
 {"days":[{"date":"YYYY-MM-DD","startMin":540,"durationMin":50,"label":"..."}],"tasks":[{"text":"...","pomodoroEstimate":2}],"mood":"lofi"}
 Aucun texte en dehors du JSON.`;
 
-const SYSTEM_MUSIC = `Tu es un expert musical qui connaît parfaitement YouTube (lofi, ambient, OST, openings, mixes, study with me).
+const SYSTEM_MUSIC = `Tu es un expert musical qui connaît parfaitement YouTube (lofi, ambient, OST, openings, J-pop, jeux vidéo, study with me).
 On te donne des titres (et parfois des chaînes) de vidéos écoutées par l'utilisateur pendant ses sessions de focus.
 INTERPRÈTE ce que ces titres révèlent — ne te contente PAS des mots des titres :
 - identifie les UNIVERS (anime, jeu vidéo, film, série), les GENRES musicaux, les ARTISTES, les langues ;
 - GÉNÉRALISE : un titre d'anime → propose d'autres musiques d'anime (autres œuvres, openings, OST), pas seulement le même animé ;
   un artiste → d'autres artistes du même genre ; un jeu → d'autres OST de jeux ; un lieu → d'autres ambiances comparables.
-Produis 3 à 5 THÈMES distincts et variés. Pour chacun : une requête de recherche YouTube en anglais qui vise des
-mixes/compilations (formats longs adaptés au focus), et une courte raison en français expliquant le lien avec ses écoutes.
+Produis 3 à 5 THÈMES distincts et variés. Pour chacun : une requête de recherche YouTube en anglais.
+IMPORTANT sur la DURÉE : NE force PAS de format. N'ajoute JAMAIS "mix", "compilation", "1 hour", "playlist" ni "long" à la requête,
+SAUF si les écoutes sont clairement des mixes longs (lofi/ambient d'1 h). Pour des morceaux/OST/openings/chansons, vise des
+TITRES INDIVIDUELS (courts, 2-5 min) — laisse passer toutes les durées. La requête doit suivre le STYLE écouté, pas un format.
+Ajoute une courte raison en français expliquant le lien avec ses écoutes.
 Réponds UNIQUEMENT avec un objet JSON de la forme :
-{"queries":[{"label":"Openings d'anime","query":"anime openings compilation mix","reason":"tu écoutes des OST d'anime"}]}
+{"queries":[{"label":"Openings d'anime","query":"best anime openings","reason":"tu écoutes des OST d'anime"}]}
 label = thème court en français, query = requête YouTube en anglais, reason = ≤ 90 caractères en français. Aucun texte hors du JSON.`;
 
 const SYSTEM_MUSIC_PLAYLIST = `Les titres fournis appartiennent à UNE playlist de l'utilisateur (son nom est donné).
