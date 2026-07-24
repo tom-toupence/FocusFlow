@@ -571,3 +571,17 @@ Extension du système d'amis (toujours **online-only / anon key + RLS**, aucun s
 > activity` à `friend_stats` — `add column if not exists` — et la table `friend_messages` + RLS) **et**
 > activer **Realtime sur `friend_messages`** (le script tente `alter publication supabase_realtime add
 > table friend_messages`, sinon Database > Replication à la main).
+
+### Correctifs même jour (retours utilisateur — UI amis)
+
+- **ProfilePanel → modale CENTRÉE** (`createPortal(document.body)`, `z-[120]`) : avant, ouvert en
+  dropdown `z-50` il passait **derrière** le tiroir Amis (`z-[60]`) et n'était plus cliquable. Désormais
+  scrim + carte centrée au-dessus de tout (sauf ⌘K `z-[200]`).
+- **Tiroir Amis moins « carré »** (`FriendsDrawer.tsx`) : **carte flottante arrondie** (`top-2 right-2
+  bottom-2 rounded-2xl`, marges) au lieu d'un rectangle plein bord-à-bord ; **la croix de fermeture est
+  remplacée par un chevron** (« ranger sur le côté ») ; header allégé (divider discret). Push du contenu
+  ajusté `md:pr-[320px]` (`FriendsLayoutShell`).
+- **Fix bulles de chat toutes noires au 1er rendu** (`FriendChat.tsx`) : l'alignement dépendait de
+  `getCurrentUserId()` **capté une fois** au montage → `null` si l'auth n'était pas encore résolue, donc
+  tous les messages tombaient dans la branche « lui » (bulle sombre) jusqu'à un remount. Corrigé sans
+  `meId` : en 1-à-1, un message est « à moi » ssi `senderId !== openFriendId`.

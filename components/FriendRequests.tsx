@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useFriendsStore } from "@/store/friendsStore";
 import { acceptRequest, removeFriendship } from "@/lib/friends";
 import { toast } from "@/components/Toast";
@@ -8,29 +9,45 @@ import { cn } from "@/lib/utils";
 
 // Notification de demandes d'amis façon launcher League of Legends : une cloche
 // avec pastille rouge dans l'en-tête ; au clic, un popover liste les demandes
-// reçues avec Accepter / Refuser.
+// reçues avec Accepter / Refuser. Le popover est PORTALÉ dans <body> pour ne pas
+// être rogné par l'`overflow-hidden` de la carte du tiroir Amis.
 export default function FriendRequests() {
   const pending = useFriendsStore((s) => s.pending);
   const refresh = useFriendsStore((s) => s.refresh);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
 
-  // Ferme le popover au clic extérieur / Échap.
+  const count = pending.length;
+
+  // Position le popover sous la cloche (coordonnées fixed, aligné à droite).
+  const place = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setPos({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) });
+  };
+  const toggle = () => {
+    if (count === 0) return;
+    if (!open) place(); // mesure la cloche avant d'ouvrir
+    setOpen((v) => !v);
+  };
+
+  // Ferme au clic extérieur / Échap ; se repositionne au resize.
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (btnRef.current?.contains(t) || popRef.current?.contains(t)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setOpen(false); } };
+    const onResize = () => place();
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey, true);
-    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey, true); };
+    window.addEventListener("resize", onResize);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey, true); window.removeEventListener("resize", onResize); };
   }, [open]);
-
-  // Le popover ne s'affiche que si `count > 0` (garde de rendu) → pas besoin de
-  // le fermer explicitement quand la dernière demande est traitée.
-  const count = pending.length;
 
   const accept = async (id: string) => {
     setBusy(id);
@@ -47,9 +64,10 @@ export default function FriendRequests() {
   };
 
   return (
-    <div ref={wrapRef} className="relative">
+    <>
       <button
-        onClick={() => count > 0 && setOpen((v) => !v)}
+        ref={btnRef}
+        onClick={toggle}
         aria-label={count > 0 ? `${count} demande${count > 1 ? "s" : ""} d'ami` : "Aucune demande d'ami"}
         className={cn(
           "relative w-8 h-8 flex items-center justify-center rounded-lg transition-all",
@@ -65,8 +83,12 @@ export default function FriendRequests() {
         )}
       </button>
 
-      {open && count > 0 && (
-        <div className="absolute right-0 top-full mt-2 w-72 z-10 rounded-xl bg-background border border-foreground/10 shadow-2xl shadow-black/40 overflow-hidden anim-section-in">
+      {open && count > 0 && pos && createPortal(
+        <div
+          ref={popRef}
+          style={{ top: pos.top, right: pos.right }}
+          className="fixed z-[130] w-[min(20rem,calc(100vw-1rem))] rounded-xl bg-background border border-foreground/10 shadow-2xl shadow-black/40 overflow-hidden anim-section-in"
+        >
           <div className="px-3.5 py-2.5 border-b border-foreground/[0.07] flex items-center gap-2">
             <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-foreground/45">Demandes reçues</span>
             <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-500/15 text-red-500 dark:text-red-400 text-[10px] font-bold flex items-center justify-center">{count}</span>
@@ -80,19 +102,20 @@ export default function FriendRequests() {
                   <p className="text-[10px] text-foreground/35">veut devenir ton ami</p>
                 </div>
                 <button onClick={() => accept(p.friendshipId)} disabled={busy === p.friendshipId} title="Accepter"
-                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 hover:bg-emerald-500/25 disabled:opacity-40 transition-all">
+                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 hover:bg-emerald-500/25 disabled:opacity-40 transition-all flex-shrink-0">
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </button>
                 <button onClick={() => decline(p.friendshipId)} disabled={busy === p.friendshipId} title="Refuser"
-                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-foreground/5 text-foreground/40 hover:text-foreground/70 disabled:opacity-40 transition-all">
+                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-foreground/5 text-foreground/40 hover:text-foreground/70 disabled:opacity-40 transition-all flex-shrink-0">
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
                 </button>
               </div>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
 
