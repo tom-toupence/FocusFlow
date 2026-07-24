@@ -8,24 +8,22 @@ import { useSessionStore } from "@/store/sessionStore";
 import { useSpotifyStore } from "@/store/spotifyStore";
 import { useTwitchStore } from "@/store/twitchStore";
 import { fetchMixVideos } from "@/store/playlistStore";
-import { buildLocalQueries, fetchAiQueries, fetchSearchVideos, RECO_MAX_SECONDS, RecVideo } from "@/lib/recommendations";
+import { fetchSearchVideos, RecVideo } from "@/lib/recommendations";
 import { LocalTrack } from "@/store/localPlaylistStore";
 import AddToMenu from "@/components/AddToMenu";
 import { cn } from "@/lib/utils";
 
 // Onglet « Découvrir » : recommandations dérivées de ce que l'utilisateur a
-// réellement écouté + recherche musicale intégrée. Sources gratuites, sans
-// clé côté client :
-//  1. « Parce que tu as écouté X » — mix radio YouTube (RD<videoId>) du top média.
-//  2. « Autour de tes thèmes » — recherches YouTube sur des mots-clés extraits
-//     des titres écoutés (affinés par le coach IA si une clé serveur existe).
-//  3. Recherche libre — /api/youtube/search, en tête, à tout moment.
+// réellement écouté + recherche musicale intégrée. Sources gratuites, sans clé.
+//  1. Sections « Parce que tu as écouté X » — un MIX RADIO YouTube (RD<videoId>)
+//     par top titre écouté. La radio suit le STYLE du morceau et renvoie des
+//     titres de durée naturelle (une chanson de 2 min → des chansons ; un mix
+//     lofi d'1 h → du lofi). AUCUN filtre de durée : tous types passent.
+//  2. Recherche libre — /api/youtube/search, en tête, à tout moment.
 
 interface Section {
   label: string;
   videos: RecVideo[];
-  /** Explication du coach IA (« tu écoutes des OST d'anime »). */
-  reason?: string;
 }
 
 const SUGGESTION_CHIPS: { label: string; query: string }[] = [
@@ -43,9 +41,7 @@ export default function DiscoverPanel() {
   const { getAllVideos } = useSessionStore();
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [becauseSection, setBecauseSection] = useState<Section | null>(null);
-  const [themeSections, setThemeSections] = useState<Section[]>([]);
-  const [aiUsed, setAiUsed] = useState(false);
+  const [recSections, setRecSections] = useState<Section[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Recherche libre.
@@ -69,47 +65,36 @@ export default function DiscoverPanel() {
     (async () => {
       setLoading(true);
 
-      // Titres réellement écoutés (YouTube uniquement), du plus récent au plus ancien.
-      const listened = entries.filter((e) => e.type === "youtube" || e.type === "playlist");
-      const titles = [...new Set(listened.map((e) => e.title))].slice(0, 20);
+      // Top titres YouTube réellement écoutés (par temps d'écoute).
+      const listened = entries.filter((e) => e.type === "youtube");
+      const topTracks = getTopPlays(listened, 10).filter((p) => p.type === "youtube").slice(0, 5);
+      if (topTracks.length === 0) {
+        if (!cancelled) { setRecSections([]); setLoading(false); }
+        return;
+      }
 
-      // 1. Mix lié au média YouTube le plus écouté.
-      const topYoutube = getTopPlays(listened, 10).find((p) => p.type === "youtube");
-      const becausePromise: Promise<Section | null> = topYoutube
-        ? fetchMixVideos(`RD${topYoutube.mediaKey}`, topYoutube.mediaKey).then(({ ids, titles: t }) => {
-            const videos = ids
-              .filter((id) => id !== topYoutube.mediaKey)
-              .slice(0, 8)
-              .map((id) => ({ id, title: t[id] ?? "Titre similaire", channel: "", lengthSeconds: null }));
-            return videos.length > 0 ? { label: `Parce que tu as écouté « ${topYoutube.title} »`, videos } : null;
-          })
-        : Promise.resolve(null);
-
-      // 2. Thèmes : le coach IA INTERPRÈTE les titres/chaînes (univers, genres,
-      // artistes) si une clé serveur existe ; sinon extraction locale enrichie.
-      const channels = [...new Set(
-        listened.map((e) => e.subtitle).filter((c) => c && c !== "YouTube Playlist")
-      )].slice(0, 15);
-      const aiQueries = titles.length > 0
-        ? await fetchAiQueries({ titles, channels }, { force: refreshKey > 0 })
-        : null;
-      const queries = aiQueries ?? buildLocalQueries(titles, channels);
-      const themesPromise = Promise.all(
-        queries.slice(0, 3).map(async (q) => ({
-          label: q.label,
-          reason: q.reason,
-          // De vrais morceaux (≤ 20 min) : sans plafond, YouTube ne renvoie que
-          // des compilations d'1 h. Le style vient de la requête (ex. OST MHA).
-          videos: (await fetchSearchVideos(q.query, 0, RECO_MAX_SECONDS)).slice(0, 8),
-        }))
+      // Un mix radio (RD<videoId>) par top titre → recommandations DANS LE MÊME
+      // STYLE, de durée naturelle, sans aucun filtre (c'est la « radio » YouTube
+      // du morceau). On dédoublonne entre sections + contre les titres connus.
+      const mixes = await Promise.all(
+        topTracks.map((t) => fetchMixVideos(`RD${t.mediaKey}`, t.mediaKey))
       );
-
-      const [because, themes] = await Promise.all([becausePromise, themesPromise]);
       if (cancelled) return;
-      setAiUsed(aiQueries !== null);
-      setBecauseSection(because);
-      setThemeSections(themes.filter((s) => s.videos.length > 0));
-      setLoading(false);
+
+      const used = new Set<string>(knownIds);
+      const sections: Section[] = [];
+      topTracks.forEach((track, i) => {
+        if (sections.length >= 4) return;
+        const { ids, titles: t } = mixes[i];
+        const videos = ids
+          .filter((id) => id !== track.mediaKey && !used.has(id))
+          .slice(0, 8)
+          .map((id) => ({ id, title: t[id] ?? "Titre similaire", channel: "", lengthSeconds: null }));
+        videos.forEach((v) => used.add(v.id));
+        if (videos.length >= 2) sections.push({ label: `Parce que tu as écouté « ${track.title} »`, videos });
+      });
+
+      if (!cancelled) { setRecSections(sections); setLoading(false); }
     })();
     return () => { cancelled = true; };
     // Relance uniquement au montage / bouton actualiser (pas à chaque écoute).
@@ -153,10 +138,8 @@ export default function DiscoverPanel() {
     router.push("/settings");
   };
 
-  const sections = [
-    ...(becauseSection ? [becauseSection] : []),
-    ...themeSections,
-  ].map((s) => ({ ...s, videos: s.videos.filter((v) => !knownIds.has(v.id)) }))
+  const sections = recSections
+    .map((s) => ({ ...s, videos: s.videos.filter((v) => !knownIds.has(v.id)) }))
     .filter((s) => s.videos.length > 0);
 
   const visibleSearchResults = searchResults.filter((v) => !knownIds.has(v.id));
@@ -267,12 +250,6 @@ export default function DiscoverPanel() {
           <section key={section.label}>
             <div className="flex items-baseline gap-2 mb-4 flex-wrap">
               <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest">{section.label}</p>
-              {aiUsed && section.reason && (
-                <span className="text-[11px] text-foreground/35">
-                  <span className="text-violet-400/80 font-medium mr-1">✦ IA</span>
-                  {section.reason}
-                </span>
-              )}
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {section.videos.map((v) => (

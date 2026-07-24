@@ -3,6 +3,8 @@
 // custom). 100% local par défaut ; le coach IA (route /api/coach, type "music")
 // peut affiner les requêtes si une clé serveur est configurée — sinon repli ici.
 
+import { fetchMixVideos } from "@/store/playlistStore";
+
 export interface RecQuery {
   label: string;   // thème lisible affiché à l'utilisateur
   query: string;   // requête envoyée à /api/youtube/search
@@ -155,17 +157,12 @@ export async function fetchAiQueries(input: AiQueryInput, opts?: { force?: boole
 }
 
 // Recherche YouTube via notre route serveur (parse, sans clé). [] si échec.
-// minSeconds : 0 = pas de plancher (défaut serveur = 600 s si omis).
-// maxSeconds : plafond de durée — les recos passent ~1200 s pour éviter les
-// compilations d'1 h que YouTube met en tête (→ de vrais morceaux, toutes durées
-// courtes/moyennes). Omis = pas de plafond (recherche directe).
-export const RECO_MAX_SECONDS = 20 * 60; // 20 min
-
-export async function fetchSearchVideos(query: string, minSeconds?: number, maxSeconds?: number): Promise<RecVideo[]> {
+// minSeconds : 0 = toutes durées (défaut serveur = 600 s si omis). Sert la barre
+// de recherche libre de « Découvrir » (l'utilisateur cherche un titre précis).
+export async function fetchSearchVideos(query: string, minSeconds?: number): Promise<RecVideo[]> {
   try {
     const params = new URLSearchParams({ q: query });
     if (minSeconds !== undefined) params.set("min", String(minSeconds));
-    if (maxSeconds !== undefined) params.set("max", String(maxSeconds));
     const res = await fetch(`/api/youtube/search?${params.toString()}`);
     if (!res.ok) return [];
     const data = await res.json();
@@ -173,4 +170,34 @@ export async function fetchSearchVideos(query: string, minSeconds?: number, maxS
   } catch {
     return [];
   }
+}
+
+export interface RecTrack { id: string; title: string; }
+
+/**
+ * Recommandations « radio » : à partir de videoIds de départ (top titres écoutés
+ * ou titres d'une playlist), récupère les MIX RADIO YouTube (RD<id>) et fusionne
+ * les suggestions en round-robin. La radio suit le STYLE/ARTISTE du morceau et
+ * renvoie des titres de DURÉE NATURELLE — chanson courte → chansons, mix lofi
+ * d'1 h → lofi, un titre de Daft Punk → d'autres Daft Punk / même style.
+ * AUCUN filtre de durée. Dédoublonne contre `exclude` + entre seeds.
+ */
+export async function fetchRadioRecommendations(
+  seedIds: string[],
+  exclude: Set<string> = new Set(),
+  limit = 10,
+): Promise<RecTrack[]> {
+  const seeds = [...new Set(seedIds.filter(Boolean))].slice(0, 3);
+  if (seeds.length === 0) return [];
+  const mixes = await Promise.all(seeds.map((id) => fetchMixVideos(`RD${id}`, id)));
+  const lists = mixes.map(({ ids, titles }) =>
+    ids.map((id) => ({ id, title: titles[id] ?? "Titre similaire" })),
+  );
+  const seen = new Set<string>([...exclude, ...seeds]);
+  const out: RecTrack[] = [];
+  for (let i = 0; out.length < limit && lists.some((l) => l.length > 0); i++) {
+    const item = lists[i % lists.length].shift();
+    if (item && !seen.has(item.id)) { seen.add(item.id); out.push(item); }
+  }
+  return out;
 }

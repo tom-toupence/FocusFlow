@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocalPlaylistStore } from "@/store/localPlaylistStore";
 import { playLocalPlaylist } from "@/lib/playback";
-import { fetchAiQueries, fetchSearchVideos, RECO_MAX_SECONDS } from "@/lib/recommendations";
-import { fetchMixVideos } from "@/store/playlistStore";
+import { fetchRadioRecommendations } from "@/lib/recommendations";
 import AddToMenu from "@/components/AddToMenu";
 import { cn } from "@/lib/utils";
 
 // Contenu d'une playlist LOCALE (créée par l'utilisateur, via AddToMenu ou la
 // File d'attente sauvegardée) : nom éditable, lecture, réordonnancement, et
-// « Recommandations pour cette playlist » (coach IA scope playlist, repli mix RD).
+// « Recommandations pour cette playlist » = mix radio (RD) semé sur SES vidéos
+// (même style/artistes, toutes durées).
 export default function LocalPlaylistModal({
   playlistId,
   onClose,
@@ -32,36 +32,13 @@ export default function LocalPlaylistModal({
     let cancelled = false;
     (async () => {
       if (!playlist || playlist.tracks.length === 0) { setRecs([]); return; }
+      // Recos = mix radio (RD) semé sur les vidéos de LA playlist → même style,
+      // durées naturelles, aucun filtre. Dédoublonne contre les titres déjà là.
       const known = new Set(playlist.tracks.map((t) => t.youtubeId));
-      // Coach IA scope playlist (interprétation univers/genre)…
-      const aiQueries = await fetchAiQueries({
-        titles: playlist.tracks.slice(0, 20).map((t) => t.title),
-        scope: "playlist",
-        playlistName: playlist.name,
-      });
-      if (cancelled) return;
-      if (aiQueries && aiQueries.length > 0) {
-        const found = (await Promise.all(aiQueries.slice(0, 2).map((q) => fetchSearchVideos(q.query, 0, RECO_MAX_SECONDS)))).flat();
-        if (cancelled) return;
-        const seen = new Set<string>();
-        const merged = found.filter((v) => {
-          if (known.has(v.id) || seen.has(v.id)) return false;
-          seen.add(v.id);
-          return true;
-        }).slice(0, 8);
-        if (merged.length > 0) {
-          setRecs(merged.map((v) => ({ id: v.id, title: v.title })));
-          return;
-        }
-      }
-      // …repli : mix RD semé sur le 1er titre.
-      const seed = playlist.tracks[0].youtubeId;
-      const { ids, titles } = await fetchMixVideos(`RD${seed}`, seed);
-      if (cancelled) return;
-      setRecs(
-        ids.filter((id) => id !== seed && !known.has(id)).slice(0, 8)
-          .map((id) => ({ id, title: titles[id] ?? "Titre similaire" }))
+      const recs = await fetchRadioRecommendations(
+        playlist.tracks.map((t) => t.youtubeId), known, 8,
       );
+      if (!cancelled) setRecs(recs);
     })();
     return () => { cancelled = true; };
     // Relance seulement quand la playlist ou son nombre de titres change.

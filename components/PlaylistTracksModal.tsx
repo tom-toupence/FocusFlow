@@ -9,7 +9,7 @@ import {
   usePlaylistStore,
 } from "@/store/playlistStore";
 import { LocalTrack } from "@/store/localPlaylistStore";
-import { fetchAiQueries, fetchSearchVideos, RECO_MAX_SECONDS } from "@/lib/recommendations";
+import { fetchRadioRecommendations } from "@/lib/recommendations";
 import AddToMenu from "@/components/AddToMenu";
 
 interface Track { id: string; title: string; }
@@ -48,41 +48,13 @@ export default function PlaylistTracksModal({
       if (cancelled) return;
       setTracks(result);
 
-      // Recommandations : le coach IA propose des titres cohérents avec CETTE
-      // playlist (interprétation univers/genre) ; repli = mix RD du 1er titre.
+      // Recommandations = mix radio (RD) semé sur les vidéos de CETTE playlist →
+      // même style/artistes, durées naturelles, aucun filtre.
       const known = new Set(result.map((t) => t.id));
-      const aiQueries = result.length > 0
-        ? await fetchAiQueries({
-            titles: result.slice(0, 20).map((t) => t.title),
-            scope: "playlist",
-            playlistName: playlist.title,
-          })
-        : null;
+      const seeds = result.length > 0 ? result.map((t) => t.id) : (playlist.startVideoId ? [playlist.startVideoId] : []);
+      const recs = await fetchRadioRecommendations(seeds, known, 8);
       if (cancelled) return;
-      if (aiQueries && aiQueries.length > 0) {
-        const found = (await Promise.all(aiQueries.slice(0, 2).map((q) => fetchSearchVideos(q.query, 0, RECO_MAX_SECONDS)))).flat();
-        if (cancelled) return;
-        const seen = new Set<string>();
-        const merged = found.filter((v) => {
-          if (known.has(v.id) || seen.has(v.id)) return false;
-          seen.add(v.id);
-          return true;
-        }).slice(0, 8);
-        if (merged.length > 0) {
-          setRecs(merged.map((v) => ({ id: v.id, title: v.title })));
-          return;
-        }
-      }
-      const seed = result[0]?.id ?? playlist.startVideoId;
-      if (!seed) { setRecs([]); return; }
-      const { ids, titles } = await fetchMixVideos(`RD${seed}`, seed);
-      if (cancelled) return;
-      setRecs(
-        ids
-          .filter((id) => id !== seed && !known.has(id))
-          .slice(0, 8)
-          .map((id) => ({ id, title: titles[id] ?? "Titre similaire" }))
-      );
+      setRecs(recs);
     })();
     return () => { cancelled = true; };
   }, [playlist.playlistId, playlist.startVideoId, playlist.title]);
