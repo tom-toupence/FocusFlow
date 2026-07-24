@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocalPlaylistStore } from "@/store/localPlaylistStore";
 import { playLocalPlaylist } from "@/lib/playback";
-import { fetchAiQueries, fetchSearchVideos } from "@/lib/recommendations";
+import { fetchAiQueries, fetchSearchVideos, RECO_MAX_SECONDS } from "@/lib/recommendations";
 import { fetchMixVideos } from "@/store/playlistStore";
 import AddToMenu from "@/components/AddToMenu";
 import { cn } from "@/lib/utils";
@@ -41,7 +41,7 @@ export default function LocalPlaylistModal({
       });
       if (cancelled) return;
       if (aiQueries && aiQueries.length > 0) {
-        const found = (await Promise.all(aiQueries.slice(0, 2).map((q) => fetchSearchVideos(q.query, 0)))).flat();
+        const found = (await Promise.all(aiQueries.slice(0, 2).map((q) => fetchSearchVideos(q.query, 0, RECO_MAX_SECONDS)))).flat();
         if (cancelled) return;
         const seen = new Set<string>();
         const merged = found.filter((v) => {

@@ -43,8 +43,14 @@ export async function GET(request: NextRequest) {
   const minLength = Number.isFinite(minParam)
     ? Math.max(0, Math.min(3600, Math.round(minParam)))
     : DEFAULT_MIN_LENGTH_SECONDS;
+  // Durée MAX optionnelle : les recos passent max=1200 (20 min) pour écarter les
+  // compilations d'1 h que YouTube classe en tête → on obtient de vrais morceaux.
+  const maxParam = Number(request.nextUrl.searchParams.get("max"));
+  const maxLength = Number.isFinite(maxParam) && maxParam > 0
+    ? Math.min(36000, Math.round(maxParam))
+    : Infinity;
 
-  const cacheKey = `${q.toLowerCase()}|${minLength}`;
+  const cacheKey = `${q.toLowerCase()}|${minLength}|${maxLength}`;
   const cached = cache.get(cacheKey);
   if (cached) {
     return NextResponse.json({ videos: cached, cached: true });
@@ -69,7 +75,7 @@ export async function GET(request: NextRequest) {
       if (!title) continue;
       const lengthSeconds = parseLength(ytText((r.lengthText as unknown) ?? {}));
       // Filtre de durée (les lives — sans durée — sont acceptés).
-      if (lengthSeconds !== null && lengthSeconds < minLength) continue;
+      if (lengthSeconds !== null && (lengthSeconds < minLength || lengthSeconds > maxLength)) continue;
       videos.push({
         id: r.videoId as string,
         title,

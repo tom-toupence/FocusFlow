@@ -155,12 +155,17 @@ export async function fetchAiQueries(input: AiQueryInput, opts?: { force?: boole
 }
 
 // Recherche YouTube via notre route serveur (parse, sans clé). [] si échec.
-// minSeconds : 0 = toutes durées (recommandations ET recherche directe — on ne
-// force plus de format long). Défaut serveur = 600 s si le param est omis.
-export async function fetchSearchVideos(query: string, minSeconds?: number): Promise<RecVideo[]> {
+// minSeconds : 0 = pas de plancher (défaut serveur = 600 s si omis).
+// maxSeconds : plafond de durée — les recos passent ~1200 s pour éviter les
+// compilations d'1 h que YouTube met en tête (→ de vrais morceaux, toutes durées
+// courtes/moyennes). Omis = pas de plafond (recherche directe).
+export const RECO_MAX_SECONDS = 20 * 60; // 20 min
+
+export async function fetchSearchVideos(query: string, minSeconds?: number, maxSeconds?: number): Promise<RecVideo[]> {
   try {
     const params = new URLSearchParams({ q: query });
     if (minSeconds !== undefined) params.set("min", String(minSeconds));
+    if (maxSeconds !== undefined) params.set("max", String(maxSeconds));
     const res = await fetch(`/api/youtube/search?${params.toString()}`);
     if (!res.ok) return [];
     const data = await res.json();

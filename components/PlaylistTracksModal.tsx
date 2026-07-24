@@ -9,7 +9,7 @@ import {
   usePlaylistStore,
 } from "@/store/playlistStore";
 import { LocalTrack } from "@/store/localPlaylistStore";
-import { fetchAiQueries, fetchSearchVideos } from "@/lib/recommendations";
+import { fetchAiQueries, fetchSearchVideos, RECO_MAX_SECONDS } from "@/lib/recommendations";
 import AddToMenu from "@/components/AddToMenu";
 
 interface Track { id: string; title: string; }
@@ -60,7 +60,7 @@ export default function PlaylistTracksModal({
         : null;
       if (cancelled) return;
       if (aiQueries && aiQueries.length > 0) {
-        const found = (await Promise.all(aiQueries.slice(0, 2).map((q) => fetchSearchVideos(q.query, 0)))).flat();
+        const found = (await Promise.all(aiQueries.slice(0, 2).map((q) => fetchSearchVideos(q.query, 0, RECO_MAX_SECONDS)))).flat();
         if (cancelled) return;
         const seen = new Set<string>();
         const merged = found.filter((v) => {

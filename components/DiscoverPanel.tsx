@@ -8,7 +8,7 @@ import { useSessionStore } from "@/store/sessionStore";
 import { useSpotifyStore } from "@/store/spotifyStore";
 import { useTwitchStore } from "@/store/twitchStore";
 import { fetchMixVideos } from "@/store/playlistStore";
-import { buildLocalQueries, fetchAiQueries, fetchSearchVideos, RecVideo } from "@/lib/recommendations";
+import { buildLocalQueries, fetchAiQueries, fetchSearchVideos, RECO_MAX_SECONDS, RecVideo } from "@/lib/recommendations";
 import { LocalTrack } from "@/store/localPlaylistStore";
 import AddToMenu from "@/components/AddToMenu";
 import { cn } from "@/lib/utils";
@@ -98,9 +98,9 @@ export default function DiscoverPanel() {
         queries.slice(0, 3).map(async (q) => ({
           label: q.label,
           reason: q.reason,
-          // Toutes durées : les recos suivent le STYLE écouté, pas un format. Du
-          // lofi d'1 h comme une OST d'anime de 3-4 min (ex. « Demon Lord », MHA).
-          videos: (await fetchSearchVideos(q.query, 0)).slice(0, 8),
+          // De vrais morceaux (≤ 20 min) : sans plafond, YouTube ne renvoie que
+          // des compilations d'1 h. Le style vient de la requête (ex. OST MHA).
+          videos: (await fetchSearchVideos(q.query, 0, RECO_MAX_SECONDS)).slice(0, 8),
         }))
       );
 
