@@ -60,7 +60,7 @@ export default function PlaylistTracksModal({
         : null;
       if (cancelled) return;
       if (aiQueries && aiQueries.length > 0) {
-        const found = (await Promise.all(aiQueries.slice(0, 2).map((q) => fetchSearchVideos(q.query)))).flat();
+        const found = (await Promise.all(aiQueries.slice(0, 2).map((q) => fetchSearchVideos(q.query, 0)))).flat();
         if (cancelled) return;
         const seen = new Set<string>();
         const merged = found.filter((v) => {

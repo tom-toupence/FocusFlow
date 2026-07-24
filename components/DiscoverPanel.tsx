@@ -98,7 +98,9 @@ export default function DiscoverPanel() {
         queries.slice(0, 3).map(async (q) => ({
           label: q.label,
           reason: q.reason,
-          videos: (await fetchSearchVideos(q.query)).slice(0, 8),
+          // Toutes durées : les recos suivent le STYLE écouté, pas un format. Du
+          // lofi d'1 h comme une OST d'anime de 3-4 min (ex. « Demon Lord », MHA).
+          videos: (await fetchSearchVideos(q.query, 0)).slice(0, 8),
         }))
       );
 
