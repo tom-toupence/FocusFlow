@@ -44,7 +44,7 @@ export default function JournalTimeline() {
               <div className="flex items-end gap-2 h-20">
                 {correlationDays.map((d) => (
                   <div key={d.date} className="flex-1 flex flex-col items-center gap-1" title={`${fmtDate(d.date)} — ${Math.round(d.minutes)} min`}>
-                    <span className="text-sm">{MOODS.find((m) => m.value === Math.round(d.mood))?.emoji}</span>
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: MOODS.find((m) => m.value === Math.round(d.mood))?.color }} />
                     <div className="w-full flex flex-col justify-end" style={{ height: "44px" }}>
                       <div className="w-full rounded-sm bg-emerald-500/50" style={{ height: `${Math.max((d.minutes / maxMin) * 100, d.minutes > 0 ? 8 : 3)}%` }} />
                     </div>
@@ -58,14 +58,14 @@ export default function JournalTimeline() {
           <div className="flex flex-col gap-2">
             {entries.slice(0, 30).map((e) => (
               <div key={e.id} className="group flex items-start gap-3 px-4 py-3 rounded-xl bg-foreground/[0.02] hover:bg-foreground/[0.04] transition-colors">
-                <span className="text-xl flex-shrink-0" title={MOODS.find((m) => m.value === e.mood)?.label}>{MOODS.find((m) => m.value === e.mood)?.emoji}</span>
+                <span className="w-3 h-3 mt-1 rounded-full flex-shrink-0" title={MOODS.find((m) => m.value === e.mood)?.label} style={{ background: MOODS.find((m) => m.value === e.mood)?.color }} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] text-foreground/40">{fmtDate(e.date)}</span>
-                    {e.pomodoros ? <span className="text-[10px] text-foreground/30">· {e.pomodoros} 🍅</span> : null}
+                    {e.pomodoros ? <span className="text-[10px] text-foreground/30">· {e.pomodoros} pomodoro{e.pomodoros > 1 ? "s" : ""}</span> : null}
                   </div>
-                  {e.wentWell && <p className="text-sm text-foreground/70 leading-snug mt-0.5">✅ {e.wentWell}</p>}
-                  {e.blockers && <p className="text-sm text-foreground/50 leading-snug">⚡ {e.blockers}</p>}
+                  {e.wentWell && <p className="text-sm text-foreground/70 leading-snug mt-0.5">{e.wentWell}</p>}
+                  {e.blockers && <p className="text-sm text-foreground/50 leading-snug">{e.blockers}</p>}
                   {!e.wentWell && !e.blockers && <p className="text-xs text-foreground/30 italic mt-0.5">Pas de note</p>}
                 </div>
                 <button onClick={() => removeEntry(e.id)} className={cn("sm:opacity-0 sm:group-hover:opacity-100 text-foreground/40 sm:text-foreground/20 hover:text-red-400 transition-all flex-shrink-0 p-1 -m-1")}>

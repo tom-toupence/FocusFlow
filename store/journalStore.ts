@@ -37,12 +37,13 @@ export const useJournalStore = create<JournalState>()(
   )
 );
 
+// Échelle d'humeur 1→5 avec une couleur (du rouge au vert) plutôt qu'un emoji.
 export const MOODS = [
-  { value: 1, emoji: "😞", label: "Difficile" },
-  { value: 2, emoji: "😕", label: "Moyen" },
-  { value: 3, emoji: "😐", label: "Correct" },
-  { value: 4, emoji: "🙂", label: "Bien" },
-  { value: 5, emoji: "😄", label: "Excellent" },
+  { value: 1, label: "Difficile", color: "#f87171" },
+  { value: 2, label: "Moyen", color: "#fb923c" },
+  { value: 3, label: "Correct", color: "#facc15" },
+  { value: 4, label: "Bien", color: "#a3e635" },
+  { value: 5, label: "Excellent", color: "#34d399" },
 ];
 
 /** Average mood per day for the last N days that have entries. */

@@ -25,7 +25,7 @@ export default function RoutinesManager() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {routines.map((r) => (
             <div key={r.id} className="group flex items-center gap-3 px-4 py-3 rounded-2xl bg-foreground/[0.03] border border-foreground/[0.06]">
-              <span className="text-xl flex-shrink-0">{r.emoji}</span>
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: r.color || "#818cf8" }} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground truncate">{r.name}</p>
                 <p className="text-[11px] text-foreground/40">

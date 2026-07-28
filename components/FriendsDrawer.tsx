@@ -52,8 +52,8 @@ export default function FriendsDrawer() {
     window.history.replaceState({}, "", url.toString());
     if (email) {
       sendFriendRequest(code).then((r) => {
-        if (r === "sent" || r === "accepted") { toast({ title: r === "accepted" ? "Vous êtes amis 🎉" : "Demande envoyée ✦", emoji: "👥", accent: "emerald" }); refresh(); }
-        else if (r === "invalid_code") toast({ title: "Lien d'invitation invalide", emoji: "👥", accent: "amber" });
+        if (r === "sent" || r === "accepted") { toast({ title: r === "accepted" ? "Vous êtes amis" : "Demande envoyée", accent: "emerald" }); refresh(); }
+        else if (r === "invalid_code") toast({ title: "Lien d'invitation invalide", accent: "amber" });
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

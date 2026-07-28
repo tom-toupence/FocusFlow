@@ -353,13 +353,13 @@ export default function ProfilePanel({ open, onClose }: Props) {
                 onClick={exportBackup}
                 className="flex-1 py-1.5 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground/70 hover:text-foreground text-xs font-medium transition-all"
               >
-                ⬇ Exporter
+                Exporter
               </button>
               <button
                 onClick={() => backupFileRef.current?.click()}
                 className="flex-1 py-1.5 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground/70 hover:text-foreground text-xs font-medium transition-all"
               >
-                ⬆ Importer
+                Importer
               </button>
               <input
                 ref={backupFileRef}

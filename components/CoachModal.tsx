@@ -170,7 +170,7 @@ export default function CoachModal({
                   "text-[9px] px-1.5 py-0.5 rounded-md font-medium",
                   source === "ai" ? "bg-violet-500/15 text-violet-500 dark:text-violet-300" : "bg-foreground/10 text-foreground/40"
                 )}>
-                  {source === "ai" ? "✦ IA" : "Plan local"}
+                  {source === "ai" ? "IA" : "Plan local"}
                 </span>
               </div>
               <p className="text-[10px] text-foreground/40">
@@ -205,7 +205,7 @@ export default function CoachModal({
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button onClick={() => bump(t.id, -1)} className="w-5 h-5 rounded bg-foreground/8 hover:bg-foreground/15 text-foreground/60 flex items-center justify-center text-xs">−</button>
                     <span className="text-[11px] text-foreground/60 tabular-nums w-10 text-center" title="Pomodoros estimés">
-                      🍅 {t.pomodoroEstimate}
+                      {t.pomodoroEstimate}
                     </span>
                     <button onClick={() => bump(t.id, 1)} className="w-5 h-5 rounded bg-foreground/8 hover:bg-foreground/15 text-foreground/60 flex items-center justify-center text-xs">+</button>
                   </div>

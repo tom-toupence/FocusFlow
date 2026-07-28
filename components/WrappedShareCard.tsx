@@ -114,20 +114,20 @@ function drawCard(data: WrappedData): HTMLCanvasElement {
     ctx.fillText("BADGES DÉBLOQUÉS", 80, y + 30);
     ctx.font = `400 56px ${sans}`;
     ctx.fillStyle = "#ffffff";
-    const line = data.badges.map((b) => `${b.emoji} ${b.title}`).join("   ");
+    const line = data.badges.map((b) => b.title).join("   ·   ");
     ctx.fillText(line.length > 50 ? line.slice(0, 49) + "…" : line, 80, y + 105);
     y += 160;
   }
 
   // Mood
   if (data.avgMood !== null) {
-    const moodEmoji = ["😞", "😕", "😐", "🙂", "😄"][Math.min(4, Math.max(0, Math.round(data.avgMood) - 1))];
+    const moodLabel = ["Difficile", "Moyen", "Correct", "Bien", "Excellent"][Math.min(4, Math.max(0, Math.round(data.avgMood) - 1))];
     ctx.fillStyle = "rgba(255,255,255,0.35)";
     ctx.font = `600 22px ${sans}`;
     ctx.fillText("HUMEUR MOYENNE", 80, y + 30);
     ctx.font = `400 56px ${sans}`;
     ctx.fillStyle = "#ffffff";
-    ctx.fillText(`${moodEmoji}  ${data.avgMood.toFixed(1)} / 5`, 80, y + 105);
+    ctx.fillText(`${data.avgMood.toFixed(1)} / 5 · ${moodLabel}`, 80, y + 105);
   }
 
   // Footer

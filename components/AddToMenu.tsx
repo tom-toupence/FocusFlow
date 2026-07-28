@@ -55,7 +55,7 @@ export default function AddToMenu({
       channelName: track.channelName,
       thumbnailUrl: track.thumbnailUrl,
     });
-    toast({ title: "Ajouté à la file", description: track.title, emoji: "🎵", accent: "emerald" });
+    toast({ title: "Ajouté à la file", description: track.title, accent: "emerald" });
     close();
   };
 
@@ -69,14 +69,14 @@ export default function AddToMenu({
       mood: "lofi",
       custom: true,
     });
-    toast({ title: "Ajouté à ta bibliothèque", description: track.title, emoji: "📚", accent: "emerald" });
+    toast({ title: "Ajouté à ta bibliothèque", description: track.title, accent: "emerald" });
     close();
   };
 
   const handleAddToPlaylist = (playlistId: string, name: string, already: boolean) => {
     if (already) { close(); return; }
     addTrack(playlistId, track);
-    toast({ title: "Ajouté à la playlist", description: `${track.title} → « ${name} »`, emoji: "🎶", accent: "emerald" });
+    toast({ title: "Ajouté à la playlist", description: `${track.title} → « ${name} »`, accent: "emerald" });
     close();
   };
 
@@ -84,7 +84,7 @@ export default function AddToMenu({
     const name = newName.trim();
     if (!name) return;
     createPlaylist(name, track);
-    toast({ title: "Playlist créée", description: name, emoji: "🎶", accent: "emerald" });
+    toast({ title: "Playlist créée", description: name, accent: "emerald" });
     close();
   };
 

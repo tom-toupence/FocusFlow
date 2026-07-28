@@ -64,8 +64,9 @@ function PomodoroChip({ estimate, used }: { estimate?: number; used?: number }) 
   const est = estimate ?? 1;
   const u = used ?? 0;
   return (
-    <span className="text-[10px] text-foreground/30 flex items-center gap-0.5 flex-shrink-0">
-      🍅 <span className={cn(u > 0 && "text-foreground/60")}>{u > 0 ? `${u}/` : ""}{est}</span>
+    <span className="text-[10px] text-foreground/30 flex items-center gap-1 flex-shrink-0" title="Pomodoros">
+      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2M9 2h6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      <span className={cn(u > 0 && "text-foreground/60")}>{u > 0 ? `${u}/` : ""}{est}</span>
     </span>
   );
 }
@@ -174,7 +175,7 @@ function CreateTodoForm({ onCreated }: { onCreated?: () => void }) {
 
           {/* Estimate */}
           <div className="flex items-center gap-1.5 ml-auto">
-            <span className="text-[11px] text-foreground/30">🍅</span>
+            <svg className="w-3 h-3 text-foreground/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-label="Pomodoros"><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2M9 2h6" strokeLinecap="round" strokeLinejoin="round" /></svg>
             {[1, 2, 3, 4, 6, 8].map((n) => (
               <button
                 key={n}

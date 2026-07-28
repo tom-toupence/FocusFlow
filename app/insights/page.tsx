@@ -251,7 +251,7 @@ export function InsightsContent() {
                         style={{ height: `${r.count > 0 ? Math.max((r.avg / maxMoodAvg) * 100, 6) : 3}%` }}
                       />
                     </div>
-                    <span className="text-lg" title={r.label}>{r.emoji}</span>
+                    <span className="w-2.5 h-2.5 rounded-full" title={r.label} style={{ background: r.color }} />
                   </div>
                 ))}
               </div>

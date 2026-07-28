@@ -15,7 +15,7 @@ import {
 // la version publique du mix en parsant la page watch de YouTube (`ytInitialData`).
 // Aucune clé API requise.
 //
-// ⚠️ Dépend du markup de YouTube : robuste aux échecs (retourne [] → repli côté client).
+// Dépend du markup de YouTube : robuste aux échecs (retourne [] → repli côté client).
 
 const cache = makeTtlCache<{ ids: string[]; titles: Record<string, string> }>(15 * 60 * 1000);
 

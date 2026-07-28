@@ -52,7 +52,7 @@ export default function GoalRing({
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         {progress.reached ? (
           <>
-            <span className="text-emerald-400 text-lg">✦</span>
+            <svg className="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
             <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider">Atteint</span>
           </>
         ) : (

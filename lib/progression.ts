@@ -107,7 +107,6 @@ export function getWeekDetail(days: Record<string, DayStats>): {
 
 export interface Challenge {
   id: string;
-  emoji: string;
   label: string;
   current: number;
   target: number;
@@ -116,13 +115,13 @@ export interface Challenge {
 
 export function getWeeklyChallenges(days: Record<string, DayStats>): Challenge[] {
   const week = getWeekDetail(days);
-  const make = (id: string, emoji: string, label: string, current: number, target: number): Challenge => ({
-    id, emoji, label, current: Math.min(current, target), target, done: current >= target,
+  const make = (id: string, label: string, current: number, target: number): Challenge => ({
+    id, label, current: Math.min(current, target), target, done: current >= target,
   });
   return [
-    make("week-days", "📅", "Jours actifs cette semaine", week.activeDays, 5),
-    make("week-pomodoros", "🍅", "Pomodoros cette semaine", week.sessions, 25),
-    make("week-minutes", "⏱️", "Minutes de focus cette semaine", week.minutes, 300),
+    make("week-days", "Jours actifs cette semaine", week.activeDays, 5),
+    make("week-pomodoros", "Pomodoros cette semaine", week.sessions, 25),
+    make("week-minutes", "Minutes de focus cette semaine", week.minutes, 300),
   ];
 }
 

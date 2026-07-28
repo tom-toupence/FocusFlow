@@ -37,7 +37,6 @@ export function playLocalPlaylist(playlistId: string): boolean {
   toast({
     title: `Lecture de « ${playlist.name} »`,
     description: hadQueue ? "La file d'attente a été remplacée." : `${items.length} titre${items.length > 1 ? "s" : ""} dans la file.`,
-    emoji: "🎵",
     accent: "emerald",
   });
   return true;

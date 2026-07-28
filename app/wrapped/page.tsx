@@ -81,8 +81,8 @@ export function WrappedContent() {
     if (mounted && weekOffset === -1 && data) markSeen(data.weekStart);
   }, [mounted, weekOffset]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const moodEmoji = data?.avgMood != null
-    ? MOODS[Math.min(4, Math.max(0, Math.round(data.avgMood) - 1))].emoji
+  const moodLabel = data?.avgMood != null
+    ? MOODS[Math.min(4, Math.max(0, Math.round(data.avgMood) - 1))].label
     : null;
 
   if (!data) return null;
@@ -96,7 +96,7 @@ export function WrappedContent() {
                 {weekOffset === -1 ? "Ta semaine passée" : "Semaine en cours"} · {wrappedWeekLabel(data)}
               </p>
               <h1 className="text-3xl font-light text-foreground tracking-tight">
-                {data.minutes > 0 ? "Voilà ce que tu as accompli ✨" : "Une semaine calme…"}
+                {data.minutes > 0 ? "Voilà ce que tu as accompli" : "Une semaine calme…"}
               </h1>
             </div>
             <div className="flex items-center gap-1 text-xs">
@@ -150,7 +150,9 @@ export function WrappedContent() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={data.topPlay.thumbnailUrl} alt="" className="w-20 h-14 rounded-xl object-cover flex-shrink-0" />
               ) : (
-                <div className="w-20 h-14 rounded-xl bg-foreground/10 flex items-center justify-center flex-shrink-0 text-xl">🎵</div>
+                <div className="w-20 h-14 rounded-xl bg-foreground/10 flex items-center justify-center flex-shrink-0 text-foreground/30">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7}><path d="M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm12-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </div>
               )}
               <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest mb-0.5">Ambiance préférée</p>
@@ -172,23 +174,21 @@ export function WrappedContent() {
               ) : (
                 <div className="flex flex-col gap-1.5">
                   {data.badges.map((b) => (
-                    <p key={b.id} className="text-sm text-foreground">
-                      {b.emoji} <span className="font-medium">{b.title}</span>
-                    </p>
+                    <p key={b.id} className="text-sm font-medium text-foreground">{b.title}</p>
                   ))}
                 </div>
               )}
             </div>
             <Panel
               label="Humeur moyenne"
-              value={data.avgMood !== null ? `${moodEmoji} ${data.avgMood.toFixed(1)}` : "—"}
+              value={data.avgMood !== null ? `${data.avgMood.toFixed(1)} · ${moodLabel}` : "—"}
               sub={data.avgMood !== null ? "d'après ton journal" : "pas de réflexion notée"}
               className="bg-foreground/[0.04] text-foreground"
             />
             <Panel
               label="Distractions"
               value={String(data.distractions)}
-              sub={data.distractions === 0 && data.sessions > 0 ? "focus parfait 🔥" : "marquées pendant le focus"}
+              sub={data.distractions === 0 && data.sessions > 0 ? "focus parfait" : "marquées pendant le focus"}
               className="bg-foreground/[0.04] text-foreground"
             />
           </div>

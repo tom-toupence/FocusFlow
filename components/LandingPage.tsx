@@ -92,24 +92,13 @@ const FEATURES: Feature[] = [
 
 const STEPS = [
   { n: "1", title: "Choisis ton ambiance", desc: "Un paysage lofi du catalogue, ta playlist YouTube, Spotify ou un stream Twitch." },
-  { n: "2", title: "Lance ta session", desc: "Règle ton rythme Pomodoro, ajoute tes tâches, et travaille en plein écran, musique + timer réunis." },
+  { n: "2", title: "Lance ta session", desc: "Règle ton rythme Pomodoro, ajoute tes tâches, et travaille en plein écran, musique et timer réunis." },
   { n: "3", title: "Suis ta progression", desc: "Stats, objectif quotidien, badges, récap hebdo — et compare ta semaine avec tes amis." },
 ];
 
-// Stack technique = les bibliothèques réellement utilisées dans le projet.
-const STACK: { group: string; items: string[] }[] = [
-  { group: "Framework", items: ["Next.js 16", "React 19", "TypeScript", "Turbopack"] },
-  { group: "UI & état", items: ["Tailwind CSS v4", "Zustand", "WebGL2 (shader)", "Canvas 2D"] },
-  { group: "Backend & sync", items: ["Supabase", "PostgreSQL + RLS", "Realtime", "Google OAuth"] },
-  { group: "Médias & audio", items: ["YouTube IFrame API", "Spotify Web Playback", "Twitch Embed", "Web Audio API"] },
-  { group: "IA & extras", items: ["Groq", "Gemini", "Web Notifications", "Flux ICS calendrier"] },
-  { group: "Déploiement", items: ["Vercel", "Local-first", "PWA-ready", "100% gratuit"] },
-];
-
-function SectionTitle({ eyebrow, title, sub }: { eyebrow: string; title: string; sub?: string }) {
+function SectionTitle({ title, sub }: { title: string; sub?: string }) {
   return (
-    <div className="text-center max-w-2xl mx-auto mb-12">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-300/70 mb-3">{eyebrow}</p>
+    <div className="max-w-2xl mb-12">
       <h2 className="text-2xl sm:text-4xl font-semibold text-white tracking-tight">{title}</h2>
       {sub && <p className="text-white/45 mt-4 text-sm sm:text-base leading-relaxed">{sub}</p>}
     </div>
@@ -133,39 +122,37 @@ export default function LandingPage() {
           <nav className="hidden md:flex items-center gap-7 text-sm text-white/50">
             <a href="#features" className="hover:text-white transition-colors">Fonctionnalités</a>
             <a href="#how" className="hover:text-white transition-colors">Comment ça marche</a>
-            <a href="#stack" className="hover:text-white transition-colors">Technologies</a>
           </nav>
           <GoogleButton label="Se connecter" />
         </div>
       </header>
 
       {/* Hero */}
-      <section className="relative max-w-6xl mx-auto px-5 sm:px-8 pt-20 sm:pt-28 pb-20 text-center">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.05] border border-white/10 text-[12px] text-white/60 mb-8">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          Gratuit, sans pub — fonctionne même sans compte
+      <section className="relative max-w-6xl mx-auto px-5 sm:px-8 pt-20 sm:pt-28 pb-20">
+        <div className="max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/10 text-[12px] text-white/55 mb-8">
+            Gratuit, sans publicité — fonctionne même sans compte
+          </div>
+          <h1 className="text-4xl sm:text-6xl font-semibold tracking-tight leading-[1.05]">
+            Ta bulle de concentration, musique et timer réunis.
+          </h1>
+          <p className="mt-6 text-base sm:text-lg text-white/50 leading-relaxed">
+            FocusFlow réunit un timer Pomodoro et un lecteur multi-sources — lofi YouTube, Spotify,
+            Twitch — dans une seule vue plein écran. Avec des statistiques, un coach de planification,
+            des amis et un catalogue d&apos;ambiances pour tenir la distance.
+          </p>
+          <div className="mt-9 flex flex-col sm:flex-row items-start gap-3">
+            <GoogleButton label="Commencer" />
+            <a href="#features" className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white/[0.05] border border-white/10 text-sm font-medium text-white/70 hover:text-white hover:bg-white/[0.08] transition-all">
+              Voir les fonctionnalités
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </a>
+          </div>
+          <p className="mt-5 text-xs text-white/25">Ton compte Google sert uniquement à t&apos;identifier et synchroniser ta progression.</p>
         </div>
-        <h1 className="text-4xl sm:text-6xl md:text-7xl font-semibold tracking-tight leading-[1.05]">
-          Ta bulle de concentration,
-          <br className="hidden sm:block" />
-          <span className="bg-gradient-to-r from-indigo-300 via-violet-300 to-rose-300 bg-clip-text text-transparent"> musique &amp; timer réunis.</span>
-        </h1>
-        <p className="max-w-xl mx-auto mt-6 text-base sm:text-lg text-white/50 leading-relaxed">
-          FocusFlow combine un timer Pomodoro solide et un lecteur multi-sources (lofi YouTube,
-          Spotify, Twitch) dans une seule vue plein écran. Ajoute des stats, un coach, des amis
-          et des ambiances curated pour rester dans le flow.
-        </p>
-        <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
-          <GoogleButton label="Commencer gratuitement" />
-          <a href="#features" className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white/[0.05] border border-white/10 text-sm font-medium text-white/70 hover:text-white hover:bg-white/[0.08] transition-all">
-            Découvrir les fonctionnalités
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </a>
-        </div>
-        <p className="mt-5 text-xs text-white/25">Ton compte Google sert uniquement à t&apos;identifier et synchroniser ta progression. Aucune donnée revendue.</p>
 
         {/* Aperçu / mockup abstrait de session */}
-        <div className="mt-16 relative mx-auto max-w-4xl">
+        <div className="mt-16 relative max-w-4xl">
           <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-white/[0.01] p-3 shadow-2xl shadow-black/50">
             <div className="rounded-xl overflow-hidden bg-[#0c0c10] border border-white/[0.06]">
               {/* barre de fenêtre */}
@@ -203,9 +190,8 @@ export default function LandingPage() {
       {/* Fonctionnalités */}
       <section id="features" className="max-w-6xl mx-auto px-5 sm:px-8 py-20 sm:py-28">
         <SectionTitle
-          eyebrow="Tout-en-un"
-          title="Une app complète pour se concentrer"
-          sub="Là où les autres font une seule chose, FocusFlow réunit le timer, la musique, l'organisation, les stats et le social — sans friction et gratuitement."
+          title="Tout ce qu'il faut pour se concentrer, au même endroit"
+          sub="Le timer, la musique, l'organisation, les statistiques et le social — réunis, sans friction, et gratuitement."
         />
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {FEATURES.map((f) => (
@@ -222,7 +208,7 @@ export default function LandingPage() {
 
       {/* Comment ça marche */}
       <section id="how" className="max-w-6xl mx-auto px-5 sm:px-8 py-20 sm:py-28">
-        <SectionTitle eyebrow="En 3 étapes" title="Prêt à travailler en 30 secondes" />
+        <SectionTitle title="En trois étapes" />
         <div className="grid md:grid-cols-3 gap-5">
           {STEPS.map((s, i) => (
             <div key={s.n} className="relative rounded-2xl border border-white/[0.07] bg-white/[0.02] p-7">
@@ -232,27 +218,6 @@ export default function LandingPage() {
               {i < STEPS.length - 1 && (
                 <svg className="hidden md:block absolute top-10 -right-3.5 w-6 h-6 text-white/15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
               )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Stack technique */}
-      <section id="stack" className="max-w-6xl mx-auto px-5 sm:px-8 py-20 sm:py-28">
-        <SectionTitle
-          eyebrow="Sous le capot"
-          title="Construit avec des technos modernes"
-          sub="Un stack web récent, 100% gratuit et sans clé obligatoire côté client. Tout est local-first : l'app marche hors-ligne, et Supabase ajoute la sync multi-appareils quand tu te connectes."
-        />
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {STACK.map((s) => (
-            <div key={s.group} className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/35 mb-3">{s.group}</p>
-              <div className="flex flex-wrap gap-2">
-                {s.items.map((it) => (
-                  <span key={it} className="px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/10 text-[12px] text-white/70">{it}</span>
-                ))}
-              </div>
             </div>
           ))}
         </div>

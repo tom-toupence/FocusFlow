@@ -63,7 +63,7 @@ export function blocksToICS(blocks: IcsBlock[], calendarName = "FocusFlow — Pl
       `DTSTAMP:${dtstamp}`,
       `DTSTART:${icsDateTime(b.date, b.startMin)}`,
       `DTEND:${icsDateTime(b.date, b.startMin + b.durationMin)}`,
-      `SUMMARY:${icsEscape(`🍅 ${summary}`)}`,
+      `SUMMARY:${icsEscape(summary)}`,
       `DESCRIPTION:${icsEscape("Bloc de focus planifié dans FocusFlow.")}`,
       "BEGIN:VALARM",
       "ACTION:DISPLAY",

@@ -165,8 +165,9 @@ function KanbanCard({
       </div>
       <div className="flex items-center gap-1.5">
         {(todo.pomodoroEstimate ?? 0) > 0 && (
-          <span className="text-[10px] text-foreground/35 tabular-nums">
-            🍅 {(todo.pomodorosUsed ?? 0) > 0 ? `${todo.pomodorosUsed}/` : ""}{todo.pomodoroEstimate}
+          <span className="text-[10px] text-foreground/35 tabular-nums flex items-center gap-1" title="Pomodoros">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2M9 2h6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            {(todo.pomodorosUsed ?? 0) > 0 ? `${todo.pomodorosUsed}/` : ""}{todo.pomodoroEstimate}
           </span>
         )}
         <div className="ml-auto flex items-center gap-1.5">

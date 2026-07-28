@@ -142,7 +142,7 @@ export default function TodoList() {
       {/* Mini kanban — 3 colonnes */}
       {todos.length === 0 ? (
         <p className="text-white/20 text-xs text-center py-6">
-          Aucune tâche — profite du flow ✌
+          Aucune tâche — profite du flow
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 min-h-0">

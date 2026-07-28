@@ -99,7 +99,7 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
       {/* Hero */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold text-foreground tracking-tight">{greeting} 👋</h1>
+          <h1 className="text-3xl font-semibold text-foreground tracking-tight">{greeting}</h1>
           <p className="text-foreground/40 mt-1 text-sm capitalize">
             {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
           </p>
@@ -119,9 +119,11 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
           onClick={() => router.push("/wrapped")}
           className="flex items-center gap-3 px-5 py-4 rounded-2xl bg-gradient-to-r from-violet-600/20 via-fuchsia-600/10 to-transparent border border-violet-500/25 hover:border-violet-500/50 transition-all text-left group"
         >
-          <span className="text-2xl">🎉</span>
+          <span className="w-9 h-9 flex-shrink-0 rounded-lg bg-violet-500/15 text-violet-300 flex items-center justify-center">
+            <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M3 3v18h18M7 15l3-4 3 3 4-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground">Ton récap de la semaine est prêt !</p>
+            <p className="text-sm font-semibold text-foreground">Ton récap de la semaine est prêt</p>
             <p className="text-xs text-foreground/45">Temps de focus, meilleur jour, badges… et une carte à partager.</p>
           </div>
           <span className="text-xs text-violet-300 font-medium flex-shrink-0 group-hover:translate-x-0.5 transition-transform">Voir →</span>
@@ -158,13 +160,13 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
           <div>
             <p className="text-xs font-semibold text-foreground/40 uppercase tracking-widest">Objectif du jour</p>
             <p className="text-sm text-foreground/70 mt-1 leading-snug">
-              {progress.reached ? "Atteint, bravo ✦" : `Encore ${unit === "minutes" ? `${Math.max(0, target - progress.value)} min` : `${Math.max(0, target - progress.value)} pomodoro${target - progress.value !== 1 ? "s" : ""}`}`}
+              {progress.reached ? "Atteint, bravo" : `Encore ${unit === "minutes" ? `${Math.max(0, target - progress.value)} min` : `${Math.max(0, target - progress.value)} pomodoro${target - progress.value !== 1 ? "s" : ""}`}`}
             </p>
           </div>
         </div>
         {/* Streak + today */}
         <div className="grid grid-cols-2 gap-3 lg:col-span-2">
-          <Stat label="Série" num={streak} format={(v) => `${v}j`} accent="text-orange-300" sub={streak >= 7 ? "🔥 en feu" : streak > 0 ? "continue" : "démarre"} />
+          <Stat label="Série" num={streak} format={(v) => `${v}j`} accent="text-orange-300" sub={streak >= 7 ? "en feu" : streak > 0 ? "continue" : "démarre"} />
           <Stat label="Focus aujourd'hui" num={today.minutesWorked} format={fmtMin} accent="text-emerald-300" sub={`${today.sessions} session${today.sessions !== 1 ? "s" : ""}`} />
         </div>
       </div>
@@ -176,7 +178,7 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 rounded-2xl bg-gradient-to-r from-rose-500/[0.08] to-transparent border border-rose-500/20">
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-foreground/40 uppercase tracking-widest mb-0.5">
-                🏃 Sprint · {st.overdue ? "deadline dépassée ⚠️" : `J-${st.daysLeft}`} · {st.blocksDone}/{st.blocksTotal} blocs
+                Sprint · {st.overdue ? "deadline dépassée" : `J-${st.daysLeft}`} · {st.blocksDone}/{st.blocksTotal} blocs
               </p>
               <p className="text-sm font-medium text-foreground truncate">{sprint.objective}</p>
               {st.todayBlock ? (
@@ -209,7 +211,7 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
       {/* Suggestion */}
       {peakHour !== null && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-violet-500/[0.07] border border-violet-500/15">
-          <span className="text-lg">💡</span>
+          <svg className="w-4 h-4 flex-shrink-0 text-violet-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z" strokeLinecap="round" strokeLinejoin="round" /></svg>
           <p className="text-xs text-foreground/60 leading-snug">
             Tu es souvent le plus concentré vers <strong className="text-violet-300">{peakHour}h</strong>.
             {Math.abs(currentHour - peakHour) <= 1 ? " C'est le moment idéal — lance-toi !" : " Garde un créneau pour tes tâches importantes."}
@@ -260,7 +262,7 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
                 onClick={() => { applyRoutine(r); router.push("/settings"); }}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-foreground/[0.04] hover:bg-foreground/[0.08] border border-foreground/10 text-sm text-foreground/80 transition-all"
               >
-                <span className="text-base">{r.emoji}</span>
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: r.color || "#818cf8" }} />
                 <span className="font-medium">{r.name}</span>
                 <span className="text-[10px] text-foreground/35">{r.workDuration}min</span>
               </button>
@@ -280,14 +282,14 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
                 <p className="text-sm font-semibold text-foreground">{activeProject.name}</p>
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-foreground/10 text-foreground/40">projet actif</span>
               </div>
-              <span className="text-xs text-foreground/40 tabular-nums">{activeProject.pomodorosDone}/{activeProject.pomodoroBudget} 🍅</span>
+              <span className="text-xs text-foreground/40 tabular-nums">{activeProject.pomodorosDone}/{activeProject.pomodoroBudget} pomodoros</span>
             </div>
             <div className="h-2 rounded-full bg-foreground/[0.06] overflow-hidden">
               <div className="h-full rounded-full transition-all" style={{ width: `${st.pct * 100}%`, background: activeProject.color }} />
             </div>
             {st.daysLeft !== null && (
               <p className="text-[11px] text-foreground/40 mt-2">
-                {st.overdue ? "⚠️ Deadline dépassée" : `${st.daysLeft}j restants · vise ${st.perDayNeeded} pomodoro${(st.perDayNeeded ?? 0) > 1 ? "s" : ""}/jour`}
+                {st.overdue ? "Deadline dépassée" : `${st.daysLeft}j restants · vise ${st.perDayNeeded} pomodoro${(st.perDayNeeded ?? 0) > 1 ? "s" : ""}/jour`}
                 {!st.overdue && (st.onTrack ? " · sur la bonne voie ✓" : " · prends de l'avance")}
               </p>
             )}
@@ -300,12 +302,10 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
         <div className="px-5 py-4 rounded-2xl bg-foreground/[0.03] border border-foreground/[0.06]">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-semibold text-foreground/40 uppercase tracking-widest">Dernière réflexion</p>
-            <span className="text-lg" title={MOODS.find((m) => m.value === recentJournal.mood)?.label}>
-              {MOODS.find((m) => m.value === recentJournal.mood)?.emoji}
-            </span>
+            <span className="w-3 h-3 rounded-full" title={MOODS.find((m) => m.value === recentJournal.mood)?.label} style={{ background: MOODS.find((m) => m.value === recentJournal.mood)?.color }} />
           </div>
-          {recentJournal.wentWell && <p className="text-sm text-foreground/70 leading-snug">✅ {recentJournal.wentWell}</p>}
-          {recentJournal.blockers && <p className="text-sm text-foreground/50 leading-snug mt-1">⚡ {recentJournal.blockers}</p>}
+          {recentJournal.wentWell && <p className="text-sm text-foreground/70 leading-snug">{recentJournal.wentWell}</p>}
+          {recentJournal.blockers && <p className="text-sm text-foreground/50 leading-snug mt-1">{recentJournal.blockers}</p>}
         </div>
       )}
     </div>

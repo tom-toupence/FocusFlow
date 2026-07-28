@@ -107,7 +107,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
             <p className="text-sm font-semibold text-foreground">Objectif quotidien</p>
             <p className="text-xs text-foreground/40 mt-0.5">
               {goalProgress.reached
-                ? "Objectif atteint pour aujourd'hui. Bravo ✦"
+                ? "Objectif atteint pour aujourd'hui. Bravo"
                 : "Fixe une cible de focus et garde le cap chaque jour."}
             </p>
           </div>
@@ -164,7 +164,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
         <StatCard
           label="Série en cours"
           value={`${streak} jour${streak !== 1 ? "s" : ""}`}
-          sub={streak >= 7 ? "🔥 En feu !" : streak > 0 ? "Continue !" : "Démarre aujourd'hui"}
+          sub={streak >= 7 ? "En feu" : streak > 0 ? "Continue" : "Démarre aujourd'hui"}
           accent="orange"
         />
         <StatCard
@@ -333,9 +333,9 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
                     : "bg-foreground/[0.02] border-foreground/[0.06]"
                 )}
               >
-                <span className={cn("text-xl flex-shrink-0 transition-all", !isUnlocked && "grayscale opacity-30")}>
-                  {a.emoji}
-                </span>
+                <svg className={cn("w-5 h-5 flex-shrink-0 transition-all", isUnlocked ? "text-amber-400" : "text-foreground/25")} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7}>
+                  <circle cx="12" cy="8" r="6" /><path d="M15.5 13.5L17 22l-5-3-5 3 1.5-8.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
                 <div className="min-w-0">
                   <p className={cn("text-xs font-semibold truncate", isUnlocked ? "text-foreground" : "text-foreground/40")}>
                     {a.title}

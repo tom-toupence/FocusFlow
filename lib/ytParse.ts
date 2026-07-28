@@ -1,6 +1,6 @@
 // Helpers serveur partagés pour parser les pages YouTube (objet `ytInitialData`).
 // Utilisés par les routes app/api/youtube/* (mix, playlist, search). Aucune clé API.
-// ⚠️ Dépend du markup de YouTube : toujours robuste aux échecs (retour null/[]).
+// Dépend du markup de YouTube : toujours robuste aux échecs (retour null/[]).
 
 export const VIDEO_ID_RE = /^[a-zA-Z0-9_-]{11}$/;
 export const LIST_ID_RE = /^[a-zA-Z0-9_-]{10,60}$/;

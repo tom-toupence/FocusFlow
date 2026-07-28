@@ -141,7 +141,7 @@ export default function PipTimer({
                   className="relative px-3 py-1.5 rounded-full bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 text-[11px] font-semibold transition-colors"
                   title="Marquer une distraction"
                 >
-                  ⚠ {distractionCount > 0 ? distractionCount : ""}
+                  <span className="inline-flex items-center gap-1"><svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" strokeLinecap="round" strokeLinejoin="round" /></svg>{distractionCount > 0 ? distractionCount : ""}</span>
                 </button>
               )}
               {isFlowtime && !isBreak && (
@@ -150,7 +150,7 @@ export default function PipTimer({
                   className="px-3 py-1.5 rounded-full bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-300 text-[11px] font-semibold transition-colors"
                   title="Terminer le flow et prendre la pause méritée"
                 >
-                  ☕
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM6 1v3M10 1v3M14 1v3" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </button>
               )}
             </div>

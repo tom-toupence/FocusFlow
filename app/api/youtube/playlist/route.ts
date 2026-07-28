@@ -19,7 +19,7 @@ import {
 //      (`startVideoId`) pour économiser l'appel RSS.
 // Repli : si le panneau échoue, on sert au moins les entrées RSS. Aucune clé API.
 //
-// ⚠️ Robuste aux échecs : retourne { videos: [] } → repli lecteur natif côté client.
+// Robuste aux échecs : retourne { videos: [] } → repli lecteur natif côté client.
 
 interface PlaylistVideo { id: string; title: string; }
 

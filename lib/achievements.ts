@@ -7,21 +7,20 @@ import { PlayEntry } from "@/store/playHistoryStore";
 
 export interface Achievement {
   id: string;
-  emoji: string;
   title: string;
   description: string;
 }
 
 export const ACHIEVEMENTS: Achievement[] = [
-  { id: "first-focus",  emoji: "🌱", title: "Premier pas",      description: "Compléter ta première session de focus." },
-  { id: "streak-7",     emoji: "🔥", title: "Une semaine",      description: "Maintenir une série de 7 jours." },
-  { id: "streak-30",    emoji: "🏔️", title: "Inarrêtable",      description: "Maintenir une série de 30 jours." },
-  { id: "pomodoros-100",emoji: "💯", title: "Centurion",        description: "Compléter 100 pomodoros au total." },
-  { id: "minutes-1000", emoji: "⏳", title: "Mille minutes",    description: "Cumuler 1000 minutes de focus." },
-  { id: "marathon",     emoji: "🏃", title: "Marathon",         description: "Compléter 8 pomodoros en une seule journée." },
-  { id: "night-owl",    emoji: "🦉", title: "Oiseau de nuit",   description: "Travailler après 22h." },
-  { id: "early-bird",   emoji: "🐦", title: "Lève-tôt",         description: "Travailler avant 7h du matin." },
-  { id: "explorer",     emoji: "🧭", title: "Explorateur",      description: "Utiliser 3 sources de média différentes." },
+  { id: "first-focus",  title: "Premier pas",      description: "Compléter ta première session de focus." },
+  { id: "streak-7",     title: "Une semaine",      description: "Maintenir une série de 7 jours." },
+  { id: "streak-30",    title: "Inarrêtable",      description: "Maintenir une série de 30 jours." },
+  { id: "pomodoros-100",title: "Centurion",        description: "Compléter 100 pomodoros au total." },
+  { id: "minutes-1000", title: "Mille minutes",    description: "Cumuler 1000 minutes de focus." },
+  { id: "marathon",     title: "Marathon",         description: "Compléter 8 pomodoros en une seule journée." },
+  { id: "night-owl",    title: "Oiseau de nuit",   description: "Travailler après 22h." },
+  { id: "early-bird",   title: "Lève-tôt",         description: "Travailler avant 7h du matin." },
+  { id: "explorer",     title: "Explorateur",      description: "Utiliser 3 sources de média différentes." },
 ];
 
 /**

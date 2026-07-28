@@ -66,7 +66,6 @@ export default function QueuePanel() {
     toast({
       title: "Playlist créée",
       description: `« ${name} » — ${items.length} titre${items.length > 1 ? "s" : ""}`,
-      emoji: "🎶",
       accent: "emerald",
     });
     setSavingName(null);

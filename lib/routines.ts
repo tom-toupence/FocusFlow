@@ -63,8 +63,8 @@ export function applyRoutine(r: Routine) {
   }
 }
 
-/** Captures the current live setup into a routine draft (minus id/name/emoji). */
-export function captureCurrentRoutine(): Omit<Routine, "id" | "name" | "emoji"> {
+/** Captures the current live setup into a routine draft (minus id/name/color). */
+export function captureCurrentRoutine(): Omit<Routine, "id" | "name" | "color"> {
   const { settings } = useTimerStore.getState();
   const { todos, selectedVideoId, selectedPlaylistId } = useSessionStore.getState();
   const { selectedPlaylistUri } = useSpotifyStore.getState();

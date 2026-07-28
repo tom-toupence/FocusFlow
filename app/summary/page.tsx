@@ -259,7 +259,7 @@ export default function SummaryPage() {
             <GoalRing progress={goalProgress} size={104} />
             <div className="flex flex-col gap-1">
               <p className="text-sm font-semibold text-foreground">
-                {goalProgress.reached ? "Objectif atteint 🎯" : "En route vers ton objectif"}
+                {goalProgress.reached ? "Objectif atteint" : "En route vers ton objectif"}
               </p>
               <p className="text-xs text-foreground/40 leading-relaxed">
                 {goalProgress.reached

@@ -192,7 +192,6 @@ export default function SessionPage() {
         toast({
           title: "Mix YouTube indisponible",
           description: "Lecture de la vidéo de départ en boucle.",
-          emoji: "🎧",
           accent: "amber",
         });
       }
@@ -337,7 +336,6 @@ export default function SessionPage() {
                   toast({
                     title: "Fin de la liste",
                     description: "La lecture continue avec des titres similaires.",
-                    emoji: "🎧",
                     accent: "emerald",
                   });
                 }
@@ -528,7 +526,7 @@ export default function SessionPage() {
     const newly = useAchievementsStore.getState().sync();
     for (const id of newly) {
       const a = ACHIEVEMENTS.find((x) => x.id === id);
-      if (a) toast({ title: "Succès débloqué !", description: a.title, emoji: a.emoji, accent: "amber" });
+      if (a) toast({ title: "Succès débloqué", description: a.title, accent: "amber" });
     }
     // Daily goal (only once per session view)
     if (!goalCelebratedRef.current) {
@@ -537,7 +535,7 @@ export default function SessionPage() {
       if (progress.reached) {
         goalCelebratedRef.current = true;
         playWorkChime();
-        toast({ title: "Objectif du jour atteint 🎯", description: "Bravo, continue sur ta lancée !", emoji: "✦", accent: "emerald" });
+        toast({ title: "Objectif du jour atteint", description: "Bravo, continue sur ta lancée.", accent: "emerald" });
       }
     }
   };
@@ -1233,22 +1231,22 @@ export default function SessionPage() {
                 </button>
               </div>
               <div className="p-4 flex flex-col gap-3.5 text-xs">
-                <HelpRow icon="⚠️" title="Distraction (touche D)">
+                <HelpRow icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" strokeLinecap="round" strokeLinejoin="round" /></svg>} title="Distraction (touche D)">
                   À chaque fois que tu décroches, clique ou appuie sur <b className="text-white/80">D</b> pour la noter. Rien n&apos;est détecté tout seul — c&apos;est toi qui marques. Moins tu en as, meilleur est ton <b className="text-white/80">Focus Score</b> en fin de session.
                 </HelpRow>
-                <HelpRow icon="⏯️" title="Pause / Reprise (Espace)">
+                <HelpRow icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M6 4v16M18 4v16" strokeLinecap="round" strokeLinejoin="round" /></svg>} title="Pause / Reprise (Espace)">
                   Met en pause le timer et la vidéo. Le raccourci <b className="text-white/80">Espace</b> fait pareil.
                 </HelpRow>
-                <HelpRow icon="🌫️" title="Mode zen (touche H)">
+                <HelpRow icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M1 1l22 22" strokeLinecap="round" strokeLinejoin="round" /></svg>} title="Mode zen (touche H)">
                   Les contrôles s&apos;effacent après 4 s sans bouger la souris — il ne reste que la vidéo et le timer. <b className="text-white/80">H</b> les masque manuellement (re-appuie ou clique pour les réafficher).
                 </HelpRow>
-                <HelpRow icon="🪟" title="Timer flottant">
+                <HelpRow icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18" strokeLinecap="round" /></svg>} title="Timer flottant">
                   Détache le timer dans une mini-fenêtre toujours au premier plan, même par-dessus tes autres applis (Chrome/Edge).
                 </HelpRow>
-                <HelpRow icon="🫧" title="Respiration guidée">
+                <HelpRow icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" /></svg>} title="Respiration guidée">
                   Pendant les pauses, une bulle t&apos;aide à respirer (cycle 4-4-4-4) pour vraiment récupérer.
                 </HelpRow>
-                <HelpRow icon="📝" title="Tâches & post-its">
+                <HelpRow icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" strokeLinecap="round" strokeLinejoin="round" /></svg>} title="Tâches & post-its">
                   Coche tes tâches au fil de la session ; ajoute des post-it en bas à gauche pour tes idées.
                 </HelpRow>
               </div>
@@ -1275,10 +1273,10 @@ export default function SessionPage() {
 
 // ─── Help panel row ───────────────────────────────────────────────────────────
 
-function HelpRow({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
+function HelpRow({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-2.5">
-      <span className="text-base flex-shrink-0 leading-none mt-0.5">{icon}</span>
+      <span className="flex-shrink-0 mt-0.5 text-white/45">{icon}</span>
       <div className="min-w-0">
         <p className="text-white/85 font-semibold text-[11px] mb-0.5">{title}</p>
         <p className="text-white/45 leading-relaxed text-[11px]">{children}</p>

@@ -10,7 +10,7 @@ import { downloadICS } from "@/lib/ics";
 import { toast } from "@/components/Toast";
 
 /**
- * "📅 Calendrier" button for the week planner.
+ * "Calendrier" button for the week planner.
  * Signed in + Supabase configured → secret webcal:// subscription URL that
  * iPhone / Google Calendar refresh automatically (read-only push of the plan).
  * Otherwise → plain .ics download of the current blocks.
@@ -26,11 +26,11 @@ export default function CalendarSync() {
   const handleOpen = async () => {
     if (!canFeed) {
       if (blocks.length === 0) {
-        toast({ title: "Planning vide", description: "Ajoute d'abord des blocs de focus.", emoji: "📅" });
+        toast({ title: "Planning vide", description: "Ajoute d'abord des blocs de focus." });
         return;
       }
       downloadICS(blocks);
-      toast({ title: "Fichier .ics téléchargé", description: "Importe-le dans ton appli calendrier. Connecte-toi pour la synchro automatique.", emoji: "📅" });
+      toast({ title: "Fichier .ics téléchargé", description: "Importe-le dans ton appli calendrier. Connecte-toi pour la synchro automatique." });
       return;
     }
     setOpen(true);
@@ -39,7 +39,7 @@ export default function CalendarSync() {
     const token = await getOrCreateCalendarToken(getCurrentUserId()!);
     setLoading(false);
     if (!token) {
-      toast({ title: "Erreur", description: "Impossible de générer le lien d'abonnement.", emoji: "⚠️", accent: "amber" });
+      toast({ title: "Erreur", description: "Impossible de générer le lien d'abonnement.", accent: "amber" });
       setOpen(false);
       return;
     }
@@ -50,7 +50,7 @@ export default function CalendarSync() {
 
   const copy = (text: string, what: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: "Copié !", description: what, emoji: "📋" });
+    toast({ title: "Copié", description: what });
   };
 
   return (
@@ -72,7 +72,7 @@ export default function CalendarSync() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-sm" onClick={() => setOpen(false)}>
           <div className="bg-background border border-foreground/10 rounded-2xl shadow-2xl shadow-black/20 w-full max-w-md max-h-[85vh] overflow-y-auto p-5 sm:p-6 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
             <div>
-              <h2 className="text-sm font-semibold text-foreground">📅 Synchro automatique du planning</h2>
+              <h2 className="text-sm font-semibold text-foreground">Synchro automatique du planning</h2>
               <p className="text-xs text-foreground/45 mt-1 leading-relaxed">
                 Abonne ton calendrier à ce lien secret : tes blocs de focus apparaîtront automatiquement
                 sur ton téléphone, avec un rappel 10 min avant. Lecture seule — rien d&apos;autre ne transite.
@@ -90,12 +90,12 @@ export default function CalendarSync() {
 
                 <div className="flex flex-col gap-3 text-xs text-foreground/55 leading-relaxed">
                   <div>
-                    <p className="font-semibold text-foreground/75 mb-0.5"> iPhone / iPad</p>
+                    <p className="font-semibold text-foreground/75 mb-0.5">iPhone / iPad</p>
                     Réglages → Apps → Calendrier → Comptes → Ajouter un compte → Autre →
                     <span className="text-foreground/75"> Ajouter un cal. avec abonnement</span> → colle le lien.
                   </div>
                   <div>
-                    <p className="font-semibold text-foreground/75 mb-0.5">🗓 Google Calendar (web)</p>
+                    <p className="font-semibold text-foreground/75 mb-0.5">Google Calendar (web)</p>
                     Paramètres → Ajouter un agenda → <span className="text-foreground/75">À partir de l&apos;URL</span> → colle le lien
                     (remplace <span className="font-mono">webcal://</span> par <span className="font-mono">https://</span>).
                     <button onClick={() => copy(feedUrl, "Lien https copié")} className="ml-1 underline text-foreground/45 hover:text-foreground/80">copier en https</button>

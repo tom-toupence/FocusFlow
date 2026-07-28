@@ -60,9 +60,8 @@ export default function SprintWizard() {
     setPlan(null);
     setObjective("");
     toast({
-      title: "Sprint lancé 🏃",
-      description: `${plan.days.length} bloc${plan.days.length > 1 ? "s" : ""} planifié${plan.days.length > 1 ? "s" : ""} jusqu'au ${deadline}. Pense à la synchro calendrier !`,
-      emoji: "🎯",
+      title: "Sprint lancé",
+      description: `${plan.days.length} bloc${plan.days.length > 1 ? "s" : ""} planifié${plan.days.length > 1 ? "s" : ""} jusqu'au ${deadline}. Pense à la synchro calendrier.`,
       accent: "emerald",
     });
   };
@@ -75,7 +74,7 @@ export default function SprintWizard() {
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
             <p className="text-xs font-semibold text-foreground/40 uppercase tracking-widest mb-1">
-              Sprint en cours · {st.overdue ? "deadline dépassée ⚠️" : `J-${st.daysLeft}`}
+              Sprint en cours · {st.overdue ? "deadline dépassée" : `J-${st.daysLeft}`}
             </p>
             <h2 className="text-base font-semibold text-foreground leading-snug">{sprint.objective}</h2>
             <p className="text-xs text-foreground/40 mt-0.5">
@@ -96,7 +95,7 @@ export default function SprintWizard() {
 
         {st.missed > 0 && (
           <p className="text-xs text-amber-500/90 mb-3">
-            ⚠️ {st.missed} bloc{st.missed > 1 ? "s" : ""} manqué{st.missed > 1 ? "s" : ""} — recalcule le plan pour redistribuer le travail.
+            {st.missed} bloc{st.missed > 1 ? "s" : ""} manqué{st.missed > 1 ? "s" : ""} — recalcule le plan pour redistribuer le travail.
           </p>
         )}
 
@@ -115,14 +114,14 @@ export default function SprintWizard() {
           )}
           {st.missed > 0 && (
             <button
-              onClick={() => { recalcSprint(sprint); toast({ title: "Plan recalculé", description: "Le travail restant a été redistribué.", emoji: "🔄" }); }}
+              onClick={() => { recalcSprint(sprint); toast({ title: "Plan recalculé", description: "Le travail restant a été redistribué." }); }}
               className="px-4 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-medium transition-all"
             >
               Recalculer le plan
             </button>
           )}
           <button
-            onClick={() => { endSprint(sprint); toast({ title: "Sprint terminé", description: "Les blocs restants ont été retirés du planning.", emoji: "🏁" }); }}
+            onClick={() => { endSprint(sprint); toast({ title: "Sprint terminé", description: "Les blocs restants ont été retirés du planning." }); }}
             className="px-4 py-2.5 rounded-xl bg-foreground/5 hover:bg-foreground/10 text-foreground/40 hover:text-foreground/60 text-xs font-medium transition-all"
           >
             Terminer le sprint
@@ -146,7 +145,7 @@ export default function SprintWizard() {
           onClick={() => setOpen(true)}
           className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 dark:text-rose-300 text-xs font-semibold transition-all"
         >
-          🏃 Nouveau sprint
+          Nouveau sprint
         </button>
       </div>
 
@@ -158,7 +157,7 @@ export default function SprintWizard() {
             onClick={(e) => e.stopPropagation()}
           >
             <div>
-              <h2 className="text-sm font-semibold text-foreground">🏃 Nouveau sprint</h2>
+              <h2 className="text-sm font-semibold text-foreground">Nouveau sprint</h2>
               <p className="text-xs text-foreground/45 mt-1 leading-relaxed">
                 Le coach répartit le travail jusqu&apos;à ta deadline : blocs dans le planning
                 (→ ton calendrier si la synchro est active), tâches dans le Kanban, et une ambiance adaptée.
@@ -223,7 +222,7 @@ export default function SprintWizard() {
                     "text-[10px] px-1.5 py-0.5 rounded-md font-medium",
                     plan.source === "ai" ? "bg-violet-500/15 text-violet-400" : "bg-foreground/10 text-foreground/40"
                   )}>
-                    {plan.source === "ai" ? "✨ IA" : "local"}
+                    {plan.source === "ai" ? "IA" : "local"}
                   </span>
                   <span className="ml-auto text-[10px] text-foreground/35">mood : {moodLabels[plan.mood] ?? plan.mood}</span>
                 </div>
@@ -244,7 +243,7 @@ export default function SprintWizard() {
                 <div className="flex flex-wrap gap-1.5">
                   {plan.tasks.map((t, i) => (
                     <span key={i} className="text-[11px] px-2 py-1 rounded-lg bg-foreground/[0.05] text-foreground/60">
-                      {t.text} <span className="text-foreground/30">×{t.pomodoroEstimate}🍅</span>
+                      {t.text} <span className="text-foreground/30">×{t.pomodoroEstimate}</span>
                     </span>
                   ))}
                 </div>

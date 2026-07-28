@@ -9,7 +9,6 @@ export interface ToastData {
   id: string;
   title: string;
   description?: string;
-  emoji?: string;
   accent?: "amber" | "emerald" | "violet" | "sky";
   /** Sortie en cours : joue l'animation toastOut avant le retrait. */
   leaving?: boolean;
@@ -58,6 +57,14 @@ const ACCENTS = {
   sky: "border-sky-500/30 from-sky-500/15",
 };
 
+// Petit repère d'accent (remplace l'ancien badge emoji).
+const DOTS = {
+  amber: "bg-amber-400/70",
+  emerald: "bg-emerald-400/70",
+  violet: "bg-violet-400/70",
+  sky: "bg-sky-400/70",
+};
+
 export default function ToastHost() {
   const { toasts, dismiss } = useToastStore();
   const [mounted, setMounted] = useState(false);
@@ -77,11 +84,7 @@ export default function ToastHost() {
             ACCENTS[t.accent ?? "amber"]
           )}
         >
-          {t.emoji && (
-            <span className="text-2xl flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl bg-white/5">
-              {t.emoji}
-            </span>
-          )}
+          <span className={cn("flex-shrink-0 w-1 self-stretch rounded-full", DOTS[t.accent ?? "amber"])} />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-white leading-tight">{t.title}</p>
             {t.description && <p className="text-xs text-white/55 mt-0.5 leading-snug">{t.description}</p>}

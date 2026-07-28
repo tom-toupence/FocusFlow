@@ -53,7 +53,7 @@ export default function FriendRequests() {
     setBusy(id);
     const ok = await acceptRequest(id);
     setBusy(null);
-    if (ok) { toast({ title: "Ami ajouté 🎉", accent: "emerald" }); refresh(); }
+    if (ok) { toast({ title: "Ami ajouté", accent: "emerald" }); refresh(); }
     else toast({ title: "Impossible d'accepter", accent: "amber" });
   };
   const decline = async (id: string) => {

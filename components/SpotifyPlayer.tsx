@@ -368,7 +368,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
       {isFirefox && (
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 max-w-md px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 backdrop-blur-sm">
           <p className="text-amber-300 text-xs leading-relaxed text-center">
-            ⚠️ Spotify ne supporte pas officiellement <strong>Firefox</strong> pour la lecture intégrée
+            Spotify ne supporte pas officiellement <strong>Firefox</strong> pour la lecture intégrée
             (coupures fréquentes). Utilise <strong>Chrome</strong> ou <strong>Edge</strong> pour une lecture stable.
           </p>
         </div>

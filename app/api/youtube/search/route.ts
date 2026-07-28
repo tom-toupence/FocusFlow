@@ -12,7 +12,7 @@ import {
 // des thèmes écoutés). On filtre les formats courts (< 10 min) : la musique de
 // focus est du format long.
 //
-// ⚠️ Robuste aux échecs : retourne { videos: [] } → état vide côté client.
+// Robuste aux échecs : retourne { videos: [] } → état vide côté client.
 
 export interface SearchVideo {
   id: string;

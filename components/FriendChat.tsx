@@ -90,7 +90,7 @@ export default function FriendChat() {
             <div className="w-12 h-12 rounded-2xl bg-foreground/[0.05] flex items-center justify-center">
               <svg className="w-6 h-6 text-foreground/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </div>
-            <p className="text-[13px] text-foreground/40">Envoie le premier message à {friend?.displayName ?? "ton ami"} 👋</p>
+            <p className="text-[13px] text-foreground/40">Envoie le premier message à {friend?.displayName ?? "ton ami"}.</p>
           </div>
         ) : (
           messages.map((m, i) => {

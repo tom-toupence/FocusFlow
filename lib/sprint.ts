@@ -136,7 +136,7 @@ export function applySprintPlan(
   const sessionStore = useSessionStore.getState();
 
   const blockIds = plan.days.map((d) =>
-    planStore.addBlock({ date: d.date, startMin: d.startMin, durationMin: d.durationMin, label: `🏃 ${d.label}` })
+    planStore.addBlock({ date: d.date, startMin: d.startMin, durationMin: d.durationMin, label: `Sprint · ${d.label}` })
   );
 
   const existing = new Set(sessionStore.todos.map((t) => t.text.toLowerCase()));
@@ -212,7 +212,7 @@ export function recalcSprint(sprint: Sprint): Sprint {
   const days = plan.days.slice(0, Math.min(daysNeeded, futureDates.length));
 
   const newIds = days.map((d) =>
-    planStore.addBlock({ date: d.date, startMin: d.startMin, durationMin: d.durationMin, label: `🏃 ${d.label}` })
+    planStore.addBlock({ date: d.date, startMin: d.startMin, durationMin: d.durationMin, label: `Sprint · ${d.label}` })
   );
 
   const updated: Sprint = { ...sprint, blockIds: [...keep, ...newIds] };

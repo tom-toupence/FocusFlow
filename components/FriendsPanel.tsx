@@ -21,12 +21,12 @@ const SORT_TABS: { id: SortKey; label: string }[] = [
 ];
 
 const SEND_MESSAGES: Record<SendResult, { title: string; accent: "emerald" | "amber" | "violet" }> = {
-  sent: { title: "Demande envoyée ✦", accent: "emerald" },
-  accepted: { title: "Vous êtes amis 🎉", accent: "emerald" },
+  sent: { title: "Demande envoyée", accent: "emerald" },
+  accepted: { title: "Vous êtes amis", accent: "emerald" },
   already_friends: { title: "Vous êtes déjà amis", accent: "violet" },
   already_pending: { title: "Demande déjà en attente", accent: "amber" },
   invalid_code: { title: "Code invalide", accent: "amber" },
-  cannot_add_self: { title: "C'est ton propre code 🙂", accent: "amber" },
+  cannot_add_self: { title: "C'est ton propre code", accent: "amber" },
   error: { title: "Erreur — réessaie", accent: "amber" },
 };
 
@@ -158,19 +158,19 @@ export default function FriendsPanel() {
     const result = await sendFriendRequest(c);
     setSending(false);
     const m = SEND_MESSAGES[result];
-    toast({ title: m.title, emoji: "👥", accent: m.accent });
+    toast({ title: m.title, accent: m.accent });
     if (result === "sent" || result === "accepted") { setCode(""); refresh(); }
   };
 
   const copyCode = () => {
     if (!myInvite) return;
     navigator.clipboard?.writeText(myInvite.inviteCode);
-    toast({ title: "Code copié", emoji: "📋", accent: "emerald" });
+    toast({ title: "Code copié", accent: "emerald" });
   };
   const copyLink = () => {
     if (!myInvite) return;
     navigator.clipboard?.writeText(`${window.location.origin}/?add=${myInvite.inviteCode}`);
-    toast({ title: "Lien d'invitation copié", description: "Partage-le pour t'ajouter en ami.", emoji: "🔗", accent: "emerald" });
+    toast({ title: "Lien d'invitation copié", description: "Partage-le pour t'ajouter en ami.", accent: "emerald" });
   };
 
   return (
@@ -232,7 +232,7 @@ export default function FriendsPanel() {
         </SectionLabel>
 
         {leaderboard.length <= 1 ? (
-          <p className="text-[13px] text-foreground/35 px-0.5 py-3 leading-relaxed">Ajoute des amis avec leur code pour comparer vos semaines de focus 🏆</p>
+          <p className="text-[13px] text-foreground/35 px-0.5 py-3 leading-relaxed">Ajoute des amis avec leur code pour comparer vos semaines de focus.</p>
         ) : (
           <div className="flex flex-col gap-1">
             {leaderboard.map((r, i) => (

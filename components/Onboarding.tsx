@@ -9,10 +9,10 @@ import { usePrefsStore } from "@/store/prefsStore";
 import { cn } from "@/lib/utils";
 
 // Seuls les moods présents dans le catalogue refondu (lofi/ambience/nature)
-const MOOD_OPTIONS: { mood: VideoMood; emoji: string }[] = [
-  { mood: "lofi", emoji: "🎧" },
-  { mood: "ambience", emoji: "🌆" },
-  { mood: "nature", emoji: "🌿" },
+const MOOD_OPTIONS: { mood: VideoMood }[] = [
+  { mood: "lofi" },
+  { mood: "ambience" },
+  { mood: "nature" },
 ];
 
 const PRESET_OPTIONS: { preset: TimerPreset; title: string; desc: string }[] = [
@@ -58,18 +58,17 @@ export default function Onboarding() {
         {step === 0 && (
           <>
             <div className="text-center">
-              <h2 className="text-xl font-semibold text-foreground">Bienvenue sur FocusFlow 👋</h2>
+              <h2 className="text-xl font-semibold text-foreground">Bienvenue sur FocusFlow</h2>
               <p className="text-sm text-foreground/45 mt-1.5">Choisis une ambiance pour ta première session.</p>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2">
               {MOOD_OPTIONS.map((o) => (
                 <button
                   key={o.mood}
                   onClick={() => { setMood(o.mood); setStep(1); }}
-                  className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-foreground/[0.04] hover:bg-foreground/[0.09] border border-foreground/10 transition-all text-left"
+                  className="px-4 py-3 rounded-2xl bg-foreground/[0.04] hover:bg-foreground/[0.09] border border-foreground/10 transition-all text-center text-sm font-medium text-foreground/85"
                 >
-                  <span className="text-2xl">{o.emoji}</span>
-                  <span className="text-sm font-medium text-foreground/85">{moodLabels[o.mood]}</span>
+                  {moodLabels[o.mood]}
                 </button>
               ))}
             </div>
@@ -110,7 +109,7 @@ export default function Onboarding() {
         {step === 2 && (
           <>
             <div className="text-center">
-              <h2 className="text-xl font-semibold text-foreground">Tout est prêt ✦</h2>
+              <h2 className="text-xl font-semibold text-foreground">Tout est prêt</h2>
               <p className="text-sm text-foreground/45 mt-1.5">
                 Ambiance <strong className="text-foreground/70">{mood ? moodLabels[mood] : "Lofi"}</strong> · rythme{" "}
                 <strong className="text-foreground/70">{PRESET_OPTIONS.find((p) => p.preset === preset)?.title}</strong>.

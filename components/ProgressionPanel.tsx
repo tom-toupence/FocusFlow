@@ -15,12 +15,13 @@ function PlantGlyph({ plant }: { plant: Plant | null }) {
       </div>
     );
   }
-  const emoji = plant.stage === 3 ? "🌳" : plant.stage === 2 ? "🌷" : plant.stage === 1 ? "🌱" : "•";
-  const size = plant.stage === 3 ? "text-2xl" : plant.stage === 2 ? "text-xl" : "text-base";
+  // Croissance figurée par un point vert qui grossit et fonce selon le palier.
+  const size = plant.stage === 3 ? "w-5 h-5" : plant.stage === 2 ? "w-3.5 h-3.5" : "w-2 h-2";
+  const shade = plant.stage === 3 ? "bg-emerald-400" : plant.stage === 2 ? "bg-emerald-400/80" : "bg-emerald-400/55";
   return (
     <div className="flex flex-col items-center justify-end h-12">
-      <span className={cn(size, "leading-none")}>{emoji}</span>
-      <div className="w-6 h-1.5 rounded-full bg-emerald-900/40 mt-0.5" />
+      <span className={cn(size, shade, "rounded-full")} />
+      <div className="w-6 h-1.5 rounded-full bg-emerald-900/40 mt-1" />
     </div>
   );
 }
@@ -79,7 +80,7 @@ export default function ProgressionPanel() {
           ))}
         </div>
         <p className="text-[10px] text-foreground/30 leading-relaxed">
-          Chaque jour de focus fait pousser une plante : 🌱 dès 25 min, 🌷 dès 1 h, 🌳 dès 2 h.
+          Chaque jour de focus fait pousser une plante : un palier dès 25 min, un deuxième dès 1 h, un troisième dès 2 h.
         </p>
       </div>
 
@@ -93,7 +94,6 @@ export default function ProgressionPanel() {
               c.done ? "bg-emerald-500/[0.07] border-emerald-500/20" : "bg-foreground/[0.02] border-foreground/[0.06]"
             )}>
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-base">{c.emoji}</span>
                 <span className="text-[11px] text-foreground/60 leading-tight flex-1">{c.label}</span>
                 {c.done && <span className="text-emerald-400 text-xs">✓</span>}
               </div>

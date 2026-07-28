@@ -13,7 +13,7 @@ export interface RoutineMedia {
 export interface Routine {
   id: string;
   name: string;
-  emoji: string;
+  color: string;
   preset: TimerPreset;
   workDuration: number;
   shortBreakDuration: number;
