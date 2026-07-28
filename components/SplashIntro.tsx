@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
 // Joué à chaque chargement complet de la page (monté dans le layout racine →
 // pas rejoué lors des navigations SPA).
 // Replis : prefers-reduced-motion ou WebGL2 absent → wordmark statique + fondu.
+// Le site NE se découvre QUE sur clic/touche — jamais de révélation automatique.
 
-const IDLE_MS = 3500;          // auto-révélation si aucune interaction
 const CLICK_REVEAL_DELAY = 450; // l'onde de choc se propage avant la révélation
 const REVEAL_SPEED = 1500;     // vitesse du front de révélation (px CSS/s)
 const FADE_MS = 400;           // fondu final du résidu
@@ -125,8 +125,6 @@ export default function SplashIntro() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const phaseRef = useRef(phase);
   useEffect(() => { phaseRef.current = phase; }, [phase]);
-  // Timer d'auto-révélation, réarmé à chaque interaction.
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Ondes de choc actives : [x, y, startTime, 0] × MAX_RIPPLES (pixels canvas).
   const ripplesRef = useRef(new Float32Array(MAX_RIPPLES * 4).fill(-1));
   const rippleCursorRef = useRef(0);
@@ -137,16 +135,6 @@ export default function SplashIntro() {
   // Piloté par l'effet WebGL : déclenche la révélation (repli = fondu simple).
   const startRevealRef = useRef<((cx: number, cy: number) => void) | null>(null);
 
-  const armIdle = () => {
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    idleTimerRef.current = setTimeout(() => {
-      if (phaseRef.current !== "show") return;
-      // Auto : révélation depuis le centre de l'écran (fondu simple en repli).
-      if (startRevealRef.current) startRevealRef.current(window.innerWidth / 2, window.innerHeight / 2);
-      else setPhase("fading");
-    }, IDLE_MS);
-  };
-
   // Capacités + boucle de rendu WebGL.
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -155,10 +143,16 @@ export default function SplashIntro() {
       ? canvas.getContext("webgl2", { alpha: true, premultipliedAlpha: true })
       : null;
     setCanShader(!!gl);
-    armIdle();
     if (!gl || !canvas) {
-      // Repli statique : fondu automatique seulement (pas de vague).
-      return () => { if (idleTimerRef.current) clearTimeout(idleTimerRef.current); };
+      // Repli statique (pas de shader) : le site se découvre AU CLIC/touche,
+      // jamais tout seul → on écoute pointerdown/keydown pour lancer le fondu.
+      const dismiss = () => setPhase((p) => (p === "show" ? "fading" : p));
+      window.addEventListener("pointerdown", dismiss);
+      window.addEventListener("keydown", dismiss);
+      return () => {
+        window.removeEventListener("pointerdown", dismiss);
+        window.removeEventListener("keydown", dismiss);
+      };
     }
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -252,7 +246,6 @@ export default function SplashIntro() {
       if (m.tx < -999) { m.x = e.clientX; m.y = e.clientY; } // 1er mouvement : pas de saut
       m.tx = e.clientX;
       m.ty = e.clientY;
-      armIdle();
     };
     const onClick = (e: PointerEvent) => {
       if (phaseRef.current !== "show") return;
@@ -263,7 +256,6 @@ export default function SplashIntro() {
       ripplesRef.current[i * 4 + 2] = shaderNow();
       ripplesRef.current[i * 4 + 3] = 0;
       rippleCursorRef.current++;
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       // 2. …puis la vague de révélation part du même point.
       const { clientX, clientY } = e;
       setTimeout(() => startRevealRef.current?.(clientX, clientY), CLICK_REVEAL_DELAY);
@@ -279,7 +271,6 @@ export default function SplashIntro() {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerdown", onClick);
       window.removeEventListener("keydown", onKey);
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       gl.getExtension("WEBGL_lose_context")?.loseContext();
     };
   }, []);

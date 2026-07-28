@@ -585,3 +585,21 @@ Extension du système d'amis (toujours **online-only / anon key + RLS**, aucun s
   `getCurrentUserId()` **capté une fois** au montage → `null` si l'auth n'était pas encore résolue, donc
   tous les messages tombaient dans la branche « lui » (bulle sombre) jusqu'à un remount. Corrigé sans
   `meId` : en 1-à-1, un message est « à moi » ssi `senderId !== openFriendId`.
+
+### Refonte moteur de recommandations (retour utilisateur — 2026-07-24)
+
+Les recos par **mots-clés** (`fetchSearchVideos` + coach IA `type:"music"`) renvoyaient surtout des
+**compilations d'1 h** (YouTube les classe en tête), et tout filtre de durée (plancher OU plafond)
+« n'avait plus de sens ». Pivot vers des recos **par mix radio YouTube** (`RD<videoId>`), qui suivent
+le **style/artiste** du morceau et renvoient des titres de **durée naturelle**, SANS aucun filtre :
+- `lib/recommendations.ts::fetchRadioRecommendations(seedIds, exclude, limit)` — fusionne en round-robin
+  les mix RD de plusieurs seeds (dédoublonne). Importe `fetchMixVideos` (pas de cycle : playlistStore
+  n'importe pas recommendations).
+- **Découvrir** (`DiscoverPanel`) : une section « Parce que tu as écouté X » **par top titre YouTube
+  écouté** (`getTopPlays`, jusqu'à 4, seeds dédoublonnés entre sections). Plus de section « thèmes ».
+- **Recos par playlist** (`PlaylistTracksModal`, `LocalPlaylistModal`) : mix RD **semé sur les vidéos
+  de la playlist** (round-robin sur les 3 premières).
+- La **barre de recherche libre** de Découvrir reste sur `fetchSearchVideos(q, 0)` (toutes durées).
+- `fetchAiQueries`/`buildLocalQueries` conservés (dormants) ; param `max` de `/api/youtube/search`
+  retiré (revert du plafond). Ex. attendu : un titre Daft Punk → d'autres Daft Punk / même style ;
+  une chanson de 2 min → des chansons ; un mix lofi d'1 h → du lofi.
