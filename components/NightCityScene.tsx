@@ -37,29 +37,26 @@ function mulberry32(seed: number) {
 const mod = (v: number, m: number) => ((v % m) + m) % m;
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
-interface Drive {
-  boost: number; // vitesse additionnelle injectée par le scroll (amortie)
-  progress: number; // 0→1 sur le premier écran de scroll
-}
+// État du scroll partagé par la scène. Volontairement au niveau MODULE (une seule
+// ville à l'écran) : le passer en prop ferait muter un prop dans useFrame, ce que
+// le compilateur React interdit — et un ref-prop re-rendrait pour rien.
+const drive = { boost: 0, progress: 0 };
 
-// Écoute du scroll hors du cycle de rendu React : on écrit dans un ref lu par
-// useFrame (aucun re-render du Canvas, donc aucun coût).
+// Écoute du scroll hors du cycle de rendu React (aucun re-render du Canvas).
 function useScrollDrive() {
-  const drive = useRef<Drive>({ boost: 0, progress: 0 });
   useEffect(() => {
     let last = window.scrollY;
     const onScroll = () => {
       const y = window.scrollY;
       const d = y - last;
       last = y;
-      drive.current.boost = clamp(drive.current.boost + d * 0.05, -9, 18);
-      drive.current.progress = clamp(y / Math.max(1, window.innerHeight), 0, 1);
+      drive.boost = clamp(drive.boost + d * 0.05, -9, 18);
+      drive.progress = clamp(y / Math.max(1, window.innerHeight), 0, 1);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-  return drive;
 }
 
 // Texture procédurale de fenêtres allumées (une seule pour toute une catégorie
@@ -134,7 +131,7 @@ function makeBlocks(count: number, seed: number, minX: number, maxX: number, min
   return out;
 }
 
-function City({ drive }: { drive: React.RefObject<Drive> }) {
+function City() {
   const towers = useRef<THREE.InstancedMesh>(null);
   const shops = useRef<THREE.InstancedMesh>(null);
   const poles = useRef<THREE.InstancedMesh>(null);
@@ -202,10 +199,9 @@ function City({ drive }: { drive: React.RefObject<Drive> }) {
 
   useFrame((state, delta) => {
     const dt = Math.min(delta, 0.05);
-    const d = drive.current;
     // Le boost du scroll s'amortit : la ville revient à sa vitesse de croisière.
-    d.boost *= Math.exp(-dt * 2.1);
-    const speed = BASE_SPEED + d.boost;
+    drive.boost *= Math.exp(-dt * 2.1);
+    const speed = BASE_SPEED + drive.boost;
     travel.current += speed * dt;
     carTravel.current += (speed * 2.4 + 5) * dt;
 
@@ -323,12 +319,12 @@ function City({ drive }: { drive: React.RefObject<Drive> }) {
 }
 
 // Caméra : parallax pointeur + plongée vers la rue au fil du scroll.
-function CameraRig({ drive }: { drive: React.RefObject<Drive> }) {
+function CameraRig() {
   useFrame((state, delta) => {
     const dt = Math.min(delta, 0.05);
     const k = Math.min(1, dt * 2.6);
     const t = state.clock.elapsedTime;
-    const p = drive.current.progress;
+    const p = drive.progress;
     const cam = state.camera;
     cam.position.x += (state.pointer.x * 1.1 - cam.position.x) * k;
     cam.position.y += (3.7 - p * 1.9 + Math.sin(t * 0.34) * 0.14 - cam.position.y) * k;
@@ -342,7 +338,7 @@ export default function NightCityScene({ className }: { className?: string }) {
   const [frameloop, setFrameloop] = useState<"always" | "never">("always");
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const visibleRef = useRef(true);
-  const drive = useScrollDrive();
+  useScrollDrive();
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -375,8 +371,8 @@ export default function NightCityScene({ className }: { className?: string }) {
         <directionalLight position={[-8, 12, -6]} intensity={0.75} color="#b9c6ff" />
         {/* Halo chaud de l'avenue, juste devant la caméra */}
         <pointLight position={[0, 2.6, 2]} intensity={14} distance={16} decay={2} color="#ffa860" />
-        <City drive={drive} />
-        <CameraRig drive={drive} />
+        <City />
+        <CameraRig />
       </Canvas>
     </div>
   );
