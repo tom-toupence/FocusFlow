@@ -210,7 +210,6 @@ export default function LandingPage() {
   const { scrollYProgress: heroP } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
   const contentY = useTransform(heroP, [0, 1], [0, 90]);
   const contentOpacity = useTransform(heroP, [0, 0.85], [1, 0]);
-  const mockY = useTransform(heroP, [0, 1], [0, 40]);
   const cueOpacity = useTransform(heroP, [0, 0.15], [1, 0]);
 
   // Section scrollytelling : phase active du mockup selon la progression.
@@ -234,12 +233,20 @@ export default function LandingPage() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="min-h-screen bg-[#0a0a0c] text-white overflow-x-hidden">
-        {/* Halos statiques (repli du shader + profondeur) */}
-        <div className="pointer-events-none fixed inset-0 -z-10">
-          <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-[radial-gradient(circle,_rgba(99,102,241,0.12)_0%,_transparent_60%)]" />
-          <div className="absolute top-1/3 -right-40 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,_rgba(236,72,153,0.09)_0%,_transparent_60%)]" />
+      <div className="min-h-screen text-white overflow-x-hidden">
+        {/* Décor 3D FIXE : ville jour→nuit pilotée par le scroll (repli = halos) */}
+        <div className="fixed inset-0 -z-10 bg-[#0a0a0c]">
+          {use3d ? (
+            <HeroScene />
+          ) : (
+            <>
+              <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-[radial-gradient(circle,_rgba(99,102,241,0.14)_0%,_transparent_60%)]" />
+              <div className="absolute top-1/3 -right-40 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,_rgba(236,72,153,0.10)_0%,_transparent_60%)]" />
+            </>
+          )}
         </div>
+        {/* Voile de lisibilité (vignette douce) au-dessus du décor */}
+        <div className="pointer-events-none fixed inset-0 -z-[5] bg-[radial-gradient(ellipse_at_50%_42%,transparent_38%,rgba(8,8,12,0.55)_100%)]" />
 
         {/* Header */}
         <header className="sticky top-0 z-30 backdrop-blur-xl bg-[#0a0a0c]/60 border-b border-white/[0.06]">
@@ -253,27 +260,23 @@ export default function LandingPage() {
           </div>
         </header>
 
-        {/* Hero — plein écran, scène 3D React Three Fiber */}
-        <section ref={heroRef} className="relative overflow-hidden">
-          <div className="absolute inset-0 -z-[1]">
-            {use3d && <HeroScene />}
-            {/* fondu vers le fond de page en bas du hero */}
-            <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-[#0a0a0c]" />
-            <div className="absolute inset-0 bg-[#0a0a0c]/15" />
-          </div>
+        {/* Hero — texte par-dessus le décor 3D (ville, crépuscule) */}
+        <section ref={heroRef} className="relative min-h-[94vh] flex items-center">
+          {/* scrim gauche pour la lisibilité du texte sur le ciel */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#08080c]/85 via-[#08080c]/35 to-transparent" />
 
           <motion.div
             style={reduce ? undefined : { y: contentY, opacity: contentOpacity }}
-            className="relative max-w-6xl mx-auto px-5 sm:px-8 pt-24 sm:pt-32 pb-24"
+            className="relative w-full max-w-6xl mx-auto px-5 sm:px-8 py-24"
           >
             <div className="max-w-2xl">
               <motion.div variants={reveal} initial="hidden" animate="show" className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/10 text-[12px] text-white/60 mb-8 backdrop-blur">
                 Gratuit, sans publicité — fonctionne même sans compte
               </motion.div>
-              <motion.h1 variants={reveal} initial="hidden" animate="show" transition={{ delay: 0.05 }} className="text-4xl sm:text-6xl font-semibold tracking-tight leading-[1.05]">
+              <motion.h1 variants={reveal} initial="hidden" animate="show" transition={{ delay: 0.05 }} className="text-4xl sm:text-6xl font-semibold tracking-tight leading-[1.05] [text-shadow:0_2px_30px_rgba(0,0,0,0.5)]">
                 Ta bulle de concentration, musique et timer réunis.
               </motion.h1>
-              <motion.p variants={reveal} initial="hidden" animate="show" transition={{ delay: 0.12 }} className="mt-6 text-base sm:text-lg text-white/55 leading-relaxed">
+              <motion.p variants={reveal} initial="hidden" animate="show" transition={{ delay: 0.12 }} className="mt-6 text-base sm:text-lg text-white/65 leading-relaxed [text-shadow:0_1px_16px_rgba(0,0,0,0.5)]">
                 FocusFlow réunit un timer Pomodoro et un lecteur multi-sources — lofi YouTube, Spotify,
                 Twitch — dans une seule vue plein écran. Avec des statistiques, un coach de planification,
                 des amis et un catalogue d&apos;ambiances pour tenir la distance.
@@ -285,19 +288,8 @@ export default function LandingPage() {
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </a>
               </motion.div>
-              <p className="mt-5 text-xs text-white/30">Ton compte Google sert uniquement à t&apos;identifier et synchroniser ta progression.</p>
+              <p className="mt-5 text-xs text-white/40">Ton compte Google sert uniquement à t&apos;identifier et synchroniser ta progression.</p>
             </div>
-
-            {/* Mockup vivant */}
-            <motion.div
-              style={reduce ? undefined : { y: mockY }}
-              initial={reduce ? false : { opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: reduce ? 0 : undefined }}
-              transition={{ duration: 0.8, delay: 0.25, ease: EASE }}
-              className="mt-16 relative max-w-4xl"
-            >
-              <LivingMockup />
-            </motion.div>
           </motion.div>
 
           {/* Indice de scroll */}
@@ -321,7 +313,7 @@ export default function LandingPage() {
                 key={f.title} variants={reveal}
                 whileHover={reduce ? undefined : { y: -4 }}
                 transition={{ type: "spring", stiffness: 300, damping: 24 }}
-                className="group rounded-2xl border border-white/[0.07] bg-white/[0.02] p-6 hover:bg-white/[0.04] hover:border-white/[0.12]"
+                className="group rounded-2xl border border-white/[0.08] bg-[#0b0b12]/55 backdrop-blur-md p-6 hover:bg-[#0b0b12]/70 hover:border-white/[0.16]"
               >
                 <div className={cn("w-11 h-11 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center mb-4", f.accent)}>
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7}>{f.icon}</svg>
@@ -347,7 +339,7 @@ export default function LandingPage() {
                 <motion.div
                   key={s.n}
                   variants={reveal} initial="hidden" whileInView="show" viewport={{ once: false, margin: "-45% 0px -45% 0px" }}
-                  className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-7"
+                  className="rounded-2xl border border-white/[0.08] bg-[#0b0b12]/55 backdrop-blur-md p-7"
                 >
                   <div className="flex items-center gap-3 mb-3">
                     <span className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400/30 to-violet-400/20 border border-white/10 flex items-center justify-center text-sm font-semibold">{s.n}</span>
@@ -365,7 +357,7 @@ export default function LandingPage() {
         <section className="max-w-6xl mx-auto px-5 sm:px-8 pb-24">
           <motion.div
             variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }}
-            className="relative overflow-hidden rounded-3xl border border-white/[0.09] bg-gradient-to-br from-indigo-500/[0.12] via-violet-500/[0.06] to-transparent p-10 sm:p-16 text-center"
+            className="relative overflow-hidden rounded-3xl border border-white/[0.1] bg-[#0b0b12]/50 backdrop-blur-md p-10 sm:p-16 text-center"
           >
             <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,_rgba(139,92,246,0.18),_transparent_60%)]" />
             <h2 className="relative text-3xl sm:text-5xl font-semibold tracking-tight">Entre dans le flow.</h2>
