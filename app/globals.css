@@ -212,6 +212,17 @@
 .anim-track-in    { animation: trackIn 0.35s ease-out both; }
 .anim-halo-pulse  { animation: haloPulse 0.9s ease-out; }
 
+/* Entrée en cascade des cartes du tableau de bord (au montage seulement).
+   Délais échelonnés sur les enfants directs. Neutralisé en reduced-motion. */
+.dash-stagger > * { animation: cascadeIn 0.5s ease-out backwards; }
+.dash-stagger > *:nth-child(1) { animation-delay: 0.03s; }
+.dash-stagger > *:nth-child(2) { animation-delay: 0.08s; }
+.dash-stagger > *:nth-child(3) { animation-delay: 0.13s; }
+.dash-stagger > *:nth-child(4) { animation-delay: 0.18s; }
+.dash-stagger > *:nth-child(5) { animation-delay: 0.23s; }
+.dash-stagger > *:nth-child(6) { animation-delay: 0.28s; }
+.dash-stagger > *:nth-child(n+7) { animation-delay: 0.32s; }
+
 /* Onglet caché → les animations d'ambiance ne tournent pas pour rien */
 :root[data-tab-hidden] .anim-aurora,
 :root[data-tab-hidden] .anim-aurora-slow {
@@ -225,7 +236,7 @@
   .anim-aurora, .anim-aurora-slow, .anim-ambient-in, .anim-bloom,
   .anim-eq, .anim-track-in, .anim-halo-pulse,
   .anim-section-in, .anim-cascade, .anim-skeleton,
-  .anim-toast-in, .anim-toast-out {
+  .anim-toast-in, .anim-toast-out, .dash-stagger > * {
     animation: none !important;
   }
 }
@@ -264,7 +275,7 @@
   html {
     @apply font-sans;
   }
-  /* ⚠️ Transition GLOBALE : ne couvre volontairement que les couleurs.
+  /* Transition GLOBALE : ne couvre volontairement que les couleurs.
      Les animations custom doivent rester sur opacity/transform/background-image
      pour ne pas entrer en conflit avec cette règle. */
   *, *::before, *::after {

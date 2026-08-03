@@ -603,3 +603,32 @@ le **style/artiste** du morceau et renvoient des titres de **durée naturelle**,
 - `fetchAiQueries`/`buildLocalQueries` conservés (dormants) ; param `max` de `/api/youtube/search`
   retiré (revert du plafond). Ex. attendu : un titre Daft Punk → d'autres Daft Punk / même style ;
   une chanson de 2 min → des chansons ; un mix lofi d'1 h → du lofi.
+
+## Journal de session — 2026-07-28 (splash au clic · landing page · zéro emoji)
+
+Retours utilisateur « UX moins générée par IA » :
+
+1. **Splash sans auto-révélation** (`SplashIntro.tsx`) : suppression du timer `IDLE_MS` — le site ne se
+   découvre plus tout seul après quelques secondes, il faut **cliquer** (onde de choc + vague de
+   révélation). Touche/clic aussi pour le repli statique (pas de WebGL). Plus aucun déclenchement auto.
+2. **Landing page complète** (`components/LandingPage.tsx`, montée par `AuthGate` à la place de l'ancien
+   `LoginScreen`) : header collant, hero (mockup de session animé), 6 cartes de fonctionnalités, « en 3
+   étapes », CTA + footer, connexion Google intégrée. Thème sombre fixe. **Section stack technique
+   retirée** à la demande, ton marketing allégé (pas de dégradé arc-en-ciel, pas d'« eyebrows »).
+3. **ZÉRO emoji dans tout le projet** (règle produit) :
+   - `Toast` n'affiche plus d'emoji (champ `emoji` retiré du type → petit repère d'accent coloré) ;
+     tous les `emoji:` des appels `toast()` supprimés.
+   - **Data sets dé-emojifiés** : humeurs `MOODS` → `{value,label,color}` (pastille colorée au lieu des
+     visages) ; `Achievement` → champ `emoji` retiré (icône SVG trophée) ; défis `Challenge` → `emoji`
+     retiré ; jardin de focus → point vert qui grossit (plus de 🌱🌷🌳) ; **routines** → champ `emoji`
+     remplacé par `color` (sélecteur de pastilles ; fallback couleur pour les anciennes routines) ;
+     onboarding moods sans emoji ; Wrapped (carte Canvas + page) en texte/labels.
+   - Tous les emoji décoratifs des titres/labels/boutons retirés (👋🎉🔥💡🍅✦✨🏃⚠️☕⬇⬆…), remplacés
+     par du texte ou des **SVG inline** (HelpRow de session, PiP, dashboard…). Préfixes fonctionnels
+     `🏃`/`🍅` retirés des labels sprint (`lib/sprint.ts`) et du SUMMARY ICS (`lib/ics.ts`) — vérifié
+     qu'aucune logique ne dépendait d'un préfixe emoji.
+   - **Conservés** : `✓`/`✗` (coches monochromes fonctionnelles), pas des emoji.
+   > Convention : **ne plus introduire d'emoji** dans l'UI. Icônes = SVG inline, statuts = couleur/texte.
+
+`npx tsc --noEmit` et `npm run build` verts (erreurs lint pré-existantes inchangées : summary.tsx:94,
+StatsSection.tsx:53, insights.tsx:102).

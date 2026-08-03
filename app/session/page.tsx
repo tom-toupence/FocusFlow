@@ -838,6 +838,12 @@ export default function SessionPage() {
             className="absolute inset-0 opacity-20 pointer-events-none"
             style={{ background: "radial-gradient(ellipse at center, var(--ambient) 0%, transparent 70%)" }}
           />
+          {/* Aurore douce : moment de repos (transform-only via .anim-aurora →
+              neutralisé en reduced-motion, mis en pause si l'onglet est caché) */}
+          <div aria-hidden className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="anim-aurora absolute -top-1/4 left-1/5 w-[70vmin] h-[70vmin] rounded-full opacity-25 blur-3xl" style={{ background: "radial-gradient(circle, var(--ambient) 0%, transparent 65%)" }} />
+            <div className="anim-aurora-slow absolute -bottom-1/4 right-1/5 w-[60vmin] h-[60vmin] rounded-full opacity-20 blur-3xl" style={{ background: "radial-gradient(circle, var(--ambient-2) 0%, transparent 65%)" }} />
+          </div>
           {/* Label */}
           <div className="flex flex-col items-center gap-2 z-10">
             <div className={cn("text-xs font-semibold uppercase tracking-[0.2em]", isLong ? "text-sky-400" : "text-emerald-400")}>
