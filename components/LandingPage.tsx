@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useScroll, useTransform, useReducedMotion, MotionConfig, type Variants } from "motion/react";
 import { signInWithGoogle } from "@/lib/supabase";
-import HeroFlowShader from "@/components/HeroFlowShader";
+import HeroScene from "@/components/HeroScene";
 import { cn } from "@/lib/utils";
 
 // Landing (AuthGate, non connecté) : hero à fond génératif WebGL + choreography
@@ -221,6 +221,17 @@ export default function LandingPage() {
     return storyP.on("change", (v) => setPhase(v > 0.66 ? "Pause" : "Focus"));
   }, [storyP]);
 
+  // Hero 3D (R3F) seulement si WebGL dispo ET pas de reduced-motion. Sinon les
+  // halos statiques suffisent. Faux au 1er rendu → aucun risque SSR sur le Canvas.
+  const [use3d, setUse3d] = useState(false);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let webgl = false;
+    try { const c = document.createElement("canvas"); webgl = !!(c.getContext("webgl2") || c.getContext("webgl")); } catch { /* pas de WebGL */ }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- capacité navigateur lue au montage (indispo en SSR)
+    if (webgl) setUse3d(true);
+  }, []);
+
   return (
     <MotionConfig reducedMotion="user">
       <div className="min-h-screen bg-[#0a0a0c] text-white overflow-x-hidden">
@@ -242,13 +253,13 @@ export default function LandingPage() {
           </div>
         </header>
 
-        {/* Hero — plein écran, fond génératif WebGL */}
+        {/* Hero — plein écran, scène 3D React Three Fiber */}
         <section ref={heroRef} className="relative overflow-hidden">
           <div className="absolute inset-0 -z-[1]">
-            <HeroFlowShader />
+            {use3d && <HeroScene />}
             {/* fondu vers le fond de page en bas du hero */}
             <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-[#0a0a0c]" />
-            <div className="absolute inset-0 bg-[#0a0a0c]/20" />
+            <div className="absolute inset-0 bg-[#0a0a0c]/15" />
           </div>
 
           <motion.div

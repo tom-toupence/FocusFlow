@@ -6,10 +6,18 @@
  */
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
-import LandingPage from "@/components/LandingPage";
+
+// Lazy-load : la landing (React Three Fiber + three + motion) n'est chargée QUE
+// pour les visiteurs NON connectés → le bundle in-app (session/dashboard) reste
+// léger et ne paie pas le coût de three.js.
+const LandingPage = dynamic(() => import("@/components/LandingPage"), {
+  ssr: false,
+  loading: () => <div className="min-h-screen bg-[#0a0a0c]" />,
+});
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
