@@ -190,6 +190,23 @@ const STEPS = [
   { n: "3", title: "Respire, puis recommence", desc: "Pauses guidées, objectif quotidien, badges et récap hebdo — et compare ta semaine avec tes amis.", phase: "Pause" as const },
 ];
 
+// Repli statique de la maquette (reduced-motion / pas de WebGL) : un desk en trait.
+function DioramaFallback() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center">
+      <svg viewBox="0 0 200 200" className="w-2/3 h-2/3 text-white/25" fill="none" stroke="currentColor" strokeWidth={3}>
+        <path d="M28 150h144" strokeLinecap="round" />
+        <path d="M46 150v18M154 150v18" strokeLinecap="round" />
+        <path d="M152 150v-42l-26-20" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M114 80l20 6-7 19-19-6z" fill="currentColor" opacity="0.35" />
+        <path d="M62 150l8-28h30l8 28" strokeLinejoin="round" />
+        <rect x="72" y="124" width="26" height="18" rx="1.5" />
+        <circle cx="52" cy="140" r="7" />
+      </svg>
+    </div>
+  );
+}
+
 function SectionTitle({ title, sub }: { title: string; sub?: string }) {
   return (
     <motion.div
@@ -233,20 +250,12 @@ export default function LandingPage() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="min-h-screen text-white overflow-x-hidden">
-        {/* Décor 3D FIXE : ville jour→nuit pilotée par le scroll (repli = halos) */}
-        <div className="fixed inset-0 -z-10 bg-[#0a0a0c]">
-          {use3d ? (
-            <HeroScene />
-          ) : (
-            <>
-              <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-[radial-gradient(circle,_rgba(99,102,241,0.14)_0%,_transparent_60%)]" />
-              <div className="absolute top-1/3 -right-40 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,_rgba(236,72,153,0.10)_0%,_transparent_60%)]" />
-            </>
-          )}
+      <div className="min-h-screen bg-[#0a0a0c] text-white overflow-x-hidden">
+        {/* Halos statiques (profondeur d'arrière-plan) */}
+        <div className="pointer-events-none fixed inset-0 -z-10">
+          <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-[radial-gradient(circle,_rgba(99,102,241,0.12)_0%,_transparent_60%)]" />
+          <div className="absolute top-1/3 -right-40 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,_rgba(236,72,153,0.09)_0%,_transparent_60%)]" />
         </div>
-        {/* Voile de lisibilité (vignette douce) au-dessus du décor */}
-        <div className="pointer-events-none fixed inset-0 -z-[5] bg-[radial-gradient(ellipse_at_50%_42%,transparent_38%,rgba(8,8,12,0.55)_100%)]" />
 
         {/* Header */}
         <header className="sticky top-0 z-30 backdrop-blur-xl bg-[#0a0a0c]/60 border-b border-white/[0.06]">
@@ -260,36 +269,47 @@ export default function LandingPage() {
           </div>
         </header>
 
-        {/* Hero — texte par-dessus le décor 3D (ville, crépuscule) */}
-        <section ref={heroRef} className="relative min-h-[94vh] flex items-center">
-          {/* scrim gauche pour la lisibilité du texte sur le ciel */}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#08080c]/85 via-[#08080c]/35 to-transparent" />
-
+        {/* Hero — texte + mini maquette 3D (bureau d'étudiant) */}
+        <section ref={heroRef} className="relative">
           <motion.div
             style={reduce ? undefined : { y: contentY, opacity: contentOpacity }}
-            className="relative w-full max-w-6xl mx-auto px-5 sm:px-8 py-24"
+            className="relative max-w-6xl mx-auto px-5 sm:px-8 pt-16 sm:pt-24 pb-24 grid lg:grid-cols-2 gap-10 lg:gap-6 items-center"
           >
-            <div className="max-w-2xl">
-              <motion.div variants={reveal} initial="hidden" animate="show" className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/10 text-[12px] text-white/60 mb-8 backdrop-blur">
+            <div className="max-w-xl">
+              <motion.div variants={reveal} initial="hidden" animate="show" className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/10 text-[12px] text-white/60 mb-8">
                 Gratuit, sans publicité — fonctionne même sans compte
               </motion.div>
-              <motion.h1 variants={reveal} initial="hidden" animate="show" transition={{ delay: 0.05 }} className="text-4xl sm:text-6xl font-semibold tracking-tight leading-[1.05] [text-shadow:0_2px_30px_rgba(0,0,0,0.5)]">
+              <motion.h1 variants={reveal} initial="hidden" animate="show" transition={{ delay: 0.05 }} className="text-4xl sm:text-6xl font-semibold tracking-tight leading-[1.05]">
                 Ta bulle de concentration, musique et timer réunis.
               </motion.h1>
-              <motion.p variants={reveal} initial="hidden" animate="show" transition={{ delay: 0.12 }} className="mt-6 text-base sm:text-lg text-white/65 leading-relaxed [text-shadow:0_1px_16px_rgba(0,0,0,0.5)]">
+              <motion.p variants={reveal} initial="hidden" animate="show" transition={{ delay: 0.12 }} className="mt-6 text-base sm:text-lg text-white/55 leading-relaxed">
                 FocusFlow réunit un timer Pomodoro et un lecteur multi-sources — lofi YouTube, Spotify,
                 Twitch — dans une seule vue plein écran. Avec des statistiques, un coach de planification,
                 des amis et un catalogue d&apos;ambiances pour tenir la distance.
               </motion.p>
               <motion.div variants={reveal} initial="hidden" animate="show" transition={{ delay: 0.19 }} className="mt-9 flex flex-col sm:flex-row items-start gap-3">
                 <GoogleButton label="Commencer" />
-                <a href="#features" className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white/[0.05] border border-white/10 text-sm font-medium text-white/70 hover:text-white hover:bg-white/[0.08] transition-all backdrop-blur">
+                <a href="#features" className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white/[0.05] border border-white/10 text-sm font-medium text-white/70 hover:text-white hover:bg-white/[0.08] transition-all">
                   Voir les fonctionnalités
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </a>
               </motion.div>
-              <p className="mt-5 text-xs text-white/40">Ton compte Google sert uniquement à t&apos;identifier et synchroniser ta progression.</p>
+              <p className="mt-5 text-xs text-white/30">Ton compte Google sert uniquement à t&apos;identifier et synchroniser ta progression.</p>
             </div>
+
+            {/* Mini maquette 3D dans une « vitrine » */}
+            <motion.div
+              initial={reduce ? false : { opacity: 0, scale: 0.94 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.9, delay: 0.2, ease: EASE }}
+              className="relative w-full max-w-[520px] mx-auto"
+            >
+              <div className="relative aspect-square rounded-3xl border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-white/[0.01] overflow-hidden shadow-2xl shadow-black/50">
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgba(255,176,96,0.14),transparent_60%)]" />
+                {use3d ? <HeroScene /> : <DioramaFallback />}
+                <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-[0.2em] text-white/30">study with me</div>
+              </div>
+            </motion.div>
           </motion.div>
 
           {/* Indice de scroll */}
@@ -313,7 +333,7 @@ export default function LandingPage() {
                 key={f.title} variants={reveal}
                 whileHover={reduce ? undefined : { y: -4 }}
                 transition={{ type: "spring", stiffness: 300, damping: 24 }}
-                className="group rounded-2xl border border-white/[0.08] bg-[#0b0b12]/55 backdrop-blur-md p-6 hover:bg-[#0b0b12]/70 hover:border-white/[0.16]"
+                className="group rounded-2xl border border-white/[0.07] bg-white/[0.02] p-6 hover:bg-white/[0.04] hover:border-white/[0.12]"
               >
                 <div className={cn("w-11 h-11 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center mb-4", f.accent)}>
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7}>{f.icon}</svg>
@@ -339,7 +359,7 @@ export default function LandingPage() {
                 <motion.div
                   key={s.n}
                   variants={reveal} initial="hidden" whileInView="show" viewport={{ once: false, margin: "-45% 0px -45% 0px" }}
-                  className="rounded-2xl border border-white/[0.08] bg-[#0b0b12]/55 backdrop-blur-md p-7"
+                  className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-7"
                 >
                   <div className="flex items-center gap-3 mb-3">
                     <span className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400/30 to-violet-400/20 border border-white/10 flex items-center justify-center text-sm font-semibold">{s.n}</span>
@@ -357,7 +377,7 @@ export default function LandingPage() {
         <section className="max-w-6xl mx-auto px-5 sm:px-8 pb-24">
           <motion.div
             variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }}
-            className="relative overflow-hidden rounded-3xl border border-white/[0.1] bg-[#0b0b12]/50 backdrop-blur-md p-10 sm:p-16 text-center"
+            className="relative overflow-hidden rounded-3xl border border-white/[0.09] bg-gradient-to-br from-indigo-500/[0.12] via-violet-500/[0.06] to-transparent p-10 sm:p-16 text-center"
           >
             <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,_rgba(139,92,246,0.18),_transparent_60%)]" />
             <h2 className="relative text-3xl sm:text-5xl font-semibold tracking-tight">Entre dans le flow.</h2>

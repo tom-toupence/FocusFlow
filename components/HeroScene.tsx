@@ -1,230 +1,201 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { EffectComposer, Bloom } from "@react-three/postprocessing";
-import * as THREE from "three";
+import { Float, ContactShadows } from "@react-three/drei";
+import type { Group, Mesh, PointLight, MeshStandardMaterial } from "three";
 import { cn } from "@/lib/utils";
 
-// Décor 3D du landing (React Three Fiber) : une petite VILLE de nuit stylisée,
-// avec un CYCLE JOUR→NUIT piloté par le SCROLL. En haut de page = crépuscule
-// doré (soleil), en scrollant = la nuit tombe, les fenêtres et néons s'allument,
-// la lune se lève, la caméra tourne lentement autour de la ville. Un clin d'œil
-// aux ambiances « study with me / lofi night city » du catalogue.
+// « Mini maquette » du landing (React Three Fiber) : un petit BUREAU d'étudiant
+// cozy en low-poly — lampe chaude, laptop allumé, tasse de café, une pile de
+// livres, une plante, et un MINUTEUR TOMATE (pomodoro) dont l'aiguille tourne.
+// Un·e étudiant·e penché·e sur son laptop. Ambiance « study with me » nocturne.
 //
-// Tout est PROCÉDURAL (aucun modèle/asset externe → gratuit, hors-ligne,
-// CSP-safe). Rendu en pause hors-viewport / onglet caché. Le repli
-// reduced-motion / pas de WebGL est géré par le parent (composant non monté).
+// Volontairement LÉGER (giga fluide) : ~30 meshes primitifs, AUCUN
+// post-processing/bloom, canvas CONTENU (pas plein écran), DPR plafonné, rendu en
+// pause hors-viewport / onglet caché. Le repli (reduced-motion / pas de WebGL)
+// est géré par le parent (composant non monté → illustration statique).
 
-type NightRef = RefObject<number>;
+function StudyDesk() {
+  const group = useRef<Group>(null);
+  const hand = useRef<Mesh>(null);      // aiguille du minuteur tomate
+  const lamp = useRef<PointLight>(null);
+  const screen = useRef<MeshStandardMaterial>(null);
 
-// Palettes jour → nuit (créées une fois, côté client).
-const DAY_TOP = new THREE.Color("#3b4a86");
-const DAY_BOT = new THREE.Color("#e0954e");
-const NIGHT_TOP = new THREE.Color("#06060f");
-const NIGHT_BOT = new THREE.Color("#241539");
-const DAY_FOG = new THREE.Color("#33406a");
-const NIGHT_FOG = new THREE.Color("#0a0814");
-const SUN_DAY = new THREE.Color("#ffd8a0");
-const SUN_SET = new THREE.Color("#ff5a2a");
-const DIR_DAY = new THREE.Color("#ffdcb0");
-const DIR_NIGHT = new THREE.Color("#5a72b8");
-
-const lerp = THREE.MathUtils.lerp;
-const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
-
-function pageScroll(): number {
-  if (typeof window === "undefined") return 0;
-  const max = document.documentElement.scrollHeight - window.innerHeight;
-  return max > 0 ? clamp01(window.scrollY / max) : 0;
-}
-
-// Fait avancer `night` (0→1) doucement vers la progression de scroll.
-function ScrollDriver({ nightRef }: { nightRef: NightRef }) {
-  useFrame(() => { nightRef.current += (pageScroll() - nightRef.current) * 0.06; });
-  return null;
-}
-
-// Ciel : dôme en dégradé vertical, couleurs lerpées jour→nuit.
-function SkyDome({ nightRef }: { nightRef: NightRef }) {
-  const uniforms = useMemo(
-    () => ({ uTop: { value: new THREE.Color() }, uBottom: { value: new THREE.Color() } }),
-    []
-  );
-  useFrame(() => {
-    const n = nightRef.current;
-    uniforms.uTop.value.copy(DAY_TOP).lerp(NIGHT_TOP, n);
-    uniforms.uBottom.value.copy(DAY_BOT).lerp(NIGHT_BOT, n);
-  });
-  return (
-    <mesh>
-      <sphereGeometry args={[60, 32, 16]} />
-      <shaderMaterial
-        side={THREE.BackSide}
-        depthWrite={false}
-        uniforms={uniforms}
-        vertexShader={`varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`}
-        fragmentShader={`varying vec3 vP; uniform vec3 uTop; uniform vec3 uBottom; void main(){ float t = smoothstep(-0.15, 0.55, normalize(vP).y); gl_FragColor = vec4(mix(uBottom, uTop, t), 1.0); }`}
-      />
-    </mesh>
-  );
-}
-
-// Soleil (jour) + lune (nuit) qui arquent, se croisent au crépuscule.
-function Celestial({ nightRef }: { nightRef: NightRef }) {
-  const sun = useRef<THREE.Mesh>(null);
-  const sunMat = useRef<THREE.MeshBasicMaterial>(null);
-  const moon = useRef<THREE.Mesh>(null);
-  const moonMat = useRef<THREE.MeshBasicMaterial>(null);
-  useFrame(() => {
-    const n = nightRef.current;
-    if (sun.current) sun.current.position.set(-15, lerp(15, -12, n), -34);
-    if (sunMat.current) {
-      sunMat.current.opacity = clamp01(1 - n * 1.4);
-      sunMat.current.color.copy(SUN_DAY).lerp(SUN_SET, clamp01(n * 1.6));
-    }
-    if (moon.current) moon.current.position.set(17, lerp(-12, 16, n), -34);
-    if (moonMat.current) moonMat.current.opacity = clamp01((n - 0.35) * 1.8);
-  });
-  return (
-    <>
-      <mesh ref={sun}>
-        <sphereGeometry args={[3.2, 32, 32]} />
-        <meshBasicMaterial ref={sunMat} color={SUN_DAY} transparent toneMapped={false} />
-      </mesh>
-      <mesh ref={moon}>
-        <sphereGeometry args={[2.1, 32, 32]} />
-        <meshBasicMaterial ref={moonMat} color="#cdd6ff" transparent opacity={0} toneMapped={false} />
-      </mesh>
-    </>
-  );
-}
-
-function Lights({ nightRef }: { nightRef: NightRef }) {
-  const dir = useRef<THREE.DirectionalLight>(null);
-  const amb = useRef<THREE.AmbientLight>(null);
-  useFrame(() => {
-    const n = nightRef.current;
-    if (dir.current) {
-      dir.current.intensity = lerp(2.6, 0.28, n);
-      dir.current.position.set(-15, lerp(15, 5, n), -8);
-      dir.current.color.copy(DIR_DAY).lerp(DIR_NIGHT, n);
-    }
-    if (amb.current) amb.current.intensity = lerp(0.55, 0.16, n);
-  });
-  return (
-    <>
-      <ambientLight ref={amb} intensity={0.55} />
-      <directionalLight ref={dir} intensity={2.6} />
-    </>
-  );
-}
-
-// Texture de fenêtres (canvas) → emissiveMap ; s'allume la nuit.
-function makeWindowTexture(): THREE.Texture {
-  const c = document.createElement("canvas");
-  c.width = 64; c.height = 128;
-  const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#050509"; ctx.fillRect(0, 0, 64, 128);
-  const cols = 4, rows = 9, cw = 64 / cols, ch = 128 / rows;
-  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
-    if (Math.random() < 0.5) continue;
-    ctx.fillStyle = Math.random() < 0.82 ? "#ffd8a0" : "#7fe6ff";
-    ctx.fillRect(x * cw + 3, y * ch + 3, cw - 6, ch - 7);
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(2, 3);
-  return tex;
-}
-
-interface B { x: number; z: number; h: number; w: number; d: number; }
-function generateBuildings(): B[] {
-  const out: B[] = [];
-  const grid = 12, spacing = 2.15;
-  for (let i = -grid; i <= grid; i++) for (let j = -grid; j <= grid; j++) {
-    if (i % 4 === 0 || j % 4 === 0) continue;      // « rues »
-    if (Math.random() < 0.28) continue;
-    const x = i * spacing + (Math.random() - 0.5) * 0.5;
-    const z = j * spacing + (Math.random() - 0.5) * 0.5;
-    const dist = Math.hypot(x, z);
-    const h = Math.max(0.7, (5.2 - dist * 0.14) * (0.35 + Math.random() * 0.95));
-    out.push({ x, z, h, w: 1.15 + Math.random() * 0.55, d: 1.15 + Math.random() * 0.55 });
-  }
-  return out;
-}
-
-function City({ nightRef }: { nightRef: NightRef }) {
-  const mesh = useRef<THREE.InstancedMesh>(null);
-  const mat = useRef<THREE.MeshStandardMaterial>(null);
-  const winTex = useMemo(makeWindowTexture, []);
-  const buildings = useMemo(generateBuildings, []);
-
-  useEffect(() => {
-    const m = mesh.current;
-    if (!m) return;
-    const dummy = new THREE.Object3D();
-    buildings.forEach((b, i) => {
-      dummy.position.set(b.x, b.h / 2, b.z);
-      dummy.scale.set(b.w, b.h, b.d);
-      dummy.updateMatrix();
-      m.setMatrixAt(i, dummy.matrix);
-    });
-    m.instanceMatrix.needsUpdate = true;
-  }, [buildings]);
-
-  useFrame(() => { if (mat.current) mat.current.emissiveIntensity = 0.1 + nightRef.current * 1.7; });
-
-  return (
-    <group>
-      <instancedMesh ref={mesh} args={[undefined, undefined, buildings.length]}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial
-          ref={mat}
-          color="#0b0b14"
-          roughness={0.72}
-          metalness={0.35}
-          emissive="#ffcf8f"
-          emissiveMap={winTex}
-          emissiveIntensity={0}
-        />
-      </instancedMesh>
-      {/* sol sombre légèrement réfléchissant */}
-      <mesh rotation-x={-Math.PI / 2}>
-        <planeGeometry args={[240, 240]} />
-        <meshStandardMaterial color="#050508" roughness={0.55} metalness={0.5} />
-      </mesh>
-    </group>
-  );
-}
-
-// Fog scène (couleur lerpée jour→nuit) — profondeur + fondu de l'horizon.
-function SceneFog({ nightRef }: { nightRef: NightRef }) {
-  const ref = useRef<THREE.Fog>(null);
-  useFrame(() => { if (ref.current) ref.current.color.copy(DAY_FOG).lerp(NIGHT_FOG, nightRef.current); });
-  return <fog attach="fog" ref={ref} args={["#33406a", 16, 62]} />;
-}
-
-// Caméra : orbite lente autour de la ville selon le scroll + parallax pointeur.
-function Rig() {
   useFrame((state) => {
-    const p = pageScroll();
-    const angle = 0.25 + p * 0.8 + state.pointer.x * 0.12;
-    const radius = 18;
-    const x = Math.sin(angle) * radius;
-    const z = Math.cos(angle) * radius;
-    const y = lerp(4.5, 9, p) + state.pointer.y * 0.7;
-    state.camera.position.set(x, y, z);
-    state.camera.lookAt(0, 2.6, 0);
+    const t = state.clock.elapsedTime;
+    if (group.current) {
+      // Rotation « tourne-disque » très douce + léger parallax au pointeur.
+      group.current.rotation.y = Math.sin(t * 0.18) * 0.28 + state.pointer.x * 0.35;
+      group.current.rotation.x = -0.02 + state.pointer.y * 0.06;
+    }
+    if (hand.current) hand.current.rotation.z = -t * 0.6;           // aiguille qui tourne
+    if (lamp.current) lamp.current.intensity = 7.5 + Math.sin(t * 3.1) * 0.5; // léger scintillement
+    if (screen.current) screen.current.emissiveIntensity = 1.1 + Math.sin(t * 2.2) * 0.15;
   });
-  return null;
+
+  return (
+    <Float speed={1.1} rotationIntensity={0.15} floatIntensity={0.35}>
+      <group ref={group} position={[0, -0.25, 0]}>
+        {/* Socle de la maquette */}
+        <mesh position={[0, -0.55, 0]} receiveShadow>
+          <cylinderGeometry args={[2.15, 2.25, 0.35, 48]} />
+          <meshStandardMaterial color="#15131c" roughness={0.85} metalness={0.1} />
+        </mesh>
+
+        {/* Tapis */}
+        <mesh position={[0, -0.37, 0.2]} rotation-x={-Math.PI / 2}>
+          <circleGeometry args={[1.5, 40]} />
+          <meshStandardMaterial color="#2a2340" roughness={0.95} />
+        </mesh>
+
+        {/* ── Bureau ─────────────────────────────────────────── */}
+        <group position={[0, 0, 0]}>
+          <mesh position={[0, 0.02, 0]} castShadow>
+            <boxGeometry args={[2.4, 0.12, 1.1]} />
+            <meshStandardMaterial color="#6d4a2c" roughness={0.6} metalness={0.05} />
+          </mesh>
+          {[[-1.05, -0.45], [1.05, -0.45], [-1.05, 0.45], [1.05, 0.45]].map(([x, z], i) => (
+            <mesh key={i} position={[x, -0.28, z]}>
+              <boxGeometry args={[0.12, 0.62, 0.12]} />
+              <meshStandardMaterial color="#4d3420" roughness={0.7} />
+            </mesh>
+          ))}
+        </group>
+
+        {/* ── Laptop ─────────────────────────────────────────── */}
+        <group position={[-0.15, 0.08, 0.08]} rotation-y={0.25}>
+          <mesh position={[0, 0.02, 0.16]}>
+            <boxGeometry args={[0.72, 0.03, 0.48]} />
+            <meshStandardMaterial color="#2b2e36" roughness={0.4} metalness={0.6} />
+          </mesh>
+          <mesh position={[0, 0.24, -0.06]} rotation-x={-1.18}>
+            <boxGeometry args={[0.72, 0.46, 0.03]} />
+            <meshStandardMaterial color="#23252b" roughness={0.4} metalness={0.6} />
+          </mesh>
+          {/* écran émissif */}
+          <mesh position={[0, 0.245, -0.045]} rotation-x={-1.18}>
+            <planeGeometry args={[0.64, 0.38]} />
+            <meshStandardMaterial ref={screen} color="#0a1a2a" emissive="#7db4ff" emissiveIntensity={1.1} toneMapped={false} />
+          </mesh>
+        </group>
+
+        {/* ── Lampe de bureau (arm + tête + lumière) ─────────── */}
+        <group position={[0.92, 0.08, -0.32]}>
+          <mesh position={[0, 0.02, 0]}>
+            <cylinderGeometry args={[0.11, 0.13, 0.04, 20]} />
+            <meshStandardMaterial color="#caa25a" roughness={0.4} metalness={0.7} />
+          </mesh>
+          <mesh position={[0, 0.3, 0]} rotation-z={0.35}>
+            <cylinderGeometry args={[0.02, 0.02, 0.6, 12]} />
+            <meshStandardMaterial color="#caa25a" roughness={0.4} metalness={0.7} />
+          </mesh>
+          <mesh position={[-0.2, 0.55, 0]} rotation-z={-0.9}>
+            <cylinderGeometry args={[0.02, 0.02, 0.42, 12]} />
+            <meshStandardMaterial color="#caa25a" roughness={0.4} metalness={0.7} />
+          </mesh>
+          <mesh position={[-0.42, 0.62, 0]} rotation-z={-1.5}>
+            <coneGeometry args={[0.14, 0.22, 20, 1, true]} />
+            <meshStandardMaterial color="#e0b45a" roughness={0.35} metalness={0.6} side={2} emissive="#ffcf7a" emissiveIntensity={0.6} />
+          </mesh>
+          <pointLight ref={lamp} position={[-0.42, 0.5, 0.05]} intensity={7.5} distance={4} decay={2} color="#ffb457" />
+        </group>
+
+        {/* ── Minuteur tomate (pomodoro) ─────────────────────── */}
+        <group position={[-0.85, 0.16, 0.28]}>
+          <mesh scale={[1, 0.82, 1]}>
+            <sphereGeometry args={[0.17, 24, 24]} />
+            <meshStandardMaterial color="#e23b32" roughness={0.45} />
+          </mesh>
+          <mesh position={[0, 0.16, 0]} rotation-x={0.3}>
+            <coneGeometry args={[0.05, 0.1, 8]} />
+            <meshStandardMaterial color="#3f9a46" roughness={0.6} />
+          </mesh>
+          {/* cadran */}
+          <mesh position={[0, 0.02, 0.15]} rotation-x={-0.15}>
+            <circleGeometry args={[0.1, 24]} />
+            <meshStandardMaterial color="#f4efe6" roughness={0.5} />
+          </mesh>
+          <mesh ref={hand} position={[0, 0.02, 0.151]} rotation-x={-0.15}>
+            <planeGeometry args={[0.012, 0.08]} />
+            <meshStandardMaterial color="#c0392b" side={2} />
+          </mesh>
+        </group>
+
+        {/* ── Tasse de café ──────────────────────────────────── */}
+        <group position={[0.55, 0.12, 0.3]}>
+          <mesh>
+            <cylinderGeometry args={[0.1, 0.09, 0.16, 20]} />
+            <meshStandardMaterial color="#e9e3d8" roughness={0.5} />
+          </mesh>
+          <mesh position={[0, 0.05, 0]}>
+            <cylinderGeometry args={[0.085, 0.085, 0.02, 20]} />
+            <meshStandardMaterial color="#3a2417" roughness={0.3} />
+          </mesh>
+          <mesh position={[0.13, 0, 0]} rotation-z={Math.PI / 2}>
+            <torusGeometry args={[0.05, 0.014, 8, 16]} />
+            <meshStandardMaterial color="#e9e3d8" roughness={0.5} />
+          </mesh>
+        </group>
+
+        {/* ── Pile de livres ─────────────────────────────────── */}
+        <group position={[0.78, 0.1, -0.05]}>
+          <mesh position={[0, 0, 0]} rotation-y={0.2}>
+            <boxGeometry args={[0.4, 0.06, 0.28]} />
+            <meshStandardMaterial color="#c0563f" roughness={0.7} />
+          </mesh>
+          <mesh position={[0.02, 0.07, 0]} rotation-y={-0.15}>
+            <boxGeometry args={[0.38, 0.06, 0.26]} />
+            <meshStandardMaterial color="#3f6f86" roughness={0.7} />
+          </mesh>
+          <mesh position={[-0.01, 0.14, 0]} rotation-y={0.08}>
+            <boxGeometry args={[0.36, 0.06, 0.26]} />
+            <meshStandardMaterial color="#d8a13c" roughness={0.7} />
+          </mesh>
+        </group>
+
+        {/* ── Petite plante ──────────────────────────────────── */}
+        <group position={[-1.0, 0.12, -0.34]}>
+          <mesh>
+            <cylinderGeometry args={[0.1, 0.08, 0.16, 16]} />
+            <meshStandardMaterial color="#b06a48" roughness={0.8} />
+          </mesh>
+          {[[0, 0.18, 0], [0.06, 0.22, 0.03], [-0.05, 0.2, -0.03]].map(([x, y, z], i) => (
+            <mesh key={i} position={[x, y, z]}>
+              <sphereGeometry args={[0.09, 12, 12]} />
+              <meshStandardMaterial color="#4c8a5a" roughness={0.8} />
+            </mesh>
+          ))}
+        </group>
+
+        {/* ── Étudiant·e (low-poly, penché·e sur le laptop) ──── */}
+        <group position={[-0.1, 0.06, 0.62]} rotation-x={0.28}>
+          <mesh position={[0, 0.28, 0]}>
+            <capsuleGeometry args={[0.24, 0.28, 6, 14]} />
+            <meshStandardMaterial color="#5a5f9c" roughness={0.85} />
+          </mesh>
+          <mesh position={[0, 0.66, -0.08]}>
+            <sphereGeometry args={[0.19, 20, 20]} />
+            <meshStandardMaterial color="#e7bd94" roughness={0.7} />
+          </mesh>
+          {/* cheveux / capuche */}
+          <mesh position={[0, 0.72, -0.12]} scale={[1, 0.9, 1]}>
+            <sphereGeometry args={[0.205, 20, 20, 0, Math.PI * 2, 0, Math.PI * 0.62]} />
+            <meshStandardMaterial color="#3a3358" roughness={0.9} />
+          </mesh>
+        </group>
+
+        {/* Ombre de contact douce (cheap, pas de shadow map) */}
+        <ContactShadows position={[0, -0.35, 0.2]} scale={4} blur={2.6} far={2} opacity={0.5} color="#000000" />
+      </group>
+    </Float>
+  );
 }
 
 export default function HeroScene({ className }: { className?: string }) {
   const [frameloop, setFrameloop] = useState<"always" | "never">("always");
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const visibleRef = useRef(true);
-  const nightRef = useRef(0);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -241,19 +212,14 @@ export default function HeroScene({ className }: { className?: string }) {
       <Canvas
         frameloop={frameloop}
         dpr={[1, 1.5]}
-        camera={{ position: [0, 4.5, 18], fov: 50 }}
-        gl={{ antialias: true, powerPreference: "high-performance" }}
+        camera={{ position: [3.6, 2.7, 4.6], fov: 42 }}
+        gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       >
-        <ScrollDriver nightRef={nightRef} />
-        <SceneFog nightRef={nightRef} />
-        <SkyDome nightRef={nightRef} />
-        <Celestial nightRef={nightRef} />
-        <Lights nightRef={nightRef} />
-        <City nightRef={nightRef} />
-        <Rig />
-        <EffectComposer>
-          <Bloom mipmapBlur intensity={1.0} luminanceThreshold={0.25} luminanceSmoothing={0.25} />
-        </EffectComposer>
+        <ambientLight intensity={0.5} color="#8a90c0" />
+        <directionalLight position={[3, 5, 2]} intensity={0.5} color="#cdd6ff" />
+        {/* remplissage chaud côté lampe */}
+        <pointLight position={[-1.5, 1.2, 1.5]} intensity={3} distance={7} color="#ffb060" />
+        <StudyDesk />
       </Canvas>
     </div>
   );
