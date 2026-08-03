@@ -254,18 +254,23 @@ export default function LandingPage() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="min-h-screen bg-[#07080f] text-white overflow-x-hidden">
+      {/* ⚠️ Aucune couche en z-index NÉGATIF ici : `body` a un fond opaque
+          (`@apply bg-background`), donc un `-z-10` serait peint DERRIÈRE lui et
+          resterait invisible. Le fond est en z-0 et le contenu en z-10. */}
+      <div className="relative min-h-screen text-white overflow-x-hidden">
         {/* FOND : la ville de nuit qui défile au scroll (ou une skyline statique) */}
-        <div className="pointer-events-none fixed inset-0 -z-20">
+        <div className="pointer-events-none fixed inset-0 z-0 bg-[#07080f]">
           {use3d ? <NightCityScene /> : <SkylineFallback />}
         </div>
         {/* Voile : la ville s'estompe au fur et à mesure qu'on descend dans le contenu */}
         <motion.div
           aria-hidden
-          className="pointer-events-none fixed inset-0 -z-10 bg-[#07080f]"
+          className="pointer-events-none fixed inset-0 z-[1] bg-[#07080f]"
           style={reduce ? { opacity: 0.85 } : { opacity: veil }}
         />
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 h-1/3 -z-10 bg-gradient-to-t from-[#07080f] to-transparent" />
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 h-1/3 z-[1] bg-gradient-to-t from-[#07080f] to-transparent" />
+        {/* Tout le contenu passe au-dessus du fond */}
+        <div className="relative z-10">
 
         {/* Header */}
         <header className="sticky top-0 z-30 backdrop-blur-xl bg-[#0a0a0c]/60 border-b border-white/[0.06]">
@@ -399,6 +404,7 @@ export default function LandingPage() {
             <p className="text-xs text-white/30">Pomodoro · Lofi · Focus — fait pour rester concentré. © {new Date().getFullYear()} FocusFlow</p>
           </div>
         </footer>
+        </div>
       </div>
     </MotionConfig>
   );

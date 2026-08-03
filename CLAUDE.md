@@ -641,17 +641,23 @@ jour/nuit plein écran (trop lourde, « lag ») → **mini maquette contenue** =
 - **Deps** (landing only, lazy) : `three`, `@react-three/fiber@9`, `@react-three/drei`, `@types/three`.
   **`@react-three/postprocessing` retiré** (le bloom était la 1ʳᵉ cause de lag). `motion` conservé pour la
   scroll choreography DOM.
-- **`components/HeroScene.tsx`** = petit **bureau d'étudiant cozy en low-poly** (primitives uniquement,
-  ~30 meshes, AUCUN post-processing) : bureau, laptop à écran émissif, **lampe chaude** (pointLight qui
-  scintille), **minuteur tomate pomodoro** dont l'aiguille tourne, tasse de café, pile de livres, plante,
-  et un·e **étudiant·e** penché·e (capsule + sphère + capuche). `ContactShadows` (drei) pour l'ombre au
-  sol (pas de shadow map). Rotation « tourne-disque » douce + parallax pointeur (`Float` de drei).
-  **Giga fluide** : canvas **contenu** (~520px, pas plein écran), `dpr={[1,1.5]}`, rendu en **pause**
-  hors-viewport (IntersectionObserver) et onglet caché.
-- **`components/LandingPage.tsx`** : hero **2 colonnes** (texte + la maquette dans une « vitrine »
-  arrondie), fond sombre + halos statiques, choreography `motion` conservée (parallax hero, révélations
-  `whileInView`, section scrollytelling collante avec le mockup DOM `LivingMockup`). Repli
-  `DioramaFallback` (SVG trait) si pas de WebGL / reduced-motion — le Canvas n'est monté que si WebGL OK.
+- **`components/NightCityScene.tsx`** (remplace `HeroScene.tsx`, supprimé) = **ville de nuit qui défile**,
+  en **fond de page** (`fixed inset-0 -z-20`, pas dans une vitrine) : avenue en boucle infinie, immeubles
+  à **retraits** (base + étage en retrait + couronne/antenne) avec fenêtres allumées **procédurales**
+  (CanvasTexture en `emissiveMap`), **enseignes néon** verticales (couleur par instance via `setColorAt`),
+  balises rouges clignotantes sur les toits, lampadaires + **reflets mouillés** étirés sur l'asphalte,
+  trafic (phares/feux), arbres, **métro aérien**, lune + arc « pomodoro », étoiles, `fogExp2` qui cache
+  le recyclage. ~14 `instancedMesh` (≈220 instances), primitives seules, **aucun post-processing**.
+  **Chorégraphie scroll** : le scroll injecte un boost de vitesse **amorti et signé** (remonter fait
+  reculer la ville) + fait plonger la caméra vers la rue ; sans scroll la ville dérive seule. L'état du
+  scroll est un **objet au niveau module** (un `drive` en prop serait muté dans `useFrame` → interdit par
+  le compilateur React). Rendu en **pause** au-delà de 1,6 écran de scroll et onglet caché ; `dpr ≤ 1.4`.
+- **`components/LandingPage.tsx`** : hero **1 colonne** posée sur la ville (scrim latéral pour la
+  lisibilité), **voile** `motion` qui masque progressivement la ville quand on entre dans le contenu,
+  choreography `motion` conservée (parallax hero, révélations `whileInView`). Section « En trois étapes »
+  **compacte** (mockup DOM `LivingMockup` + 3 cartes côte à côte, l'étape active suit le scroll et le
+  survol) — l'ancien scrollytelling étalé sur plusieurs écrans a été retiré (illisible). Repli
+  `SkylineFallback` (SVG trait) si pas de WebGL / reduced-motion — Canvas monté seulement si WebGL OK.
 - **`components/AuthGate.tsx`** : `dynamic(() => import LandingPage, { ssr:false })` → three/R3F/motion
   **hors du bundle in-app** (chargés seulement pour les visiteurs non connectés).
 
