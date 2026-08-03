@@ -632,3 +632,30 @@ Retours utilisateur « UX moins générée par IA » :
 
 `npx tsc --noEmit` et `npm run build` verts (erreurs lint pré-existantes inchangées : summary.tsx:94,
 StatsSection.tsx:53, insights.tsx:102).
+
+## Journal de session — 2026-08-03 (landing R3F : mini maquette « bureau d'étudiant »)
+
+Refonte du hero du landing avec **React Three Fiber** (v9, React 19). Itérations : orbe abstrait → ville
+jour/nuit plein écran (trop lourde, « lag ») → **mini maquette contenue** = la version retenue.
+
+- **Deps** (landing only, lazy) : `three`, `@react-three/fiber@9`, `@react-three/drei`, `@types/three`.
+  **`@react-three/postprocessing` retiré** (le bloom était la 1ʳᵉ cause de lag). `motion` conservé pour la
+  scroll choreography DOM.
+- **`components/HeroScene.tsx`** = petit **bureau d'étudiant cozy en low-poly** (primitives uniquement,
+  ~30 meshes, AUCUN post-processing) : bureau, laptop à écran émissif, **lampe chaude** (pointLight qui
+  scintille), **minuteur tomate pomodoro** dont l'aiguille tourne, tasse de café, pile de livres, plante,
+  et un·e **étudiant·e** penché·e (capsule + sphère + capuche). `ContactShadows` (drei) pour l'ombre au
+  sol (pas de shadow map). Rotation « tourne-disque » douce + parallax pointeur (`Float` de drei).
+  **Giga fluide** : canvas **contenu** (~520px, pas plein écran), `dpr={[1,1.5]}`, rendu en **pause**
+  hors-viewport (IntersectionObserver) et onglet caché.
+- **`components/LandingPage.tsx`** : hero **2 colonnes** (texte + la maquette dans une « vitrine »
+  arrondie), fond sombre + halos statiques, choreography `motion` conservée (parallax hero, révélations
+  `whileInView`, section scrollytelling collante avec le mockup DOM `LivingMockup`). Repli
+  `DioramaFallback` (SVG trait) si pas de WebGL / reduced-motion — le Canvas n'est monté que si WebGL OK.
+- **`components/AuthGate.tsx`** : `dynamic(() => import LandingPage, { ssr:false })` → three/R3F/motion
+  **hors du bundle in-app** (chargés seulement pour les visiteurs non connectés).
+
+> Règle perf R3F : rester **contenu + low-poly + sans post-processing**, `frameloop` en pause
+> hors-viewport, DPR ≤ 1.5. Le fond in-session reste la vraie vidéo — pas de 3D par-dessus.
+
+`npx tsc --noEmit`, `npm run lint` (fichiers touchés) et `npm run build` verts.

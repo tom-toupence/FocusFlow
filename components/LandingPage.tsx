@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useScroll, useTransform, useReducedMotion, MotionConfig, type Variants } from "motion/react";
 import { signInWithGoogle } from "@/lib/supabase";
-import HeroScene from "@/components/HeroScene";
+import NightCityScene from "@/components/NightCityScene";
 import { cn } from "@/lib/utils";
 
 // Landing (AuthGate, non connecté) : hero à fond génératif WebGL + choreography
@@ -190,18 +190,18 @@ const STEPS = [
   { n: "3", title: "Respire, puis recommence", desc: "Pauses guidées, objectif quotidien, badges et récap hebdo — et compare ta semaine avec tes amis.", phase: "Pause" as const },
 ];
 
-// Repli statique de la maquette (reduced-motion / pas de WebGL) : un desk en trait.
+// Repli statique (reduced-motion / pas de WebGL) : une skyline de nuit en trait.
 function DioramaFallback() {
   return (
-    <div className="absolute inset-0 flex items-center justify-center">
-      <svg viewBox="0 0 200 200" className="w-2/3 h-2/3 text-white/25" fill="none" stroke="currentColor" strokeWidth={3}>
-        <path d="M28 150h144" strokeLinecap="round" />
-        <path d="M46 150v18M154 150v18" strokeLinecap="round" />
-        <path d="M152 150v-42l-26-20" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M114 80l20 6-7 19-19-6z" fill="currentColor" opacity="0.35" />
-        <path d="M62 150l8-28h30l8 28" strokeLinejoin="round" />
-        <rect x="72" y="124" width="26" height="18" rx="1.5" />
-        <circle cx="52" cy="140" r="7" />
+    <div className="absolute inset-0 flex items-end justify-center pb-10">
+      <svg viewBox="0 0 200 130" className="w-5/6 text-white/25" fill="none" stroke="currentColor" strokeWidth={2}>
+        <circle cx="44" cy="26" r="9" fill="currentColor" opacity="0.4" stroke="none" />
+        <path d="M6 118h188" strokeLinecap="round" />
+        <path d="M16 118V72h22v46M38 118V52h26v66M64 118V84h18v34M82 118V44h24v74M106 118V78h20v40M126 118V62h22v56M148 118V88h16v30M164 118V70h20v48" strokeLinejoin="round" />
+        <g opacity="0.6" strokeWidth="3" strokeLinecap="round">
+          <path d="M22 80h3M31 80h3M22 92h3M44 62h3M53 74h3M44 86h3M70 92h3M88 54h3M97 66h3M88 78h3M112 88h3M132 72h3M141 84h3M154 96h3M170 80h3M179 92h3" />
+        </g>
+        <path d="M92 126h16M120 126h14M60 126h12" opacity="0.35" strokeLinecap="round" />
       </svg>
     </div>
   );
@@ -297,17 +297,18 @@ export default function LandingPage() {
               <p className="mt-5 text-xs text-white/30">Ton compte Google sert uniquement à t&apos;identifier et synchroniser ta progression.</p>
             </div>
 
-            {/* Mini maquette 3D dans une « vitrine » */}
+            {/* Mini ville de nuit (3D) dans une « vitrine » — défile au scroll */}
             <motion.div
               initial={reduce ? false : { opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.9, delay: 0.2, ease: EASE }}
               className="relative w-full max-w-[520px] mx-auto"
             >
-              <div className="relative aspect-square rounded-3xl border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-white/[0.01] overflow-hidden shadow-2xl shadow-black/50">
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgba(255,176,96,0.14),transparent_60%)]" />
-                {use3d ? <HeroScene /> : <DioramaFallback />}
-                <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-[0.2em] text-white/30">study with me</div>
+              <div className="relative aspect-[5/4] rounded-3xl border border-white/[0.08] bg-[#0b0d18] overflow-hidden shadow-2xl shadow-black/50">
+                {use3d ? <NightCityScene /> : <DioramaFallback />}
+                {/* Vignettage : la ville se fond dans les bords de la vitrine */}
+                <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_70px_20px_rgba(6,7,15,0.85)]" />
+                <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-[0.2em] text-white/30">night drive · lofi</div>
               </div>
             </motion.div>
           </motion.div>
@@ -348,13 +349,17 @@ export default function LandingPage() {
         {/* Comment ça marche — scrollytelling collant */}
         <section id="how" className="max-w-6xl mx-auto px-5 sm:px-8 py-20 sm:py-28">
           <SectionTitle title="En trois étapes" />
-          <div ref={scrollyRef} className="grid md:grid-cols-2 gap-10 md:gap-16">
-            {/* Mockup collant (desktop) */}
-            <div className="md:sticky md:top-24 md:self-start">
-              <LivingMockup phase={phase} />
+          <div ref={scrollyRef} className="grid md:grid-cols-2 gap-10 md:gap-16 md:items-start">
+            {/* Mockup collant (desktop) — CENTRÉ dans le viewport : la carte active
+                se trouve toujours à la même hauteur que le timer. */}
+            <div className="md:sticky md:top-0 md:h-screen md:flex md:items-center md:self-start">
+              <div className="w-full">
+                <LivingMockup phase={phase} />
+              </div>
             </div>
-            {/* Étapes */}
-            <div className="flex flex-col gap-6 md:gap-24 md:py-10">
+            {/* Étapes — espacées en unités de viewport et décalées d'un demi-écran
+                pour que chaque carte croise le centre (donc le timer). */}
+            <div className="flex flex-col gap-6 md:gap-[26vh] md:py-[calc(50vh-8rem)]">
               {STEPS.map((s, i) => (
                 <motion.div
                   key={s.n}
