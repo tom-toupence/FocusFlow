@@ -191,10 +191,10 @@ const STEPS = [
 ];
 
 // Repli statique (reduced-motion / pas de WebGL) : une skyline de nuit en trait.
-function DioramaFallback() {
+function SkylineFallback() {
   return (
-    <div className="absolute inset-0 flex items-end justify-center pb-10">
-      <svg viewBox="0 0 200 130" className="w-5/6 text-white/25" fill="none" stroke="currentColor" strokeWidth={2}>
+    <div className="absolute inset-0 flex items-end justify-center bg-[radial-gradient(ellipse_at_50%_100%,rgba(38,44,92,0.55),transparent_65%)]">
+      <svg viewBox="0 0 200 130" className="w-full max-w-5xl text-white/20" fill="none" stroke="currentColor" strokeWidth={2}>
         <circle cx="44" cy="26" r="9" fill="currentColor" opacity="0.4" stroke="none" />
         <path d="M6 118h188" strokeLinecap="round" />
         <path d="M16 118V72h22v46M38 118V52h26v66M64 118V84h18v34M82 118V44h24v74M106 118V78h20v40M126 118V62h22v56M148 118V88h16v30M164 118V70h20v48" strokeLinejoin="round" />
@@ -228,14 +228,18 @@ export default function LandingPage() {
   const contentY = useTransform(heroP, [0, 1], [0, 90]);
   const contentOpacity = useTransform(heroP, [0, 0.85], [1, 0]);
   const cueOpacity = useTransform(heroP, [0, 0.15], [1, 0]);
+  // Voile qui masque progressivement la ville : lisible dès qu'on entre dans le contenu.
+  const veil = useTransform(heroP, [0, 0.6], [0.12, 0.88]);
 
-  // Section scrollytelling : phase active du mockup selon la progression.
+  // « En trois étapes » : l'étape active pilote la phase du timer de l'aperçu.
+  // Elle suit le scroll dans la section, et le survol la force.
   const scrollyRef = useRef<HTMLDivElement | null>(null);
   const { scrollYProgress: storyP } = useScroll({ target: scrollyRef, offset: ["start center", "end center"] });
-  const [phase, setPhase] = useState<"Focus" | "Pause">("Focus");
+  const [active, setActive] = useState(0);
   useEffect(() => {
-    return storyP.on("change", (v) => setPhase(v > 0.66 ? "Pause" : "Focus"));
+    return storyP.on("change", (v) => setActive(v > 0.62 ? 2 : v > 0.3 ? 1 : 0));
   }, [storyP]);
+  const phase = STEPS[active].phase;
 
   // Hero 3D (R3F) seulement si WebGL dispo ET pas de reduced-motion. Sinon les
   // halos statiques suffisent. Faux au 1er rendu → aucun risque SSR sur le Canvas.
@@ -250,12 +254,18 @@ export default function LandingPage() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="min-h-screen bg-[#0a0a0c] text-white overflow-x-hidden">
-        {/* Halos statiques (profondeur d'arrière-plan) */}
-        <div className="pointer-events-none fixed inset-0 -z-10">
-          <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-[radial-gradient(circle,_rgba(99,102,241,0.12)_0%,_transparent_60%)]" />
-          <div className="absolute top-1/3 -right-40 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,_rgba(236,72,153,0.09)_0%,_transparent_60%)]" />
+      <div className="min-h-screen bg-[#07080f] text-white overflow-x-hidden">
+        {/* FOND : la ville de nuit qui défile au scroll (ou une skyline statique) */}
+        <div className="pointer-events-none fixed inset-0 -z-20">
+          {use3d ? <NightCityScene /> : <SkylineFallback />}
         </div>
+        {/* Voile : la ville s'estompe au fur et à mesure qu'on descend dans le contenu */}
+        <motion.div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 -z-10 bg-[#07080f]"
+          style={reduce ? { opacity: 0.85 } : { opacity: veil }}
+        />
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 h-1/3 -z-10 bg-gradient-to-t from-[#07080f] to-transparent" />
 
         {/* Header */}
         <header className="sticky top-0 z-30 backdrop-blur-xl bg-[#0a0a0c]/60 border-b border-white/[0.06]">
@@ -269,13 +279,15 @@ export default function LandingPage() {
           </div>
         </header>
 
-        {/* Hero — texte + mini maquette 3D (bureau d'étudiant) */}
+        {/* Hero — texte posé sur la ville de nuit */}
         <section ref={heroRef} className="relative">
+          {/* Scrim latéral : garantit la lisibilité du texte par-dessus la ville */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#07080f] via-[#07080f]/65 to-transparent" />
           <motion.div
             style={reduce ? undefined : { y: contentY, opacity: contentOpacity }}
-            className="relative max-w-6xl mx-auto px-5 sm:px-8 pt-16 sm:pt-24 pb-24 grid lg:grid-cols-2 gap-10 lg:gap-6 items-center"
+            className="relative max-w-6xl mx-auto px-5 sm:px-8 min-h-[calc(100vh-4rem)] flex items-center pb-16"
           >
-            <div className="max-w-xl">
+            <div className="max-w-2xl">
               <motion.div variants={reveal} initial="hidden" animate="show" className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/10 text-[12px] text-white/60 mb-8">
                 Gratuit, sans publicité — fonctionne même sans compte
               </motion.div>
@@ -296,21 +308,6 @@ export default function LandingPage() {
               </motion.div>
               <p className="mt-5 text-xs text-white/30">Ton compte Google sert uniquement à t&apos;identifier et synchroniser ta progression.</p>
             </div>
-
-            {/* Mini ville de nuit (3D) dans une « vitrine » — défile au scroll */}
-            <motion.div
-              initial={reduce ? false : { opacity: 0, scale: 0.94 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.9, delay: 0.2, ease: EASE }}
-              className="relative w-full max-w-[520px] mx-auto"
-            >
-              <div className="relative aspect-[5/4] rounded-3xl border border-white/[0.08] bg-[#0b0d18] overflow-hidden shadow-2xl shadow-black/50">
-                {use3d ? <NightCityScene /> : <DioramaFallback />}
-                {/* Vignettage : la ville se fond dans les bords de la vitrine */}
-                <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_70px_20px_rgba(6,7,15,0.85)]" />
-                <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-[0.2em] text-white/30">night drive · lofi</div>
-              </div>
-            </motion.div>
           </motion.div>
 
           {/* Indice de scroll */}
@@ -346,34 +343,34 @@ export default function LandingPage() {
           </motion.div>
         </section>
 
-        {/* Comment ça marche — scrollytelling collant */}
+        {/* Comment ça marche — compact : mockup + 3 étapes lisibles d'un seul coup
+            d'œil (pas d'étalement sur plusieurs écrans). La carte survolée/active
+            pilote la phase du timer du mockup. */}
         <section id="how" className="max-w-6xl mx-auto px-5 sm:px-8 py-20 sm:py-28">
           <SectionTitle title="En trois étapes" />
-          <div ref={scrollyRef} className="grid md:grid-cols-2 gap-10 md:gap-16 md:items-start">
-            {/* Mockup collant (desktop) — CENTRÉ dans le viewport : la carte active
-                se trouve toujours à la même hauteur que le timer. */}
-            <div className="md:sticky md:top-0 md:h-screen md:flex md:items-center md:self-start">
-              <div className="w-full">
-                <LivingMockup phase={phase} />
-              </div>
-            </div>
-            {/* Étapes — espacées en unités de viewport et décalées d'un demi-écran
-                pour que chaque carte croise le centre (donc le timer). */}
-            <div className="flex flex-col gap-6 md:gap-[26vh] md:py-[calc(50vh-8rem)]">
+          <div ref={scrollyRef} className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+            <LivingMockup phase={phase} />
+            <div className="flex flex-col gap-3">
               {STEPS.map((s, i) => (
                 <motion.div
                   key={s.n}
-                  variants={reveal} initial="hidden" whileInView="show" viewport={{ once: false, margin: "-45% 0px -45% 0px" }}
-                  className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-7"
+                  variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }}
+                  onMouseEnter={() => setActive(i)}
+                  className={cn(
+                    "flex gap-4 rounded-2xl border p-5 transition-colors",
+                    i === active
+                      ? "border-white/[0.14] bg-white/[0.05]"
+                      : "border-white/[0.07] bg-white/[0.02] hover:bg-white/[0.04]"
+                  )}
                 >
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400/30 to-violet-400/20 border border-white/10 flex items-center justify-center text-sm font-semibold">{s.n}</span>
-                    <h3 className="text-lg font-semibold text-white">{s.title}</h3>
+                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400/30 to-violet-400/20 border border-white/10 flex items-center justify-center text-[13px] font-semibold">{s.n}</span>
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-white">{s.title}</h3>
+                    <p className="mt-1.5 text-sm text-white/50 leading-relaxed">{s.desc}</p>
                   </div>
-                  <p className="text-sm text-white/50 leading-relaxed">{s.desc}</p>
-                  {i === STEPS.length - 1 && <p className="mt-3 text-[11px] text-emerald-300/70">La pause change l&apos;ambiance du timer — regarde le mockup.</p>}
                 </motion.div>
               ))}
+              <p className="pl-12 text-[11px] text-white/30">Survole une étape : le timer de l&apos;aperçu change d&apos;ambiance.</p>
             </div>
           </div>
         </section>
