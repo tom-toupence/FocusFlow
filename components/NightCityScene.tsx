@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import {
@@ -431,7 +431,8 @@ function Train({ materials }: { materials: Materials }) {
 // Ciel équirectangulaire du kit (remplace ciel + étoiles + lune procéduraux).
 function NightSky() {
   const tex = useTexture(SKY_URL);
-  const { scene } = useThree();
+  // On travaille sur un clone : muter la texture renvoyée par le hook est
+  // interdit par le compilateur React (et elle est mise en cache par drei).
   const bg = useMemo(() => {
     const t = tex.clone();
     t.mapping = THREE.EquirectangularReflectionMapping;
@@ -439,15 +440,9 @@ function NightSky() {
     t.needsUpdate = true;
     return t;
   }, [tex]);
-  useEffect(() => {
-    scene.background = bg;
-    scene.backgroundIntensity = 0.85;
-    return () => {
-      scene.background = null;
-      bg.dispose();
-    };
-  }, [scene, bg]);
-  return null;
+  useEffect(() => () => bg.dispose(), [bg]);
+  // `attach` = façon déclarative de poser scene.background (aucune mutation).
+  return <primitive object={bg} attach="background" />;
 }
 
 // ── La ville ─────────────────────────────────────────────────────────────────
@@ -639,6 +634,7 @@ export default function NightCityScene({ className }: { className?: string }) {
         frameloop={frameloop}
         dpr={[1, 1.4]}
         camera={{ position: [0, 7, 22], fov: 52 }}
+        scene={{ backgroundIntensity: 0.85 }}
         gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
         onCreated={({ gl }) => gl.setClearColor(HORIZON)}
       >
