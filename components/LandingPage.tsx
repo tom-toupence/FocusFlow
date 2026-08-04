@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useScroll, useTransform, useReducedMotion, MotionConfig, type Variants } from "motion/react";
 import { signInWithGoogle } from "@/lib/supabase";
-import HeroStage from "@/components/HeroStage";
+import RoomScene from "@/components/RoomScene";
 import { cn } from "@/lib/utils";
 
 // Landing (AuthGate, non connecté). Hero = texte + `HeroStage` (la fenêtre sur
@@ -237,12 +237,12 @@ export default function LandingPage() {
           (`@apply bg-background`), donc un `-z-10` serait peint DERRIÈRE lui et
           resterait invisible. Le fond est en z-0 et le contenu en z-10. */}
       <div className="relative min-h-screen text-white overflow-x-hidden">
-        {/* FOND PLEIN ÉCRAN : la pièce — mur, baie vitrée sur la ville, bureau et
-            laptop qui fait tourner la vraie session. */}
+        {/* FOND PLEIN ÉCRAN — ÉTAPE 0 : la « boîte blanche ». Pièce vide en 3D,
+            éclairée par une HDRI de ville de nuit, avec occlusion ambiante,
+            ombres portées et profondeur de champ. Test de réalisme avant d'y
+            poser le moindre meuble. */}
         <div className="pointer-events-none fixed inset-0 z-0">
-          <HeroStage>
-            <LivingMockup bare />
-          </HeroStage>
+          <RoomScene />
         </div>
         {/* Voile de lisibilité côté texte (le titre est à gauche, la baie à droite) */}
         <div className="pointer-events-none fixed inset-0 z-[1] bg-[linear-gradient(100deg,rgba(4,5,11,0.94)_0%,rgba(4,5,11,0.78)_28%,rgba(4,5,11,0.30)_52%,transparent_70%)]" />
