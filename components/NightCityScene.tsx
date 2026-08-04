@@ -5,7 +5,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import {
-  buildBusStop, buildNeonSign, buildStreetLamp, buildTrafficLight, buildTrain, buildTree, mulberry32,
+  buildBusStop, buildNeonSign, buildStreetLamp, buildTrafficLight, buildTree, mulberry32,
 } from "@/lib/cityMeshes";
 import { cn } from "@/lib/utils";
 

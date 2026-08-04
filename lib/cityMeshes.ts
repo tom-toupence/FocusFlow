@@ -2,24 +2,24 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 // MOBILIER URBAIN procédural de la ville de nuit du landing (`NightCityScene`).
-// Les immeubles et les voitures viennent des kits Kenney (`public/city_models`,
-// `public/car_models`) ; ce module fournit ce que le kit n'a pas et qui donne
-// l'ambiance nocturne : lampadaires, feux, abribus, arbres, enseignes néon,
-// métro aérien. Pur three.js, aucun asset externe.
+// Les immeubles et les voitures viennent des kits dans `public/city_models` et
+// `public/car_models` ; ce module fournit ce que les kits n'ont pas et qui donne
+// l'ambiance nocturne : lampadaires, feux tricolores, abribus, arbres, enseignes
+// néon. Pur three.js, aucun asset externe.
 //
 // Chaque constructeur renvoie des BufferGeometry FUSIONNÉES par matériau : une
 // seule géométrie par bucket → une seule instancedMesh par bucket, donc très peu
 // de draw calls même avec des modèles détaillés.
 //
 // Buckets :
-//   shell   → béton/tôle (MeshStandardMaterial sombre)
-//   glow    → surfaces lumineuses (fenêtres, néons, phares) — COULEUR PAR SOMMET,
-//             ce qui permet des centaines de teintes différentes avec un seul
-//             matériau MeshBasicMaterial({ vertexColors: true }).
-//   glass   → vitrages sombres (MeshStandardMaterial métallique)
+//   shell → béton/tôle (MeshStandardMaterial sombre)
+//   glow  → surfaces lumineuses (lentilles, néons) — COULEUR PAR SOMMET, ce qui
+//           permet des dizaines de teintes avec un seul
+//           MeshBasicMaterial({ vertexColors: true }).
 //
 // Convention d'orientation : « profondeur » = axe Z (le sens de circulation),
-// origine au sol (y = 0), centré en x/z.
+// origine au sol (y = 0), centré en x/z. Ce qui doit faire face à la rue regarde
+// vers +X (on tourne l'objet de π pour le trottoir d'en face).
 
 export interface Built {
   shell: THREE.BufferGeometry;
@@ -165,25 +165,5 @@ export function buildNeonSign(seed: number): Built {
   for (let i = 0; i < n; i++) {
     glow.push(paint(box(0.16, 0.3, 0.3, 0, 0.2 + (i * (h - 0.5)) / n, 0), color, 1.15));
   }
-  return { shell: merge(shell, EMPTY()), glow: merge(glow, EMPTY()) };
-}
-
-// Rame de métro aérien : caisse, bandeau de fenêtres, bogies, phare.
-export function buildTrain(): Built {
-  const shell: THREE.BufferGeometry[] = [];
-  const glow: THREE.BufferGeometry[] = [];
-  const L = 5.4;
-  for (let c = 0; c < 3; c++) {
-    const z = (c - 1) * (L + 0.3);
-    shell.push(box(2.0, 1.9, L, 0, 0, z));
-    shell.push(box(2.1, 0.14, L * 0.98, 0, 1.9, z)); // toit
-    for (const sx of [1, -1]) {
-      glow.push(paint(box(0.05, 0.62, L * 0.82, (sx * 2.0) / 2 + sx * 0.02, 0.85, z), "#ffeccc", 0.95));
-    }
-    for (const bz of [-L / 3, L / 3]) {
-      shell.push(box(1.6, 0.3, 0.9, 0, -0.02, z + bz));
-    }
-  }
-  glow.push(paint(box(0.7, 0.22, 0.06, 0, 1.0, 1.6 * (L + 0.3) + 0.2), "#fff6e2", 1));
   return { shell: merge(shell, EMPTY()), glow: merge(glow, EMPTY()) };
 }

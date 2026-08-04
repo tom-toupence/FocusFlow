@@ -664,9 +664,14 @@ jour/nuit plein écran (trop lourde, « lag ») → **mini maquette contenue** =
   teintes avec UN seul `MeshBasicMaterial({vertexColors:true})`).
 - **`components/NightCityScene.tsx`** (remplace `HeroScene.tsx`, supprimé) = **ville de nuit qui défile**,
   en **fond de page** (pas dans une vitrine) : avenue en boucle infinie (`loopZ`), immeubles du kit semés
-  des 2 côtés, trafic sur 2 voies (roues qui tournent), mobilier urbain procédural, reflets mouillés,
-  balises de toit clignotantes, métro aérien, skybox de nuit, `fogExp2` (couleur = horizon du skybox) qui
-  cache le recyclage. Chaque modèle est **instancié**, **aucun post-processing ni shadow map**,
+  sur **4 rangées en profondeur de chaque côté** (une file unique donnait un effet « couloir » ; les
+  rangées lointaines privilégient les tours), trafic sur 2 voies (roues qui tournent), mobilier urbain
+  procédural, enseignes néon **ancrées sur la façade d'immeubles réels** (calculées depuis les lots, pas
+  posées dans le vide), reflets mouillés, balises de toit clignotantes, skybox de nuit, `fogExp2`
+  (couleur = horizon du skybox) qui cache le recyclage.
+  > ⚠️ **`NEAR` doit rester DERRIÈRE la caméra** (z ≥ position caméra + marge) : sinon les immeubles se
+  > téléportent en plein champ de vision au lieu de sortir de l'écran. Et `SPAN` doit être assez grand
+  > pour que le fond de la boucle soit noyé par le brouillard (sinon on voit apparaître les recyclés). Chaque modèle est **instancié**, **aucun post-processing ni shadow map**,
   `dpr ≤ 1.4`. Le rendu **ne s'arrête que si l'onglet est caché** — le flow doit continuer jusqu'en bas
   de page (le voile du landing plafonne à 0,55 d'opacité, il n'efface jamais la ville).
   Réglages en tête de fichier : `BUILD_SCALE`, `CAR_SCALE`, `LANE_X`/`CURB_X`/`FRONT_X` (gabarit de la
@@ -693,6 +698,11 @@ jour/nuit plein écran (trop lourde, « lag ») → **mini maquette contenue** =
   `SkylineFallback` (SVG trait) si pas de WebGL / reduced-motion — Canvas monté seulement si WebGL OK.
 - **`components/AuthGate.tsx`** : `dynamic(() => import LandingPage, { ssr:false })` → three/R3F/motion
   **hors du bundle in-app** (chargés seulement pour les visiteurs non connectés).
+- **Tiroir Amis absent de la landing** : `FriendsDrawer` et `FriendsLayoutShell` sont montés dans
+  `layout.tsx`, donc **hors de l'AuthGate** — ils s'affichaient sur la landing. Les deux exigent
+  désormais un utilisateur connecté (`profileStore.googleEmail`, vidé au `SIGNED_OUT`) + le pattern
+  `mounted`. ⚠️ Garder leurs conditions d'affichage **synchronisées** : sinon le contenu reste décalé de
+  320 px pour un tiroir invisible.
 
 > Règle perf R3F : rester **contenu + low-poly + sans post-processing**, `frameloop` en pause
 > hors-viewport, DPR ≤ 1.5. Le fond in-session reste la vraie vidéo — pas de 3D par-dessus.

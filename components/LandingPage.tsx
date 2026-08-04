@@ -286,8 +286,16 @@ export default function LandingPage() {
 
         {/* Hero — texte posé sur la ville de nuit */}
         <section ref={heroRef} className="relative">
-          {/* Scrim latéral : garantit la lisibilité du texte par-dessus la ville */}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#07080f] via-[#07080f]/65 to-transparent" />
+          {/* Scrim latéral : garantit la lisibilité du texte par-dessus la ville.
+              Le masque vertical évite la CASSURE NETTE en bas de section (sinon
+              on voit une frontière horizontale franche avec la suite de la page). */}
+          <div
+            className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#07080f] via-[#07080f]/65 to-transparent"
+            style={{
+              maskImage: "linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%)",
+              WebkitMaskImage: "linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%)",
+            }}
+          />
           <motion.div
             style={reduce ? undefined : { y: contentY, opacity: contentOpacity }}
             className="relative max-w-6xl mx-auto px-5 sm:px-8 min-h-[calc(100vh-4rem)] flex items-center pb-16"

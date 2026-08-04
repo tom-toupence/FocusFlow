@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useFriendsDrawer } from "@/store/friendsDrawerStore";
@@ -31,11 +31,16 @@ export default function FriendsDrawer() {
   const unreadTotal = totalUnread(unread);
   const notif = pending.length; // demandes reçues = pastille d'alerte (priorité)
 
+  // Pattern `mounted` : `email` vient d'un store persisté, on attend le montage
+  // client pour décider d'afficher (sinon mismatch d'hydratation).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   // Ouvert par défaut sur desktop (façon launcher) ; fermé sur mobile pour ne
-  // pas masquer l'écran. Une seule fois au montage (SSR-safe → pas de mismatch).
+  // pas masquer l'écran. Seulement une fois CONNECTÉ (pas sur la landing).
   useEffect(() => {
-    if (window.matchMedia("(min-width: 768px)").matches) useFriendsDrawer.getState().setOpen(true);
-  }, []);
+    if (email && window.matchMedia("(min-width: 768px)").matches) useFriendsDrawer.getState().setOpen(true);
+  }, [email]);
 
   // Rafraîchit à l'ouverture (le Realtime maintient ensuite à jour).
   useEffect(() => { if (open && email) refresh(); }, [open, email, refresh]);
@@ -71,8 +76,9 @@ export default function FriendsDrawer() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, setOpen, closeChat]);
 
-  // Masqué pendant la session, et si Supabase n'est pas configuré (mode local).
-  if (!supabase || pathname?.startsWith("/session")) return null;
+  // Masqué pendant la session, si Supabase n'est pas configuré (mode local), et
+  // tant qu'on n'est pas connecté → donc absent de la landing page.
+  if (!supabase || !mounted || !email || pathname?.startsWith("/session")) return null;
 
   return (
     <>
