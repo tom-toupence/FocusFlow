@@ -641,17 +641,30 @@ jour/nuit plein écran (trop lourde, « lag ») → **mini maquette contenue** =
 - **Deps** (landing only, lazy) : `three`, `@react-three/fiber@9`, `@react-three/drei`, `@types/three`.
   **`@react-three/postprocessing` retiré** (le bloom était la 1ʳᵉ cause de lag). `motion` conservé pour la
   scroll choreography DOM.
+- **`lib/cityMeshes.ts`** (nouveau) = **modélisation procédurale** de la ville, en pur three.js (aucun
+  asset, aucune dépendance en plus). Chaque constructeur renvoie des géométries **fusionnées**
+  (`mergeGeometries` de `three/examples/jsm/utils/BufferGeometryUtils.js`) **par bucket de matériau** :
+  `shell` (béton/tôle), `glow` (surfaces lumineuses — **couleur par sommet**, ce qui donne des centaines
+  de teintes de fenêtres avec UN seul `MeshBasicMaterial({vertexColors:true})`), `glass`, `wheels`.
+  Modèles : `buildBuilding` (socle commerçant vitré + store + corniches par étage + fenêtres encadrées +
+  balcons à barreaux + acrotère + château d'eau + clim + antenne), `buildCar` (3 profils **extrudés**
+  sedan/coupé/van avec bevel = vraie carrosserie galbée, vitrage, 4 roues pneu+jante, pare-chocs,
+  rétros, phares/feux), `buildStreetLamp` (mât + bras en col de cygne), `buildTrafficLight`,
+  `buildBusStop`, `buildTree`, `buildNeonSign`, `buildTrain`.
 - **`components/NightCityScene.tsx`** (remplace `HeroScene.tsx`, supprimé) = **ville de nuit qui défile**,
-  en **fond de page** (`fixed inset-0 -z-20`, pas dans une vitrine) : avenue en boucle infinie, immeubles
-  à **retraits** (base + étage en retrait + couronne/antenne) avec fenêtres allumées **procédurales**
-  (CanvasTexture en `emissiveMap`), **enseignes néon** verticales (couleur par instance via `setColorAt`),
-  balises rouges clignotantes sur les toits, lampadaires + **reflets mouillés** étirés sur l'asphalte,
-  trafic (phares/feux), arbres, **métro aérien**, lune + arc « pomodoro », étoiles, `fogExp2` qui cache
-  le recyclage. ~14 `instancedMesh` (≈220 instances), primitives seules, **aucun post-processing**.
+  en **fond de page** (pas dans une vitrine) : avenue en boucle infinie (`loopZ`), 6 archétypes
+  d'immeubles semés des 2 côtés, trafic sur 2 voies, mobilier urbain, reflets mouillés, balises de toit
+  clignotantes, métro aérien, lune + arc « pomodoro », `fogExp2` qui cache le recyclage. Chaque modèle est
+  **instancié** (~20 `instancedMesh`), **aucun post-processing ni shadow map**, `dpr ≤ 1.4`, rendu en
+  **pause** au-delà de 1,6 écran de scroll et onglet caché.
   **Chorégraphie scroll** : le scroll injecte un boost de vitesse **amorti et signé** (remonter fait
-  reculer la ville) + fait plonger la caméra vers la rue ; sans scroll la ville dérive seule. L'état du
-  scroll est un **objet au niveau module** (un `drive` en prop serait muté dans `useFrame` → interdit par
-  le compilateur React). Rendu en **pause** au-delà de 1,6 écran de scroll et onglet caché ; `dpr ≤ 1.4`.
+  reculer la ville) + fait plonger la caméra vers la rue ; sans scroll la ville dérive seule. L'état de
+  simulation est un **objet au niveau module** (`drive`) : passé en prop il serait muté dans `useFrame`,
+  ce que le compilateur React interdit. `<Simulation/>` est monté **en premier** (les `useFrame` suivent
+  l'ordre de montage) et avance `drive.travel` que toutes les rangées lisent.
+  > ⚠️ **Piège z-index** : `body` a un fond opaque (`@apply bg-background` dans `globals.css`), donc une
+  > couche en **z-index négatif** (`-z-10`) est peinte DERRIÈRE ce fond et reste **invisible** (bug vécu :
+  > ville totalement absente). Le fond est en `z-0`, le voile en `z-[1]`, le contenu en `z-10`.
 - **`components/LandingPage.tsx`** : hero **1 colonne** posée sur la ville (scrim latéral pour la
   lisibilité), **voile** `motion` qui masque progressivement la ville quand on entre dans le contenu,
   choreography `motion` conservée (parallax hero, révélations `whileInView`). Section « En trois étapes »

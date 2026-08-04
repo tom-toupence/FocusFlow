@@ -228,8 +228,9 @@ export default function LandingPage() {
   const contentY = useTransform(heroP, [0, 1], [0, 90]);
   const contentOpacity = useTransform(heroP, [0, 0.85], [1, 0]);
   const cueOpacity = useTransform(heroP, [0, 0.15], [1, 0]);
-  // Voile qui masque progressivement la ville : lisible dès qu'on entre dans le contenu.
-  const veil = useTransform(heroP, [0, 0.6], [0.12, 0.88]);
+  // Voile de lisibilité : il assombrit la ville sans jamais la cacher — le flow
+  // doit rester visible jusqu'en bas de page.
+  const veil = useTransform(heroP, [0, 0.6], [0.1, 0.55]);
 
   // « En trois étapes » : l'étape active pilote la phase du timer de l'aperçu.
   // Elle suit le scroll dans la section, et le survol la force.
@@ -266,14 +267,13 @@ export default function LandingPage() {
         <motion.div
           aria-hidden
           className="pointer-events-none fixed inset-0 z-[1] bg-[#07080f]"
-          style={reduce ? { opacity: 0.85 } : { opacity: veil }}
+          style={reduce ? { opacity: 0.55 } : { opacity: veil }}
         />
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 h-1/3 z-[1] bg-gradient-to-t from-[#07080f] to-transparent" />
         {/* Tout le contenu passe au-dessus du fond */}
         <div className="relative z-10">
 
         {/* Header */}
-        <header className="sticky top-0 z-30 backdrop-blur-xl bg-[#0a0a0c]/60 border-b border-white/[0.06]">
+        <header className="sticky top-0 z-30 backdrop-blur-xl bg-[#07080f]/70 border-b border-white/[0.06]">
           <div className="max-w-6xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
             <Logo />
             <nav className="hidden md:flex items-center gap-7 text-sm text-white/50">
@@ -336,7 +336,7 @@ export default function LandingPage() {
                 key={f.title} variants={reveal}
                 whileHover={reduce ? undefined : { y: -4 }}
                 transition={{ type: "spring", stiffness: 300, damping: 24 }}
-                className="group rounded-2xl border border-white/[0.07] bg-white/[0.02] p-6 hover:bg-white/[0.04] hover:border-white/[0.12]"
+                className="group rounded-2xl border border-white/[0.07] bg-[#0a0d18]/55 backdrop-blur-md p-6 hover:bg-[#0a0d18]/75 hover:border-white/[0.12]"
               >
                 <div className={cn("w-11 h-11 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center mb-4", f.accent)}>
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7}>{f.icon}</svg>
@@ -362,10 +362,10 @@ export default function LandingPage() {
                   variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }}
                   onMouseEnter={() => setActive(i)}
                   className={cn(
-                    "flex gap-4 rounded-2xl border p-5 transition-colors",
+                    "flex gap-4 rounded-2xl border p-5 backdrop-blur-md transition-colors",
                     i === active
-                      ? "border-white/[0.14] bg-white/[0.05]"
-                      : "border-white/[0.07] bg-white/[0.02] hover:bg-white/[0.04]"
+                      ? "border-white/[0.16] bg-[#0a0d18]/80"
+                      : "border-white/[0.07] bg-[#0a0d18]/55 hover:bg-[#0a0d18]/70"
                   )}
                 >
                   <span className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400/30 to-violet-400/20 border border-white/10 flex items-center justify-center text-[13px] font-semibold">{s.n}</span>
@@ -384,7 +384,7 @@ export default function LandingPage() {
         <section className="max-w-6xl mx-auto px-5 sm:px-8 pb-24">
           <motion.div
             variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }}
-            className="relative overflow-hidden rounded-3xl border border-white/[0.09] bg-gradient-to-br from-indigo-500/[0.12] via-violet-500/[0.06] to-transparent p-10 sm:p-16 text-center"
+            className="relative overflow-hidden rounded-3xl border border-white/[0.09] bg-[#0a0d18]/60 backdrop-blur-md p-10 sm:p-16 text-center"
           >
             <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,_rgba(139,92,246,0.18),_transparent_60%)]" />
             <h2 className="relative text-3xl sm:text-5xl font-semibold tracking-tight">Entre dans le flow.</h2>
@@ -398,7 +398,7 @@ export default function LandingPage() {
         </section>
 
         {/* Footer */}
-        <footer className="border-t border-white/[0.06]">
+        <footer className="border-t border-white/[0.06] bg-[#07080f]/60 backdrop-blur-md">
           <div className="max-w-6xl mx-auto px-5 sm:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
             <Logo />
             <p className="text-xs text-white/30">Pomodoro · Lofi · Focus — fait pour rester concentré. © {new Date().getFullYear()} FocusFlow</p>
