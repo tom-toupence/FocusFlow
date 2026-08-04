@@ -3,15 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useScroll, useTransform, useReducedMotion, MotionConfig, type Variants } from "motion/react";
 import { signInWithGoogle } from "@/lib/supabase";
-import RoomBackdrop from "@/components/RoomBackdrop";
+import HeroStage from "@/components/HeroStage";
 import { cn } from "@/lib/utils";
 
-// Landing (AuthGate, non connecté) : hero à fond génératif WebGL + choreography
-// au scroll (motion / Framer Motion) — parallax, révélations en cascade, section
-// « scrollytelling » collante, et un mockup de session VIVANT (timer qui tourne,
-// equalizer, titre qui défile). Thème sombre, zéro emoji, SVG inline, aucune
-// image/dépendance externe. Reduced-motion : MotionConfig "user" + repli statique
-// du shader → tout se dégrade proprement (fondus sans mouvement).
+// Landing (AuthGate, non connecté). Hero = texte + `HeroStage` (la fenêtre sur
+// la ville et le laptop en CSS 3D qui fait tourner la vraie session). Le reste
+// de la page est chorégraphié au scroll avec `motion` : parallaxe du hero,
+// révélations en cascade. Thème sombre, zéro emoji, icônes en SVG inline.
+// Reduced-motion : `MotionConfig reducedMotion="user"` → tout se dégrade en
+// simples fondus, sans mouvement.
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -73,7 +73,10 @@ const TRACKS = [
 // Mockup de session « vivant » : timer qui décompte (boucle ~3 min pour une
 // progression visible), equalizer pseudo-réactif, titre qui défile. Pur
 // transform/opacity. `phase` (Focus/Pause) piloté par la section scrollytelling.
-function LivingMockup({ phase = "Focus" }: { phase?: "Focus" | "Pause" }) {
+// `bare` : rend uniquement l'écran (sans la fenêtre de navigateur) pour être
+// affiché DANS la dalle du laptop du hero — c'est le produit lui-même qui sert
+// de démo, pas une illustration.
+function LivingMockup({ phase = "Focus", bare = false }: { phase?: "Focus" | "Pause"; bare?: boolean }) {
   const TOTAL = 180;
   const [remaining, setRemaining] = useState(TOTAL);
   const [track, setTrack] = useState(0);
@@ -92,16 +95,8 @@ function LivingMockup({ phase = "Focus" }: { phase?: "Focus" | "Pause" }) {
   const dash = 276;
   const isBreak = phase === "Pause";
 
-  return (
-    <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-white/[0.01] p-3 shadow-2xl shadow-black/50">
-      <div className="rounded-xl overflow-hidden bg-[#0c0c10] border border-white/[0.06]">
-        <div className="flex items-center gap-1.5 px-3.5 h-9 border-b border-white/[0.06]">
-          <span className="w-2.5 h-2.5 rounded-full bg-white/15" />
-          <span className="w-2.5 h-2.5 rounded-full bg-white/15" />
-          <span className="w-2.5 h-2.5 rounded-full bg-white/15" />
-          <span className="ml-3 text-[11px] text-white/30">focusflow · session</span>
-        </div>
-        <div className="relative aspect-video flex items-center justify-center overflow-hidden">
+  const screen = (
+    <div className={cn("relative flex items-center justify-center overflow-hidden", bare ? "h-full w-full" : "aspect-video")}>
           {/* fond ambiant qui dérive lentement */}
           <motion.div
             aria-hidden
@@ -152,7 +147,21 @@ function LivingMockup({ phase = "Focus" }: { phase?: "Focus" | "Pause" }) {
               </motion.span>
             </div>
           </div>
+    </div>
+  );
+
+  if (bare) return screen;
+
+  return (
+    <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-white/[0.01] p-3 shadow-2xl shadow-black/50">
+      <div className="rounded-xl overflow-hidden bg-[#0c0c10] border border-white/[0.06]">
+        <div className="flex items-center gap-1.5 px-3.5 h-9 border-b border-white/[0.06]">
+          <span className="w-2.5 h-2.5 rounded-full bg-white/15" />
+          <span className="w-2.5 h-2.5 rounded-full bg-white/15" />
+          <span className="w-2.5 h-2.5 rounded-full bg-white/15" />
+          <span className="ml-3 text-[11px] text-white/30">focusflow · session</span>
         </div>
+        {screen}
       </div>
     </div>
   );
@@ -211,9 +220,6 @@ export default function LandingPage() {
   const contentY = useTransform(heroP, [0, 1], [0, 90]);
   const contentOpacity = useTransform(heroP, [0, 0.85], [1, 0]);
   const cueOpacity = useTransform(heroP, [0, 0.15], [1, 0]);
-  // Voile de lisibilité : il assombrit la ville sans jamais la cacher — le flow
-  // doit rester visible jusqu'en bas de page.
-  const veil = useTransform(heroP, [0, 0.6], [0.1, 0.55]);
 
   // « En trois étapes » : l'étape active pilote la phase du timer de l'aperçu.
   // Elle suit le scroll dans la section, et le survol la force.
@@ -231,17 +237,12 @@ export default function LandingPage() {
           (`@apply bg-background`), donc un `-z-10` serait peint DERRIÈRE lui et
           resterait invisible. Le fond est en z-0 et le contenu en z-10. */}
       <div className="relative min-h-screen text-white overflow-x-hidden">
-        {/* FOND : la vue « study with me » — bureau en contre-jour devant une
-            fenêtre ouverte sur la ville. Photo + silhouettes 2D, aucune 3D. */}
-        <div className="pointer-events-none fixed inset-0 z-0">
-          <RoomBackdrop />
+        {/* Fond de page : nuit sourde + deux halos très diffus. La lumière, la
+            vraie, vient de la scène du hero (débord de la fenêtre). */}
+        <div className="pointer-events-none fixed inset-0 z-0 bg-[#06070d]">
+          <div className="absolute -top-40 right-0 w-[900px] h-[900px] rounded-full bg-[radial-gradient(circle,_rgba(99,102,241,0.10)_0%,_transparent_60%)]" />
+          <div className="absolute bottom-0 -left-40 w-[700px] h-[700px] rounded-full bg-[radial-gradient(circle,_rgba(236,120,80,0.07)_0%,_transparent_60%)]" />
         </div>
-        {/* Voile : la ville s'estompe au fur et à mesure qu'on descend dans le contenu */}
-        <motion.div
-          aria-hidden
-          className="pointer-events-none fixed inset-0 z-[1] bg-[#07080f]"
-          style={reduce ? { opacity: 0.55 } : { opacity: veil }}
-        />
         {/* Tout le contenu passe au-dessus du fond */}
         <div className="relative z-10">
 
@@ -257,23 +258,13 @@ export default function LandingPage() {
           </div>
         </header>
 
-        {/* Hero — texte posé sur la ville de nuit */}
+        {/* Hero — texte à gauche, scène (fenêtre + laptop) à droite. */}
         <section ref={heroRef} className="relative">
-          {/* Scrim latéral : garantit la lisibilité du texte par-dessus la ville.
-              Le masque vertical évite la CASSURE NETTE en bas de section (sinon
-              on voit une frontière horizontale franche avec la suite de la page). */}
-          <div
-            className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#07080f] via-[#07080f]/65 to-transparent"
-            style={{
-              maskImage: "linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%)",
-              WebkitMaskImage: "linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%)",
-            }}
-          />
           <motion.div
             style={reduce ? undefined : { y: contentY, opacity: contentOpacity }}
-            className="relative max-w-6xl mx-auto px-5 sm:px-8 min-h-[calc(100vh-4rem)] flex items-center pb-16"
+            className="relative max-w-6xl mx-auto px-5 sm:px-8 min-h-[calc(100vh-4rem)] grid lg:grid-cols-[minmax(0,1fr)_auto] gap-14 lg:gap-10 items-center py-16"
           >
-            <div className="max-w-2xl">
+            <div className="max-w-xl">
               <motion.div variants={reveal} initial="hidden" animate="show" className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/10 text-[12px] text-white/60 mb-8">
                 Gratuit, sans publicité — fonctionne même sans compte
               </motion.div>
@@ -294,6 +285,19 @@ export default function LandingPage() {
               </motion.div>
               <p className="mt-5 text-xs text-white/30">Ton compte Google sert uniquement à t&apos;identifier et synchroniser ta progression.</p>
             </div>
+
+            {/* La scène : la photo dans son châssis (format exact, donc entière)
+                et, devant, le laptop qui fait tourner la vraie session. */}
+            <motion.div
+              initial={reduce ? false : { opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 1, delay: 0.25, ease: EASE }}
+              className="pb-16 lg:pb-24"
+            >
+              <HeroStage>
+                <LivingMockup bare />
+              </HeroStage>
+            </motion.div>
           </motion.div>
 
           {/* Indice de scroll */}
