@@ -237,12 +237,15 @@ export default function LandingPage() {
           (`@apply bg-background`), donc un `-z-10` serait peint DERRIÈRE lui et
           resterait invisible. Le fond est en z-0 et le contenu en z-10. */}
       <div className="relative min-h-screen text-white overflow-x-hidden">
-        {/* Fond de page : nuit sourde + deux halos très diffus. La lumière, la
-            vraie, vient de la scène du hero (débord de la fenêtre). */}
-        <div className="pointer-events-none fixed inset-0 z-0 bg-[#06070d]">
-          <div className="absolute -top-40 right-0 w-[900px] h-[900px] rounded-full bg-[radial-gradient(circle,_rgba(99,102,241,0.10)_0%,_transparent_60%)]" />
-          <div className="absolute bottom-0 -left-40 w-[700px] h-[700px] rounded-full bg-[radial-gradient(circle,_rgba(236,120,80,0.07)_0%,_transparent_60%)]" />
+        {/* FOND PLEIN ÉCRAN : la pièce — mur, baie vitrée sur la ville, bureau et
+            laptop qui fait tourner la vraie session. */}
+        <div className="pointer-events-none fixed inset-0 z-0">
+          <HeroStage>
+            <LivingMockup bare />
+          </HeroStage>
         </div>
+        {/* Voile de lisibilité côté texte (le titre est à gauche, la baie à droite) */}
+        <div className="pointer-events-none fixed inset-0 z-[1] bg-[linear-gradient(100deg,rgba(4,5,11,0.94)_0%,rgba(4,5,11,0.78)_28%,rgba(4,5,11,0.30)_52%,transparent_70%)]" />
         {/* Tout le contenu passe au-dessus du fond */}
         <div className="relative z-10">
 
@@ -262,7 +265,7 @@ export default function LandingPage() {
         <section ref={heroRef} className="relative">
           <motion.div
             style={reduce ? undefined : { y: contentY, opacity: contentOpacity }}
-            className="relative max-w-6xl mx-auto px-5 sm:px-8 min-h-[calc(100vh-4rem)] grid lg:grid-cols-[minmax(0,1fr)_auto] gap-14 lg:gap-10 items-center py-16"
+            className="relative max-w-6xl mx-auto px-5 sm:px-8 min-h-[calc(100vh-4rem)] flex items-center pb-24"
           >
             <div className="max-w-xl">
               <motion.div variants={reveal} initial="hidden" animate="show" className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/10 text-[12px] text-white/60 mb-8">
@@ -285,19 +288,6 @@ export default function LandingPage() {
               </motion.div>
               <p className="mt-5 text-xs text-white/30">Ton compte Google sert uniquement à t&apos;identifier et synchroniser ta progression.</p>
             </div>
-
-            {/* La scène : la photo dans son châssis (format exact, donc entière)
-                et, devant, le laptop qui fait tourner la vraie session. */}
-            <motion.div
-              initial={reduce ? false : { opacity: 0, y: 24 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 1, delay: 0.25, ease: EASE }}
-              className="pb-16 lg:pb-24"
-            >
-              <HeroStage>
-                <LivingMockup bare />
-              </HeroStage>
-            </motion.div>
           </motion.div>
 
           {/* Indice de scroll */}

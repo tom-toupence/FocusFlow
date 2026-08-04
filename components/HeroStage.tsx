@@ -2,193 +2,211 @@
 
 import Image from "next/image";
 import { motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform } from "motion/react";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
-// SCÈNE du hero : une fenêtre ouverte sur la ville, et devant elle, sur un plan
-// de bureau, un laptop qui fait tourner la VRAIE interface de session.
+// SCÈNE du landing, en PLEIN ÉCRAN : une pièce sombre, une baie vitrée sur la
+// ville, un bureau, et un laptop qui fait tourner la vraie interface de session.
 //
-// ── Parti pris ──────────────────────────────────────────────────────────────
-// Les tentatives précédentes mélangeaient une photo réaliste et des silhouettes
-// vectorielles à plat : ça ne tient pas ensemble (échelles et perspectives
-// incohérentes → effet bricolé). Ici, plus aucun dessin approximatif :
-//   • la photo est affichée à son format EXACT (4:5) dans un châssis de fenêtre,
-//     donc entière, jamais recadrée ;
-//   • le laptop est construit en CSS 3D avec des MATIÈRES (dégradés, liserés,
-//     reflet de dalle, ombre de contact), pas au trait ;
-//   • son écran affiche le composant de session réel — c'est le produit qui fait
-//     la démonstration, pas une illustration.
+// ── Ce qui fait qu'une pièce se lit ────────────────────────────────────────
+// Pas des contours dessinés (les essais précédents en silhouettes vectorielles
+// donnaient un rendu bricolé), mais de la LUMIÈRE et des ÉPAISSEURS :
+//   • une EMBRASURE (l'épaisseur du mur autour de la vitre), dont la joue
+//     intérieure est éclairée — c'est elle qui dit « fenêtre percée dans un mur »
+//     plutôt que « image collée » ;
+//   • un APPUI de fenêtre avec son arête éclairée ;
+//   • la TACHE DE LUMIÈRE que la fenêtre projette en biais sur le bureau —
+//     le détail qui ancre tout le décor dans une pièce réelle ;
+//   • un mur qui reçoit ce même halo, en dégradé.
+// La photo garde son format exact (4:5) : elle est affichée ENTIÈRE, jamais
+// recadrée, et la baie monte du plafond au bureau comme une vraie fenêtre.
 //
-// ── Chorégraphie ────────────────────────────────────────────────────────────
-// Le scroll fait TOMBER LA NUIT dans la fenêtre : le couchant s'efface, les
-// lumières de la ville s'embrasent (copie floutée de l'image en fusion `screen`,
-// donc seuls les points déjà lumineux montent), et l'écran du laptop devient la
-// principale source de lumière de la scène.
+// ── Chorégraphie ───────────────────────────────────────────────────────────
+// Le scroll fait tomber la nuit : le couchant s'efface, les lumières de la ville
+// s'embrasent (copie floutée en fusion `screen` → seuls les points déjà clairs
+// montent), la tache de lumière s'éteint et l'écran du laptop devient la
+// principale source lumineuse de la pièce.
 //
-// Perf : une seule image (optimisée par `next/image` → AVIF/WebP, cache edge
-// Vercel), des dégradés CSS, aucune 3D WebGL. Tout est `transform`/`opacity`.
+// Perf : une image (optimisée par `next/image` → AVIF/WebP, cache edge Vercel),
+// des dégradés CSS, zéro WebGL. Uniquement `transform`/`opacity`.
 
 const PHOTO = "/pexels-ethan-brooke-1123775-3142005.jpg";
 
 export default function HeroStage({ children }: { children: React.ReactNode }) {
   const reduce = useReducedMotion();
-  const ref = useRef<HTMLDivElement>(null);
 
-  // Parallaxe au pointeur, à l'échelle de la scène : la fenêtre et le laptop ne
-  // bougent pas de la même quantité, c'est ce qui crée la profondeur.
+  // Parallaxe au pointeur : quelques pixels, la vue bouge plus que la pièce.
   const px = useMotionValue(0);
   const py = useMotionValue(0);
-  const sx = useSpring(px, { stiffness: 45, damping: 20, mass: 0.6 });
-  const sy = useSpring(py, { stiffness: 45, damping: 20, mass: 0.6 });
+  const sx = useSpring(px, { stiffness: 40, damping: 20, mass: 0.7 });
+  const sy = useSpring(py, { stiffness: 40, damping: 20, mass: 0.7 });
 
   useEffect(() => {
     if (reduce) return;
-    const el = ref.current;
-    if (!el) return;
     const onMove = (e: PointerEvent) => {
-      const r = el.getBoundingClientRect();
-      px.set((e.clientX - r.left) / r.width - 0.5);
-      py.set((e.clientY - r.top) / r.height - 0.5);
+      px.set(e.clientX / window.innerWidth - 0.5);
+      py.set(e.clientY / window.innerHeight - 0.5);
     };
     window.addEventListener("pointermove", onMove, { passive: true });
     return () => window.removeEventListener("pointermove", onMove);
   }, [px, py, reduce]);
 
   // « Il se fait tard » : 0 = couchant, 1 = nuit noire.
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
-  const night = useTransform(scrollYProgress, [0, 0.75], [0, 1]);
+  const { scrollY } = useScroll();
+  const night = useTransform(scrollY, [0, 900], [0, 1], { clamp: true });
   const dusk = useTransform(night, [0, 0.8], [1, 0]);
-  const dark = useTransform(night, [0, 1], [0.1, 0.62]);
-  const bloom = useTransform(night, [0.05, 1], [0.05, 0.7]);
-  const spill = useTransform(night, [0, 1], [0.4, 0.75]);
+  const dark = useTransform(night, [0, 1], [0.08, 0.6]);
+  const bloom = useTransform(night, [0.05, 1], [0.05, 0.72]);
+  const daylight = useTransform(night, [0, 0.7], [1, 0]); // tache de lumière au sol
+  const lampLight = useTransform(night, [0.2, 0.9], [0.25, 1]); // relais de l'écran
+  // La scène s'efface quand on entre dans le contenu (mais ne disparaît jamais).
+  const stage = useTransform(scrollY, [0, 700], [1, 0.5], { clamp: true });
 
-  const winX = useTransform(sx, (v) => v * -16);
-  const winY = useTransform(sy, (v) => v * -10);
-  const tilt = useTransform(sx, (v) => v * 4);
-  const deskX = useTransform(sx, (v) => v * 26);
+  const viewX = useTransform(sx, (v) => v * -18);
+  const viewY = useTransform(sy, (v) => v * -12);
+  const roomX = useTransform(sx, (v) => v * 8);
 
   return (
-    <div ref={ref} className="relative w-full flex justify-center lg:justify-end">
-      {/* Débord de lumière : la même image, très floutée et agrandie derrière le
-          châssis — c'est elle qui teinte le fond de page comme le ferait une
-          vraie fenêtre allumée dans une pièce sombre. */}
+    <motion.div className="absolute inset-0 overflow-hidden bg-[#07080e]" style={reduce ? undefined : { opacity: stage }}>
+      {/* ── Le mur ────────────────────────────────────────────────────────── */}
+      <div className="absolute inset-0 bg-[linear-gradient(160deg,#0b0c14_0%,#08090f_45%,#050609_100%)]" />
+      {/* Halo de la fenêtre sur le mur : c'est la seule source de jour. */}
       <motion.div
-        aria-hidden
-        className="pointer-events-none absolute -inset-x-24 -inset-y-16 -z-10 overflow-hidden"
-        style={{ opacity: reduce ? 0.5 : spill }}
-      >
-        <Image
-          src={PHOTO}
-          alt=""
-          fill
-          sizes="20vw"
-          className="object-cover scale-125"
-          style={{ filter: "blur(72px) saturate(1.5)" }}
-        />
-      </motion.div>
+        className="absolute inset-0"
+        style={{
+          opacity: reduce ? 0.5 : daylight,
+          background: "radial-gradient(62% 58% at 74% 42%, rgba(148,168,225,0.16) 0%, rgba(90,110,170,0.06) 45%, transparent 72%)",
+        }}
+      />
 
+      {/* ── La baie vitrée ────────────────────────────────────────────────── */}
+      {/* Hauteur du plafond au bureau, largeur déduite du format EXACT de la
+          photo (4:5) : l'image est donc entière. */}
       <motion.div
-        className="relative"
-        style={reduce ? undefined : { x: winX, y: winY, rotateY: tilt, transformPerspective: 1600 }}
+        className="absolute top-[7vh] h-[64vh] w-[calc(64vh*0.8)] right-[6vw] lg:right-[9vw]"
+        style={reduce ? undefined : { x: roomX }}
       >
-        {/* ── La fenêtre ─────────────────────────────────────────────────── */}
-        {/* Le châssis épouse le format EXACT de la photo (4:5) : l'image est
-            donc affichée en entier, jamais rognée. */}
-        <div className="relative w-[min(78vw,420px)] lg:w-[min(38vw,460px)] aspect-[4/5] rounded-[20px] p-[10px] bg-gradient-to-b from-[#1b1f28] to-[#0c0e14] shadow-[0_40px_120px_-30px_rgba(0,0,0,0.9)] ring-1 ring-white/[0.07]">
-          {/* liseré intérieur : le bois du châssis attrape la lumière de la ville */}
-          <div className="relative h-full w-full overflow-hidden rounded-[12px] ring-1 ring-white/[0.10]">
-            <Image src={PHOTO} alt="Vue sur la ville depuis la fenêtre, à la tombée de la nuit" fill priority sizes="(max-width: 1024px) 78vw, 460px" className="object-cover" />
+        {/* Embrasement : l'épaisseur du mur. La joue de gauche prend la lumière,
+            celle de droite reste dans l'ombre → le percement se lit. */}
+        <div className="absolute -inset-[14px] rounded-[6px] bg-[linear-gradient(100deg,#1a1d27_0%,#101320_38%,#0a0c14_100%)] shadow-[0_50px_140px_-40px_rgba(0,0,0,0.95)]" />
+        <div className="absolute -inset-[14px] rounded-[6px] ring-1 ring-white/[0.05]" />
 
-            {/* Embrasement des lumières (fusion `screen` : seuls les points déjà
-                clairs montent, donc les fenêtres s'allument d'elles-mêmes) */}
-            <motion.div className="absolute inset-0 mix-blend-screen" style={{ opacity: reduce ? 0.4 : bloom }}>
-              <Image src={PHOTO} alt="" fill sizes="20vw" className="object-cover" style={{ filter: "blur(18px) brightness(1.45) saturate(1.3)" }} />
-            </motion.div>
+        <motion.div className="relative h-full w-full overflow-hidden" style={reduce ? undefined : { x: viewX, y: viewY }}>
+          <Image
+            src={PHOTO}
+            alt="Vue sur la ville depuis la fenêtre, à la tombée de la nuit"
+            fill
+            priority
+            sizes="(max-width: 1024px) 60vw, 45vh"
+            className="object-cover"
+          />
 
-            {/* Étalonnage : le couchant s'efface, le bleu nuit monte */}
-            <motion.div
-              className="absolute inset-0"
-              style={{
-                opacity: reduce ? 0.3 : dusk,
-                background: "linear-gradient(to bottom, rgba(255,146,52,0.20) 0%, rgba(255,120,50,0.10) 38%, transparent 70%)",
-              }}
-            />
-            <motion.div
-              className="absolute inset-0"
-              style={{
-                opacity: reduce ? 0.45 : dark,
-                background: "linear-gradient(to bottom, rgba(3,6,22,0.92) 0%, rgba(4,7,24,0.35) 45%, rgba(6,9,26,0.30) 100%)",
-              }}
-            />
+          {/* Embrasement des lumières de la ville */}
+          <motion.div className="absolute inset-0 mix-blend-screen" style={{ opacity: reduce ? 0.4 : bloom }}>
+            <Image src={PHOTO} alt="" fill sizes="20vw" className="object-cover" style={{ filter: "blur(16px) brightness(1.45) saturate(1.3)" }} />
+          </motion.div>
 
-            {/* Croisillons : ils sont DANS la fenêtre, donc ils ont un sens —
-                et ils portent un liseré clair sur leur arête éclairée. */}
-            <div className="absolute inset-y-0 left-1/2 w-[7px] -translate-x-1/2 bg-[#0a0c12] after:absolute after:inset-y-0 after:left-0 after:w-px after:bg-white/[0.13]" />
-            <div className="absolute inset-x-0 top-[38%] h-[7px] bg-[#0a0c12] after:absolute after:inset-x-0 after:top-0 after:h-px after:bg-white/[0.13]" />
-
-            {/* Reflet de vitre */}
-            <div className="absolute inset-0 opacity-[0.07] bg-[linear-gradient(104deg,transparent_42%,#dce9ff_50%,transparent_58%)]" />
-            {/* La vitre s'assombrit vers le bas, là où le bureau entre en scène */}
-            <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#05070d] to-transparent" />
-          </div>
-        </div>
-
-        {/* ── Le bureau et le laptop ─────────────────────────────────────── */}
-        <motion.div
-          className="absolute inset-x-0 -bottom-2 flex justify-center"
-          style={reduce ? undefined : { x: deskX }}
-        >
-          <Laptop>{children}</Laptop>
+          {/* Étalonnage jour → nuit */}
+          <motion.div
+            className="absolute inset-0"
+            style={{
+              opacity: reduce ? 0.3 : dusk,
+              background: "linear-gradient(to bottom, rgba(255,146,52,0.18) 0%, rgba(255,120,50,0.08) 38%, transparent 70%)",
+            }}
+          />
+          <motion.div
+            className="absolute inset-0"
+            style={{
+              opacity: reduce ? 0.45 : dark,
+              background: "linear-gradient(to bottom, rgba(3,6,22,0.92) 0%, rgba(4,7,24,0.30) 45%, rgba(6,9,26,0.28) 100%)",
+            }}
+          />
+          {/* Reflet de vitre */}
+          <div className="absolute inset-0 opacity-[0.06] bg-[linear-gradient(104deg,transparent_44%,#dce9ff_51%,transparent_58%)]" />
         </motion.div>
 
-        {/* Plan de travail : une surface, pas un trait — dégradé + arête qui
-            capte la lumière de l'écran. */}
-        <div className="pointer-events-none absolute inset-x-[-14%] -bottom-3 h-24 rounded-[50%] bg-[radial-gradient(ellipse_at_center,rgba(255,166,92,0.10),transparent_70%)]" />
+        {/* Croisillons : dans le plan de la vitre, avec l'arête éclairée */}
+        <div className="pointer-events-none absolute inset-y-0 left-1/2 w-[8px] -translate-x-1/2 bg-[#0a0c13] after:absolute after:inset-y-0 after:left-0 after:w-px after:bg-white/[0.14]" />
+        <div className="pointer-events-none absolute inset-x-0 top-[38%] h-[8px] bg-[#0a0c13] after:absolute after:inset-x-0 after:top-0 after:h-px after:bg-white/[0.14]" />
+
+        {/* Appui de fenêtre : une tablette, avec son arête qui capte le jour */}
+        <div className="absolute inset-x-[-26px] top-full h-[18px] rounded-b-[3px] bg-[linear-gradient(to_bottom,#20242f,#0c0e15)]">
+          <div className="absolute inset-x-0 top-0 h-px bg-white/[0.16]" />
+        </div>
       </motion.div>
-    </div>
+
+      {/* ── Le bureau ─────────────────────────────────────────────────────── */}
+      <div className="absolute inset-x-0 bottom-0 h-[26vh] bg-[linear-gradient(to_bottom,#0c0e15_0%,#070810_55%,#05060b_100%)]">
+        <div className="absolute inset-x-0 top-0 h-px bg-white/[0.07]" />
+        {/* Tache de lumière projetée par la fenêtre — en biais, comme le veut
+            l'incidence. C'est elle qui ancre la scène dans une vraie pièce. */}
+        <motion.div
+          className="absolute right-[4vw] lg:right-[7vw] top-0 h-full w-[46vw] max-w-[720px] blur-2xl"
+          style={{
+            opacity: reduce ? 0.5 : daylight,
+            transform: "skewX(-26deg)",
+            background: "linear-gradient(to bottom, rgba(150,172,230,0.20), rgba(120,140,200,0.05) 60%, transparent 100%)",
+          }}
+        />
+        {/* Nappe chaude de l'écran sur le plan de travail */}
+        <motion.div
+          className="absolute right-[10vw] top-0 h-full w-[34vw] max-w-[520px] blur-3xl"
+          style={{
+            opacity: reduce ? 0.5 : lampLight,
+            background: "radial-gradient(ellipse at 50% 0%, rgba(140,170,255,0.22), transparent 70%)",
+          }}
+        />
+      </div>
+
+      {/* ── Le laptop, posé sur le bureau ─────────────────────────────────── */}
+      {/* Aucun parent en transformation 3D : sinon le navigateur rasterise tout
+          le sous-arbre en basse résolution et l'écran devient FLOU. */}
+      <div className="absolute bottom-[7vh] right-[6vw] lg:right-[11vw] w-[min(52vw,330px)] lg:w-[min(24vw,360px)]">
+        <Laptop>{children}</Laptop>
+      </div>
+    </motion.div>
   );
 }
 
-// ── Laptop en CSS 3D ────────────────────────────────────────────────────────
-// Un vrai volume : dalle inclinée, charnière, clavier en fuite, châssis
-// métallique et ombre de contact. L'écran reçoit le composant passé en enfant
-// (l'interface de session réelle), pas une illustration.
+// ── Laptop ──────────────────────────────────────────────────────────────────
+// La dalle reste dans le plan de l'écran (donc NETTE) ; seul le clavier part en
+// perspective, et lui n'a aucun texte à rendre. Le volume vient des matières :
+// dégradés d'aluminium, liserés, ombre de contact, reflet de dalle.
 function Laptop({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative w-[min(72vw,380px)] lg:w-[min(34vw,400px)]" style={{ perspective: "1200px" }}>
+    <div className="relative">
       {/* Ombre de contact au sol */}
-      <div className="absolute left-1/2 bottom-0 h-8 w-[85%] -translate-x-1/2 translate-y-4 rounded-[50%] bg-black/70 blur-2xl" />
+      <div className="absolute left-1/2 bottom-[-14px] h-10 w-[92%] -translate-x-1/2 rounded-[50%] bg-black/80 blur-2xl" />
 
-      <div style={{ transformStyle: "preserve-3d" }}>
-        {/* Dalle : châssis + bordure + écran + reflet */}
-        <div
-          className="relative rounded-t-[12px] rounded-b-[4px] bg-gradient-to-b from-[#2c313c] to-[#171a21] p-[7px] pb-[9px] shadow-[0_18px_40px_-18px_rgba(0,0,0,0.9)] ring-1 ring-white/[0.09]"
-          style={{ transform: "rotateX(-6deg)", transformOrigin: "bottom center" }}
-        >
-          <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[6px] bg-[#07080d] ring-1 ring-black/60">
-            {children}
-            {/* Reflet oblique de la dalle */}
-            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(118deg,rgba(255,255,255,0.10)_0%,transparent_38%,transparent_62%,rgba(255,255,255,0.05)_100%)]" />
-          </div>
-          {/* Encoche caméra */}
-          <div className="absolute left-1/2 top-[3px] h-[3px] w-[3px] -translate-x-1/2 rounded-full bg-white/25" />
+      {/* Écran */}
+      <div className="relative rounded-[14px] bg-[linear-gradient(150deg,#3a4150_0%,#22262f_35%,#12151b_100%)] p-[9px] pb-[16px] shadow-[0_26px_60px_-24px_rgba(0,0,0,0.95)] ring-1 ring-white/[0.10]">
+        <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[7px] bg-[#06070c] ring-1 ring-black/70">
+          {children}
+          {/* Reflet de dalle : léger, oblique, pour la matière « verre » */}
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(116deg,rgba(255,255,255,0.09)_0%,transparent_34%,transparent_66%,rgba(255,255,255,0.04)_100%)]" />
         </div>
-
-        {/* Clavier en fuite : la perspective fait le volume, le dégradé la matière */}
-        <div
-          className="relative -mt-[2px] h-[54px] rounded-b-[10px] bg-gradient-to-b from-[#2a2f3a] via-[#1d212a] to-[#0f1218] ring-1 ring-white/[0.07]"
-          style={{ transform: "rotateX(74deg)", transformOrigin: "top center" }}
-        >
-          {/* charnière */}
-          <div className="absolute inset-x-6 top-0 h-px bg-white/10" />
-          {/* pavé tactile */}
-          <div className="absolute left-1/2 top-[18px] h-[22px] w-[34%] -translate-x-1/2 rounded-[4px] bg-[#151922] ring-1 ring-white/[0.05]" />
-          {/* encoche d'ouverture */}
-          <div className="absolute left-1/2 bottom-[3px] h-[3px] w-[14%] -translate-x-1/2 rounded-full bg-black/50" />
-        </div>
+        {/* Mention sous la dalle + caméra */}
+        <div className="absolute left-1/2 top-[3.5px] h-[3px] w-[3px] -translate-x-1/2 rounded-full bg-white/25" />
+        <div className="absolute inset-x-0 bottom-[4px] text-center text-[6px] tracking-[0.3em] text-white/20">FOCUSFLOW</div>
       </div>
 
-      {/* Lueur de l'écran qui déborde sur le bureau */}
-      <div className="pointer-events-none absolute inset-x-[-20%] -bottom-6 h-16 bg-[radial-gradient(ellipse_at_center,rgba(150,180,255,0.16),transparent_70%)]" />
+      {/* Clavier en fuite : la perspective donne le volume, pas un contour */}
+      <div className="relative" style={{ perspective: "900px" }}>
+        <div
+          className="relative -mt-[3px] h-[46px] rounded-b-[12px] bg-[linear-gradient(to_bottom,#333a47_0%,#1f242e_28%,#12151c_75%,#0a0c11_100%)] ring-1 ring-white/[0.06]"
+          style={{ transform: "rotateX(72deg)", transformOrigin: "top center" }}
+        >
+          {/* charnière */}
+          <div className="absolute inset-x-8 top-0 h-px bg-white/[0.14]" />
+          {/* rangées de touches, suggérées par de fines nervures */}
+          <div className="absolute inset-x-[9%] top-[6px] h-[16px] rounded-[2px] bg-[repeating-linear-gradient(to_right,rgba(255,255,255,0.05)_0_5px,transparent_5px_9px)] opacity-70" />
+          {/* pavé tactile */}
+          <div className="absolute left-1/2 top-[26px] h-[14px] w-[30%] -translate-x-1/2 rounded-[3px] bg-[#171b23] ring-1 ring-white/[0.05]" />
+        </div>
+        {/* Tranche avant : l'épaisseur du châssis, avec l'encoche d'ouverture */}
+        <div className="mx-[3%] h-[5px] rounded-b-[6px] bg-[linear-gradient(to_bottom,#22262f,#0b0d12)] ring-1 ring-white/[0.05]">
+          <div className="absolute left-1/2 h-[3px] w-[12%] -translate-x-1/2 rounded-b-full bg-black/60" />
+        </div>
+      </div>
     </div>
   );
 }
