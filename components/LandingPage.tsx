@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useScroll, useTransform, useReducedMotion, MotionConfig, type Variants } from "motion/react";
 import { signInWithGoogle } from "@/lib/supabase";
-import NightCityScene from "@/components/NightCityScene";
+import WindowScene from "@/components/WindowScene";
 import { cn } from "@/lib/utils";
 
 // Landing (AuthGate, non connecté) : hero à fond génératif WebGL + choreography
@@ -259,9 +259,10 @@ export default function LandingPage() {
           (`@apply bg-background`), donc un `-z-10` serait peint DERRIÈRE lui et
           resterait invisible. Le fond est en z-0 et le contenu en z-10. */}
       <div className="relative min-h-screen text-white overflow-x-hidden">
-        {/* FOND : la ville de nuit qui défile au scroll (ou une skyline statique) */}
-        <div className="pointer-events-none fixed inset-0 z-0 bg-[#07080f]">
-          {use3d ? <NightCityScene /> : <SkylineFallback />}
+        {/* FOND : la vue « study with me » — chambre de nuit, pluie sur la vitre,
+            ville floue dehors (ou une skyline statique sans WebGL) */}
+        <div className="pointer-events-none fixed inset-0 z-0 bg-[#04050c]">
+          {use3d ? <WindowScene /> : <SkylineFallback />}
         </div>
         {/* Voile : la ville s'estompe au fur et à mesure qu'on descend dans le contenu */}
         <motion.div
@@ -383,7 +384,6 @@ export default function LandingPage() {
                   </div>
                 </motion.div>
               ))}
-              <p className="pl-12 text-[11px] text-white/30">Survole une étape : le timer de l&apos;aperçu change d&apos;ambiance.</p>
             </div>
           </div>
         </section>
