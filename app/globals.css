@@ -212,6 +212,26 @@
 .anim-track-in    { animation: trackIn 0.35s ease-out both; }
 .anim-halo-pulse  { animation: haloPulse 0.9s ease-out; }
 
+/* Landing — chambre : volutes d'encens et respiration de la lampe.
+   Volontairement LENTES : dans une pièce calme, rien ne s'agite. */
+@keyframes smokeRise {
+  0%   { opacity: 0;    transform: translate3d(0, 0, 0) scale(0.7) rotate(0deg); }
+  18%  { opacity: 0.42; }
+  60%  { opacity: 0.24; }
+  100% { opacity: 0;    transform: translate3d(26px, -160px, 0) scale(2.1) rotate(8deg); }
+}
+@keyframes lampFlicker {
+  0%, 100% { opacity: 0.94; }
+  50%      { opacity: 1; }
+}
+.anim-smoke { animation: smokeRise 11s linear infinite; will-change: transform, opacity; }
+.anim-lamp  { animation: lampFlicker 7s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-smoke, .anim-lamp { animation: none; }
+  .anim-smoke { opacity: 0.18; }
+}
+
 /* Entrée en cascade des cartes du tableau de bord (au montage seulement).
    Délais échelonnés sur les enfants directs. Neutralisé en reduced-motion. */
 .dash-stagger > * { animation: cascadeIn 0.5s ease-out backwards; }
