@@ -641,15 +641,21 @@ jour/nuit plein écran (trop lourde, « lag ») → **mini maquette contenue** =
 - **Deps** (landing only, lazy) : `three`, `@react-three/fiber@9`, `@react-three/drei`, `@types/three`.
   **`@react-three/postprocessing` retiré** (le bloom était la 1ʳᵉ cause de lag). `motion` conservé pour la
   scroll choreography DOM.
-- **Assets 3D (kits Kenney, CC0 — aucune attribution requise)** dans `public/` :
-  `city_models/*.glb` (3 immeubles + 3 gratte-ciels), `car_models/*.glb` (berline, taxi, van — la
-  carrosserie et les 4 roues sont des **nœuds séparés**, donc les roues tournent),
-  `skyboxes/skybox-night-2k.png` (ciel équirectangulaire). **Seuls les modèles utilisés sont versionnés**
-  (~1,5 Mo au total) : les formats FBX/OBJ et les modèles inutilisés ont été supprimés, et le skybox a
-  été **ré-encodé de 4096² à 2048²** (1074 Ko → 274 Ko, 4× moins de VRAM ; couleur d'horizon
-  échantillonnée `#2d3a66` = couleur du brouillard de la scène).
-  ⚠️ Les deux kits n'ont **pas la même échelle** (immeuble ≈ 1 unité, voiture ≈ 2,5) : normalisation via
-  `BUILD_SCALE` / `CAR_SCALE` + bounding boxes mesurées au chargement (placement indépendant du modèle).
+- **Assets 3D (CC0)** dans `public/` — **seuls les modèles réellement utilisés sont versionnés**
+  (~1,8 Mo au total ; formats sources et modèles inutilisés supprimés) :
+  - `city_models/*.glb` — kit Kenney : 3 immeubles + 3 gratte-ciels (atlas `colormap` embarqué).
+  - `car_models/*.glb` — pack Quaternius fourni en **OBJ**, converti par **`scripts/obj2glb.mjs`**
+    (pur Node, aucune dépendance) : couleurs des matériaux `.mtl` **cuites en vertex colors** (pas d'UV
+    dans ce pack), matériaux `*Lights*` isolés dans un mesh **`lights`** rendu émissif, objets `*Wheel*`
+    → nœuds **`wheel-*` recentrés sur leur moyeu** (donc les roues tournent), modèle réorienté
+    (avant vers **+Z**) et mis à l'échelle (**4,2 m de long**, d'où `CAR_SCALE = 1`).
+    Attributs compressés (couleurs u8, index u16) : ~250 Ko → ~185 Ko par voiture.
+  - `skyboxes/skybox-night-2k.png` — ciel équirectangulaire, **ré-encodé de 4096² à 2048²** par
+    **`scripts/resize-skybox.mjs`** (PNG indexé, pur zlib) : 1074 Ko → 274 Ko et 4× moins de VRAM. Le
+    script échantillonne aussi la **couleur d'horizon** (`#2d3a66`) réutilisée comme couleur de brouillard.
+  ⚠️ Les kits n'ont **pas la même échelle** (immeuble ≈ 1 unité) : normalisation via `BUILD_SCALE` +
+  bounding boxes mesurées au chargement (le placement ne dépend d'aucune constante par modèle).
+  ⚠️ three.js ne lit **ni `.blend` ni `.fbx` sans loader dédié** : tout asset doit finir en `.glb`.
 - **`lib/cityMeshes.ts`** (nouveau) = **mobilier urbain procédural** (ce que le kit ne fournit pas et qui
   fait la nuit) : `buildStreetLamp` (mât + bras en col de cygne), `buildTrafficLight`, `buildBusStop`,
   `buildTree`, `buildNeonSign`, `buildTrain`. Pur three.js, géométries **fusionnées**
@@ -665,7 +671,12 @@ jour/nuit plein écran (trop lourde, « lag ») → **mini maquette contenue** =
   de page (le voile du landing plafonne à 0,55 d'opacité, il n'efface jamais la ville).
   Réglages en tête de fichier : `BUILD_SCALE`, `CAR_SCALE`, `LANE_X`/`CURB_X`/`FRONT_X` (gabarit de la
   rue) et **`FACADE_DIR`** (sens de la façade du kit — à passer à `-1` si les immeubles tournent le dos
-  à l'avenue).
+  à l'avenue). Caméra en **plongée** au-dessus de l'avenue, qui descend vers la rue au fil du scroll.
+  > ⚠️ **Ville « toute blanche » = SUR-EXPOSITION**, pas une texture manquante : les atlas des kits sont
+  > peints en couleurs de jour et se délavent dès que l'éclairage monte (le `pointLight` était à 40).
+  > Garder des intensités faibles (ambient ~0.3, directionnelle ~0.4, points < 15, exposure 0.92) et
+  > **coloriser par instance** (`setColorAt`, `CITY_TINTS`, multiplié par l'atlas) plutôt que de teinter
+  > le matériau — une teinte globale rend la ville monochrome.
   **Chorégraphie scroll** : le scroll injecte un boost de vitesse **amorti et signé** (remonter fait
   reculer la ville) + fait plonger la caméra vers la rue ; sans scroll la ville dérive seule. L'état de
   simulation est un **objet au niveau module** (`drive`) : passé en prop il serait muté dans `useFrame`,

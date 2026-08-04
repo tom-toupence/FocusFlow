@@ -42,8 +42,10 @@ const SKY_URL = "/skyboxes/skybox-night-2k.png";
 CITY_URLS.forEach((u) => useGLTF.preload(u));
 CAR_URLS.forEach((u) => useGLTF.preload(u));
 
-const SPAN = 96; // profondeur de la boucle : ce qui dépasse est recyclé au fond
-const NEAR = 14; // z le plus proche (derrière la caméra) avant recyclage
+const SPAN = 150; // profondeur de la boucle : ce qui dépasse est recyclé au fond
+// ⚠️ NEAR doit rester DERRIÈRE la caméra (qui va de z=34 à z=22) : sinon les
+// immeubles se téléportent en plein champ de vision au lieu de sortir de l'écran.
+const NEAR = 46;
 const BASE_SPEED = 3.2; // dérive de croisière (unités/s)
 const BUILD_SCALE = 6.5; // kit ville → mètres (un immeuble de 1,29 fait ~8,4 m)
 const CAR_SCALE = 1; // les voitures sont déjà normalisées (4,2 m) à la conversion
@@ -415,7 +417,7 @@ function Beacons({ lots }: { lots: { x: number; y: number; z: number }[] }) {
 function RoadMarkings() {
   const mesh = useRef<THREE.InstancedMesh>(null);
   const dummy = useDummy();
-  const slots = useMemo(() => Array.from({ length: 32 }, (_, i) => -(i / 32) * SPAN), []);
+  const slots = useMemo(() => Array.from({ length: 48 }, (_, i) => -(i / 48) * SPAN), []);
   useFrame(() => {
     for (let i = 0; i < slots.length; i++) {
       dummy.position.set(0, 0.025, loopZ(slots[i], drive.travel));
@@ -431,34 +433,6 @@ function RoadMarkings() {
       <planeGeometry args={[1, 1]} />
       <meshBasicMaterial color="#7c86a8" transparent opacity={0.35} depthWrite={false} />
     </instancedMesh>
-  );
-}
-
-// Métro aérien : traverse le fond de la scène en boucle.
-function Train({ materials }: { materials: Materials }) {
-  const group = useRef<THREE.Group>(null);
-  const model = useMemo(() => buildTrain(), []);
-  useEffect(() => () => { model.shell.dispose(); model.glow.dispose(); }, [model]);
-  useFrame((state) => {
-    if (group.current) group.current.position.x = mod(state.clock.elapsedTime * 9 + 60, 220) - 110;
-  });
-  return (
-    <group position={[0, 15, -62]}>
-      <mesh position={[0, -1.7, 0]}>
-        <boxGeometry args={[220, 0.6, 4]} />
-        <meshStandardMaterial color="#0d1020" roughness={0.95} />
-      </mesh>
-      {[-46, -16, 16, 46].map((x) => (
-        <mesh key={x} position={[x, -8.5, 0]}>
-          <boxGeometry args={[1.8, 14, 1.8]} />
-          <meshStandardMaterial color="#0d1020" roughness={0.95} />
-        </mesh>
-      ))}
-      <group ref={group} rotation-y={Math.PI / 2} scale={1.6}>
-        <mesh geometry={model.shell} material={materials.props} />
-        <mesh geometry={model.glow} material={materials.glow} />
-      </group>
-    </group>
   );
 }
 
@@ -486,30 +460,53 @@ function City() {
   const cityGltf = useGLTF(CITY_URLS) as unknown as Gltf[];
   const carGltf = useGLTF(CAR_URLS) as unknown as Gltf[];
 
-  // Immeubles : un archétype par modèle, semés le long des deux trottoirs.
+  // Immeubles : plusieurs RANGÉES en profondeur de chaque côté — une file unique
+  // donne une impression de couloir, alors qu'un tissu urbain se voit derrière la
+  // première ligne. Les rangées lointaines privilégient les tours (silhouette).
   const city = useMemo(() => {
     const models = cityGltf.map(extractBuilding);
+    const towers = models.map((_, i) => i).filter((i) => models[i].height > 18);
     const rnd = mulberry32(24);
     const lots: Lot[][] = models.map(() => []);
     const beacons: { x: number; y: number; z: number }[] = [];
-    const perSide = 11;
+    const signs: { x: number; z: number; rot: number; y: number }[] = [];
+
+    const ROWS = [
+      { front: FRONT_X, count: 16, jitter: 1.5, tall: false, signs: true },
+      { front: FRONT_X + 12, count: 12, jitter: 3.5, tall: false, signs: false },
+      { front: FRONT_X + 26, count: 9, jitter: 6, tall: true, signs: false },
+      { front: FRONT_X + 46, count: 6, jitter: 10, tall: true, signs: false },
+    ];
+
     for (const side of [-1, 1]) {
-      for (let i = 0; i < perSide; i++) {
-        const mi = Math.floor(rnd() * models.length);
-        const m = models[mi];
-        const x = side * (FRONT_X + m.depth / 2 + rnd() * 1.5);
-        const z = -((i + (side < 0 ? 0 : 0.5)) / perSide) * SPAN;
-        // Façade tournée vers la rue (cf. FACADE_DIR).
-        lots[mi].push({
-          x,
-          z,
-          rot: (side < 0 ? Math.PI / 2 : -Math.PI / 2) * FACADE_DIR,
-          tint: CITY_TINTS[Math.floor(rnd() * CITY_TINTS.length)],
-        });
-        if (m.height > 20) beacons.push({ x, y: m.height + 0.3, z });
+      for (const row of ROWS) {
+        for (let i = 0; i < row.count; i++) {
+          const pool = row.tall && towers.length > 0 ? towers : models.map((_, k) => k);
+          const mi = pool[Math.floor(rnd() * pool.length)];
+          const m = models[mi];
+          const x = side * (row.front + m.depth / 2 + rnd() * row.jitter);
+          const z = -((i + (side < 0 ? 0 : 0.5)) / row.count) * SPAN - rnd() * 4;
+          // Façade tournée vers la rue (cf. FACADE_DIR).
+          lots[mi].push({
+            x,
+            z,
+            rot: (side < 0 ? Math.PI / 2 : -Math.PI / 2) * FACADE_DIR,
+            tint: CITY_TINTS[Math.floor(rnd() * CITY_TINTS.length)],
+          });
+          if (m.height > 20) beacons.push({ x, y: m.height + 0.3, z });
+          // Enseignes PLAQUÉES sur la façade réelle (et pas posées dans le vide).
+          if (row.signs && rnd() > 0.55) {
+            signs.push({
+              x: x - side * (m.depth / 2 + 0.12),
+              z,
+              rot: 0, // les panneaux du caisson regardent déjà ±X, donc la rue
+              y: 2.5 + rnd() * Math.max(1, m.height * 0.45),
+            });
+          }
+        }
       }
     }
-    return { models, lots, beacons };
+    return { models, lots, beacons, signs };
   }, [cityGltf]);
 
   // Trafic : 3 carrosseries réparties sur les deux voies.
@@ -517,9 +514,10 @@ function City() {
     const models = carGltf.map(extractCar);
     const rnd = mulberry32(77);
     const slots: CarSlot[][] = models.map(() => []);
-    for (let i = 0; i < 11; i++) {
+    const CARS = 16;
+    for (let i = 0; i < CARS; i++) {
       const mi = Math.floor(rnd() * models.length);
-      slots[mi].push({ z: -(i / 11) * SPAN - rnd() * 6, lane: i % 2 === 0 ? 1 : -1, speed: 0.45 + rnd() * 0.6 });
+      slots[mi].push({ z: -(i / CARS) * SPAN - rnd() * 6, lane: i % 2 === 0 ? 1 : -1, speed: 0.45 + rnd() * 0.6 });
     }
     return { models, slots };
   }, [carGltf]);
@@ -532,39 +530,33 @@ function City() {
     const lamp = buildStreetLamp();
     const lamps: Lot[] = [];
     const reflections: { x: number; z: number }[] = [];
-    for (let i = 0; i < 14; i++) {
-      const z = -(i / 14) * SPAN;
+    const LAMPS = 22; // un lampadaire tous les ~7 m sur la longueur de boucle
+    for (let i = 0; i < LAMPS; i++) {
+      const z = -(i / LAMPS) * SPAN;
       const left = i % 2 === 0;
       lamps.push({ x: left ? -CURB_X - 0.5 : CURB_X + 0.5, z, rot: left ? 0 : Math.PI });
       reflections.push({ x: left ? -CURB_X : CURB_X, z });
     }
     const trafficLight = buildTrafficLight();
-    const tlSlots: Lot[] = [0, 1, 2, 3].map((i) => ({
+    const tlSlots: Lot[] = [0, 1, 2, 3, 4, 5].map((i) => ({
       x: i % 2 === 0 ? -CURB_X - 0.2 : CURB_X + 0.2,
-      z: -(i / 4) * SPAN - 7,
+      z: -(i / 6) * SPAN - 7,
       rot: i % 2 === 0 ? 0 : Math.PI,
     }));
     const busStop = buildBusStop();
-    const bsSlots: Lot[] = [0, 1].map((i) => ({
-      x: i === 0 ? -CURB_X - 1.1 : CURB_X + 1.1,
-      z: -(i / 2) * SPAN - 20,
-      rot: i === 0 ? 0 : Math.PI,
+    const bsSlots: Lot[] = [0, 1, 2].map((i) => ({
+      x: i % 2 === 0 ? -CURB_X - 1.1 : CURB_X + 1.1,
+      z: -(i / 3) * SPAN - 20,
+      rot: i % 2 === 0 ? 0 : Math.PI,
     }));
     const tree = buildTree(12);
-    const treeSlots: Lot[] = Array.from({ length: 12 }, (_, i) => ({
+    const treeSlots: Lot[] = Array.from({ length: 20 }, (_, i) => ({
       x: (i % 2 === 0 ? -1 : 1) * (CURB_X + 0.9),
-      z: -(i / 12) * SPAN - 4 - rnd() * 3,
+      z: -(i / 20) * SPAN - 4 - rnd() * 3,
       rot: rnd() * Math.PI,
     }));
     const sign = buildNeonSign(56);
-    const signSlots = Array.from({ length: 7 }, (_, i) => {
-      const side = i % 2 === 0 ? -1 : 1;
-      return {
-        slot: { x: side * (FRONT_X - 0.3), z: -(i / 7) * SPAN - rnd() * 6, rot: side > 0 ? Math.PI / 2 : -Math.PI / 2 } as Lot,
-        y: 4 + rnd() * 5,
-      };
-    });
-    return { lamp, lamps, reflections, trafficLight, tlSlots, busStop, bsSlots, tree, treeSlots, sign, signSlots };
+    return { lamp, lamps, reflections, trafficLight, tlSlots, busStop, bsSlots, tree, treeSlots, sign };
   }, []);
 
   // Libération mémoire au démontage (géométries clonées + matériaux).
@@ -587,7 +579,6 @@ function City() {
     <group>
       <Simulation />
       <NightSky />
-      <Train materials={materials} />
 
       {/* Asphalte mouillé (reflet spéculaire), chaussée, trottoirs */}
       <mesh rotation-x={-Math.PI / 2} position={[0, 0, -30]}>
@@ -626,8 +617,10 @@ function City() {
       <PropRow shell={props.trafficLight.shell} glow={props.trafficLight.glow} slots={props.tlSlots} materials={materials} />
       <PropRow shell={props.busStop.shell} glow={props.busStop.glow} slots={props.bsSlots} materials={materials} />
       <PropRow shell={props.tree.shell} glow={props.tree.glow} slots={props.treeSlots} materials={materials} />
-      {props.signSlots.map((s, i) => (
-        <PropRow key={i} shell={props.sign.shell} glow={props.sign.glow} slots={[s.slot]} y={s.y} materials={materials} />
+      {/* Enseignes néon : une rangée par hauteur d'accroche, chacune calée sur la
+          façade d'un immeuble réel. */}
+      {city.signs.map((s, i) => (
+        <PropRow key={i} shell={props.sign.shell} glow={props.sign.glow} slots={[{ x: s.x, z: s.z, rot: s.rot }]} y={s.y} materials={materials} />
       ))}
 
       {/* Trafic (kit voitures, roues qui tournent) */}
@@ -680,7 +673,9 @@ export default function NightCityScene({ className }: { className?: string }) {
       >
         {/* Le brouillard fond les immeubles recyclés dans la nuit (boucle
             invisible) — sa couleur est celle de l'horizon du skybox. */}
-        <fogExp2 attach="fog" args={[HORIZON, 0.009]} />
+        {/* Dense au point que le fond de la boucle (≈140 unités) soit noyé : c'est
+            lui qui cache l'apparition des immeubles recyclés. */}
+        <fogExp2 attach="fog" args={[HORIZON, 0.0135]} />
         {/* Éclairage volontairement FAIBLE : les atlas des kits sont peints en
             couleurs de jour et se délavent (tout blanc) dès qu'on sur-expose. */}
         <ambientLight intensity={0.32} color="#5a67ad" />
