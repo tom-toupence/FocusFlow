@@ -4,35 +4,39 @@ import Image from "next/image";
 import { motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform } from "motion/react";
 import { useEffect } from "react";
 
-// FOND du landing : la vue « study with me ». On est assis à un bureau, la nuit
-// tombe sur la ville, et on regarde par la fenêtre.
+// FOND du landing : la vue « study with me » — on est assis à un bureau devant
+// une baie vitrée, et **la nuit tombe pendant qu'on descend la page**.
 //
-// ── Pourquoi ce n'est PAS de la 3D ──────────────────────────────────────────
+// ── L'idée ──────────────────────────────────────────────────────────────────
+// La photo est prise à l'heure bleue. Le scroll fait passer la scène du coucher
+// de soleil à la nuit noire : le ciel se refroidit, les lumières de la ville
+// s'embrasent, la lampe du bureau s'allume. Un pomodoro, c'est du temps qui
+// passe — c'est le scroll qui le fait passer.
+//
+// ── Pourquoi ce n'est PAS de la 3D ─────────────────────────────────────────
 // Une pièce à contre-jour se lit à la SILHOUETTE, pas au volume : des primitives
-// 3D en perspective donnent une bouillie de rectangles sombres (essai précédent),
-// alors qu'un tracé 2D net se lit instantanément. Donc : une photo en fond, des
-// silhouettes vectorielles au premier plan, et de la parallaxe entre les deux.
-// Bénéfice collatéral : plus une ligne de three.js sur la landing.
+// 3D en perspective donnent une bouillie de rectangles sombres (essais
+// précédents). Donc photo + tracés 2D nets, et zéro three.js sur la landing.
 //
-// Perf : 1 image (servie en AVIF/WebP par l'optimiseur Next, mise en cache à
-// l'edge Vercel), des dégradés CSS et deux SVG inline. Les seules animations sont
-// des `transform`/`opacity` composés par le GPU.
+// Perf : une image (servie en AVIF/WebP par l'optimiseur Next, cache edge
+// Vercel), sa copie floutée pour le bloom, des dégradés CSS et un SVG. Toutes
+// les animations sont des `opacity`/`transform` composés par le GPU.
 
 const PHOTO = "/pexels-ethan-brooke-1123775-3142005.jpg";
 
 // Noir de silhouette : jamais du #000 pur (ça « troue » l'écran), toujours une
 // nuit très légèrement bleutée.
-const INK = "#04050a";
+const INK = "#05060c";
 
 export default function RoomBackdrop() {
   const reduce = useReducedMotion();
 
-  // Parallaxe au pointeur : quelques pixels seulement, en sens inverse entre le
-  // fond et le premier plan. C'est ce décalage qui donne la profondeur.
+  // Parallaxe au pointeur : quelques pixels, en sens inverse entre le fond et le
+  // premier plan. C'est ce décalage qui donne la profondeur.
   const px = useMotionValue(0);
   const py = useMotionValue(0);
-  const sx = useSpring(px, { stiffness: 45, damping: 18, mass: 0.6 });
-  const sy = useSpring(py, { stiffness: 45, damping: 18, mass: 0.6 });
+  const sx = useSpring(px, { stiffness: 40, damping: 18, mass: 0.7 });
+  const sy = useSpring(py, { stiffness: 40, damping: 18, mass: 0.7 });
 
   useEffect(() => {
     if (reduce) return;
@@ -44,188 +48,172 @@ export default function RoomBackdrop() {
     return () => window.removeEventListener("pointermove", onMove);
   }, [px, py, reduce]);
 
-  // Parallaxe au scroll : la ville monte doucement, la pièce reste en place.
+  // « Il se fait tard » : 0 = coucher de soleil, 1 = nuit noire. Étalé sur le
+  // premier écran et demi, pour que la bascule soit sensible dès le hero.
   const { scrollY } = useScroll();
-  const cityY = useTransform(scrollY, [0, 1200], [0, 90]);
-  const cityScale = useTransform(scrollY, [0, 1200], [1.04, 1.12]);
+  const night = useTransform(scrollY, [0, 1100], [0, 1], { clamp: true });
 
-  const photoX = useTransform(sx, (v) => v * 22);
-  const photoY = useTransform(sy, (v) => v * 14);
-  const roomX = useTransform(sx, (v) => v * -8);
-  const roomY = useTransform(sy, (v) => v * -5);
+  // Cadrage : léger panoramique vers le bas (on suit la ville qui s'allume).
+  const panY = useTransform(night, [0, 1], ["-2.5%", "3.5%"]);
+  const zoom = useTransform(night, [0, 1], [1.03, 1.12]);
+  const photoX = useTransform(sx, (v) => v * 20);
+  const photoY = useTransform(sy, (v) => v * 12);
+  const roomX = useTransform(sx, (v) => v * -7);
+  const roomY = useTransform(sy, (v) => v * -4);
+
+  // Les trois couches qui font la nuit.
+  const dusk = useTransform(night, [0, 0.85], [1, 0]); // chaleur du couchant
+  const dark = useTransform(night, [0, 1], [0.12, 0.72]); // bleu nuit
+  const bloom = useTransform(night, [0.1, 1], [0, 0.62]); // embrasement des fenêtres
+  const lamp = useTransform(night, [0.25, 0.9], [0, 1]); // la lampe s'allume
 
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ background: INK }}>
-      {/* ── La ville, vue par la fenêtre ─────────────────────────────────── */}
+      {/* ── La ville ─────────────────────────────────────────────────────── */}
       <motion.div
-        className="absolute inset-[-6%]"
-        style={reduce ? undefined : { x: photoX, y: photoY, translateY: cityY, scale: cityScale }}
+        className="absolute inset-[-8%]"
+        style={reduce ? undefined : { x: photoX, y: photoY, translateY: panY, scale: zoom }}
+      >
+        <Image src={PHOTO} alt="" fill priority sizes="100vw" className="object-cover object-[52%_38%]" />
+      </motion.div>
+
+      {/* Embrasement : la MÊME image, floutée et sur-exposée, en fusion `screen`.
+          Seuls les points déjà lumineux ressortent → les fenêtres et les phares
+          s'allument sans qu'on ait à les placer un par un. */}
+      <motion.div
+        className="absolute inset-[-8%] mix-blend-screen"
+        style={reduce ? { opacity: 0.4 } : { opacity: bloom, x: photoX, y: photoY, translateY: panY, scale: zoom }}
       >
         <Image
           src={PHOTO}
           alt=""
           fill
-          priority
-          sizes="100vw"
-          className="object-cover object-[52%_42%]"
+          sizes="30vw"
+          className="object-cover object-[52%_38%]"
+          style={{ filter: "blur(22px) brightness(1.5) saturate(1.35)" }}
         />
       </motion.div>
 
-      {/* Traitement « vitre » : la nuit refroidit l'image, le bas garde la chaleur
-          des lumières de la rue, et une brume légère éloigne le fond. */}
-      <div
+      {/* Étalonnage : le couchant s'efface, le bleu nuit monte. */}
+      <motion.div
         className="absolute inset-0"
         style={{
+          opacity: reduce ? 0.25 : dusk,
           background:
-            "linear-gradient(to bottom, rgba(6,9,26,0.72) 0%, rgba(8,11,28,0.34) 34%, rgba(10,8,20,0.18) 62%, rgba(26,14,8,0.30) 100%)",
+            "linear-gradient(to bottom, rgba(255,150,60,0.16) 0%, rgba(255,120,50,0.10) 34%, rgba(80,60,120,0.06) 62%, transparent 100%)",
         }}
       />
+      <motion.div
+        className="absolute inset-0"
+        style={{
+          opacity: reduce ? 0.55 : dark,
+          background:
+            "linear-gradient(to bottom, rgba(4,7,24,0.95) 0%, rgba(5,8,26,0.55) 40%, rgba(6,9,26,0.35) 70%, rgba(10,7,18,0.55) 100%)",
+        }}
+      />
+
       {/* Reflet oblique sur le verre */}
       <div
-        className="absolute inset-0 opacity-[0.06]"
-        style={{ background: "linear-gradient(104deg, transparent 38%, #cfe0ff 47%, transparent 56%)" }}
+        className="absolute inset-0 opacity-[0.05]"
+        style={{ background: "linear-gradient(104deg, transparent 40%, #cfe0ff 48%, transparent 56%)" }}
       />
 
       {/* ── La pièce, en contre-jour ─────────────────────────────────────── */}
       <motion.div className="absolute inset-0" style={reduce ? undefined : { x: roomX, y: roomY }}>
         <WindowFrame />
-        <Curtain />
-        <Desk />
+        <Desk lamp={reduce ? undefined : lamp} />
       </motion.div>
 
-      {/* Halo chaud de la lampe de bureau (à droite, au-dessus du plan) */}
-      <div
-        className="absolute right-[6%] bottom-[16%] w-[42vw] max-w-[560px] aspect-square anim-lamp"
-        style={{
-          background: "radial-gradient(circle, rgba(255,164,72,0.28) 0%, rgba(255,140,60,0.10) 38%, transparent 70%)",
-        }}
-      />
-
-      {/* Vignette + voile de lisibilité côté texte */}
+      {/* Vignette + voile de lisibilité côté texte (le titre est à gauche). */}
       <div
         className="absolute inset-0"
-        style={{ background: "radial-gradient(ellipse 90% 75% at 50% 45%, transparent 40%, rgba(3,4,9,0.72) 100%)" }}
+        style={{ background: "radial-gradient(ellipse 92% 78% at 55% 42%, transparent 42%, rgba(3,4,9,0.66) 100%)" }}
       />
       <div
         className="absolute inset-0"
-        style={{ background: "linear-gradient(100deg, rgba(3,4,9,0.94) 0%, rgba(3,4,9,0.72) 32%, rgba(3,4,9,0.15) 62%, transparent 80%)" }}
+        style={{ background: "linear-gradient(100deg, rgba(3,4,9,0.92) 0%, rgba(3,4,9,0.62) 30%, rgba(3,4,9,0.12) 58%, transparent 76%)" }}
       />
     </div>
   );
 }
 
-// ── Menuiserie de la fenêtre ────────────────────────────────────────────────
-// Des barres CSS (et non un SVG étiré) : elles restent parfaitement nettes et
-// d'épaisseur constante quelle que soit la taille d'écran. Le liseré clair sur
-// l'arête intérieure est ce qui fait lire « bois sombre éclairé par la ville »
-// plutôt que « rectangle noir ».
+// ── Menuiserie ──────────────────────────────────────────────────────────────
+// Des barres CSS (et non un SVG étiré) : épaisseur constante et arêtes nettes à
+// toute taille d'écran. Volontairement FINE — la photo doit respirer, c'est elle
+// le spectacle ; le châssis ne fait que dire « tu es à l'intérieur ».
 function WindowFrame() {
-  const bar = "absolute bg-[#04050a]";
-  const rim = "after:absolute after:bg-white/[0.07]";
+  const bar = "absolute";
+  const rim = "after:absolute after:bg-white/[0.06]";
+  const style = { background: INK };
   return (
     <div className="absolute inset-0">
-      {/* linteau */}
-      <div className={`${bar} inset-x-0 top-0 h-[6vh] ${rim} after:inset-x-0 after:bottom-0 after:h-px`} />
-      {/* jambages */}
-      <div className={`${bar} inset-y-0 left-0 w-[4.5vw] ${rim} after:inset-y-0 after:right-0 after:w-px`} />
-      <div className={`${bar} inset-y-0 right-0 w-[4.5vw] ${rim} after:inset-y-0 after:left-0 after:w-px`} />
-      {/* meneau vertical, volontairement décentré */}
-      <div className={`${bar} inset-y-0 left-[57%] w-[0.9vw] min-w-[7px] ${rim} after:inset-y-0 after:left-0 after:w-px`} />
+      <div className={`${bar} inset-x-0 top-0 h-[3vh] ${rim} after:inset-x-0 after:bottom-0 after:h-px`} style={style} />
+      <div className={`${bar} inset-y-0 left-0 w-[2.6vw] ${rim} after:inset-y-0 after:right-0 after:w-px`} style={style} />
+      <div className={`${bar} inset-y-0 right-0 w-[2.6vw] ${rim} after:inset-y-0 after:left-0 after:w-px`} style={style} />
+      {/* meneau vertical, décentré côté droit pour ne pas couper le titre */}
+      <div className={`${bar} inset-y-0 left-[62%] w-[0.5vw] min-w-[5px] ${rim} after:inset-y-0 after:left-0 after:w-px`} style={style} />
       {/* traverse haute */}
-      <div className={`${bar} inset-x-0 top-[34%] h-[1vh] min-h-[7px] ${rim} after:inset-x-0 after:bottom-0 after:h-px`} />
-      {/* allège : le mur sous la fenêtre, sur lequel repose le bureau */}
-      <div className={`${bar} inset-x-0 bottom-0 h-[19vh] ${rim} after:inset-x-0 after:top-0 after:h-px`} />
+      <div className={`${bar} inset-x-0 top-[30%] h-[0.6vh] min-h-[5px] ${rim} after:inset-x-0 after:bottom-0 after:h-px`} style={style} />
     </div>
-  );
-}
-
-// ── Rideau ──────────────────────────────────────────────────────────────────
-// Un pan de tissu à gauche : il cadre l'image et masque la coupure du montant.
-function Curtain() {
-  return (
-    <svg
-      className="absolute inset-y-0 left-0 h-full w-[22vw] max-w-[320px]"
-      viewBox="0 0 200 800"
-      preserveAspectRatio="none"
-      aria-hidden
-    >
-      <defs>
-        <linearGradient id="curtain" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#04050a" />
-          <stop offset="0.62" stopColor="#04050a" />
-          <stop offset="1" stopColor="#04050a" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d="M0 0h150c-6 120 10 190-4 300 12 130-8 240 2 360 4 60-2 100-8 140H0z" fill="url(#curtain)" />
-      {/* plis : de fins liserés qui attrapent la lumière de la ville */}
-      <path d="M52 0c8 200-10 380 2 560 6 90 0 160-6 240" stroke="rgba(255,255,255,0.05)" strokeWidth="1.5" fill="none" />
-      <path d="M104 0c-6 210 12 400-2 580-4 70 2 150 6 220" stroke="rgba(255,255,255,0.035)" strokeWidth="1.5" fill="none" />
-    </svg>
   );
 }
 
 // ── Le bureau ───────────────────────────────────────────────────────────────
-// Ancré en bas à droite (le texte du hero occupe la gauche). Tout est en
-// silhouette, avec un liseré chaud sur les arêtes hautes : c'est la lampe qui
-// vient de la droite, hors champ. Le laptop est vu DE DOS, ouvert vers la
-// fenêtre — la position de quelqu'un qui travaille face à la vue.
-function Desk() {
+// Ancré en bas à droite (le texte occupe la gauche). Trois objets seulement —
+// laptop, tasse, lampe — car une silhouette lisible vaut mieux qu'un décor
+// encombré. Les liserés chauds sur les arêtes hautes, c'est la lampe hors champ.
+function Desk({ lamp }: { lamp?: ReturnType<typeof useTransform<number, number>> }) {
   return (
-    <svg
-      className="absolute bottom-0 right-0 w-[74vw] max-w-[1150px]"
-      viewBox="0 0 1150 420"
-      preserveAspectRatio="xMaxYMax meet"
-      aria-hidden
-    >
-      <defs>
-        <linearGradient id="screenGlow" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#8fb6ff" stopOpacity="0.5" />
-          <stop offset="1" stopColor="#8fb6ff" stopOpacity="0.05" />
-        </linearGradient>
-        <radialGradient id="mugSteam" cx="0.5" cy="1" r="0.9">
-          <stop offset="0" stopColor="#ffd9a8" stopOpacity="0.22" />
-          <stop offset="1" stopColor="#ffd9a8" stopOpacity="0" />
-        </radialGradient>
-      </defs>
+    <div className="absolute inset-x-0 bottom-0 h-[34vh]">
+      {/* Halo de la lampe : il apparaît quand la nuit tombe. */}
+      <motion.div
+        className="absolute right-[4%] bottom-[6%] w-[46vw] max-w-[620px] aspect-square anim-lamp"
+        style={{
+          opacity: lamp ?? 0.55,
+          background: "radial-gradient(circle, rgba(255,168,80,0.34) 0%, rgba(255,142,60,0.12) 40%, transparent 72%)",
+        }}
+      />
 
-      {/* Lueur diffuse de l'écran, qui déborde derrière le capot */}
-      <ellipse cx="596" cy="214" rx="190" ry="54" fill="url(#screenGlow)" opacity="0.5" />
+      {/* Objets posés sur le plan (aspect préservé) */}
+      <svg
+        className="absolute bottom-[10vh] right-[3vw] h-[19vh] w-auto"
+        viewBox="0 0 760 220"
+        preserveAspectRatio="xMaxYMax meet"
+        aria-hidden
+      >
+        <defs>
+          <linearGradient id="screenSpill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#9dbcff" stopOpacity="0.42" />
+            <stop offset="1" stopColor="#9dbcff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
 
-      {/* Plan de travail */}
-      <path d="M0 260h1150v160H0z" fill={INK} />
-      <path d="M0 260h1150" stroke="rgba(255,200,150,0.16)" strokeWidth="2" />
+        {/* Débord lumineux de l'écran, derrière le capot */}
+        <ellipse cx="196" cy="196" rx="168" ry="40" fill="url(#screenSpill)" />
 
-      {/* Laptop vu de dos, capot légèrement incliné vers la fenêtre */}
-      <path d="M470 262l22-118a10 10 0 0 1 10-8h190a10 10 0 0 1 10 8l22 118z" fill={INK} />
-      <path d="M492 144a10 10 0 0 1 10-8h190a10 10 0 0 1 10 8" stroke="rgba(190,215,255,0.30)" strokeWidth="2.5" fill="none" />
-      <path d="M446 262h258l14 16H432z" fill={INK} />
-      <path d="M446 262h258" stroke="rgba(255,215,170,0.14)" strokeWidth="1.5" />
+        {/* Laptop vu de dos, ouvert vers la fenêtre */}
+        <path d="M96 200l20-118a10 10 0 0 1 10-8h140a10 10 0 0 1 10 8l20 118z" fill={INK} />
+        <path d="M126 74a10 10 0 0 1 10-8h140a10 10 0 0 1 10 8" stroke="rgba(190,215,255,0.34)" strokeWidth="2.5" fill="none" />
+        <path d="M74 200h260l14 14H60z" fill={INK} />
+        <path d="M74 200h260" stroke="rgba(255,215,170,0.16)" strokeWidth="1.5" />
 
-      {/* Tasse fumante */}
-      <path d="M846 268v-46h58v46z" fill={INK} />
-      <ellipse cx="875" cy="222" rx="29" ry="7" fill={INK} />
-      <ellipse cx="875" cy="222" rx="29" ry="7" fill="none" stroke="rgba(255,200,150,0.22)" strokeWidth="1.5" />
-      <path d="M904 232c16 0 16 22 0 22" stroke={INK} strokeWidth="9" fill="none" />
-      <path d="M866 214c-6-14 10-18 4-32" stroke="rgba(255,220,180,0.16)" strokeWidth="2.5" fill="none" className="anim-steam" />
-      <ellipse cx="875" cy="196" rx="42" ry="34" fill="url(#mugSteam)" />
+        {/* Tasse fumante */}
+        <path d="M436 206v-44h56v44z" fill={INK} />
+        <ellipse cx="464" cy="162" rx="28" ry="7" fill={INK} stroke="rgba(255,200,150,0.26)" strokeWidth="1.5" />
+        <path d="M492 172c15 0 15 22 0 22" stroke={INK} strokeWidth="9" fill="none" />
+        <path d="M456 152c-6-14 10-18 4-32" stroke="rgba(255,224,186,0.20)" strokeWidth="2.5" fill="none" className="anim-steam" />
 
-      {/* Casque posé à plat */}
-      <path d="M232 268c0-34 26-58 60-58s60 24 60 58" stroke={INK} strokeWidth="13" fill="none" />
-      <path d="M232 268c0-34 26-58 60-58s60 24 60 58" stroke="rgba(255,210,170,0.13)" strokeWidth="2" fill="none" />
-      <rect x="216" y="252" width="30" height="24" rx="10" fill={INK} />
-      <rect x="338" y="252" width="30" height="24" rx="10" fill={INK} />
+        {/* Lampe d'architecte, source du halo */}
+        <path d="M636 206v-92h18v92z" fill={INK} />
+        <path d="M598 206h94" stroke={INK} strokeWidth="15" strokeLinecap="round" />
+        <path d="M646 114c0-30 26-52 58-52l-16 60z" fill={INK} />
+        <path d="M646 114c0-30 26-52 58-52" stroke="rgba(255,190,120,0.5)" strokeWidth="2.5" fill="none" />
+      </svg>
 
-      {/* Petite plante */}
-      <path d="M104 268v-40h52v40z" fill={INK} />
-      <path d="M130 228c-30-6-40-40-22-62 22 4 34 34 22 62z" fill={INK} />
-      <path d="M130 228c26-12 30-48 10-66-20 10-24 42-10 66z" fill={INK} />
-      <path d="M130 228c-30-6-40-40-22-62" stroke="rgba(180,230,200,0.14)" strokeWidth="2" fill="none" />
-
-      {/* Pied de lampe, à l'extrême droite : le halo chaud vient de là */}
-      <path d="M1044 268v-96h20v96z" fill={INK} />
-      <path d="M1002 268h104" stroke={INK} strokeWidth="16" strokeLinecap="round" />
-      <path d="M1054 172c0-30 26-52 58-52l-16 62z" fill={INK} />
-      <path d="M1054 172c0-30 26-52 58-52" stroke="rgba(255,190,120,0.45)" strokeWidth="2.5" fill="none" />
-    </svg>
+      {/* Plan de travail : une bande nette, avec l'arête qui capte la lumière. */}
+      <div className="absolute inset-x-0 bottom-0 h-[10vh]" style={{ background: INK }}>
+        <div className="absolute inset-x-0 top-0 h-px bg-[rgba(255,200,150,0.18)]" />
+      </div>
+    </div>
   );
 }
