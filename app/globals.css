@@ -212,6 +212,24 @@
 .anim-track-in    { animation: trackIn 0.35s ease-out both; }
 .anim-halo-pulse  { animation: haloPulse 0.9s ease-out; }
 
+/* Landing : respiration très lente de la lampe de bureau et filet de vapeur de
+   la tasse. Une lampe ne clignote pas — l'amplitude reste minime. */
+@keyframes lampBreath {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.04); }
+}
+@keyframes steamRise {
+  0%   { opacity: 0;    transform: translateY(6px) scaleY(0.9); }
+  40%  { opacity: 0.55; }
+  100% { opacity: 0;    transform: translateY(-16px) scaleY(1.15); }
+}
+.anim-lamp  { animation: lampBreath 9s ease-in-out infinite; }
+.anim-steam { animation: steamRise 7s ease-in-out infinite; transform-origin: bottom; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-lamp, .anim-steam { animation: none; }
+}
+
 /* Entrée en cascade des cartes du tableau de bord (au montage seulement).
    Délais échelonnés sur les enfants directs. Neutralisé en reduced-motion. */
 .dash-stagger > * { animation: cascadeIn 0.5s ease-out backwards; }

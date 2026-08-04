@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useScroll, useTransform, useReducedMotion, MotionConfig, type Variants } from "motion/react";
 import { signInWithGoogle } from "@/lib/supabase";
-import WindowScene from "@/components/WindowScene";
+import RoomBackdrop from "@/components/RoomBackdrop";
 import { cn } from "@/lib/utils";
 
 // Landing (AuthGate, non connecté) : hero à fond génératif WebGL + choreography
@@ -190,23 +190,6 @@ const STEPS = [
   { n: "3", title: "Respire, puis recommence", desc: "Pauses guidées, objectif quotidien, badges et récap hebdo — et compare ta semaine avec tes amis.", phase: "Pause" as const },
 ];
 
-// Repli statique (reduced-motion / pas de WebGL) : une skyline de nuit en trait.
-function SkylineFallback() {
-  return (
-    <div className="absolute inset-0 flex items-end justify-center bg-[radial-gradient(ellipse_at_50%_100%,rgba(38,44,92,0.55),transparent_65%)]">
-      <svg viewBox="0 0 200 130" className="w-full max-w-5xl text-white/20" fill="none" stroke="currentColor" strokeWidth={2}>
-        <circle cx="44" cy="26" r="9" fill="currentColor" opacity="0.4" stroke="none" />
-        <path d="M6 118h188" strokeLinecap="round" />
-        <path d="M16 118V72h22v46M38 118V52h26v66M64 118V84h18v34M82 118V44h24v74M106 118V78h20v40M126 118V62h22v56M148 118V88h16v30M164 118V70h20v48" strokeLinejoin="round" />
-        <g opacity="0.6" strokeWidth="3" strokeLinecap="round">
-          <path d="M22 80h3M31 80h3M22 92h3M44 62h3M53 74h3M44 86h3M70 92h3M88 54h3M97 66h3M88 78h3M112 88h3M132 72h3M141 84h3M154 96h3M170 80h3M179 92h3" />
-        </g>
-        <path d="M92 126h16M120 126h14M60 126h12" opacity="0.35" strokeLinecap="round" />
-      </svg>
-    </div>
-  );
-}
-
 function SectionTitle({ title, sub }: { title: string; sub?: string }) {
   return (
     <motion.div
@@ -242,27 +225,16 @@ export default function LandingPage() {
   }, [storyP]);
   const phase = STEPS[active].phase;
 
-  // Hero 3D (R3F) seulement si WebGL dispo ET pas de reduced-motion. Sinon les
-  // halos statiques suffisent. Faux au 1er rendu → aucun risque SSR sur le Canvas.
-  const [use3d, setUse3d] = useState(false);
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    let webgl = false;
-    try { const c = document.createElement("canvas"); webgl = !!(c.getContext("webgl2") || c.getContext("webgl")); } catch { /* pas de WebGL */ }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- capacité navigateur lue au montage (indispo en SSR)
-    if (webgl) setUse3d(true);
-  }, []);
-
   return (
     <MotionConfig reducedMotion="user">
       {/* ⚠️ Aucune couche en z-index NÉGATIF ici : `body` a un fond opaque
           (`@apply bg-background`), donc un `-z-10` serait peint DERRIÈRE lui et
           resterait invisible. Le fond est en z-0 et le contenu en z-10. */}
       <div className="relative min-h-screen text-white overflow-x-hidden">
-        {/* FOND : la vue « study with me » — chambre de nuit, pluie sur la vitre,
-            ville floue dehors (ou une skyline statique sans WebGL) */}
-        <div className="pointer-events-none fixed inset-0 z-0 bg-[#04050c]">
-          {use3d ? <WindowScene /> : <SkylineFallback />}
+        {/* FOND : la vue « study with me » — bureau en contre-jour devant une
+            fenêtre ouverte sur la ville. Photo + silhouettes 2D, aucune 3D. */}
+        <div className="pointer-events-none fixed inset-0 z-0">
+          <RoomBackdrop />
         </div>
         {/* Voile : la ville s'estompe au fur et à mesure qu'on descend dans le contenu */}
         <motion.div
