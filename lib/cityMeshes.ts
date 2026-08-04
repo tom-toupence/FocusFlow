@@ -1,11 +1,15 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
-// Modélisation procédurale de la ville de nuit du landing (`NightCityScene`).
-// Pur three.js, aucune dépendance ni asset externe (règle « tout doit rester
-// gratuit / local »). Chaque constructeur renvoie des BufferGeometry FUSIONNÉES
-// par matériau : une seule géométrie par bucket → une seule instancedMesh par
-// bucket, donc très peu de draw calls même avec des modèles détaillés.
+// MOBILIER URBAIN procédural de la ville de nuit du landing (`NightCityScene`).
+// Les immeubles et les voitures viennent des kits Kenney (`public/city_models`,
+// `public/car_models`) ; ce module fournit ce que le kit n'a pas et qui donne
+// l'ambiance nocturne : lampadaires, feux, abribus, arbres, enseignes néon,
+// métro aérien. Pur three.js, aucun asset externe.
+//
+// Chaque constructeur renvoie des BufferGeometry FUSIONNÉES par matériau : une
+// seule géométrie par bucket → une seule instancedMesh par bucket, donc très peu
+// de draw calls même avec des modèles détaillés.
 //
 // Buckets :
 //   shell   → béton/tôle (MeshStandardMaterial sombre)
@@ -66,24 +70,34 @@ const EMPTY = () => new THREE.BufferGeometry();
 // MOBILIER URBAIN
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Lampadaire à col de cygne (mât + bras courbe + luminaire).
-export function buildStreetLamp(mirrored: boolean): Built {
+// Lampadaire à col de cygne : mât vertical, bras en quart de cercle qui prolonge
+// EXACTEMENT le haut du mât, puis luminaire horizontal au bout du bras.
+//
+// ⚠️ Le quart de tore vit dans le plan XY : il ne faut SURTOUT pas le `rotateY`
+// (ça l'envoie dans le plan ZY, le bras part alors le long de la rue et la tête
+// paraît décrochée du mât). On reste dans le plan XY avec `rotateZ`, et on place
+// le centre en (R, T) : l'arc va de (R, T+R) [tangente horizontale, où se pose le
+// luminaire] jusqu'à (0, T) [tangente verticale = sommet exact du mât].
+// Le bras pointe vers +X ; pour l'autre trottoir on tourne l'objet entier de π.
+export function buildStreetLamp(): Built {
   const shell: THREE.BufferGeometry[] = [];
   const glow: THREE.BufferGeometry[] = [];
-  const s = mirrored ? -1 : 1;
+  const T = 3.2; // hauteur du mât
+  const R = 0.62; // rayon du col de cygne
 
   shell.push(new THREE.CylinderGeometry(0.13, 0.17, 0.22, 10).translate(0, 0.11, 0));
-  shell.push(new THREE.CylinderGeometry(0.06, 0.08, 3.1, 10).translate(0, 1.65, 0));
-  // bras : quart de tore
-  const arm = new THREE.TorusGeometry(0.62, 0.05, 6, 12, Math.PI / 2);
-  arm.rotateY(s > 0 ? Math.PI / 2 : -Math.PI / 2);
-  arm.translate(0, 3.2, 0);
+  shell.push(new THREE.CylinderGeometry(0.06, 0.08, T - 0.1, 10).translate(0, (T + 0.1) / 2, 0));
+
+  // TorusGeometry n'a pas de `thetaStart` : l'arc part toujours de θ=0, on le
+  // fait donc pivoter d'un quart de tour DANS son plan.
+  const arm = new THREE.TorusGeometry(R, 0.05, 6, 14, Math.PI / 2);
+  arm.rotateZ(Math.PI / 2);
+  arm.translate(R, T, 0);
   shell.push(arm);
-  // luminaire
-  const head = new THREE.BoxGeometry(0.46, 0.12, 0.3);
-  head.translate(s * 0.62, 3.76, 0);
-  shell.push(head);
-  glow.push(paint(box(0.38, 0.05, 0.24, s * 0.62, 3.64, 0), "#ffc27a", 1));
+
+  // Luminaire posé au bout du bras (tangente horizontale) + lentille dessous.
+  shell.push(box(0.55, 0.13, 0.3, R + 0.26, T + R - 0.13));
+  glow.push(paint(box(0.42, 0.05, 0.24, R + 0.26, T + R - 0.18), "#ffc27a", 1));
 
   return { shell: merge(shell, EMPTY()), glow: merge(glow, EMPTY()) };
 }

@@ -641,22 +641,31 @@ jour/nuit plein écran (trop lourde, « lag ») → **mini maquette contenue** =
 - **Deps** (landing only, lazy) : `three`, `@react-three/fiber@9`, `@react-three/drei`, `@types/three`.
   **`@react-three/postprocessing` retiré** (le bloom était la 1ʳᵉ cause de lag). `motion` conservé pour la
   scroll choreography DOM.
-- **`lib/cityMeshes.ts`** (nouveau) = **modélisation procédurale** de la ville, en pur three.js (aucun
-  asset, aucune dépendance en plus). Chaque constructeur renvoie des géométries **fusionnées**
+- **Assets 3D (kits Kenney, CC0 — aucune attribution requise)** dans `public/` :
+  `city_models/*.glb` (3 immeubles + 3 gratte-ciels), `car_models/*.glb` (berline, taxi, van — la
+  carrosserie et les 4 roues sont des **nœuds séparés**, donc les roues tournent),
+  `skyboxes/skybox-night-2k.png` (ciel équirectangulaire). **Seuls les modèles utilisés sont versionnés**
+  (~1,5 Mo au total) : les formats FBX/OBJ et les modèles inutilisés ont été supprimés, et le skybox a
+  été **ré-encodé de 4096² à 2048²** (1074 Ko → 274 Ko, 4× moins de VRAM ; couleur d'horizon
+  échantillonnée `#2d3a66` = couleur du brouillard de la scène).
+  ⚠️ Les deux kits n'ont **pas la même échelle** (immeuble ≈ 1 unité, voiture ≈ 2,5) : normalisation via
+  `BUILD_SCALE` / `CAR_SCALE` + bounding boxes mesurées au chargement (placement indépendant du modèle).
+- **`lib/cityMeshes.ts`** (nouveau) = **mobilier urbain procédural** (ce que le kit ne fournit pas et qui
+  fait la nuit) : `buildStreetLamp` (mât + bras en col de cygne), `buildTrafficLight`, `buildBusStop`,
+  `buildTree`, `buildNeonSign`, `buildTrain`. Pur three.js, géométries **fusionnées**
   (`mergeGeometries` de `three/examples/jsm/utils/BufferGeometryUtils.js`) **par bucket de matériau** :
-  `shell` (béton/tôle), `glow` (surfaces lumineuses — **couleur par sommet**, ce qui donne des centaines
-  de teintes de fenêtres avec UN seul `MeshBasicMaterial({vertexColors:true})`), `glass`, `wheels`.
-  Modèles : `buildBuilding` (socle commerçant vitré + store + corniches par étage + fenêtres encadrées +
-  balcons à barreaux + acrotère + château d'eau + clim + antenne), `buildCar` (3 profils **extrudés**
-  sedan/coupé/van avec bevel = vraie carrosserie galbée, vitrage, 4 roues pneu+jante, pare-chocs,
-  rétros, phares/feux), `buildStreetLamp` (mât + bras en col de cygne), `buildTrafficLight`,
-  `buildBusStop`, `buildTree`, `buildNeonSign`, `buildTrain`.
+  `shell` (béton/tôle) et `glow` (surfaces lumineuses — **couleur par sommet**, donc des dizaines de
+  teintes avec UN seul `MeshBasicMaterial({vertexColors:true})`).
 - **`components/NightCityScene.tsx`** (remplace `HeroScene.tsx`, supprimé) = **ville de nuit qui défile**,
-  en **fond de page** (pas dans une vitrine) : avenue en boucle infinie (`loopZ`), 6 archétypes
-  d'immeubles semés des 2 côtés, trafic sur 2 voies, mobilier urbain, reflets mouillés, balises de toit
-  clignotantes, métro aérien, lune + arc « pomodoro », `fogExp2` qui cache le recyclage. Chaque modèle est
-  **instancié** (~20 `instancedMesh`), **aucun post-processing ni shadow map**, `dpr ≤ 1.4`, rendu en
-  **pause** au-delà de 1,6 écran de scroll et onglet caché.
+  en **fond de page** (pas dans une vitrine) : avenue en boucle infinie (`loopZ`), immeubles du kit semés
+  des 2 côtés, trafic sur 2 voies (roues qui tournent), mobilier urbain procédural, reflets mouillés,
+  balises de toit clignotantes, métro aérien, skybox de nuit, `fogExp2` (couleur = horizon du skybox) qui
+  cache le recyclage. Chaque modèle est **instancié**, **aucun post-processing ni shadow map**,
+  `dpr ≤ 1.4`. Le rendu **ne s'arrête que si l'onglet est caché** — le flow doit continuer jusqu'en bas
+  de page (le voile du landing plafonne à 0,55 d'opacité, il n'efface jamais la ville).
+  Réglages en tête de fichier : `BUILD_SCALE`, `CAR_SCALE`, `LANE_X`/`CURB_X`/`FRONT_X` (gabarit de la
+  rue) et **`FACADE_DIR`** (sens de la façade du kit — à passer à `-1` si les immeubles tournent le dos
+  à l'avenue).
   **Chorégraphie scroll** : le scroll injecte un boost de vitesse **amorti et signé** (remonter fait
   reculer la ville) + fait plonger la caméra vers la rue ; sans scroll la ville dérive seule. L'état de
   simulation est un **objet au niveau module** (`drive`) : passé en prop il serait muté dans `useFrame`,

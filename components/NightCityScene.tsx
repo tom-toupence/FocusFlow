@@ -36,7 +36,7 @@ import { cn } from "@/lib/utils";
 
 const CITY_URLS = ["building-a", "building-e", "building-f", "building-skyscraper-a", "building-skyscraper-d", "building-skyscraper-e"]
   .map((n) => `/city_models/${n}.glb`);
-const CAR_URLS = ["sedan", "taxi", "van"].map((n) => `/car_models/${n}.glb`);
+const CAR_URLS = ["taxi", "normal-car1", "normal-car2", "suv"].map((n) => `/car_models/${n}.glb`);
 const SKY_URL = "/skyboxes/skybox-night-2k.png";
 
 CITY_URLS.forEach((u) => useGLTF.preload(u));
@@ -46,11 +46,15 @@ const SPAN = 96; // profondeur de la boucle : ce qui dépasse est recyclé au fo
 const NEAR = 14; // z le plus proche (derrière la caméra) avant recyclage
 const BASE_SPEED = 3.2; // dérive de croisière (unités/s)
 const BUILD_SCALE = 6.5; // kit ville → mètres (un immeuble de 1,29 fait ~8,4 m)
-const CAR_SCALE = 1.6; // kit voitures → mètres (une berline fait ~4,1 m)
+const CAR_SCALE = 1; // les voitures sont déjà normalisées (4,2 m) à la conversion
 const LANE_X = 2.0; // axe des voies
 const CURB_X = 3.6; // bord de trottoir
 const FRONT_X = 5.6; // alignement des façades
 const HORIZON = "#2d3a66"; // couleur d'horizon échantillonnée dans le skybox
+// Sens de la façade des immeubles du kit (supposée sur +Z). Si les bâtiments
+// tournent le dos à l'avenue, passer cette constante à -1 : c'est le seul
+// réglage à changer.
+const FACADE_DIR = 1;
 
 const mod = (v: number, m: number) => ((v % m) + m) % m;
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -146,50 +150,48 @@ function extractBuilding(gltf: Gltf): BuildingModel {
 
 interface CarModel {
   body: THREE.BufferGeometry;
-  wheel: THREE.BufferGeometry;
-  offsets: THREE.Vector3[];
-  map: THREE.Texture | null;
+  lights: THREE.BufferGeometry | null;
+  wheels: { geometry: THREE.BufferGeometry; offset: THREE.Vector3 }[];
   wheelRadius: number;
 }
 
-// Une voiture = une carrosserie + 4 roues en nœuds séparés. On isole la roue
-// (recentrée sur son propre barycentre) et ses 4 positions pour pouvoir les
-// FAIRE TOURNER pendant le trajet.
+// Une voiture = les nœuds `body` (carrosserie, couleurs par sommet), `lights`
+// (phares/feux, rendus ÉMISSIFS) et `wheel-*` (recentrés sur leur moyeu à la
+// conversion, donc ils TOURNENT). Cf. le convertisseur OBJ→GLB : les roues
+// arrière forment un seul nœud (l'essieu), ce qui est exactement ce qu'il faut.
 function extractCar(gltf: Gltf): CarModel {
   const bodies: THREE.BufferGeometry[] = [];
-  const offsets: THREE.Vector3[] = [];
-  let wheel: THREE.BufferGeometry | null = null;
-  let wheelRadius = 0.3;
-  let map: THREE.Texture | null = null;
+  const wheels: { geometry: THREE.BufferGeometry; offset: THREE.Vector3 }[] = [];
+  let lights: THREE.BufferGeometry | null = null;
+  let wheelRadius = 0.35;
 
   eachMesh(gltf.scene, (m) => {
     const g = m.geometry.clone();
     g.applyMatrix4(m.matrixWorld);
-    g.scale(CAR_SCALE, CAR_SCALE, CAR_SCALE);
-    map = map ?? mapOf(m);
-    if (!m.name.startsWith("wheel")) {
-      bodies.push(g);
+    if (CAR_SCALE !== 1) g.scale(CAR_SCALE, CAR_SCALE, CAR_SCALE);
+
+    if (m.name.startsWith("wheel")) {
+      // La transformée du nœud a replacé la roue : on la ramène à l'origine et
+      // on garde sa position comme décalage d'instance.
+      g.computeBoundingBox();
+      const bb = g.boundingBox ?? new THREE.Box3();
+      const c = new THREE.Vector3();
+      bb.getCenter(c);
+      g.translate(-c.x, -c.y, -c.z);
+      wheels.push({ geometry: g, offset: c });
+      wheelRadius = Math.max(wheelRadius, (bb.max.y - bb.min.y) / 2);
       return;
     }
-    g.computeBoundingBox();
-    const bb = g.boundingBox ?? new THREE.Box3();
-    const c = new THREE.Vector3();
-    bb.getCenter(c);
-    offsets.push(c);
-    if (wheel) {
-      g.dispose();
+    if (m.name === "lights") {
+      lights = g;
       return;
     }
-    g.translate(-c.x, -c.y, -c.z);
-    wheel = g;
-    wheelRadius = (bb.max.y - bb.min.y) / 2;
+    bodies.push(g);
   });
 
-  // Carrosserie : on garde le premier mesh et on jette les accessoires éventuels
-  // (portes, calandres) plutôt que de fusionner des attributs hétérogènes.
   const body = bodies[0] ?? new THREE.BufferGeometry();
   bodies.slice(1).forEach((g) => g.dispose());
-  return { body, wheel: wheel ?? new THREE.BufferGeometry(), offsets, map, wheelRadius };
+  return { body, lights, wheels, wheelRadius };
 }
 
 // ── Matériaux ────────────────────────────────────────────────────────────────
@@ -197,19 +199,20 @@ function extractCar(gltf: Gltf): CarModel {
 function useNightMaterials() {
   return useMemo(() => {
     const cache = new Map<string, THREE.MeshStandardMaterial>();
-    // Les atlas Kenney sont peints en couleurs de JOUR : on les refroidit
-    // (multiplication par une teinte bleutée) et on ajoute une légère émission
-    // pour que les façades restent lisibles la nuit.
+    // Les atlas des kits sont peints en couleurs de JOUR. On garde une base
+    // presque neutre (sinon tout vire au bleu) : la couleur vient de la TEINTE
+    // PAR INSTANCE (`setColorAt`, multipliée par l'atlas) et l'émission, faible,
+    // évite juste que les façades tombent dans le noir.
     const forMap = (map: THREE.Texture | null, emissive: number) => {
       const key = (map?.uuid ?? "none") + ":" + emissive;
       let m = cache.get(key);
       if (!m) {
         m = new THREE.MeshStandardMaterial({
           map: map ?? undefined,
-          color: "#aab6e4",
-          roughness: 0.78,
-          metalness: 0.08,
-          emissive: new THREE.Color("#5b6699"),
+          color: "#f0f2ff",
+          roughness: 0.8,
+          metalness: 0.1,
+          emissive: new THREE.Color("#232c57"),
           emissiveMap: map ?? undefined,
           emissiveIntensity: emissive,
         });
@@ -219,7 +222,10 @@ function useNightMaterials() {
     };
     const props = new THREE.MeshStandardMaterial({ color: "#171b28", roughness: 0.72, metalness: 0.45 });
     const glow = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
-    return { forMap, props, glow, cache };
+    // Carrosseries : couleurs cuites en vertex colors à la conversion OBJ→GLB,
+    // un peu vernies pour accrocher les lumières de la rue.
+    const car = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.38 });
+    return { forMap, props, glow, car, cache };
   }, []);
 }
 
@@ -227,15 +233,29 @@ type Materials = ReturnType<typeof useNightMaterials>;
 
 // ── Rangées instanciées ──────────────────────────────────────────────────────
 
-interface Lot { x: number; z: number; rot: number }
+interface Lot { x: number; z: number; rot: number; tint?: string }
 
 function useDummy() {
   return useMemo(() => new THREE.Object3D(), []);
 }
 
+// Teintes de nuit appliquées PAR INSTANCE (multipliées par l'atlas du kit) :
+// c'est ce qui donne une ville colorée plutôt qu'un décor monochrome.
+const CITY_TINTS = ["#ffd2a1", "#9fd0ff", "#ffb3cd", "#a6f0d3", "#c9b6ff", "#ffe6a8", "#8fc4ff", "#ffc08f"];
+
 function BuildingRow({ model, lots, material }: { model: BuildingModel; lots: Lot[]; material: THREE.Material }) {
   const mesh = useRef<THREE.InstancedMesh>(null);
   const dummy = useDummy();
+
+  // Une teinte par immeuble (multipliée par la texture du kit).
+  useEffect(() => {
+    const m = mesh.current;
+    if (!m) return;
+    const c = new THREE.Color();
+    lots.forEach((l, i) => m.setColorAt(i, c.set(l.tint ?? "#ffffff")));
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
+  }, [lots]);
+
   useFrame(() => {
     for (let i = 0; i < lots.length; i++) {
       const l = lots[i];
@@ -251,21 +271,20 @@ function BuildingRow({ model, lots, material }: { model: BuildingModel; lots: Lo
 
 interface CarSlot { z: number; lane: 1 | -1; speed: number }
 
-function CarRow({ model, slots, material }: { model: CarModel; slots: CarSlot[]; material: THREE.Material }) {
+function CarRow({ model, slots, materials }: { model: CarModel; slots: CarSlot[]; materials: Materials }) {
   const body = useRef<THREE.InstancedMesh>(null);
-  const wheels = useRef<THREE.InstancedMesh>(null);
+  const lights = useRef<THREE.InstancedMesh>(null);
+  const wheelRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
   const dummy = useDummy();
-  const offset = useMemo(() => new THREE.Vector3(), []);
   const spin = useRef(0);
-  const wheelCount = slots.length * model.offsets.length;
 
   useFrame((_, delta) => {
     const t = drive.travel;
-    // Les roues roulent à la vitesse réelle du véhicule (défilement + sa propre
-    // vitesse), rapportée à leur rayon.
+    // Les roues roulent à la vitesse réelle du véhicule (défilement de la ville
+    // + sa propre vitesse), rapportée à leur rayon.
     const ground = Math.abs(drive.speed) + 6;
     spin.current -= (Math.min(delta, 0.05) * ground) / Math.max(0.05, model.wheelRadius);
-    let w = 0;
+
     for (let i = 0; i < slots.length; i++) {
       const s = slots[i];
       // Voie proche (+1) : vient vers nous. Voie éloignée (−1) : s'éloigne.
@@ -276,24 +295,39 @@ function CarRow({ model, slots, material }: { model: CarModel; slots: CarSlot[];
       dummy.rotation.set(0, rot, 0);
       dummy.updateMatrix();
       body.current?.setMatrixAt(i, dummy.matrix);
-      for (const o of model.offsets) {
-        offset.copy(o);
-        if (rot !== 0) offset.set(-o.x, o.y, -o.z);
-        dummy.position.set(x + offset.x, offset.y, z + offset.z);
+      lights.current?.setMatrixAt(i, dummy.matrix);
+
+      for (let w = 0; w < model.wheels.length; w++) {
+        const o = model.wheels[w].offset;
+        // Demi-tour = décalage miroir en x/z (pas de clone par frame).
+        const ox = rot === 0 ? o.x : -o.x;
+        const oz = rot === 0 ? o.z : -o.z;
+        dummy.position.set(x + ox, o.y, z + oz);
         dummy.rotation.set(0, rot, 0);
         dummy.rotateX(spin.current * s.lane);
         dummy.updateMatrix();
-        wheels.current?.setMatrixAt(w++, dummy.matrix);
+        wheelRefs.current[w]?.setMatrixAt(i, dummy.matrix);
       }
     }
     if (body.current) body.current.instanceMatrix.needsUpdate = true;
-    if (wheels.current) wheels.current.instanceMatrix.needsUpdate = true;
+    if (lights.current) lights.current.instanceMatrix.needsUpdate = true;
+    for (const m of wheelRefs.current) if (m) m.instanceMatrix.needsUpdate = true;
   });
 
   return (
     <>
-      <instancedMesh ref={body} args={[model.body, material, slots.length]} frustumCulled={false} />
-      <instancedMesh ref={wheels} args={[model.wheel, material, wheelCount]} frustumCulled={false} />
+      <instancedMesh ref={body} args={[model.body, materials.car, slots.length]} frustumCulled={false} />
+      {model.lights && (
+        <instancedMesh ref={lights} args={[model.lights, materials.glow, slots.length]} frustumCulled={false} />
+      )}
+      {model.wheels.map((w, i) => (
+        <instancedMesh
+          key={i}
+          ref={(el) => { wheelRefs.current[i] = el; }}
+          args={[w.geometry, materials.car, slots.length]}
+          frustumCulled={false}
+        />
+      ))}
     </>
   );
 }
@@ -465,8 +499,13 @@ function City() {
         const m = models[mi];
         const x = side * (FRONT_X + m.depth / 2 + rnd() * 1.5);
         const z = -((i + (side < 0 ? 0 : 0.5)) / perSide) * SPAN;
-        // Les modèles du kit ont leur façade sur +Z : on les tourne vers la rue.
-        lots[mi].push({ x, z, rot: side < 0 ? Math.PI / 2 : -Math.PI / 2 });
+        // Façade tournée vers la rue (cf. FACADE_DIR).
+        lots[mi].push({
+          x,
+          z,
+          rot: (side < 0 ? Math.PI / 2 : -Math.PI / 2) * FACADE_DIR,
+          tint: CITY_TINTS[Math.floor(rnd() * CITY_TINTS.length)],
+        });
         if (m.height > 20) beacons.push({ x, y: m.height + 0.3, z });
       }
     }
@@ -488,15 +527,16 @@ function City() {
   // Mobilier urbain procédural.
   const props = useMemo(() => {
     const rnd = mulberry32(303);
-    const lampL = buildStreetLamp(false);
-    const lampR = buildStreetLamp(true);
-    const lightsL: Lot[] = [];
-    const lightsR: Lot[] = [];
+    // UN seul modèle de lampadaire : le bras pointe vers +X, on tourne l'objet
+    // d'un demi-tour pour le trottoir d'en face (le bras vise toujours la rue).
+    const lamp = buildStreetLamp();
+    const lamps: Lot[] = [];
     const reflections: { x: number; z: number }[] = [];
     for (let i = 0; i < 14; i++) {
       const z = -(i / 14) * SPAN;
-      if (i % 2 === 0) { lightsL.push({ x: -CURB_X - 0.5, z, rot: 0 }); reflections.push({ x: -CURB_X, z }); }
-      else { lightsR.push({ x: CURB_X + 0.5, z, rot: 0 }); reflections.push({ x: CURB_X, z }); }
+      const left = i % 2 === 0;
+      lamps.push({ x: left ? -CURB_X - 0.5 : CURB_X + 0.5, z, rot: left ? 0 : Math.PI });
+      reflections.push({ x: left ? -CURB_X : CURB_X, z });
     }
     const trafficLight = buildTrafficLight();
     const tlSlots: Lot[] = [0, 1, 2, 3].map((i) => ({
@@ -524,19 +564,19 @@ function City() {
         y: 4 + rnd() * 5,
       };
     });
-    return { lampL, lampR, lightsL, lightsR, reflections, trafficLight, tlSlots, busStop, bsSlots, tree, treeSlots, sign, signSlots };
+    return { lamp, lamps, reflections, trafficLight, tlSlots, busStop, bsSlots, tree, treeSlots, sign, signSlots };
   }, []);
 
   // Libération mémoire au démontage (géométries clonées + matériaux).
   useEffect(() => {
     const geos = [
       ...city.models.map((m) => m.geometry),
-      ...traffic.models.flatMap((m) => [m.body, m.wheel]),
-      props.lampL.shell, props.lampL.glow, props.lampR.shell, props.lampR.glow,
+      ...traffic.models.flatMap((m) => [m.body, ...(m.lights ? [m.lights] : []), ...m.wheels.map((w) => w.geometry)]),
+      props.lamp.shell, props.lamp.glow,
       props.trafficLight.shell, props.trafficLight.glow, props.busStop.shell, props.busStop.glow,
       props.tree.shell, props.tree.glow, props.sign.shell, props.sign.glow,
     ];
-    const mats = [materials.props, materials.glow, ...materials.cache.values()];
+    const mats = [materials.props, materials.glow, materials.car, ...materials.cache.values()];
     return () => {
       geos.forEach((g) => g.dispose());
       mats.forEach((m) => m.dispose());
@@ -581,8 +621,7 @@ function City() {
       <Beacons lots={city.beacons} />
 
       {/* Mobilier urbain (procédural) */}
-      <PropRow shell={props.lampL.shell} glow={props.lampL.glow} slots={props.lightsL} materials={materials} />
-      <PropRow shell={props.lampR.shell} glow={props.lampR.glow} slots={props.lightsR} materials={materials} />
+      <PropRow shell={props.lamp.shell} glow={props.lamp.glow} slots={props.lamps} materials={materials} />
       <WetReflections slots={props.reflections} />
       <PropRow shell={props.trafficLight.shell} glow={props.trafficLight.glow} slots={props.tlSlots} materials={materials} />
       <PropRow shell={props.busStop.shell} glow={props.busStop.glow} slots={props.bsSlots} materials={materials} />
@@ -593,25 +632,26 @@ function City() {
 
       {/* Trafic (kit voitures, roues qui tournent) */}
       {traffic.models.map((m, i) =>
-        traffic.slots[i].length > 0
-          ? <CarRow key={i} model={m} slots={traffic.slots[i]} material={materials.forMap(m.map, 0.12)} />
-          : null
+        traffic.slots[i].length > 0 ? <CarRow key={i} model={m} slots={traffic.slots[i]} materials={materials} /> : null
       )}
     </group>
   );
 }
 
-// Caméra : parallax pointeur + plongée vers la rue au fil du scroll.
+// Caméra : vue en PLONGÉE au-dessus de l'avenue (on domine la ville, on voit les
+// voitures avancer sous nous), qui descend vers la rue au fil du scroll.
+// Parallax au pointeur par-dessus.
 function CameraRig() {
   useFrame((state, delta) => {
     const k = Math.min(1, Math.min(delta, 0.05) * 2.4);
     const t = state.clock.elapsedTime;
     const p = drive.progress;
     const cam = state.camera;
-    cam.position.x += (state.pointer.x * 1.8 - cam.position.x) * k;
-    cam.position.y += (7 - p * 3 + Math.sin(t * 0.3) * 0.25 - cam.position.y) * k;
-    cam.position.z += (22 - p * 5 - cam.position.z) * k;
-    cam.lookAt(0, 9 - state.pointer.y * 1.4 - p * 2.5, -34);
+    cam.position.x += (state.pointer.x * 2.4 - cam.position.x) * k;
+    cam.position.y += (19 - p * 9 + Math.sin(t * 0.28) * 0.4 - cam.position.y) * k;
+    cam.position.z += (34 - p * 12 - cam.position.z) * k;
+    // On vise la chaussée devant nous : plus on descend, plus on regarde loin.
+    cam.lookAt(0, 1.5 + p * 3.5 - state.pointer.y * 1.6, -26 - p * 8);
   });
   return null;
 }
@@ -633,19 +673,23 @@ export default function NightCityScene({ className }: { className?: string }) {
       <Canvas
         frameloop={frameloop}
         dpr={[1, 1.4]}
-        camera={{ position: [0, 7, 22], fov: 52 }}
-        scene={{ backgroundIntensity: 0.85 }}
-        gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
+        camera={{ position: [0, 19, 34], fov: 50 }}
+        scene={{ backgroundIntensity: 0.8 }}
+        gl={{ antialias: true, alpha: false, powerPreference: "high-performance", toneMappingExposure: 0.92 }}
         onCreated={({ gl }) => gl.setClearColor(HORIZON)}
       >
         {/* Le brouillard fond les immeubles recyclés dans la nuit (boucle
             invisible) — sa couleur est celle de l'horizon du skybox. */}
-        <fogExp2 attach="fog" args={[HORIZON, 0.011]} />
-        <ambientLight intensity={0.6} color="#7d88c8" />
+        <fogExp2 attach="fog" args={[HORIZON, 0.009]} />
+        {/* Éclairage volontairement FAIBLE : les atlas des kits sont peints en
+            couleurs de jour et se délavent (tout blanc) dès qu'on sur-expose. */}
+        <ambientLight intensity={0.32} color="#5a67ad" />
         {/* Clair de lune */}
-        <directionalLight position={[-14, 20, -10]} intensity={0.9} color="#c3cdff" />
-        {/* Halo chaud de l'avenue, juste devant la caméra */}
-        <pointLight position={[0, 5, 6]} intensity={40} distance={34} decay={2} color="#ffa860" />
+        <directionalLight position={[-14, 22, -10]} intensity={0.42} color="#b6c3ff" />
+        {/* Halo chaud de l'avenue, sous la caméra */}
+        <pointLight position={[0, 7, 8]} intensity={9} distance={30} decay={2} color="#ff9d4d" />
+        {/* Contre-jour froid au fond de l'avenue : détache les silhouettes */}
+        <pointLight position={[0, 10, -40]} intensity={14} distance={60} decay={2} color="#4d6dff" />
         <Suspense fallback={null}>
           <City />
         </Suspense>
