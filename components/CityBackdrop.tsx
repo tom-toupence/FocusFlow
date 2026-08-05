@@ -36,8 +36,10 @@ export default function CityBackdrop() {
 
   // Descente dans l'image : le conteneur fait 138 % de la hauteur d'écran et
   // remonte de 27 % — on traverse donc toute la photo de haut en bas.
+  // ⚠️ On n'anime QUE `translateY`. Animer aussi `scale` obligeait le navigateur
+  // à re-rastériser une image de 4,6 Mpx à chaque palier de zoom : c'était l'une
+  // des causes des ralentissements.
   const pan = useTransform(scrollYProgress, [0, 1], ["0%", "-27%"]);
-  const zoom = useTransform(scrollYProgress, [0, 1], [1.08, 1]);
 
   // Tombée de la nuit, calée sur le premier tiers de page (là où on regarde).
   const night = useTransform(scrollYProgress, [0, 0.42], [0, 1], { clamp: true });
@@ -50,24 +52,30 @@ export default function CityBackdrop() {
       {/* La photo, dans un cadre plus haut que l'écran */}
       <motion.div
         className="absolute inset-x-0 top-0 h-[138%]"
-        style={reduce ? undefined : { y: pan, scale: zoom }}
+        style={reduce ? undefined : { y: pan, willChange: "transform" }}
       >
         <Image src={PHOTO} alt="" fill priority sizes="100vw" className="object-cover object-center" />
       </motion.div>
 
-      {/* Embrasement : la même image floutée, en fusion `screen` */}
+      {/* Embrasement : la même image floutée, en fusion `screen`.
+          ⚠️ Le flou est calculé sur une couche au QUART de la taille, puis
+          agrandie ×4 par transform (gratuit). Un `blur(26px)` en plein écran
+          coûtait une fortune ; ici `blur(7px)` sur un quart de surface donne le
+          même rendu pour ~1/16e du travail. */}
       <motion.div
         className="absolute inset-x-0 top-0 h-[138%] mix-blend-screen"
-        style={reduce ? { opacity: 0.35 } : { opacity: ignite, y: pan, scale: zoom }}
+        style={reduce ? { opacity: 0.35 } : { opacity: ignite, y: pan, willChange: "transform, opacity" }}
       >
-        <Image
-          src={PHOTO}
-          alt=""
-          fill
-          sizes="25vw"
-          className="object-cover object-center"
-          style={{ filter: "blur(26px) brightness(1.55) saturate(1.4)" }}
-        />
+        <div className="absolute left-0 top-0 h-1/4 w-1/4 origin-top-left scale-[4]">
+          <Image
+            src={PHOTO}
+            alt=""
+            fill
+            sizes="25vw"
+            className="object-cover object-center"
+            style={{ filter: "blur(7px) brightness(1.55) saturate(1.4)" }}
+          />
+        </div>
       </motion.div>
 
       {/* Étalonnage : le couchant s'efface… */}
@@ -90,30 +98,37 @@ export default function CityBackdrop() {
       />
 
       {/* Étalonnage cinéma : ombres froides, hautes lumières chaudes (teal &
-          orange). En `soft-light`, donc discret — c'est ce qui donne le « fini
-          étalonné » plutôt que la photo brute. */}
+          orange). ⚠️ En alpha simple et NON en `soft-light` : un mode de fusion
+          plein écran force une recomposition de toute la surface à chaque frame
+          de scroll. Le rendu est à peine moins subtil, pour un coût nul. */}
       <div
-        className="absolute inset-0 mix-blend-soft-light opacity-70"
+        className="absolute inset-0 opacity-60"
         style={{
           background:
-            "radial-gradient(70% 60% at 18% 88%, rgba(255,170,90,0.55), transparent 60%), radial-gradient(70% 60% at 82% 12%, rgba(80,150,255,0.5), transparent 60%)",
+            "radial-gradient(70% 60% at 18% 88%, rgba(255,150,70,0.30), transparent 62%), radial-gradient(70% 60% at 84% 10%, rgba(60,120,230,0.26), transparent 62%)",
         }}
       />
 
-      {/* Grain + vignette : la finition photographique */}
-      <div className="absolute inset-0 mix-blend-overlay opacity-[0.16]" style={{ backgroundImage: GRAIN }} />
+      {/* Grain + vignette : la finition photographique (en fusion normale) */}
+      <div className="absolute inset-0 opacity-[0.10]" style={{ backgroundImage: GRAIN }} />
       <div
         className="absolute inset-0"
         style={{ background: "radial-gradient(ellipse 94% 80% at 50% 46%, transparent 42%, rgba(2,3,8,0.8) 100%)" }}
       />
 
-      {/* Voile de lisibilité côté texte */}
+      {/* Voile de lisibilité côté texte — volontairement COURT, pour laisser la
+          photo s'étendre vers la gauche. Le titre reste lisible grâce au
+          renforcement local derrière le bloc de texte (ci-dessous). */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            "linear-gradient(100deg, rgba(3,4,10,0.95) 0%, rgba(3,4,10,0.78) 26%, rgba(3,4,10,0.30) 54%, transparent 74%)",
+            "linear-gradient(100deg, rgba(3,4,10,0.88) 0%, rgba(3,4,10,0.52) 18%, rgba(3,4,10,0.16) 38%, transparent 56%)",
         }}
+      />
+      <div
+        className="absolute inset-y-0 left-0 w-[60%]"
+        style={{ background: "radial-gradient(58% 46% at 30% 50%, rgba(2,3,9,0.62), transparent 72%)" }}
       />
 
       {!reduce && <TimeRail progress={night} />}

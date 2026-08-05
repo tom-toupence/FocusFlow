@@ -248,7 +248,7 @@ export default function LandingPage() {
         <div className="relative z-10">
 
         {/* Header */}
-        <header className="sticky top-0 z-30 backdrop-blur-xl bg-[#07080f]/70 border-b border-white/[0.06]">
+        <header className="sticky top-0 z-30 bg-[#07080f]/92 border-b border-white/[0.06]">
           <div className="max-w-6xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
             <Logo />
             <nav className="hidden md:flex items-center gap-7 text-sm text-white/50">
@@ -293,7 +293,9 @@ export default function LandingPage() {
               initial={reduce ? false : { opacity: 0, y: 30, rotate: -3 }}
               animate={{ opacity: 1, y: 0, rotate: -1.6 }}
               transition={{ duration: 1.1, delay: 0.3, ease: EASE }}
-              className="hidden lg:block drop-shadow-[0_40px_80px_rgba(0,0,0,0.65)]"
+              // `drop-shadow` est un filtre : coûteux sur un grand élément. La
+              // carte porte déjà son `box-shadow`, qui suffit.
+              className="hidden lg:block"
             >
               <LivingMockup />
             </motion.div>
@@ -320,7 +322,7 @@ export default function LandingPage() {
                 key={f.title} variants={reveal}
                 whileHover={reduce ? undefined : { y: -4 }}
                 transition={{ type: "spring", stiffness: 300, damping: 24 }}
-                className="group rounded-2xl border border-white/[0.07] bg-[#0a0d18]/55 backdrop-blur-md p-6 hover:bg-[#0a0d18]/75 hover:border-white/[0.12]"
+                className="group rounded-2xl border border-white/[0.07] bg-[#0a0d18]/88 p-6 hover:bg-[#10141f]/92 hover:border-white/[0.12]"
               >
                 <div className={cn("w-11 h-11 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center mb-4", f.accent)}>
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7}>{f.icon}</svg>
@@ -346,10 +348,10 @@ export default function LandingPage() {
                   variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }}
                   onMouseEnter={() => setActive(i)}
                   className={cn(
-                    "flex gap-4 rounded-2xl border p-5 backdrop-blur-md transition-colors",
+                    "flex gap-4 rounded-2xl border p-5 transition-colors",
                     i === active
-                      ? "border-white/[0.16] bg-[#0a0d18]/80"
-                      : "border-white/[0.07] bg-[#0a0d18]/55 hover:bg-[#0a0d18]/70"
+                      ? "border-white/[0.16] bg-[#10141f]/94"
+                      : "border-white/[0.07] bg-[#0a0d18]/88 hover:bg-[#10141f]/92"
                   )}
                 >
                   <span className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400/30 to-violet-400/20 border border-white/10 flex items-center justify-center text-[13px] font-semibold">{s.n}</span>
@@ -367,7 +369,7 @@ export default function LandingPage() {
         <section className="max-w-6xl mx-auto px-5 sm:px-8 pb-24">
           <motion.div
             variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }}
-            className="relative overflow-hidden rounded-3xl border border-white/[0.09] bg-[#0a0d18]/60 backdrop-blur-md p-10 sm:p-16 text-center"
+            className="relative overflow-hidden rounded-3xl border border-white/[0.09] bg-[#0a0d18]/90 p-10 sm:p-16 text-center"
           >
             <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,_rgba(139,92,246,0.18),_transparent_60%)]" />
             <h2 className="relative text-3xl sm:text-5xl font-semibold tracking-tight">Entre dans le flow.</h2>
@@ -381,7 +383,7 @@ export default function LandingPage() {
         </section>
 
         {/* Footer */}
-        <footer className="border-t border-white/[0.06] bg-[#07080f]/60 backdrop-blur-md">
+        <footer className="border-t border-white/[0.06] bg-[#07080f]/92">
           <div className="max-w-6xl mx-auto px-5 sm:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
             <Logo />
             <p className="text-xs text-white/30">Pomodoro · Lofi · Focus — fait pour rester concentré. © {new Date().getFullYear()} FocusFlow</p>

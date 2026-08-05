@@ -11,9 +11,9 @@ import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
-// Lazy-load : la landing (React Three Fiber + three + motion) n'est chargée QUE
-// pour les visiteurs NON connectés → le bundle in-app (session/dashboard) reste
-// léger et ne paie pas le coût de three.js.
+// Lazy-load : la landing (photo plein écran + motion) n'est chargée QUE pour les
+// visiteurs NON connectés → le bundle in-app (session/dashboard) n'en paie pas
+// le coût.
 const LandingPage = dynamic(() => import("@/components/LandingPage"), {
   ssr: false,
   loading: () => <div className="min-h-screen bg-[#0a0a0c]" />,
