@@ -109,26 +109,24 @@ export default function CityBackdrop() {
         }}
       />
 
-      {/* Grain + vignette : la finition photographique (en fusion normale) */}
+      {/* Grain + vignette : la finition photographique (en fusion normale).
+          ⚠️ Vignettage OUVERT : à 0,8 d'opacité il noircissait tout le bord
+          gauche — bien plus que le voile de texte lui-même. */}
       <div className="absolute inset-0 opacity-[0.10]" style={{ backgroundImage: GRAIN }} />
       <div
         className="absolute inset-0"
-        style={{ background: "radial-gradient(ellipse 94% 80% at 50% 46%, transparent 42%, rgba(2,3,8,0.8) 100%)" }}
+        style={{ background: "radial-gradient(ellipse 115% 100% at 50% 46%, transparent 58%, rgba(2,3,8,0.5) 100%)" }}
       />
 
-      {/* Voile de lisibilité côté texte — volontairement COURT, pour laisser la
-          photo s'étendre vers la gauche. Le titre reste lisible grâce au
-          renforcement local derrière le bloc de texte (ci-dessous). */}
+      {/* Voile de lisibilité côté texte — volontairement LÉGER : la photo doit
+          s'étendre jusqu'au bord gauche. Le contraste du titre est assuré par
+          son ombre portée (cf. LandingPage), pas en noircissant l'image. */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            "linear-gradient(100deg, rgba(3,4,10,0.88) 0%, rgba(3,4,10,0.52) 18%, rgba(3,4,10,0.16) 38%, transparent 56%)",
+            "linear-gradient(100deg, rgba(3,4,10,0.62) 0%, rgba(3,4,10,0.34) 16%, rgba(3,4,10,0.10) 36%, transparent 54%)",
         }}
-      />
-      <div
-        className="absolute inset-y-0 left-0 w-[60%]"
-        style={{ background: "radial-gradient(58% 46% at 30% 50%, rgba(2,3,9,0.62), transparent 72%)" }}
       />
 
       {!reduce && <TimeRail progress={night} />}

@@ -269,10 +269,10 @@ export default function LandingPage() {
               <motion.div variants={reveal} initial="hidden" animate="show" className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/10 text-[12px] text-white/60 mb-8">
                 Gratuit, sans publicité — fonctionne même sans compte
               </motion.div>
-              <motion.h1 variants={reveal} initial="hidden" animate="show" transition={{ delay: 0.05 }} className="text-4xl sm:text-6xl font-semibold tracking-tight leading-[1.05]">
+              <motion.h1 variants={reveal} initial="hidden" animate="show" transition={{ delay: 0.05 }} className="text-4xl sm:text-6xl font-semibold tracking-tight leading-[1.05] [text-shadow:0_2px_30px_rgba(0,0,0,0.7)]">
                 Ta bulle de concentration, musique et timer réunis.
               </motion.h1>
-              <motion.p variants={reveal} initial="hidden" animate="show" transition={{ delay: 0.12 }} className="mt-6 text-base sm:text-lg text-white/55 leading-relaxed">
+              <motion.p variants={reveal} initial="hidden" animate="show" transition={{ delay: 0.12 }} className="mt-6 text-base sm:text-lg text-white/70 leading-relaxed [text-shadow:0_1px_16px_rgba(0,0,0,0.85)]">
                 FocusFlow réunit un timer Pomodoro et un lecteur multi-sources — lofi YouTube, Spotify,
                 Twitch — dans une seule vue plein écran. Avec des statistiques, un coach de planification,
                 des amis et un catalogue d&apos;ambiances pour tenir la distance.
