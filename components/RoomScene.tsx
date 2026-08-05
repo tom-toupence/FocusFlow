@@ -32,7 +32,12 @@ import { cn } from "@/lib/utils";
 
 RectAreaLightUniformsLib.init();
 
-const WALL = "#d8d4cd"; // blanc cassé (un blanc pur crame en ACES)
+// ⚠️ Étalonnage nocturne : les murs sont un gris FROID et sombre. Une teinte
+// crème, multipliée par une lumière chaude, donne le beige d'une chambre
+// d'hôpital en plein jour — l'erreur du premier jet. La nuit, une pièce est
+// sombre à 80 %, et seules quelques flaques de lumière la sculptent.
+const WALL = "#9aa0ad";
+const FLOOR = "#6f7480";
 
 function Room() {
   const W = 5;
@@ -51,7 +56,7 @@ function Room() {
       {/* Sol */}
       <mesh position={[0, -T / 2, 0]} receiveShadow>
         <boxGeometry args={[W, T, D]} />
-        <meshStandardMaterial color="#b9b2a8" roughness={0.75} />
+        <meshStandardMaterial color={FLOOR} roughness={0.62} />
       </mesh>
       {/* Plafond */}
       <mesh position={[0, H + T / 2, 0]} receiveShadow>
@@ -138,19 +143,23 @@ function Lighting() {
   }, []);
   return (
     <>
+      {/* Le ciel urbain qui entre par la vitre : FROID, et seule vraie source
+          générale de la pièce. */}
       <rectAreaLight
         position={[0, 1.75, -2.34]}
         rotation={[0, Math.PI, 0]}
         width={2.7}
         height={1.6}
-        intensity={5.5}
-        color="#9fb6ff"
+        intensity={2.8}
+        color="#7d97e8"
       />
+      {/* Clair de lune rasant : il ne sert QU'À projeter la croix des meneaux
+          sur le sol. Froid et faible — c'est un accent, pas un éclairage. */}
       <directionalLight
         ref={dir}
         position={[-2.2, 4.2, -8]}
-        intensity={2.6}
-        color="#ffd0a0"
+        intensity={0.9}
+        color="#aebfff"
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0008}
@@ -162,8 +171,11 @@ function Lighting() {
         shadow-camera-near={0.5}
         shadow-camera-far={20}
       />
-      {/* Rebond très doux depuis l'intérieur, pour que les ombres ne soient pas noires */}
-      <ambientLight intensity={0.12} color="#8ea0c8" />
+      {/* Rebond minimal : juste de quoi ne pas boucher les noirs */}
+      <ambientLight intensity={0.045} color="#6f80ad" />
+      {/* Flaque CHAUDE posée sur le bureau : c'est le contraste chaud/froid qui
+          fait la nuit. (La vraie lampe arrivera à l'étape suivante.) */}
+      <pointLight position={[0.95, 1.05, -0.85]} intensity={2.2} distance={3.4} decay={2} color="#ffb066" />
     </>
   );
 }
@@ -172,9 +184,11 @@ function Lighting() {
 function CameraBreath() {
   useFrame((state) => {
     const t = state.clock.elapsedTime;
-    state.camera.position.x = 0.25 + Math.sin(t * 0.18) * 0.035;
-    state.camera.position.y = 1.26 + Math.sin(t * 0.24) * 0.018;
-    state.camera.lookAt(0, 1.5, -2.6);
+    // Reculée et abaissée : on voit le sol (donc la croix d'ombre) et le volume
+    // du bureau, au lieu d'être collé au mur de façade.
+    state.camera.position.x = 0.55 + Math.sin(t * 0.18) * 0.04;
+    state.camera.position.y = 1.18 + Math.sin(t * 0.24) * 0.02;
+    state.camera.lookAt(-0.1, 1.32, -2.6);
   });
   return null;
 }
@@ -193,12 +207,15 @@ export default function RoomScene({ className }: { className?: string }) {
         shadows
         frameloop={frameloop}
         dpr={[1, 1.5]}
-        camera={{ position: [0.25, 1.26, 1.15], fov: 50 }}
+        camera={{ position: [0.55, 1.18, 2.35], fov: 46 }}
         gl={{ antialias: false, powerPreference: "high-performance" }}
       >
         <Suspense fallback={null}>
           {/* La ville de nuit sert à la fois de lumière et de vue par la fenêtre */}
-          <Environment files="/hdri/hansaplatz_1k.hdr" background environmentIntensity={0.55} backgroundIntensity={0.7} />
+          {/* L'HDRI n'éclaire que faiblement (sinon elle lave les murs), mais la
+              ville derrière la vitre reste VIVE : c'est cet écart qui fait la
+              nuit — dehors brille, dedans est sombre. */}
+          <Environment files="/hdri/hansaplatz_1k.hdr" background environmentIntensity={0.22} backgroundIntensity={1.25} />
           <Lighting />
           <Room />
           <CameraBreath />
@@ -206,8 +223,9 @@ export default function RoomScene({ className }: { className?: string }) {
           <EffectComposer multisampling={4}>
             {/* L'occlusion ambiante : c'est elle qui « pose » les volumes */}
             <N8AO aoRadius={0.65} intensity={2.6} distanceFalloff={0.8} quality="medium" halfRes />
-            {/* Mise au point sur le bureau, la fenêtre part en flou */}
-            <DepthOfField focusDistance={0.012} focalLength={0.045} bokehScale={4} />
+            {/* Mise au point sur le bureau ; seule la ville, au loin, part en
+                bokeh. Une pièce entièrement floue ne se lit plus. */}
+            <DepthOfField focusDistance={0.022} focalLength={0.028} bokehScale={3} />
             <Bloom intensity={0.35} luminanceThreshold={0.85} luminanceSmoothing={0.3} mipmapBlur />
             <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
             <Vignette offset={0.32} darkness={0.72} />
