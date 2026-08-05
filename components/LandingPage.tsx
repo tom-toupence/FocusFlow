@@ -243,7 +243,9 @@ export default function LandingPage() {
           <CityBackdrop />
         </div>
         {/* Voile de lisibilité côté texte (le titre est à gauche, la baie à droite) */}
-        <div className="pointer-events-none fixed inset-0 z-[1] bg-[linear-gradient(100deg,rgba(4,5,11,0.94)_0%,rgba(4,5,11,0.78)_28%,rgba(4,5,11,0.30)_52%,transparent_70%)]" />
+        {/* (Pas de voile ici : la lisibilité est gérée dans `CityBackdrop`, en un
+            seul endroit. Il y en avait un second à 0,94 d'opacité, hérité d'une
+            version précédente, qui noircissait tout le bord gauche.) */}
         {/* Tout le contenu passe au-dessus du fond */}
         <div className="relative z-10">
 

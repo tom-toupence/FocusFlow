@@ -124,10 +124,10 @@ export default function CityBackdrop() {
             1. un assombrissement UNIFORME et léger, qui n'a aucun bord ;
             2. un halo très large et très doux derrière le bloc de texte.
           Le contraste du titre vient surtout de son ombre portée (LandingPage). */}
-      <div className="absolute inset-0 bg-[rgba(3,4,10,0.26)]" />
+      <div className="absolute inset-0 bg-[rgba(3,4,10,0.22)]" />
       <div
         className="absolute inset-0"
-        style={{ background: "radial-gradient(78% 90% at 20% 52%, rgba(3,4,10,0.40), transparent 78%)" }}
+        style={{ background: "radial-gradient(80% 92% at 18% 52%, rgba(3,4,10,0.30), transparent 80%)" }}
       />
 
       {!reduce && <TimeRail progress={night} />}
