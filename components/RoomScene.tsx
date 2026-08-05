@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Environment } from "@react-three/drei";
+import { Environment, useGLTF, useTexture } from "@react-three/drei";
 import { Bloom, DepthOfField, EffectComposer, N8AO, Noise, ToneMapping, Vignette } from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
 import * as THREE from "three";
@@ -124,13 +124,83 @@ function Room() {
         </group>
       </group>
 
-      {/* Un volume témoin : c'est lui qui montre l'ombre de contact et l'AO. */}
-      <mesh position={[0.15, 0.37, -1.05]} castShadow receiveShadow>
-        <boxGeometry args={[1.6, 0.74, 0.7]} />
-        <meshStandardMaterial color="#a89b8a" roughness={0.8} />
+      <Desk />
+      {/* Mobilier Poly Haven (CC0), à l'échelle réelle */}
+      <Prop url="/models/ArmChair_01/ArmChair_01_1k.gltf" position={[-0.35, 0, -0.75]} rotationY={Math.PI - 0.32} />
+      <Prop url="/models/desk_lamp_arm_01/desk_lamp_arm_01_1k.gltf" position={[0.66, 0.74, -2.02]} rotationY={-2.1} />
+    </group>
+  );
+}
+
+// Le bureau : géométrie simple, mais MATIÈRES RÉELLES — les cartes PBR viennent
+// du modèle Poly Haven (bois massif : couleur, normales, rugosité). C'est le
+// bon compromis quand l'asset existant n'est pas à la bonne échelle : on garde
+// ses textures, on refait la forme.
+function Desk() {
+  const tex = useTexture({
+    map: "/models/WoodenTable_02/textures/WoodenTable_02_diff_1k.jpg",
+    normalMap: "/models/WoodenTable_02/textures/WoodenTable_02_nor_gl_1k.jpg",
+    roughnessMap: "/models/WoodenTable_02/textures/WoodenTable_02_arm_1k.jpg",
+  });
+
+  // On travaille sur des CLONES : les textures renvoyées par `useTexture` sont
+  // mises en cache par drei et muter un retour de hook est interdit par le
+  // compilateur React. Le clone partage l'image, il ne coûte qu'un upload GPU.
+  const mats = useMemo(() => {
+    const out: Record<string, THREE.Texture> = {};
+    for (const [key, t] of Object.entries(tex)) {
+      const c = t.clone();
+      c.wrapS = c.wrapT = THREE.RepeatWrapping;
+      c.repeat.set(2.2, 1);
+      if (key === "map") c.colorSpace = THREE.SRGBColorSpace;
+      c.needsUpdate = true;
+      out[key] = c;
+    }
+    return out as { map: THREE.Texture; normalMap: THREE.Texture; roughnessMap: THREE.Texture };
+  }, [tex]);
+
+  const TOP_Y = 0.74;
+  const W = 1.75;
+  const D = 0.72;
+
+  return (
+    <group position={[0.05, 0, -1.86]}>
+      {/* Plateau */}
+      <mesh position={[0, TOP_Y, 0]} castShadow receiveShadow>
+        <boxGeometry args={[W, 0.045, D]} />
+        <meshStandardMaterial {...mats} roughness={0.75} metalness={0.02} />
+      </mesh>
+      {/* Joues latérales pleines : elles créent l'ombre franche sous le plateau */}
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[(s * (W - 0.06)) / 2, TOP_Y / 2, 0]} castShadow receiveShadow>
+          <boxGeometry args={[0.045, TOP_Y, D - 0.06]} />
+          <meshStandardMaterial {...mats} roughness={0.78} metalness={0.02} />
+        </mesh>
+      ))}
+      {/* Fond de caisson, pour que le dessous ne soit pas traversant */}
+      <mesh position={[0, TOP_Y - 0.34, -D / 2 + 0.05]} receiveShadow>
+        <boxGeometry args={[W - 0.12, 0.5, 0.03]} />
+        <meshStandardMaterial {...mats} roughness={0.8} />
       </mesh>
     </group>
   );
+}
+
+// Charge un glTF Poly Haven et active les ombres sur tous ses maillages.
+function Prop({ url, position, rotationY = 0, scale = 1 }: { url: string; position: [number, number, number]; rotationY?: number; scale?: number }) {
+  const { scene } = useGLTF(url);
+  const cloned = useMemo(() => {
+    const c = scene.clone(true);
+    c.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) {
+        m.castShadow = true;
+        m.receiveShadow = true;
+      }
+    });
+    return c;
+  }, [scene]);
+  return <primitive object={cloned} position={position} rotation-y={rotationY} scale={scale} />;
 }
 
 // Lumière : une nappe rectangulaire dans le plan de la vitre (le ciel qui entre)
@@ -173,9 +243,12 @@ function Lighting() {
       />
       {/* Rebond minimal : juste de quoi ne pas boucher les noirs */}
       <ambientLight intensity={0.045} color="#6f80ad" />
-      {/* Flaque CHAUDE posée sur le bureau : c'est le contraste chaud/froid qui
-          fait la nuit. (La vraie lampe arrivera à l'étape suivante.) */}
-      <pointLight position={[0.95, 1.05, -0.85]} intensity={2.2} distance={3.4} decay={2} color="#ffb066" />
+      {/* Lampe de bureau : sa lumière doit rester CONTENUE sur le plateau —
+          `distance` court et intensité basse. Trop de portée et elle repeint
+          tout le mur en orange (erreur du réglage précédent). */}
+      <pointLight position={[0.6, 1.06, -1.86]} intensity={1.1} distance={1.9} decay={2} color="#ffb066" castShadow shadow-mapSize={[1024, 1024]} shadow-bias={-0.0015} />
+      {/* Débord infime, pour que le halo ne s'arrête pas net */}
+      <pointLight position={[0.5, 1.3, -1.6]} intensity={0.25} distance={3.2} decay={2} color="#ff9d4d" />
     </>
   );
 }
