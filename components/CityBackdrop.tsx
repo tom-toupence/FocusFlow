@@ -115,18 +115,19 @@ export default function CityBackdrop() {
       <div className="absolute inset-0 opacity-[0.10]" style={{ backgroundImage: GRAIN }} />
       <div
         className="absolute inset-0"
-        style={{ background: "radial-gradient(ellipse 115% 100% at 50% 46%, transparent 58%, rgba(2,3,8,0.5) 100%)" }}
+        style={{ background: "radial-gradient(ellipse 120% 105% at 50% 46%, transparent 64%, rgba(2,3,8,0.34) 100%)" }}
       />
 
-      {/* Voile de lisibilité côté texte — volontairement LÉGER : la photo doit
-          s'étendre jusqu'au bord gauche. Le contraste du titre est assuré par
-          son ombre portée (cf. LandingPage), pas en noircissant l'image. */}
+      {/* Lisibilité — SANS bandeau. Un dégradé gauche→droite se lit comme un
+          voile noir posé sur la photo (« violent »), parce que l'œil repère la
+          transition. On combine donc :
+            1. un assombrissement UNIFORME et léger, qui n'a aucun bord ;
+            2. un halo très large et très doux derrière le bloc de texte.
+          Le contraste du titre vient surtout de son ombre portée (LandingPage). */}
+      <div className="absolute inset-0 bg-[rgba(3,4,10,0.26)]" />
       <div
         className="absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(100deg, rgba(3,4,10,0.62) 0%, rgba(3,4,10,0.34) 16%, rgba(3,4,10,0.10) 36%, transparent 54%)",
-        }}
+        style={{ background: "radial-gradient(78% 90% at 20% 52%, rgba(3,4,10,0.40), transparent 78%)" }}
       />
 
       {!reduce && <TimeRail progress={night} />}
