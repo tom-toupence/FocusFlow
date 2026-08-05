@@ -2,8 +2,8 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Environment, useGLTF, useTexture } from "@react-three/drei";
-import { Bloom, DepthOfField, EffectComposer, N8AO, Noise, ToneMapping, Vignette } from "@react-three/postprocessing";
+import { AdaptiveDpr, Environment, useGLTF, useTexture } from "@react-three/drei";
+import { Bloom, EffectComposer, N8AO, Noise, ToneMapping, Vignette } from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
 import * as THREE from "three";
 import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
@@ -231,7 +231,7 @@ function Lighting() {
         intensity={0.9}
         color="#aebfff"
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[1024, 1024]}
         shadow-bias={-0.0008}
         shadow-normalBias={0.02}
         shadow-camera-left={-4}
@@ -243,14 +243,31 @@ function Lighting() {
       />
       {/* Rebond minimal : juste de quoi ne pas boucher les noirs */}
       <ambientLight intensity={0.045} color="#6f80ad" />
-      {/* Lampe de bureau : sa lumière doit rester CONTENUE sur le plateau —
-          `distance` court et intensité basse. Trop de portée et elle repeint
-          tout le mur en orange (erreur du réglage précédent). */}
-      <pointLight position={[0.6, 1.06, -1.86]} intensity={1.1} distance={1.9} decay={2} color="#ffb066" castShadow shadow-mapSize={[1024, 1024]} shadow-bias={-0.0015} />
+      {/* Lampe de bureau : lumière CONTENUE sur le plateau (portée courte).
+          ⚠️ SURTOUT PAS de `castShadow` ici : l'ombre d'une lumière ponctuelle
+          est une shadow map CUBE — la scène est rendue 6 fois de plus par
+          frame. C'était la cause principale des ralentissements. */}
+      <pointLight position={[0.6, 1.06, -1.86]} intensity={1.1} distance={1.9} decay={2} color="#ffb066" />
       {/* Débord infime, pour que le halo ne s'arrête pas net */}
       <pointLight position={[0.5, 1.3, -1.6]} intensity={0.25} distance={3.2} decay={2} color="#ff9d4d" />
     </>
   );
+}
+
+// Les ombres portées ne changent JAMAIS (aucun objet ne bouge, et la lumière non
+// plus) : on les calcule sur les premières frames, puis on gèle la shadow map.
+// three la recalcule sinon à chaque frame, pour rien.
+function FreezeShadows() {
+  const done = useRef(0);
+  useFrame((state) => {
+    if (done.current > 3) return;
+    done.current += 1;
+    if (done.current === 3) {
+      state.gl.shadowMap.autoUpdate = false;
+      state.gl.shadowMap.needsUpdate = true;
+    }
+  });
+  return null;
 }
 
 // Léger flottement de caméra : une caméra tenue à la main ne se fige jamais.
@@ -268,10 +285,25 @@ function CameraBreath() {
 
 export default function RoomScene({ className }: { className?: string }) {
   const [frameloop, setFrameloop] = useState<"always" | "never">("always");
+
+  // On ne rend que si l'onglet est visible ET qu'on est encore sur le hero :
+  // une fois la page défilée, la scène est masquée par le contenu, la calculer
+  // est du gaspillage pur.
   useEffect(() => {
-    const apply = () => setFrameloop(document.hidden ? "never" : "always");
+    let raf = 0;
+    const apply = () =>
+      setFrameloop(document.hidden || window.scrollY > window.innerHeight * 1.15 ? "never" : "always");
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(apply);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
     document.addEventListener("visibilitychange", apply);
-    return () => document.removeEventListener("visibilitychange", apply);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+      document.removeEventListener("visibilitychange", apply);
+    };
   }, []);
 
   return (
@@ -279,7 +311,10 @@ export default function RoomScene({ className }: { className?: string }) {
       <Canvas
         shadows
         frameloop={frameloop}
-        dpr={[1, 1.5]}
+        // DPR plafonné à 1,25 : sur un écran dense, 1,5 c'est déjà 2,25× les
+        // pixels à calculer, effets compris.
+        dpr={[1, 1.25]}
+        performance={{ min: 0.5 }}
         camera={{ position: [0.55, 1.18, 2.35], fov: 46 }}
         gl={{ antialias: false, powerPreference: "high-performance" }}
       >
@@ -287,19 +322,32 @@ export default function RoomScene({ className }: { className?: string }) {
           {/* La ville de nuit sert à la fois de lumière et de vue par la fenêtre */}
           {/* L'HDRI n'éclaire que faiblement (sinon elle lave les murs), mais la
               ville derrière la vitre reste VIVE : c'est cet écart qui fait la
-              nuit — dehors brille, dedans est sombre. */}
-          <Environment files="/hdri/hansaplatz_1k.hdr" background environmentIntensity={0.22} backgroundIntensity={1.25} />
+              nuit — dehors brille, dedans est sombre.
+              `backgroundBlurriness` donne le bokeh de la ville UNE FOIS pour
+              toutes, au chargement : ça remplace la passe de profondeur de champ
+              qui coûtait, elle, à chaque frame. */}
+          <Environment
+            files="/hdri/hansaplatz_1k.hdr"
+            background
+            backgroundBlurriness={0.34}
+            environmentIntensity={0.22}
+            backgroundIntensity={1.35}
+          />
           <Lighting />
           <Room />
           <CameraBreath />
+          <FreezeShadows />
+          {/* Baisse automatiquement la résolution de rendu si la machine peine */}
+          <AdaptiveDpr pixelated />
 
-          <EffectComposer multisampling={4}>
-            {/* L'occlusion ambiante : c'est elle qui « pose » les volumes */}
-            <N8AO aoRadius={0.65} intensity={2.6} distanceFalloff={0.8} quality="medium" halfRes />
-            {/* Mise au point sur le bureau ; seule la ville, au loin, part en
-                bokeh. Une pièce entièrement floue ne se lit plus. */}
-            <DepthOfField focusDistance={0.022} focalLength={0.028} bokehScale={3} />
-            <Bloom intensity={0.35} luminanceThreshold={0.85} luminanceSmoothing={0.3} mipmapBlur />
+          {/* MSAA retiré (`multisampling={0}`) : sur un buffer plein écran c'est
+              très cher, et le grain + le flou du fond masquent l'aliasing. */}
+          <EffectComposer multisampling={0}>
+            {/* L'occlusion ambiante : c'est elle qui « pose » les volumes.
+                Seul effet coûteux conservé — en demi-résolution et en qualité
+                « performance », car c'est lui qui porte le réalisme. */}
+            <N8AO aoRadius={0.6} intensity={2.4} distanceFalloff={0.8} quality="performance" halfRes />
+            <Bloom intensity={0.32} luminanceThreshold={0.9} luminanceSmoothing={0.3} mipmapBlur />
             <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
             <Vignette offset={0.32} darkness={0.72} />
             <Noise opacity={0.035} />
