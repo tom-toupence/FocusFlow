@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   motion,
   useMotionValue,
@@ -14,47 +14,92 @@ import {
 } from "motion/react";
 import { signInWithGoogle } from "@/lib/supabase";
 import CityBackdrop from "@/components/CityBackdrop";
+import { defaultVideos } from "@/data/videos";
 import { cn } from "@/lib/utils";
 
-// LANDING (AuthGate, visiteur non connecté).
+// ═══════════════════════════════════════════════════════════════════════════
+// LANDING — « Ethereal Glass » posée sur la ville la nuit, en cascade Z.
 //
-// Ambiance : la ville, la nuit. `CityBackdrop` occupe le fond en `fixed` et
-// fait TOMBER LA NUIT au fil du scroll (la photo descend, le couchant s'efface,
-// les fenêtres s'allument, un rail d'heure avance). Toute la page est
-// chorégraphiée par-dessus.
+// PARTI PRIS SUR L'IMAGERIE : zéro photo générique. Toutes les images de cette
+// page sont les VRAIES vignettes YouTube du catalogue (`data/videos.ts`) :
+// Shibuya sous la pluie, la baie de Yokohama, le Bund la nuit. C'est le produit
+// qui s'illustre lui-même, et chaque image est raccord avec son propos.
+// Les trois sources externes (YouTube, Spotify, Twitch) ne sont PAS illustrées
+// par des photos mais par leur marque et un morceau de leur interface.
 //
-// Choix technique : TOUT passe par `motion/react` (déjà une dépendance, et
-// utilisé par CityBackdrop). Pas de GSAP en parallèle : deux moteurs de scroll
-// sur la même page se disputeraient les frames.
+// AMBIANCE : `CityBackdrop` tient le fond en `fixed` et fait tomber la nuit au
+// fil du scroll (la photo descend, le couchant s'efface, les fenêtres
+// s'allument, un rail d'heure avance).
 //
-// Règles de perf tenues partout :
-//   - on n'anime que `transform` / `opacity` ;
-//   - la position du pointeur vit dans des MotionValue, JAMAIS dans un state
-//     (sinon re-render de tout l'arbre à chaque pixel parcouru) ;
-//   - tout se neutralise sous `prefers-reduced-motion` (MotionConfig + gardes).
+// 3D : une vraie scène `preserve-3d` dans le hero. Les éléments flottent à des
+// profondeurs différentes (`translateZ`) et la scène s'oriente vers le curseur,
+// donc la parallaxe est réelle et non simulée.
+//
+// PERF : uniquement `transform` / `opacity`. La position du pointeur vit dans
+// des MotionValue, jamais dans un state. `backdrop-blur` réservé aux éléments
+// fixes et aux cartes de taille modeste. Tout se replie sous reduced-motion.
+// ═══════════════════════════════════════════════════════════════════════════
 
-const EASE = [0.16, 1, 0.3, 1] as const;
+const SPRING = { stiffness: 110, damping: 20, mass: 0.6 };
+const EASE = [0.32, 0.72, 0, 1] as const;
+
+const thumb = (id: string) => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 
 /* ══════════════════════════════════════════════════════════════════════════
    Primitives
    ══════════════════════════════════════════════════════════════════════════ */
 
-/** Bouton magnétique : il se penche vers le curseur. Uniquement en MotionValue. */
-function Magnetic({
+/** Double-bezel : coque extérieure + noyau, rayons concentriques. */
+function Bezel({
   children,
   className,
-  onClick,
-  strength = 14,
+  inner,
+  radius = 2,
 }: {
   children: React.ReactNode;
   className?: string;
+  inner?: string;
+  radius?: number;
+}) {
+  return (
+    <div
+      className={cn("border border-white/10 bg-white/[0.04] p-1.5", className)}
+      style={{ borderRadius: `${radius}rem` }}
+    >
+      <div
+        className={cn("relative overflow-hidden bg-[#07080e] shadow-[inset_0_1px_1px_rgba(255,255,255,0.14)]", inner)}
+        style={{ borderRadius: `${radius - 0.375}rem` }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.04] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-white/50">
+      {children}
+    </span>
+  );
+}
+
+/** CTA « island » : pilule + icône nichée dans son propre cercle. */
+function Cta({
+  label,
+  onClick,
+  tone = "light",
+  className,
+}: {
+  label: string;
   onClick?: () => void;
-  strength?: number;
+  tone?: "light" | "glass";
+  className?: string;
 }) {
   const ref = useRef<HTMLButtonElement>(null);
   const reduce = useReducedMotion();
-  const x = useSpring(useMotionValue(0), { stiffness: 260, damping: 18 });
-  const y = useSpring(useMotionValue(0), { stiffness: 260, damping: 18 });
+  const x = useSpring(useMotionValue(0), { stiffness: 250, damping: 17 });
+  const y = useSpring(useMotionValue(0), { stiffness: 250, damping: 17 });
 
   return (
     <motion.button
@@ -64,64 +109,42 @@ function Magnetic({
       onPointerMove={(e) => {
         if (reduce || !ref.current) return;
         const r = ref.current.getBoundingClientRect();
-        x.set(((e.clientX - r.left) / r.width - 0.5) * strength * 2);
-        y.set(((e.clientY - r.top) / r.height - 0.5) * strength);
+        x.set(((e.clientX - r.left) / r.width - 0.5) * 22);
+        y.set(((e.clientY - r.top) / r.height - 0.5) * 12);
       }}
       onPointerLeave={() => {
         x.set(0);
         y.set(0);
       }}
-      whileTap={reduce ? undefined : { scale: 0.97 }}
-      className={className}
-    >
-      {children}
-    </motion.button>
-  );
-}
-
-function GoogleCta({ label = "Commencer" }: { label?: string }) {
-  const [loading, setLoading] = useState(false);
-  return (
-    <Magnetic
-      onClick={async () => {
-        setLoading(true);
-        await signInWithGoogle();
-      }}
-      className="group inline-flex items-center gap-3 rounded-full bg-white px-7 py-4 text-sm font-semibold tracking-tight text-[#08090f] transition-colors hover:bg-white/90"
-    >
-      {loading ? (
-        <span className="h-4 w-4 rounded-full border-2 border-black/20 border-t-black/70 animate-spin" />
-      ) : (
-        <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
-          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
-          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-        </svg>
+      className={cn(
+        "group inline-flex items-center gap-4 rounded-full py-2 pl-7 pr-2 text-sm font-semibold tracking-tight transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.98]",
+        tone === "light"
+          ? "bg-white text-[#08090f] hover:bg-white/92"
+          : "border border-white/15 bg-white/[0.05] text-white hover:border-white/35 hover:bg-white/[0.09]",
+        className
       )}
-      {loading ? "Redirection" : label}
-      <svg
-        className="h-3.5 w-3.5 transition-transform duration-500 ease-out group-hover:translate-x-1"
-        viewBox="0 0 16 16"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden
+    >
+      {label}
+      <span
+        className={cn(
+          "flex h-9 w-9 items-center justify-center rounded-full transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:-translate-y-[1px] group-hover:translate-x-1 group-hover:scale-105",
+          tone === "light" ? "bg-black/[0.07]" : "bg-white/10"
+        )}
       >
-        <path d="M2.5 8h11M9 3.5L13.5 8 9 12.5" />
-      </svg>
-    </Magnetic>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
+          <path d="M4.5 11.5L11.5 4.5M6 4.5h5.5V10" />
+        </svg>
+      </span>
+    </motion.button>
   );
 }
 
 function Wordmark() {
   return (
     <span className="flex items-center gap-2.5">
-      <span className="relative flex h-7 w-7 items-center justify-center rounded-full border border-white/20">
-        <span className="absolute inset-0 rounded-full bg-[#ffb570]/20 blur-[6px]" aria-hidden />
-        <svg className="relative h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
+      <span className="relative flex h-7 w-7 items-center justify-center rounded-full border border-white/15">
+        <span className="absolute inset-0 rounded-full bg-[#ffb570]/25 blur-[7px]" aria-hidden />
+        <svg className="relative h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" aria-hidden>
           <circle cx="12" cy="12" r="8.5" />
           <path d="M12 7.5V12l3 2.2" />
         </svg>
@@ -131,479 +154,729 @@ function Wordmark() {
   );
 }
 
+/** Entrée au scroll : montée lourde, flou qui se dissipe. */
+function Rise({
+  children,
+  delay = 0,
+  className,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.div
+      initial={reduce ? false : { opacity: 0, y: 64, filter: "blur(10px)" }}
+      whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      viewport={{ once: true, margin: "-90px" }}
+      transition={{ duration: 0.95, delay, ease: EASE }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
-   Aperçu de session : le produit lui-même, incliné vers le curseur
+   HERO — scène 3D : la session au centre, ses satellites en profondeur
    ══════════════════════════════════════════════════════════════════════════ */
 
-const TRACKS = [
-  "Lofi hip hop, beats to study",
-  "Rainy Tokyo, night ambience",
-  "Study with me, Kyoto 4K",
-  "Deep focus, piano et cordes",
-];
+const HERO_TRACKS = defaultVideos.filter((v) => ["abao-11", "abao-15", "cn-01", "driv-01"].includes(v.id));
 
-function SessionCard({ px, py }: { px?: MotionValue<number>; py?: MotionValue<number> }) {
+/** Élément flottant à une profondeur donnée : il dérive en boucle et suit la scène. */
+function Floating({
+  z,
+  drift = 14,
+  duration = 9,
+  className,
+  children,
+}: {
+  z: number;
+  drift?: number;
+  duration?: number;
+  className?: string;
+  children: React.ReactNode;
+}) {
   const reduce = useReducedMotion();
-  const TOTAL = 180;
+  return (
+    <motion.div
+      className={cn("absolute", className)}
+      style={{ transform: `translateZ(${z}px)`, transformStyle: "preserve-3d" }}
+      animate={reduce ? undefined : { y: [0, -drift, 0] }}
+      transition={{ duration, repeat: Infinity, ease: "easeInOut" }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function HeroScene({ px, py }: { px: MotionValue<number>; py: MotionValue<number> }) {
+  const reduce = useReducedMotion();
+  const rotY = useSpring(useTransform(px, [-0.5, 0.5], [14, -14]), SPRING);
+  const rotX = useSpring(useTransform(py, [-0.5, 0.5], [-11, 11]), SPRING);
+
+  const TOTAL = 1500; // 25 min
   const [remaining, setRemaining] = useState(TOTAL);
   const [track, setTrack] = useState(0);
 
   useEffect(() => {
     if (reduce) return;
     const t = setInterval(() => setRemaining((r) => (r <= 1 ? TOTAL : r - 1)), 1000);
-    const k = setInterval(() => setTrack((i) => (i + 1) % TRACKS.length), 5200);
+    const k = setInterval(() => setTrack((i) => (i + 1) % HERO_TRACKS.length), 5600);
     return () => {
       clearInterval(t);
       clearInterval(k);
     };
   }, [reduce]);
 
-  // Inclinaison 3D pilotée par la position normalisée du pointeur (-0.5 → 0.5).
-  const zero = useMotionValue(0);
-  const rotY = useSpring(useTransform(px ?? zero, [-0.5, 0.5], [10, -10]), { stiffness: 120, damping: 18 });
-  const rotX = useSpring(useTransform(py ?? zero, [-0.5, 0.5], [-8, 8]), { stiffness: 120, damping: 18 });
-
+  const current = HERO_TRACKS[track] ?? defaultVideos[0];
   const progress = 1 - remaining / TOTAL;
   const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
   const ss = String(remaining % 60).padStart(2, "0");
-  const dash = 276;
+  const dash = 2 * Math.PI * 44;
 
   return (
     <motion.div
-      style={reduce ? undefined : { rotateX: rotX, rotateY: rotY, transformPerspective: 1200 }}
-      className="relative w-[24rem] max-w-full rounded-3xl border border-white/12 bg-[#0a0c14]/70 p-2 backdrop-blur-xl"
+      style={reduce ? undefined : { rotateX: rotX, rotateY: rotY, transformPerspective: 1400, transformStyle: "preserve-3d" }}
+      className="relative h-[28rem] w-[22rem] sm:h-[30rem] sm:w-[26rem]"
     >
-      <span
-        aria-hidden
-        className="pointer-events-none absolute -inset-px rounded-3xl"
-        style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.16), 0 30px 80px -30px rgba(0,0,0,0.9)" }}
-      />
-      <div className="relative overflow-hidden rounded-[1.25rem] bg-[#070810]">
-        <div className="flex items-center gap-2 border-b border-white/[0.07] px-4 py-2.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-white/20" />
-          <span className="h-1.5 w-1.5 rounded-full bg-white/20" />
-          <span className="ml-2 font-mono text-[10px] tracking-wider text-white/30">focusflow / session</span>
-        </div>
-
-        <div className="relative flex aspect-[4/3] flex-col items-center justify-center gap-6">
-          <div
-            aria-hidden
-            className="absolute inset-0 bg-cover bg-center opacity-[0.18] grayscale"
-            style={{ backgroundImage: "url(https://picsum.photos/seed/focusflow-night-kyoto/900/700)" }}
-          />
-          <div className="relative h-32 w-32">
-            <motion.span
-              aria-hidden
-              className="absolute inset-0 rounded-full"
-              style={{ background: "radial-gradient(circle, rgba(255,180,110,0.20), transparent 70%)" }}
-              animate={reduce ? undefined : { scale: [1, 1.14, 1], opacity: [0.55, 0.95, 0.55] }}
-              transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
+      {/* Noyau : l'écran de session, avec la vraie vidéo du catalogue derrière */}
+      <Floating z={0} drift={10} duration={11} className="inset-x-0 top-8">
+        <Bezel radius={2}>
+          <div className="relative aspect-[4/3]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              key={current.youtubeId}
+              src={thumb(current.youtubeId)}
+              alt=""
+              className="anim-ambient-in absolute inset-0 h-full w-full object-cover opacity-45"
             />
-            <svg className="relative h-full w-full -rotate-90" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="3" />
-              <circle
-                cx="50"
-                cy="50"
-                r="44"
-                fill="none"
-                stroke="#ffc38a"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeDasharray={dash}
-                strokeDashoffset={dash * (1 - progress)}
-                style={{ transition: "stroke-dashoffset 1s linear" }}
-              />
-            </svg>
-            <span className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="font-mono text-[28px] tabular-nums text-white">
-                {mm}:{ss}
-              </span>
-              <span className="mt-1 font-mono text-[9px] uppercase tracking-[0.2em] text-white/35">Focus</span>
-            </span>
-          </div>
+            <span className="absolute inset-0 bg-gradient-to-t from-[#05060c] via-[#05060c]/55 to-[#05060c]/25" aria-hidden />
 
-          <span className="relative flex max-w-[80%] items-center gap-2.5 rounded-full border border-white/10 bg-black/50 px-3.5 py-2 backdrop-blur">
-            <span className="flex h-3 items-end gap-[2px]" aria-hidden>
-              {[1.2, 1.5, 1.35].map((d, i) => (
-                <span
-                  key={i}
-                  className="anim-eq w-[2px] rounded-full bg-[#ffc38a]"
-                  style={{ height: "100%", animationDuration: `${d}s`, animationDelay: `${-i * 0.45}s` }}
-                />
-              ))}
-            </span>
-            <span key={track} className="anim-track-in truncate text-[11px] text-white/60">
-              {TRACKS[track]}
+            <div className="relative flex h-full flex-col items-center justify-center gap-5">
+              <div className="relative h-28 w-28">
+                <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="2.5" />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="44"
+                    fill="none"
+                    stroke="#ffc38a"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeDasharray={dash}
+                    strokeDashoffset={dash * (1 - progress)}
+                    style={{ transition: "stroke-dashoffset 1s linear" }}
+                  />
+                </svg>
+                <span className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="font-mono text-[26px] tabular-nums text-white">
+                    {mm}:{ss}
+                  </span>
+                  <span className="mt-1 font-mono text-[9px] uppercase tracking-[0.22em] text-white/35">Focus</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </Bezel>
+      </Floating>
+
+      {/* Satellite avant-plan : le titre en cours */}
+      <Floating z={90} drift={16} duration={8} className="-left-6 bottom-14 w-[17rem] sm:-left-12">
+        <div className="flex items-center gap-3 rounded-2xl border border-white/12 bg-[#0a0c14]/85 p-2.5 backdrop-blur-xl">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={thumb(current.youtubeId)} alt="" className="h-11 w-11 shrink-0 rounded-xl object-cover" />
+          <span className="min-w-0">
+            <span className="block truncate text-[12px] font-medium text-white/85">{current.title}</span>
+            <span className="mt-0.5 flex items-center gap-1.5">
+              <span className="flex h-2.5 items-end gap-[2px]" aria-hidden>
+                {[1.2, 1.5, 1.35].map((d, i) => (
+                  <span
+                    key={i}
+                    className="anim-eq w-[2px] rounded-full bg-[#ffc38a]"
+                    style={{ height: "100%", animationDuration: `${d}s`, animationDelay: `${-i * 0.4}s` }}
+                  />
+                ))}
+              </span>
+              <span className="truncate font-mono text-[10px] text-white/35">{current.channel}</span>
             </span>
           </span>
         </div>
+      </Floating>
+
+      {/* Satellite arrière-plan : la tâche en cours */}
+      <Floating z={-70} drift={12} duration={13} className="-right-4 top-0 w-[13rem] sm:-right-10">
+        <div className="rounded-2xl border border-white/10 bg-[#0a0c14]/70 p-4 backdrop-blur-xl">
+          <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/35">En cours</span>
+          <p className="mt-2 text-[13px] leading-snug text-white/80">Relire le chapitre 4</p>
+          <span className="mt-3 flex gap-1" aria-hidden>
+            {[1, 1, 1, 0].map((full, i) => (
+              <span key={i} className={cn("h-1 flex-1 rounded-full", full ? "bg-[#ffc38a]/70" : "bg-white/12")} />
+            ))}
+          </span>
+        </div>
+      </Floating>
+
+      {/* Satellite lointain : la présence d'un ami */}
+      <Floating z={-130} drift={9} duration={15} className="-left-2 top-2 w-[11rem] sm:-left-6">
+        <div className="flex items-center gap-2.5 rounded-full border border-white/10 bg-[#0a0c14]/70 py-2 pl-2 pr-4 backdrop-blur-xl">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={thumb(defaultVideos[12]?.youtubeId ?? current.youtubeId)} alt="" className="h-7 w-7 rounded-full object-cover" />
+          <span className="min-w-0">
+            <span className="block truncate text-[11px] text-white/75">Camille</span>
+            <span className="block font-mono text-[9px] text-[#7fd4c1]">en focus</span>
+          </span>
+        </div>
+      </Floating>
+    </motion.div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CATALOGUE — carrousel 3D des vraies vidéos, qu'on fait tourner à la main
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const CAROUSEL = defaultVideos.filter((v) =>
+  ["abao-01", "abao-11", "abao-15", "swj-01", "hatsu-01", "jplo-01", "driv-01", "cn-01", "driv-05", "kr-01", "tw-01", "ramb-02"].includes(v.id)
+);
+
+function Carousel3D() {
+  const reduce = useReducedMotion();
+  const count = CAROUSEL.length;
+  const step = 360 / count;
+  const radius = 430;
+
+  const angle = useMotionValue(0);
+  const smooth = useSpring(angle, { stiffness: 70, damping: 18, mass: 0.7 });
+  const dragging = useRef(false);
+  const lastX = useRef(0);
+
+  // Dérive lente en continu, interrompue pendant qu'on tire dessus.
+  useEffect(() => {
+    if (reduce) return;
+    let raf = 0;
+    let prev = performance.now();
+    const loop = (now: number) => {
+      const dt = now - prev;
+      prev = now;
+      if (!dragging.current) angle.set(angle.get() + dt * 0.0042);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [angle, reduce]);
+
+  const onDown = useCallback((e: React.PointerEvent) => {
+    dragging.current = true;
+    lastX.current = e.clientX;
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+  }, []);
+  const onMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!dragging.current) return;
+      angle.set(angle.get() + (e.clientX - lastX.current) * 0.22);
+      lastX.current = e.clientX;
+    },
+    [angle]
+  );
+  const onUp = useCallback(() => {
+    dragging.current = false;
+  }, []);
+
+  return (
+    <div
+      className="relative h-[24rem] cursor-grab select-none active:cursor-grabbing sm:h-[27rem]"
+      style={{ perspective: "1500px" }}
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerCancel={onUp}
+      onPointerLeave={onUp}
+    >
+      <motion.div
+        className="absolute left-1/2 top-1/2 h-0 w-0"
+        style={{ transformStyle: "preserve-3d", rotateY: smooth, rotateX: -6 }}
+      >
+        {CAROUSEL.map((v, i) => (
+          <div
+            key={v.id}
+            className="absolute h-[10.5rem] w-[18.5rem] -translate-x-1/2 -translate-y-1/2"
+            style={{ transform: `rotateY(${i * step}deg) translateZ(${radius}px)`, transformStyle: "preserve-3d" }}
+          >
+            <div className="group h-full w-full overflow-hidden rounded-2xl border border-white/12 bg-[#07080e] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={thumb(v.youtubeId)}
+                alt=""
+                loading="lazy"
+                draggable={false}
+                className="h-full w-full object-cover opacity-70 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-105 group-hover:opacity-100"
+              />
+              <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#05060c] via-[#05060c]/70 to-transparent px-4 pb-3 pt-10">
+                <span className="block truncate text-[13px] font-medium text-white/90">{v.title}</span>
+                <span className="mt-0.5 block truncate font-mono text-[10px] text-white/35">
+                  {v.channel} · {v.country}
+                </span>
+              </span>
+            </div>
+          </div>
+        ))}
+      </motion.div>
+
+      {/* Fondus latéraux : le carrousel sort du cadre sans coupure nette */}
+      <span className="pointer-events-none absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-[#05060c] to-transparent" aria-hidden />
+      <span className="pointer-events-none absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-[#05060c] to-transparent" aria-hidden />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SOURCES — marques réelles + un morceau de leur interface (aucune photo)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function YoutubeMark() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="#ff0033" aria-hidden>
+      <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1c.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8zM9.6 15.6V8.4l6.2 3.6-6.2 3.6z" />
+    </svg>
+  );
+}
+function SpotifyMark() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="#1db954" aria-hidden>
+      <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.6 0 12 0zm5.5 17.3a.75.75 0 0 1-1 .25c-2.8-1.7-6.3-2.1-10.4-1.2a.75.75 0 1 1-.33-1.46c4.5-1 8.4-.55 11.5 1.35.35.22.46.68.25 1.06zm1.47-3.27a.94.94 0 0 1-1.29.31c-3.2-2-8.07-2.54-11.85-1.39a.94.94 0 1 1-.54-1.8c4.32-1.31 9.69-.7 13.37 1.58.44.28.58.86.31 1.3zm.13-3.4C15.26 8.4 8.9 8.2 5.24 9.3a1.12 1.12 0 1 1-.65-2.15C8.79 5.88 15.81 6.12 20.24 8.75a1.12 1.12 0 1 1-1.14 1.93z" />
+    </svg>
+  );
+}
+function TwitchMark() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="#9146ff" aria-hidden>
+      <path d="M4.3 0 1 4.4v15.2h5.2V24h4.2l3.3-4.4h4.2L24 13V0H4.3zm17.2 12.2-3.3 3.3h-5.2l-3.3 3.3v-3.3H6.2V2.2h15.3v10z" />
+      <path d="M13.6 5.4h2.2v6.5h-2.2zM8.7 5.4h2.2v6.5H8.7z" />
+    </svg>
+  );
+}
+
+const SOURCE_TABS = [
+  {
+    key: "catalogue",
+    name: "Catalogue",
+    line: "Une cinquantaine de paysages tenus à la main, classés par ambiance. Rien à chercher, tu cliques et ça tourne.",
+  },
+  { key: "youtube", name: "YouTube", line: "Tes playlists et ta file d'attente, jouées dans TON ordre. YouTube ne reprend jamais la main." },
+  { key: "spotify", name: "Spotify", line: "Ta bibliothèque Premium se lit dans la session, sans changer d'onglet ni couper le timer." },
+  { key: "twitch", name: "Twitch", line: "Un live ou une rediffusion en fond, pour travailler à côté de quelqu'un." },
+] as const;
+
+function SourceShowcase() {
+  const [tab, setTab] = useState<(typeof SOURCE_TABS)[number]["key"]>("catalogue");
+  const active = SOURCE_TABS.find((t) => t.key === tab)!;
+
+  return (
+    <div className="grid gap-10 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-16">
+      <div className="flex flex-col gap-2">
+        {SOURCE_TABS.map((t) => {
+          const on = t.key === tab;
+          return (
+            <button
+              key={t.key}
+              onMouseEnter={() => setTab(t.key)}
+              onFocus={() => setTab(t.key)}
+              onClick={() => setTab(t.key)}
+              className={cn(
+                "group relative overflow-hidden rounded-2xl px-5 py-4 text-left transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)]",
+                on ? "border border-white/12 bg-white/[0.05]" : "border border-transparent hover:bg-white/[0.03]"
+              )}
+              aria-pressed={on}
+            >
+              <span className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-black/40">
+                  {t.key === "youtube" ? <YoutubeMark /> : t.key === "spotify" ? <SpotifyMark /> : t.key === "twitch" ? <TwitchMark /> : (
+                    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="#ffc38a" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M3 17.5V7a1 1 0 0 1 1-1h5l2 2.5h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
+                    </svg>
+                  )}
+                </span>
+                <span className="text-[15px] font-medium text-white">{t.name}</span>
+              </span>
+              <span
+                className={cn(
+                  "mt-2 block text-[13px] leading-relaxed text-white/45 transition-all duration-500",
+                  on ? "max-h-24 opacity-100" : "max-h-0 overflow-hidden opacity-0"
+                )}
+              >
+                {active.key === t.key ? t.line : t.line}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <Bezel radius={2.25} className="self-start">
+        <div className="relative aspect-[16/10] w-full">
+          {tab === "catalogue" && <CataloguePane />}
+          {tab === "youtube" && <QueuePane />}
+          {tab === "spotify" && <SpotifyPane />}
+          {tab === "twitch" && <TwitchPane />}
+        </div>
+      </Bezel>
+    </div>
+  );
+}
+
+const PANE_IN = { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.6, ease: EASE } };
+
+function CataloguePane() {
+  const items = defaultVideos.slice(0, 6);
+  return (
+    <motion.div {...PANE_IN} className="grid h-full grid-cols-3 gap-2 p-3">
+      {items.map((v) => (
+        <div key={v.id} className="group relative overflow-hidden rounded-xl">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={thumb(v.youtubeId)}
+            alt=""
+            loading="lazy"
+            className="h-full w-full object-cover opacity-65 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-105 group-hover:opacity-100"
+          />
+          <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/85 to-transparent px-2.5 pb-2 pt-6 text-[10px] text-white/80">
+            {v.country}
+          </span>
+        </div>
+      ))}
+    </motion.div>
+  );
+}
+
+function QueuePane() {
+  const items = defaultVideos.slice(20, 25);
+  return (
+    <motion.div {...PANE_IN} className="flex h-full flex-col gap-1.5 p-4">
+      <span className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">
+        <YoutubeMark /> File d&apos;attente
+      </span>
+      {items.map((v, i) => (
+        <div
+          key={v.id}
+          className={cn(
+            "flex items-center gap-3 rounded-xl px-2.5 py-2 transition-colors",
+            i === 0 ? "bg-white/[0.07]" : "hover:bg-white/[0.04]"
+          )}
+        >
+          <span className="w-4 shrink-0 text-center font-mono text-[10px] text-white/30">{i + 1}</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={thumb(v.youtubeId)} alt="" loading="lazy" className="h-8 w-12 shrink-0 rounded-md object-cover" />
+          <span className="min-w-0 flex-1 truncate text-[12px] text-white/75">{v.title}</span>
+          {i === 0 && (
+            <span className="flex h-3 items-end gap-[2px]" aria-hidden>
+              {[1.2, 1.45, 1.3].map((d, k) => (
+                <span key={k} className="anim-eq w-[2px] rounded-full bg-[#ffc38a]" style={{ height: "100%", animationDuration: `${d}s`, animationDelay: `${-k * 0.4}s` }} />
+              ))}
+            </span>
+          )}
+        </div>
+      ))}
+    </motion.div>
+  );
+}
+
+function SpotifyPane() {
+  const rows = [
+    { t: "Weightless", a: "Marconi Union", d: "8:08" },
+    { t: "Nuvole Bianche", a: "Ludovico Einaudi", d: "5:57" },
+    { t: "Intro", a: "The xx", d: "2:07" },
+    { t: "An Ending (Ascent)", a: "Brian Eno", d: "4:24" },
+  ];
+  return (
+    <motion.div {...PANE_IN} className="flex h-full flex-col p-5">
+      <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">
+        <SpotifyMark /> Connecté en Premium
+      </span>
+      <div className="mt-4 flex flex-1 flex-col justify-center gap-1">
+        {rows.map((r, i) => (
+          <div key={r.t} className={cn("flex items-center gap-3 rounded-xl px-3 py-2.5", i === 1 && "bg-white/[0.06]")}>
+            <span className="w-3 font-mono text-[10px] text-white/25">{i + 1}</span>
+            <span className="min-w-0 flex-1">
+              <span className={cn("block truncate text-[13px]", i === 1 ? "text-[#1db954]" : "text-white/80")}>{r.t}</span>
+              <span className="block truncate text-[11px] text-white/35">{r.a}</span>
+            </span>
+            <span className="font-mono text-[10px] tabular-nums text-white/30">{r.d}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 h-[3px] w-full overflow-hidden rounded-full bg-white/10">
+        <span className="block h-full w-[38%] rounded-full bg-[#1db954]" />
+      </div>
+    </motion.div>
+  );
+}
+
+function TwitchPane() {
+  const chat = [
+    { u: "lenaCodes", m: "quelqu'un révise la bio ce soir ?" },
+    { u: "marco_dev", m: "3e pomodoro, ça pique" },
+    { u: "sora", m: "la pluie sur le stream est parfaite" },
+    { u: "juliette", m: "on repart pour 25 min" },
+  ];
+  return (
+    <motion.div {...PANE_IN} className="grid h-full grid-cols-[1fr_minmax(0,11rem)] gap-3 p-4">
+      <div className="relative overflow-hidden rounded-xl bg-black/50">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={thumb(defaultVideos[0].youtubeId)} alt="" loading="lazy" className="h-full w-full object-cover opacity-40" />
+        <span className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-[#9146ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white">
+          <span className="h-1.5 w-1.5 rounded-full bg-white" aria-hidden />
+          Live
+        </span>
+        <span className="absolute bottom-3 left-3 flex items-center gap-2">
+          <TwitchMark />
+          <span className="font-mono text-[11px] text-white/70">studywithme_fr</span>
+        </span>
+      </div>
+      <div className="flex flex-col gap-2 overflow-hidden rounded-xl bg-white/[0.03] p-3">
+        {chat.map((c) => (
+          <p key={c.u} className="text-[11px] leading-snug text-white/55">
+            <span className="text-[#9146ff]">{c.u}</span> {c.m}
+          </p>
+        ))}
       </div>
     </motion.div>
   );
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   Manifeste : les mots s'allument un par un, au rythme du scroll
+   POMODORO JOUABLE — la démo la plus honnête possible : le vrai geste
    ══════════════════════════════════════════════════════════════════════════ */
 
-function ScrubbedText({ text }: { text: string }) {
-  const ref = useRef<HTMLParagraphElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start 0.85", "end 0.45"] });
-  const words = text.split(" ");
+function TryPomodoro() {
+  const PRESETS = [
+    { label: "Classique", work: 25 },
+    { label: "Profond", work: 50 },
+    { label: "Court", work: 15 },
+  ];
+  const [preset, setPreset] = useState(0);
+  const [running, setRunning] = useState(false);
+  const total = PRESETS[preset].work * 60;
+  const [left, setLeft] = useState(total);
+
+  useEffect(() => {
+    setLeft(PRESETS[preset].work * 60);
+    setRunning(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset]);
+
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setLeft((l) => (l <= 1 ? 0 : l - 1)), 1000);
+    return () => clearInterval(id);
+  }, [running]);
+
+  const progress = 1 - left / total;
+  const dash = 2 * Math.PI * 52;
+  const mm = String(Math.floor(left / 60)).padStart(2, "0");
+  const ss = String(left % 60).padStart(2, "0");
 
   return (
-    <p
-      ref={ref}
-      className="mx-auto max-w-5xl text-balance text-center text-[clamp(1.5rem,3.4vw,2.9rem)] font-medium leading-[1.32] tracking-[-0.02em] text-white"
-    >
-      {words.map((w, i) => (
-        <Word key={`${w}-${i}`} progress={scrollYProgress} index={i} total={words.length}>
-          {w}
-        </Word>
-      ))}
-    </p>
-  );
-}
-
-function Word({
-  progress,
-  index,
-  total,
-  children,
-}: {
-  progress: MotionValue<number>;
-  index: number;
-  total: number;
-  children: React.ReactNode;
-}) {
-  const start = index / total;
-  const opacity = useTransform(progress, [start, start + 1 / total], [0.14, 1]);
-  return (
-    <motion.span style={{ opacity }} className="inline-block">
-      {children}
-      <span className="inline-block w-[0.28em]" />
-    </motion.span>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   Pile d'étapes : chacune se colle en haut, la précédente recule
-   ══════════════════════════════════════════════════════════════════════════ */
-
-const STEPS = [
-  {
-    n: "01",
-    title: "Choisis ton ambiance",
-    body: "Un paysage du catalogue, ta playlist YouTube, un album Spotify ou un stream Twitch. La pluie sur Osaka, un train de nuit, une bibliothèque à Séoul.",
-    seed: "focusflow-step-ambiance",
-  },
-  {
-    n: "02",
-    title: "Pose ton rythme",
-    body: "Pomodoro classique, sessions longues, ou Flowtime qui te laisse aller au bout de ton élan puis calcule la pause que tu as méritée.",
-    seed: "focusflow-step-rythme",
-  },
-  {
-    n: "03",
-    title: "Laisse la nuit passer",
-    body: "Respiration guidée pendant les pauses, journal d'humeur, objectif du jour, récap de la semaine. Au matin, tu sais exactement ce que tu as fait.",
-    seed: "focusflow-step-nuit",
-  },
-];
-
-function StepStack() {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-
-  return (
-    <div ref={ref} className="relative">
-      {STEPS.map((s, i) => (
-        <StepCard key={s.n} step={s} index={i} total={STEPS.length} progress={scrollYProgress} />
-      ))}
-    </div>
-  );
-}
-
-function StepCard({
-  step,
-  index,
-  total,
-  progress,
-}: {
-  step: (typeof STEPS)[number];
-  index: number;
-  total: number;
-  progress: MotionValue<number>;
-}) {
-  const reduce = useReducedMotion();
-  const isLast = index === total - 1;
-  // La carte recule quand la SUIVANTE arrive : segment [i/total, (i+1)/total].
-  const scale = useTransform(progress, [index / total, (index + 1) / total], [1, isLast ? 1 : 0.93]);
-  const opacity = useTransform(progress, [index / total, (index + 1) / total], [1, isLast ? 1 : 0.35]);
-
-  return (
-    <div className="sticky top-[14vh] mb-6 last:mb-0">
-      <motion.article
-        style={reduce ? undefined : { scale, opacity, transformOrigin: "top center" }}
-        className="group relative grid gap-10 overflow-hidden rounded-[2rem] border border-white/10 bg-[#080a12]/85 p-8 backdrop-blur-xl md:grid-cols-[1fr_minmax(0,20rem)] md:items-center md:p-12"
-      >
-        <div className="max-w-xl">
-          <span className="font-mono text-[11px] tracking-[0.2em] text-[#ffc38a]/70">{step.n}</span>
-          <h3 className="mt-5 text-[clamp(1.7rem,3.2vw,2.6rem)] font-semibold leading-[1.08] tracking-[-0.03em] text-white">
-            {step.title}
-          </h3>
-          <p className="mt-5 max-w-md text-[15px] leading-relaxed text-white/50">{step.body}</p>
-        </div>
-        <div className="relative aspect-[4/3] overflow-hidden rounded-2xl md:aspect-[3/4]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={`https://picsum.photos/seed/${step.seed}/900/1200`}
-            alt=""
-            loading="lazy"
-            className="h-full w-full object-cover opacity-70 contrast-125 grayscale transition-all duration-700 ease-out group-hover:scale-105 group-hover:opacity-95 group-hover:grayscale-0"
-          />
-          <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#05060c] via-transparent to-transparent" aria-hidden />
-        </div>
-      </motion.article>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   Accordéon horizontal : les quatre façons de remplir le silence
-   ══════════════════════════════════════════════════════════════════════════ */
-
-const SOURCES = [
-  {
-    key: "catalogue",
-    title: "Catalogue",
-    line: "Une cinquantaine de paysages choisis à la main : Tokyo, Osaka, Kyoto, Jeju, Ha Long, Hong Kong.",
-    seed: "focusflow-source-catalogue",
-  },
-  {
-    key: "youtube",
-    title: "YouTube",
-    line: "Tes playlists et tes vidéos, jouées dans ton ordre grâce à la file d'attente FocusFlow.",
-    seed: "focusflow-source-youtube",
-  },
-  {
-    key: "spotify",
-    title: "Spotify",
-    line: "Ta bibliothèque Premium se lit dans la session, sans jamais changer d'onglet.",
-    seed: "focusflow-source-spotify",
-  },
-  {
-    key: "twitch",
-    title: "Twitch",
-    line: "Un live ou une rediffusion en fond, pour travailler à côté de quelqu'un.",
-    seed: "focusflow-source-twitch",
-  },
-];
-
-function SourceAccordion() {
-  const [open, setOpen] = useState(0);
-  return (
-    <div className="flex flex-col gap-2 md:h-[60vh] md:min-h-[26rem] md:flex-row">
-      {SOURCES.map((s, i) => {
-        const active = open === i;
-        return (
-          <button
-            key={s.key}
-            onMouseEnter={() => setOpen(i)}
-            onFocus={() => setOpen(i)}
-            onClick={() => setOpen(i)}
-            aria-expanded={active}
-            className={cn(
-              "group relative overflow-hidden rounded-2xl border border-white/10 text-left transition-all duration-700 ease-out",
-              active ? "h-[18rem] md:h-auto md:flex-[3.2]" : "h-[8.5rem] md:h-auto md:flex-[1]"
-            )}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`https://picsum.photos/seed/${s.seed}/1200/1600`}
-              alt=""
-              loading="lazy"
+    <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-20">
+      <div className="max-w-lg">
+        <Eyebrow>Essaye tout de suite</Eyebrow>
+        <h2 className="mt-7 text-[clamp(2rem,4vw,3.1rem)] font-semibold leading-[1.05] tracking-[-0.03em] text-white">
+          Le minuteur, pour de vrai.
+        </h2>
+        <p className="mt-6 text-[16px] leading-relaxed text-white/50">
+          Celui-ci fonctionne, ici, sans compte. C&apos;est exactement le moteur de la session : trois rythmes, un
+          bouton, et le temps qui descend.
+        </p>
+        <div className="mt-9 flex flex-wrap gap-2">
+          {PRESETS.map((p, i) => (
+            <button
+              key={p.label}
+              onClick={() => setPreset(i)}
               className={cn(
-                "absolute inset-0 h-full w-full object-cover transition-all duration-700 ease-out",
-                active ? "scale-105 opacity-60 grayscale-0" : "opacity-35 grayscale"
+                "rounded-full px-5 py-2.5 text-[13px] font-medium transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
+                i === preset
+                  ? "border border-white/25 bg-white/[0.08] text-white"
+                  : "border border-white/10 text-white/45 hover:border-white/25 hover:text-white/80"
+              )}
+            >
+              {p.label}
+              <span className="ml-2 font-mono text-[11px] text-white/35">{p.work}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="justify-self-center">
+        <Bezel radius={3} className="w-[19rem]">
+          <div className="flex flex-col items-center gap-7 px-8 py-10">
+            <div className="relative h-[13.5rem] w-[13.5rem]">
+              <motion.span
+                aria-hidden
+                className="absolute inset-4 rounded-full"
+                style={{ background: "radial-gradient(circle, rgba(255,180,110,0.18), transparent 70%)" }}
+                animate={running ? { scale: [1, 1.08, 1], opacity: [0.6, 1, 0.6] } : { opacity: 0.4 }}
+                transition={{ duration: 4, repeat: running ? Infinity : 0, ease: "easeInOut" }}
+              />
+              <svg className="h-full w-full -rotate-90" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
+                <circle
+                  cx="60"
+                  cy="60"
+                  r="52"
+                  fill="none"
+                  stroke="#ffc38a"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeDasharray={dash}
+                  strokeDashoffset={dash * (1 - progress)}
+                  style={{ transition: "stroke-dashoffset 1s linear" }}
+                />
+              </svg>
+              <span className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="font-mono text-[42px] leading-none tabular-nums text-white">
+                  {mm}:{ss}
+                </span>
+                <span className="mt-2 font-mono text-[9px] uppercase tracking-[0.22em] text-white/35">
+                  {left === 0 ? "Terminé" : running ? "En cours" : "En attente"}
+                </span>
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => (left === 0 ? (setLeft(total), setRunning(true)) : setRunning((r) => !r))}
+                className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#08090f] transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:scale-105 active:scale-95"
+                aria-label={running ? "Mettre en pause" : "Démarrer"}
+              >
+                {running ? (
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
+                    <rect x="6" y="5" width="4" height="14" rx="1" />
+                    <rect x="14" y="5" width="4" height="14" rx="1" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" className="ml-0.5 h-4 w-4" fill="currentColor" aria-hidden>
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setRunning(false);
+                  setLeft(total);
+                }}
+                className="flex h-12 w-12 items-center justify-center rounded-full border border-white/12 text-white/50 transition-colors hover:border-white/30 hover:text-white"
+                aria-label="Réinitialiser"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M3 12a9 9 0 1 0 2.6-6.4M3 4.5V10h5.5" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </Bezel>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TRACE — ce que l'app garde de tes soirées
+   ══════════════════════════════════════════════════════════════════════════ */
+
+// Trame déterministe (pas de Math.random au rendu : le SSR et le client
+// doivent produire exactement la même grille).
+const HEAT = Array.from({ length: 91 }, (_, i) => (i * 37) % 11);
+
+function TracePanel() {
+  const reduce = useReducedMotion();
+  return (
+    <div className="grid gap-4 md:grid-cols-3">
+      <div className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-8 md:col-span-2">
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">Treize semaines</span>
+        <div className="mt-6 grid grid-flow-col grid-rows-7 gap-[5px]">
+          {HEAT.map((v, i) => (
+            <motion.span
+              key={i}
+              initial={reduce ? false : { opacity: 0, scale: 0.4 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: (i % 30) * 0.012, ease: EASE }}
+              className={cn(
+                "aspect-square rounded-[3px]",
+                v > 8 ? "bg-[#ffc38a]" : v > 6 ? "bg-[#ffc38a]/65" : v > 4 ? "bg-[#ffc38a]/35" : v > 2 ? "bg-white/12" : "bg-white/[0.05]"
               )}
             />
-            <span className="absolute inset-0 bg-gradient-to-t from-[#05060c] via-[#05060c]/55 to-transparent" aria-hidden />
-            <span className="relative flex h-full flex-col justify-end p-6">
-              <span className="text-xl font-semibold tracking-tight text-white md:text-2xl">{s.title}</span>
-              <span
-                className={cn(
-                  "mt-2 max-w-sm text-sm leading-relaxed text-white/60 transition-all duration-500",
-                  active ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
-                )}
-              >
-                {s.line}
-              </span>
-            </span>
-          </button>
-        );
-      })}
+          ))}
+        </div>
+        <p className="mt-6 max-w-md text-[14px] leading-relaxed text-white/45">
+          Chaque carré est une soirée. La série, le score de concentration et le récap du dimanche se construisent tout
+          seuls pendant que tu travailles.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        {[
+          { k: "Série en cours", v: "17 j" },
+          { k: "Cette semaine", v: "9h 20m" },
+          { k: "Score de concentration", v: "84" },
+        ].map((s) => (
+          <div key={s.k} className="flex-1 rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-7">
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">{s.k}</span>
+            <p className="mt-4 font-mono text-[34px] leading-none tabular-nums text-white">{s.v}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   Bento (grid-flow-dense, 4 x 2 : 2x2 + quatre 1x1, zéro cellule vide)
+   PAGE
    ══════════════════════════════════════════════════════════════════════════ */
-
-const CELL =
-  "group relative overflow-hidden rounded-3xl border border-white/10 bg-[#080a12]/80 p-7 backdrop-blur-xl transition-colors duration-500 hover:border-white/25";
-
-function Bento() {
-  return (
-    <div className="grid grid-flow-dense grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:grid-rows-2">
-      <article className={cn(CELL, "flex flex-col justify-between gap-10 p-9 sm:col-span-2 lg:row-span-2")}>
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-40 transition-opacity duration-700 group-hover:opacity-70"
-          style={{ background: "radial-gradient(90% 70% at 20% 0%, rgba(255,170,90,0.16), transparent 65%)" }}
-        />
-        <div className="relative">
-          <h3 className="text-[clamp(1.4rem,2.3vw,1.95rem)] font-semibold leading-[1.12] tracking-[-0.025em] text-white">
-            La musique et le timer ne sont plus dans deux onglets.
-          </h3>
-          <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-white/45">
-            Le lecteur occupe l&apos;écran, le timer vit dessus, tes tâches restent à portée de main. Plus rien à
-            surveiller ailleurs.
-          </p>
-        </div>
-        <div className="relative aspect-[16/10] overflow-hidden rounded-2xl border border-white/10">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="https://picsum.photos/seed/focusflow-bento-session/1200/760"
-            alt=""
-            loading="lazy"
-            className="h-full w-full object-cover opacity-65 contrast-125 grayscale transition-all duration-700 ease-out group-hover:scale-105 group-hover:opacity-90 group-hover:grayscale-0"
-          />
-        </div>
-      </article>
-
-      <article className={CELL}>
-        <h3 className="text-lg font-semibold tracking-tight text-white">Flowtime</h3>
-        <p className="mt-3 text-sm leading-relaxed text-white/45">
-          Quand l&apos;élan est là, le chrono monte au lieu de descendre, et la pause se calcule sur ce que tu as
-          vraiment donné.
-        </p>
-        <span className="mt-7 block font-mono text-[34px] leading-none tabular-nums text-white/25 transition-colors duration-500 group-hover:text-[#ffc38a]/75">
-          52:14
-        </span>
-      </article>
-
-      <article className={CELL}>
-        <h3 className="text-lg font-semibold tracking-tight text-white">Ta file, ton ordre</h3>
-        <p className="mt-3 text-sm leading-relaxed text-white/45">
-          Les titres que tu as choisis, joués dans la séquence que tu as posée. YouTube ne reprend pas la main.
-        </p>
-        <span className="mt-7 flex flex-col gap-2" aria-hidden>
-          {[76, 54, 88].map((w, i) => (
-            <span
-              key={i}
-              className="h-1 rounded-full bg-white/15 transition-colors duration-500 group-hover:bg-white/35"
-              style={{ width: `${w}%`, transitionDelay: `${i * 70}ms` }}
-            />
-          ))}
-        </span>
-      </article>
-
-      <article className={CELL}>
-        <h3 className="text-lg font-semibold tracking-tight text-white">Ce que tu as fait</h3>
-        <p className="mt-3 text-sm leading-relaxed text-white/45">
-          Séries, heatmap, score de concentration, récap de la semaine à partager.
-        </p>
-        <span className="mt-7 flex h-12 items-end gap-1.5" aria-hidden>
-          {[30, 62, 44, 88, 52, 74, 96].map((h, i) => (
-            <span
-              key={i}
-              className="flex-1 rounded-sm bg-white/15 transition-colors duration-500 group-hover:bg-[#ffc38a]/60"
-              style={{ height: `${h}%`, transitionDelay: `${i * 45}ms` }}
-            />
-          ))}
-        </span>
-      </article>
-
-      <article className={CELL}>
-        <h3 className="text-lg font-semibold tracking-tight text-white">Personne ne travaille seul</h3>
-        <p className="mt-3 text-sm leading-relaxed text-white/45">
-          Ajoute tes amis par code, vois qui est en focus, compare la semaine, écris-leur sans quitter la page.
-        </p>
-        <span className="mt-7 flex items-center gap-3" aria-hidden>
-          <span className="flex -space-x-2">
-            {["a", "b", "c"].map((s) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={s}
-                src={`https://picsum.photos/seed/focusflow-friend-${s}/80/80`}
-                alt=""
-                loading="lazy"
-                className="h-8 w-8 rounded-full border border-white/20 object-cover grayscale transition-all duration-500 group-hover:grayscale-0"
-              />
-            ))}
-          </span>
-          <span className="flex h-8 items-center rounded-full border border-white/15 bg-white/[0.06] px-3 font-mono text-[10px] text-white/50">
-            en focus
-          </span>
-        </span>
-      </article>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   Page
-   ══════════════════════════════════════════════════════════════════════════ */
-
-const PLACES = ["Kyoto", "Osaka", "Hong Kong", "Jeju", "Ha Long", "Taipei", "Shanghai", "Bali", "Katmandou", "Guilin"];
 
 export default function LandingPage() {
   const reduce = useReducedMotion();
 
-  // Position du pointeur dans le hero, normalisée (-0.5 → 0.5), en MotionValue.
   const heroRef = useRef<HTMLElement>(null);
   const px = useMotionValue(0);
   const py = useMotionValue(0);
-  const spotX = useSpring(useTransform(px, (v) => (v + 0.5) * 100), { stiffness: 90, damping: 20 });
-  const spotY = useSpring(useTransform(py, (v) => (v + 0.5) * 100), { stiffness: 90, damping: 20 });
-  const spotlight = useMotionTemplate`radial-gradient(44rem circle at ${spotX}% ${spotY}%, rgba(255,183,110,0.13), transparent 62%)`;
+  const spotX = useSpring(useTransform(px, (v) => (v + 0.5) * 100), { stiffness: 80, damping: 20 });
+  const spotY = useSpring(useTransform(py, (v) => (v + 0.5) * 100), { stiffness: 80, damping: 20 });
+  const spotlight = useMotionTemplate`radial-gradient(42rem circle at ${spotX}% ${spotY}%, rgba(255,183,110,0.14), transparent 60%)`;
 
-  // Parallaxe du contenu du hero pendant qu'il quitte l'écran.
   const { scrollYProgress: heroP } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
-  const heroY = useTransform(heroP, [0, 1], [0, 110]);
-  const heroFade = useTransform(heroP, [0, 0.8], [1, 0]);
+  const heroY = useTransform(heroP, [0, 1], [0, 120]);
+  const heroFade = useTransform(heroP, [0, 0.75], [1, 0]);
+
+  const marquee = useMemo(
+    () => Array.from(new Set(defaultVideos.map((v) => v.country).filter(Boolean) as string[])),
+    []
+  );
 
   return (
     <MotionConfig reducedMotion="user">
       <main className="relative w-full max-w-full overflow-x-hidden bg-[#05060c] text-white">
-        {/* Fond : la ville, et la nuit qui tombe au fil du scroll */}
+        {/* La ville, et la nuit qui tombe au fil du scroll */}
         <div className="pointer-events-none fixed inset-0 z-0">
           <CityBackdrop />
         </div>
 
         <div className="relative z-10">
-          {/* Navigation : pilule flottante */}
-          <header className="fixed inset-x-0 top-4 z-40 flex justify-center px-4">
-            <nav className="flex w-full max-w-3xl items-center justify-between gap-6 rounded-full border border-white/12 bg-[#080a12]/70 py-2 pl-5 pr-2 backdrop-blur-xl">
+          {/* Nav : île de verre détachée du bord */}
+          <header className="fixed inset-x-0 top-6 z-40 flex justify-center px-4">
+            <nav className="flex w-max items-center gap-8 rounded-full border border-white/12 bg-[#080a12]/70 py-2 pl-5 pr-2 backdrop-blur-2xl">
               <Wordmark />
-              <div className="hidden items-center gap-7 text-[13px] text-white/45 md:flex">
-                <a href="#produit" className="transition-colors hover:text-white">Produit</a>
-                <a href="#sources" className="transition-colors hover:text-white">Sources</a>
-                <a href="#deroule" className="transition-colors hover:text-white">Déroulé</a>
+              <div className="hidden items-center gap-6 text-[13px] text-white/45 md:flex">
+                <a href="#catalogue" className="transition-colors duration-500 hover:text-white">Catalogue</a>
+                <a href="#sources" className="transition-colors duration-500 hover:text-white">Sources</a>
+                <a href="#minuteur" className="transition-colors duration-500 hover:text-white">Minuteur</a>
               </div>
-              <Magnetic
-                onClick={() => signInWithGoogle()}
-                strength={8}
-                className="rounded-full bg-white px-5 py-2.5 text-[13px] font-semibold text-[#08090f] transition-colors hover:bg-white/90"
-              >
-                Se connecter
-              </Magnetic>
+              <Cta label="Se connecter" onClick={() => signInWithGoogle()} className="py-1.5 pl-5 pr-1.5 text-[13px]" />
             </nav>
           </header>
 
-          {/* Attention : hero asymétrique, le curseur éclaire la ville */}
+          {/* ── Hero ─────────────────────────────────────────────────────── */}
           <section
             ref={heroRef}
             onPointerMove={(e) => {
@@ -612,73 +885,71 @@ export default function LandingPage() {
               px.set((e.clientX - r.left) / r.width - 0.5);
               py.set((e.clientY - r.top) / r.height - 0.5);
             }}
-            className="relative flex min-h-[100dvh] items-center px-5 pb-24 pt-32 sm:px-8"
+            className="relative flex min-h-[100dvh] items-center px-4 pb-24 pt-36 sm:px-8"
           >
             <motion.span aria-hidden className="pointer-events-none absolute inset-0" style={reduce ? undefined : { background: spotlight }} />
 
             <motion.div
               style={reduce ? undefined : { y: heroY, opacity: heroFade }}
-              className="relative mx-auto grid w-full max-w-7xl items-center gap-16 lg:grid-cols-[minmax(0,1fr)_auto]"
+              className="relative mx-auto grid w-full max-w-[86rem] items-center gap-20 lg:grid-cols-[minmax(0,1fr)_auto]"
             >
-              <div className="w-full max-w-5xl">
-                <motion.h1
-                  initial={reduce ? false : { opacity: 0, y: 26 }}
+              <div className="max-w-4xl">
+                <motion.div
+                  initial={reduce ? false : { opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 1, ease: EASE }}
-                  className="text-[clamp(2.8rem,6.6vw,5.6rem)] font-semibold leading-[1] tracking-[-0.035em] [text-shadow:0_4px_40px_rgba(0,0,0,0.75)]"
+                  transition={{ duration: 0.8, ease: EASE }}
                 >
-                  Le monde s&apos;éteint,
+                  <Eyebrow>Gratuit, sans publicité</Eyebrow>
+                </motion.div>
+
+                <motion.h1
+                  initial={reduce ? false : { opacity: 0, y: 40, filter: "blur(12px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  transition={{ duration: 1.1, delay: 0.08, ease: EASE }}
+                  className="mt-8 text-[clamp(2.9rem,6.8vw,5.9rem)] font-semibold leading-[0.98] tracking-[-0.04em] [text-shadow:0_4px_44px_rgba(0,0,0,0.8)]"
+                >
+                  La ville s&apos;allume,
                   <br />
-                  ta
-                  <span
-                    className="mx-3 inline-block h-[0.6em] w-[1.4em] -translate-y-[0.06em] rounded-full bg-cover bg-center align-middle grayscale-[0.35]"
-                    style={{ backgroundImage: "url(https://picsum.photos/seed/focusflow-neon-street/400/240)" }}
-                    aria-hidden
-                  />
-                  session commence.
+                  toi tu te poses.
                 </motion.h1>
 
                 <motion.p
-                  initial={reduce ? false : { opacity: 0, y: 20 }}
+                  initial={reduce ? false : { opacity: 0, y: 26 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.9, delay: 0.15, ease: EASE }}
-                  className="mt-8 max-w-md text-[17px] leading-relaxed text-white/60 [text-shadow:0_1px_20px_rgba(0,0,0,0.9)]"
+                  transition={{ duration: 0.9, delay: 0.2, ease: EASE }}
+                  className="mt-9 max-w-lg text-[17px] leading-relaxed text-white/60 [text-shadow:0_1px_20px_rgba(0,0,0,0.9)]"
                 >
-                  Un timer Pomodoro et ta musique dans le même écran. Le reste du bruit attend dehors.
+                  Un minuteur Pomodoro et ta musique dans le même écran, sur un paysage qui tourne en boucle. Le reste
+                  du bruit attend dehors.
                 </motion.p>
 
                 <motion.div
-                  initial={reduce ? false : { opacity: 0, y: 18 }}
+                  initial={reduce ? false : { opacity: 0, y: 22 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.9, delay: 0.26, ease: EASE }}
-                  className="mt-11 flex flex-wrap items-center gap-4"
+                  transition={{ duration: 0.9, delay: 0.3, ease: EASE }}
+                  className="mt-12 flex flex-wrap items-center gap-4"
                 >
-                  <GoogleCta label="Commencer" />
-                  <a
-                    href="#produit"
-                    className="rounded-full border border-white/25 px-7 py-4 text-sm font-semibold tracking-tight text-white transition-colors hover:border-white/60 hover:bg-white/[0.06]"
-                  >
-                    Découvrir
-                  </a>
+                  <Cta label="Commencer" onClick={() => signInWithGoogle()} />
+                  <Cta label="Voir le catalogue" tone="glass" onClick={() => document.getElementById("catalogue")?.scrollIntoView({ behavior: "smooth" })} />
                 </motion.div>
               </div>
 
               <motion.div
-                initial={reduce ? false : { opacity: 0, y: 40, rotate: -2 }}
-                animate={{ opacity: 1, y: 0, rotate: -1.2 }}
-                transition={{ duration: 1.2, delay: 0.32, ease: EASE }}
+                initial={reduce ? false : { opacity: 0, y: 60, filter: "blur(14px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                transition={{ duration: 1.3, delay: 0.34, ease: EASE }}
                 className="hidden justify-self-end lg:block"
               >
-                <SessionCard px={px} py={py} />
+                <HeroScene px={px} py={py} />
               </motion.div>
             </motion.div>
           </section>
 
-          {/* Les lieux du catalogue, en défilement continu */}
-          <div className="relative overflow-hidden border-y border-white/[0.07] bg-[#05060c]/50 py-6 backdrop-blur-sm">
-            <div className="anim-marquee flex w-max items-center gap-10 pr-10">
-              {[...PLACES, ...PLACES].map((p, i) => (
-                <span key={`${p}-${i}`} className="flex items-center gap-10 font-mono text-[12px] uppercase tracking-[0.22em] text-white/25">
+          {/* ── Pays du catalogue, en défilement ─────────────────────────── */}
+          <div className="relative overflow-hidden border-y border-white/[0.07] py-6">
+            <div className="anim-marquee flex w-max items-center gap-12 pr-12">
+              {[...marquee, ...marquee].map((p, i) => (
+                <span key={`${p}-${i}`} className="flex items-center gap-12 font-mono text-[12px] uppercase tracking-[0.24em] text-white/25">
                   {p}
                   <span className="h-1 w-1 rounded-full bg-white/15" aria-hidden />
                 </span>
@@ -686,76 +957,72 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Interest : bento */}
-          <section id="produit" className="mx-auto w-full max-w-7xl px-5 py-32 sm:px-8 md:py-48">
-            <motion.h2
-              initial={reduce ? false : { opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-80px" }}
-              transition={{ duration: 0.8, ease: EASE }}
-              className="mb-16 max-w-4xl text-[clamp(2rem,4.2vw,3.3rem)] font-semibold leading-[1.05] tracking-[-0.03em]"
-            >
-              Tout ce qui sert à tenir une heure, réuni au même endroit.
-            </motion.h2>
-            <Bento />
+          {/* ── Catalogue en carrousel 3D ────────────────────────────────── */}
+          <section id="catalogue" className="mx-auto w-full max-w-[86rem] px-4 py-28 sm:px-8 md:py-40">
+            <Rise className="mb-16 max-w-3xl">
+              <Eyebrow>Le catalogue</Eyebrow>
+              <h2 className="mt-7 text-[clamp(2rem,4.4vw,3.4rem)] font-semibold leading-[1.04] tracking-[-0.035em]">
+                Cinquante-six endroits où poser ta soirée.
+              </h2>
+              <p className="mt-6 max-w-xl text-[16px] leading-relaxed text-white/50">
+                Study with me à Osaka, la pluie sur Shinjuku, le Bund à minuit, un train le long de la rivière au Gifu.
+                Attrape le carrousel et fais-le tourner.
+              </p>
+            </Rise>
+            <Rise delay={0.1}>
+              <Carousel3D />
+            </Rise>
           </section>
 
-          {/* Desire : manifeste dont les mots s'allument */}
-          <section className="mx-auto w-full max-w-7xl px-5 py-32 sm:px-8 md:py-48">
-            <ScrubbedText text="Tu ouvres un onglet pour la musique, un autre pour le minuteur, un troisième pour la liste. Puis tu ouvres celui de trop. FocusFlow referme tout ça dans un seul écran, et te rend ta soirée." />
+          {/* ── Sources ──────────────────────────────────────────────────── */}
+          <section id="sources" className="mx-auto w-full max-w-[86rem] px-4 pb-28 sm:px-8 md:pb-40">
+            <Rise className="mb-16 max-w-3xl">
+              <h2 className="text-[clamp(2rem,4.4vw,3.4rem)] font-semibold leading-[1.04] tracking-[-0.035em]">
+                Quatre façons de remplir le silence.
+              </h2>
+            </Rise>
+            <Rise delay={0.08}>
+              <SourceShowcase />
+            </Rise>
           </section>
 
-          {/* Desire : sources en accordéon horizontal */}
-          <section id="sources" className="mx-auto w-full max-w-7xl px-5 pb-32 sm:px-8 md:pb-48">
-            <motion.h2
-              initial={reduce ? false : { opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-80px" }}
-              transition={{ duration: 0.8, ease: EASE }}
-              className="mb-14 max-w-3xl text-[clamp(1.8rem,3.4vw,2.7rem)] font-semibold leading-[1.1] tracking-[-0.03em]"
-            >
-              Quatre façons de remplir le silence.
-            </motion.h2>
-            <SourceAccordion />
+          {/* ── Minuteur jouable ─────────────────────────────────────────── */}
+          <section id="minuteur" className="mx-auto w-full max-w-[86rem] px-4 pb-28 sm:px-8 md:pb-40">
+            <Rise>
+              <TryPomodoro />
+            </Rise>
           </section>
 
-          {/* Desire : la pile d'étapes */}
-          <section id="deroule" className="mx-auto w-full max-w-7xl px-5 pb-32 sm:px-8 md:pb-48">
-            <motion.h2
-              initial={reduce ? false : { opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-80px" }}
-              transition={{ duration: 0.8, ease: EASE }}
-              className="mb-16 max-w-3xl text-[clamp(1.8rem,3.4vw,2.7rem)] font-semibold leading-[1.1] tracking-[-0.03em]"
-            >
-              Une soirée de travail, du début à la fin.
-            </motion.h2>
-            <StepStack />
+          {/* ── Trace ────────────────────────────────────────────────────── */}
+          <section className="mx-auto w-full max-w-[86rem] px-4 pb-28 sm:px-8 md:pb-40">
+            <Rise className="mb-16 max-w-3xl">
+              <h2 className="text-[clamp(2rem,4.4vw,3.4rem)] font-semibold leading-[1.04] tracking-[-0.035em]">
+                Le lendemain, tu sais ce que tu as fait.
+              </h2>
+            </Rise>
+            <Rise delay={0.08}>
+              <TracePanel />
+            </Rise>
           </section>
 
-          {/* Action */}
-          <section className="mx-auto w-full max-w-7xl px-5 py-32 text-center sm:px-8 md:py-48">
-            <motion.div
-              initial={reduce ? false : { opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.9, ease: EASE }}
-            >
-              <h2 className="mx-auto max-w-5xl text-[clamp(2.5rem,6.4vw,5rem)] font-semibold leading-[1] tracking-[-0.035em]">
+          {/* ── Action ───────────────────────────────────────────────────── */}
+          <section className="mx-auto w-full max-w-[86rem] px-4 pb-32 text-center sm:px-8 md:pb-48">
+            <Rise>
+              <h2 className="mx-auto max-w-5xl text-[clamp(2.6rem,6.6vw,5.2rem)] font-semibold leading-[0.98] tracking-[-0.04em]">
                 Il fait nuit. Tu as une heure devant toi.
               </h2>
-              <p className="mx-auto mt-8 max-w-md text-[15px] leading-relaxed text-white/50">
-                Gratuit, sans publicité, utilisable même sans compte. Google sert seulement à retrouver ta progression
-                d&apos;un appareil à l&apos;autre.
+              <p className="mx-auto mt-9 max-w-md text-[15px] leading-relaxed text-white/50">
+                Utilisable sans compte. Google sert seulement à retrouver ta progression d&apos;un appareil à
+                l&apos;autre.
               </p>
               <div className="mt-12 flex justify-center">
-                <GoogleCta label="Ouvrir une session" />
+                <Cta label="Ouvrir une session" onClick={() => signInWithGoogle()} />
               </div>
-            </motion.div>
+            </Rise>
           </section>
 
-          <footer className="border-t border-white/[0.07] bg-[#05060c]/70 backdrop-blur-sm">
-            <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-5 px-5 py-10 sm:flex-row sm:px-8">
+          <footer className="border-t border-white/[0.07]">
+            <div className="mx-auto flex w-full max-w-[86rem] flex-col items-center justify-between gap-5 px-4 py-10 sm:flex-row sm:px-8">
               <Wordmark />
               <p className="font-mono text-[11px] tracking-wider text-white/25">
                 Pomodoro · Lofi · Focus. © {new Date().getFullYear()}
