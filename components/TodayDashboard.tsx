@@ -30,6 +30,10 @@ import { cn } from "@/lib/utils";
 // foreground. Le mouvement est motivé : entrée en cascade (hiérarchie de
 // lecture), barres de la semaine qui poussent (le chiffre devient une forme),
 // pression tactile sur les actions. Tout se replie sous prefers-reduced-motion.
+//
+// DENSITÉ VOULUE : BASSE (3/10). Grands intervalles entre les blocs, tuiles
+// largement rembourrées, peu d'éléments par ligne, chiffres au grand corps.
+// Si tu ajoutes une tuile ici, demande-toi d'abord laquelle enlever.
 
 function fmtMin(min: number): string {
   if (min <= 0) return "0 min";
@@ -69,7 +73,7 @@ function Tile({
       transition={{ type: "spring", stiffness: 320, damping: 26 }}
       onClick={onClick}
       className={cn(
-        "relative rounded-2xl border border-foreground/[0.08] bg-foreground/[0.025] p-5",
+        "relative rounded-3xl border border-foreground/[0.08] bg-foreground/[0.025] p-7 sm:p-8",
         interactive && "cursor-pointer hover:border-foreground/20 hover:bg-foreground/[0.05] transition-colors",
         className
       )}
@@ -119,12 +123,12 @@ function WeekBars({ data, unitMax }: { data: { date: string; minutes: number; la
   const reduce = useReducedMotion();
   const today = localToday();
   return (
-    <div className="flex items-end gap-1.5 h-24">
+    <div className="flex h-36 items-end gap-2 sm:gap-3">
       {data.map((d, i) => {
         const ratio = unitMax > 0 ? d.minutes / unitMax : 0;
         const isToday = d.date === today;
         return (
-          <div key={d.date} className="group flex flex-1 flex-col items-center gap-2">
+          <div key={d.date} className="group flex flex-1 flex-col items-center gap-3">
             <div className="relative flex w-full flex-1 items-end">
               <motion.div
                 initial={reduce ? false : { scaleY: 0 }}
@@ -160,8 +164,8 @@ function Metric({ label, value, sub }: { label: string; value: string; sub?: str
   return (
     <div className="min-w-0">
       <Label>{label}</Label>
-      <p className="mt-1.5 font-mono text-xl tabular-nums tracking-tight text-foreground">{value}</p>
-      {sub && <p className="mt-0.5 truncate text-[11px] text-foreground/35">{sub}</p>}
+      <p className="mt-3 font-mono text-[28px] leading-none tabular-nums tracking-tight text-foreground">{value}</p>
+      {sub && <p className="mt-2 truncate text-[12px] text-foreground/35">{sub}</p>}
     </div>
   );
 }
@@ -186,8 +190,8 @@ function DayRail({ blocks }: { blocks: { id: string; startMin: number; durationM
   const nowPct = ((nowMin - START) / span) * 100;
 
   return (
-    <div className="mt-4">
-      <div className="relative h-9 rounded-lg bg-foreground/[0.05]">
+    <div className="mt-6">
+      <div className="relative h-12 rounded-xl bg-foreground/[0.05]">
         {blocks.map((b, i) => {
           const left = ((b.startMin - START) / span) * 100;
           const width = (b.durationMin / span) * 100;
@@ -203,7 +207,7 @@ function DayRail({ blocks }: { blocks: { id: string; startMin: number; durationM
                 width: `${Math.max(Math.min(width, 100 - Math.max(left, 0)), 2.5)}%`,
                 transformOrigin: "left",
               }}
-              className="absolute inset-y-1 flex items-center overflow-hidden rounded-md bg-focus/25 px-2"
+              className="absolute inset-y-1.5 flex items-center overflow-hidden rounded-lg bg-focus/25 px-2.5"
               title={`${formatMinOfDay(b.startMin)} · ${b.durationMin} min · ${b.label || "Focus"}`}
             >
               <span className="truncate text-[10px] font-medium text-foreground/75">{b.label || "Focus"}</span>
@@ -214,7 +218,7 @@ function DayRail({ blocks }: { blocks: { id: string; startMin: number; durationM
           <span className="absolute inset-y-0 w-px bg-foreground/50" style={{ left: `${nowPct}%` }} aria-hidden />
         )}
       </div>
-      <div className="mt-1.5 flex justify-between font-mono text-[10px] text-foreground/25">
+      <div className="mt-2.5 flex justify-between font-mono text-[10px] text-foreground/25">
         <span>06h</span>
         <span>12h</span>
         <span>18h</span>
@@ -289,14 +293,14 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
   const sprintStatus = sprint ? getSprintStatus(sprint, blocks) : null;
 
   return (
-    <motion.div variants={container} initial="hidden" animate="show" className="flex flex-col gap-3">
+    <motion.div variants={container} initial="hidden" animate="show" className="flex flex-col gap-8 sm:gap-10">
       {/* En-tête */}
-      <motion.div variants={tile} className="mb-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <motion.div variants={tile} className="flex flex-col gap-6 pt-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/35">
             {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
           </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-[40px] sm:leading-[1.05]">
+          <h1 className="mt-3 text-[34px] font-semibold leading-[1.05] tracking-[-0.03em] text-foreground sm:text-[46px]">
             {greeting}
           </h1>
         </div>
@@ -335,19 +339,19 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
       )}
 
       {/* Bento principal : objectif (5) + semaine (7) */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-        <Tile className="flex items-center gap-5 lg:col-span-5">
-          <GoalRing progress={progress} size={104} stroke={9} />
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:gap-6">
+        <Tile className="flex items-center gap-7 lg:col-span-5">
+          <GoalRing progress={progress} size={132} stroke={10} />
           <div className="min-w-0">
             <Label>Objectif du jour</Label>
-            <p className="mt-2 text-[15px] leading-snug text-foreground/80">
+            <p className="mt-3 text-[17px] leading-snug text-foreground/80">
               {progress.reached
                 ? "Atteint. Le reste est du bonus."
                 : `Encore ${Math.max(0, target - progress.value)} ${unit === "minutes" ? "min" : `pomodoro${target - progress.value !== 1 ? "s" : ""}`}`}
             </p>
             <button
               onClick={startSession}
-              className="mt-3 font-mono text-[11px] uppercase tracking-[0.12em] text-focus transition-opacity hover:opacity-70"
+              className="mt-5 font-mono text-[11px] uppercase tracking-[0.12em] text-focus transition-opacity hover:opacity-70"
             >
               Lancer maintenant
             </button>
@@ -359,18 +363,19 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
             <Label>Sept derniers jours</Label>
             <p className="font-mono text-[11px] tabular-nums text-foreground/40">{fmtMin(weekTotal)}</p>
           </div>
-          <div className="mt-5">
+          <div className="mt-8">
             <WeekBars data={week} unitMax={weekMax} />
           </div>
-          <div className="mt-5 grid grid-cols-3 gap-4 border-t border-foreground/[0.07] pt-4">
+          <div className="mt-8 grid grid-cols-2 gap-8 border-t border-foreground/[0.07] pt-7">
             <CountMetric label="Série" num={streak} format={(v) => `${v} j`} sub={streak >= 7 ? "solide" : streak > 0 ? "en cours" : "à relancer"} />
             <CountMetric label="Aujourd'hui" num={today.minutesWorked} format={fmtMin} sub={`${today.sessions} session${today.sessions !== 1 ? "s" : ""}`} />
-            <Metric
-              label="Heure forte"
-              value={peakHour !== null ? `${peakHour}h` : "-"}
-              sub={peakHour !== null && Math.abs(currentHour - peakHour) <= 1 ? "c'est maintenant" : "d'après ton historique"}
-            />
           </div>
+          {peakHour !== null && (
+            <p className="mt-6 text-[13px] text-foreground/40">
+              Tu es le plus souvent concentré vers {peakHour}h
+              {Math.abs(currentHour - peakHour) <= 1 ? ", c'est maintenant." : "."}
+            </p>
+          )}
         </Tile>
       </div>
 
@@ -410,7 +415,7 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
       )}
 
       {/* Journée : rail horaire (7) + prochaine tâche (5) */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:gap-6">
         <Tile className="lg:col-span-7">
           <div className="flex items-center justify-between gap-4">
             <Label>Ta journée</Label>
@@ -538,7 +543,7 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
 
       {/* Bas de page : récap hebdo + dernière réflexion */}
       {(showWrappedBanner || recentJournal) && (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
           {showWrappedBanner && (
             <Tile interactive onClick={() => router.push("/wrapped")} className="flex items-center gap-4">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-focus/15 text-focus">
@@ -584,11 +589,11 @@ function DashboardSkeleton() {
         </div>
         <span className="anim-skeleton block h-11 w-48 rounded-xl bg-foreground/10" />
       </div>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:gap-6">
         <span className="anim-skeleton block h-[164px] rounded-2xl bg-foreground/[0.06] lg:col-span-5" />
         <span className="anim-skeleton block h-[164px] rounded-2xl bg-foreground/[0.06] lg:col-span-7" />
       </div>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:gap-6">
         <span className="anim-skeleton block h-32 rounded-2xl bg-foreground/[0.06] lg:col-span-7" />
         <span className="anim-skeleton block h-32 rounded-2xl bg-foreground/[0.06] lg:col-span-5" />
       </div>

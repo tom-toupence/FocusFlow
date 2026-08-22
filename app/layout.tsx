@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SupabaseProvider from "@/components/SupabaseProvider";
 import AuthGate from "@/components/AuthGate";
@@ -21,12 +21,6 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const instrumentSerif = Instrument_Serif({
-  variable: "--font-instrument",
-  subsets: ["latin"],
-  weight: "400",
-});
-
 // `viewport-fit=cover` active env(safe-area-inset-*) sur iPhone à encoche —
 // AppNav/CreateMenu/AddToMenu s'en servent déjà pour leurs bottom-bars.
 export const viewport: Viewport = {
@@ -46,7 +40,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className={`${geist.variable} ${geistMono.variable} ${instrumentSerif.variable} h-full dark`}>
+    <html lang="fr" className={`${geist.variable} ${geistMono.variable} h-full dark`}>
       <head>
         {/* Apply saved theme before first paint to avoid flash */}
         <script dangerouslySetInnerHTML={{ __html: `try{var t=JSON.parse(localStorage.getItem('focusflow-theme')||'{}').state?.theme;if(t==='light')document.documentElement.classList.remove('dark');else document.documentElement.classList.add('dark');}catch(e){}` }} />

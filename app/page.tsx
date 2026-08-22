@@ -1156,7 +1156,7 @@ export default function LandingPage() {
           </div>
         </header>
 
-        <main className="flex-1 px-4 sm:px-6 py-6 sm:py-8 max-w-6xl mx-auto w-full pb-24 md:pb-10">
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 pb-28 sm:px-8 sm:py-12 md:pb-16">
         {/* Sous-sélecteur de sources (section Écouter) */}
         {section === "ecouter" && (
           <div className="mb-7 inline-flex flex-wrap gap-1 rounded-xl border border-foreground/[0.08] bg-foreground/[0.025] p-1">

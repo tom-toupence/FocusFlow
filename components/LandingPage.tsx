@@ -1,91 +1,98 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  motion,
+  useMotionValue,
+  useMotionTemplate,
+  useReducedMotion,
+  useScroll,
+  useSpring,
+  useTransform,
+  MotionConfig,
+  type MotionValue,
+} from "motion/react";
 import { signInWithGoogle } from "@/lib/supabase";
+import CityBackdrop from "@/components/CityBackdrop";
 import { cn } from "@/lib/utils";
 
-// Landing (AuthGate, non connecté) — direction « minimalisme utilitaire » :
-// canvas chaud clair, titrage en serif éditorial, tout le reste en 1px de
-// bordure. Aucune ombre lourde, aucun dégradé, aucun emoji. Le mouvement se
-// limite à des révélations au scroll (IntersectionObserver) et à une seule
-// nappe lumineuse fixe qui dérive très lentement.
+// LANDING (AuthGate, visiteur non connecté).
 //
-// ⚠️ La page est volontairement en palette claire FIXE (indépendante du thème
-// de l'app) : les couleurs sont écrites en dur, jamais via les tokens
-// foreground/background, qui sont sombres ici (<html class="dark">).
+// Ambiance : la ville, la nuit. `CityBackdrop` occupe le fond en `fixed` et
+// fait TOMBER LA NUIT au fil du scroll (la photo descend, le couchant s'efface,
+// les fenêtres s'allument, un rail d'heure avance). Toute la page est
+// chorégraphiée par-dessus.
+//
+// Choix technique : TOUT passe par `motion/react` (déjà une dépendance, et
+// utilisé par CityBackdrop). Pas de GSAP en parallèle : deux moteurs de scroll
+// sur la même page se disputeraient les frames.
+//
+// Règles de perf tenues partout :
+//   - on n'anime que `transform` / `opacity` ;
+//   - la position du pointeur vit dans des MotionValue, JAMAIS dans un state
+//     (sinon re-render de tout l'arbre à chaque pixel parcouru) ;
+//   - tout se neutralise sous `prefers-reduced-motion` (MotionConfig + gardes).
 
-const INK = "#1B1B19";
-const MUTED = "#787774";
-const LINE = "#E6E4DF";
-const CANVAS = "#F7F6F3";
+const EASE = [0.16, 1, 0.3, 1] as const;
 
-/* ── Révélation au scroll ──────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   Primitives
+   ══════════════════════════════════════════════════════════════════════════ */
 
-function Reveal({
+/** Bouton magnétique : il se penche vers le curseur. Uniquement en MotionValue. */
+function Magnetic({
   children,
-  delay = 0,
   className,
-  style,
-  as: Tag = "div",
+  onClick,
+  strength = 14,
 }: {
   children: React.ReactNode;
-  delay?: number;
   className?: string;
-  style?: React.CSSProperties;
-  as?: "div" | "section" | "li" | "header";
+  onClick?: () => void;
+  strength?: number;
 }) {
-  const ref = useRef<HTMLElement | null>(null);
-  const [shown, setShown] = useState(false);
-  const Comp = Tag as React.ElementType;
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setShown(true);
-          io.disconnect();
-        }
-      },
-      { rootMargin: "-60px 0px" }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+  const ref = useRef<HTMLButtonElement>(null);
+  const reduce = useReducedMotion();
+  const x = useSpring(useMotionValue(0), { stiffness: 260, damping: 18 });
+  const y = useSpring(useMotionValue(0), { stiffness: 260, damping: 18 });
 
   return (
-    <Comp
+    <motion.button
       ref={ref}
-      data-shown={shown}
-      className={cn("reveal", className)}
-      style={{ ...style, "--reveal-delay": `${delay}ms` } as React.CSSProperties}
+      onClick={onClick}
+      style={reduce ? undefined : { x, y }}
+      onPointerMove={(e) => {
+        if (reduce || !ref.current) return;
+        const r = ref.current.getBoundingClientRect();
+        x.set(((e.clientX - r.left) / r.width - 0.5) * strength * 2);
+        y.set(((e.clientY - r.top) / r.height - 0.5) * strength);
+      }}
+      onPointerLeave={() => {
+        x.set(0);
+        y.set(0);
+      }}
+      whileTap={reduce ? undefined : { scale: 0.97 }}
+      className={className}
     >
       {children}
-    </Comp>
+    </motion.button>
   );
 }
 
-/* ── Primitives ────────────────────────────────────────────────────────── */
-
-function GoogleButton({ label = "Continuer avec Google", size = "md" }: { label?: string; size?: "sm" | "md" }) {
+function GoogleCta({ label = "Commencer" }: { label?: string }) {
   const [loading, setLoading] = useState(false);
   return (
-    <button
+    <Magnetic
       onClick={async () => {
         setLoading(true);
         await signInWithGoogle();
       }}
-      disabled={loading}
-      className={cn(
-        "inline-flex items-center justify-center gap-2.5 rounded-md bg-[#1B1B19] text-white font-medium transition-colors hover:bg-[#333331] disabled:opacity-60 motion-safe:active:scale-[0.98]",
-        size === "sm" ? "px-4 py-2 text-[13px]" : "px-5 py-3 text-sm"
-      )}
+      className="group inline-flex items-center gap-3 rounded-full bg-white px-7 py-4 text-sm font-semibold tracking-tight text-[#08090f] transition-colors hover:bg-white/90"
     >
       {loading ? (
-        <span className="w-3.5 h-3.5 rounded-full border-2 border-white/25 border-t-white/80 animate-spin" />
+        <span className="h-4 w-4 rounded-full border-2 border-black/20 border-t-black/70 animate-spin" />
       ) : (
-        <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden>
+        <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
           <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
           <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
@@ -93,112 +100,113 @@ function GoogleButton({ label = "Continuer avec Google", size = "md" }: { label?
         </svg>
       )}
       {loading ? "Redirection" : label}
-    </button>
+      <svg
+        className="h-3.5 w-3.5 transition-transform duration-500 ease-out group-hover:translate-x-1"
+        viewBox="0 0 16 16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
+        <path d="M2.5 8h11M9 3.5L13.5 8 9 12.5" />
+      </svg>
+    </Magnetic>
   );
 }
 
 function Wordmark() {
   return (
     <span className="flex items-center gap-2.5">
-      <span className="w-7 h-7 rounded-md border flex items-center justify-center bg-white" style={{ borderColor: LINE }}>
-        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth={2} strokeLinecap="round">
+      <span className="relative flex h-7 w-7 items-center justify-center rounded-full border border-white/20">
+        <span className="absolute inset-0 rounded-full bg-[#ffb570]/20 blur-[6px]" aria-hidden />
+        <svg className="relative h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
           <circle cx="12" cy="12" r="8.5" />
           <path d="M12 7.5V12l3 2.2" />
         </svg>
       </span>
-      <span className="text-[15px] font-medium tracking-tight" style={{ color: INK }}>
-        FocusFlow
-      </span>
+      <span className="text-[15px] font-semibold tracking-tight text-white">FocusFlow</span>
     </span>
   );
 }
 
-function Tag({ tone = "blue", children }: { tone?: "blue" | "green" | "yellow"; children: React.ReactNode }) {
-  const tones = {
-    blue: { bg: "#E1F3FE", fg: "#1F6C9F" },
-    green: { bg: "#EDF3EC", fg: "#346538" },
-    yellow: { bg: "#FBF3DB", fg: "#956400" },
-  }[tone];
-  return (
-    <span
-      className="inline-flex items-center rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.09em]"
-      style={{ background: tones.bg, color: tones.fg }}
-    >
-      {children}
-    </span>
-  );
-}
-
-function Key({ children }: { children: React.ReactNode }) {
-  return (
-    <kbd
-      className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded font-mono text-[11px] bg-white"
-      style={{ border: `1px solid ${LINE}`, color: MUTED }}
-    >
-      {children}
-    </kbd>
-  );
-}
-
-/* ── Aperçu de session (chrome de fenêtre) ─────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   Aperçu de session : le produit lui-même, incliné vers le curseur
+   ══════════════════════════════════════════════════════════════════════════ */
 
 const TRACKS = [
-  "Lofi hip hop — beats to study",
-  "Rainy Tokyo — night ambience",
-  "Study with me — Kyoto 4K",
-  "Deep focus — piano & strings",
+  "Lofi hip hop, beats to study",
+  "Rainy Tokyo, night ambience",
+  "Study with me, Kyoto 4K",
+  "Deep focus, piano et cordes",
 ];
 
-function SessionPreview({ phase = "Focus" }: { phase?: "Focus" | "Pause" }) {
+function SessionCard({ px, py }: { px?: MotionValue<number>; py?: MotionValue<number> }) {
+  const reduce = useReducedMotion();
   const TOTAL = 180;
   const [remaining, setRemaining] = useState(TOTAL);
   const [track, setTrack] = useState(0);
 
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (reduce) return;
     const t = setInterval(() => setRemaining((r) => (r <= 1 ? TOTAL : r - 1)), 1000);
-    const k = setInterval(() => setTrack((i) => (i + 1) % TRACKS.length), 5000);
+    const k = setInterval(() => setTrack((i) => (i + 1) % TRACKS.length), 5200);
     return () => {
       clearInterval(t);
       clearInterval(k);
     };
-  }, []);
+  }, [reduce]);
+
+  // Inclinaison 3D pilotée par la position normalisée du pointeur (-0.5 → 0.5).
+  const zero = useMotionValue(0);
+  const rotY = useSpring(useTransform(px ?? zero, [-0.5, 0.5], [10, -10]), { stiffness: 120, damping: 18 });
+  const rotX = useSpring(useTransform(py ?? zero, [-0.5, 0.5], [-8, 8]), { stiffness: 120, damping: 18 });
 
   const progress = 1 - remaining / TOTAL;
   const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
   const ss = String(remaining % 60).padStart(2, "0");
   const dash = 276;
-  const isBreak = phase === "Pause";
 
   return (
-    <div className="rounded-xl overflow-hidden bg-white" style={{ border: `1px solid ${LINE}` }}>
-      {/* Chrome de fenêtre */}
-      <div className="flex items-center gap-1.5 px-3.5 h-9" style={{ borderBottom: `1px solid ${LINE}` }}>
-        <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#E0DEDA" }} />
-        <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#E0DEDA" }} />
-        <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#E0DEDA" }} />
-        <span className="ml-3 font-mono text-[10px]" style={{ color: MUTED }}>
-          focusflow / session
-        </span>
-      </div>
+    <motion.div
+      style={reduce ? undefined : { rotateX: rotX, rotateY: rotY, transformPerspective: 1200 }}
+      className="relative w-[24rem] max-w-full rounded-3xl border border-white/12 bg-[#0a0c14]/70 p-2 backdrop-blur-xl"
+    >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -inset-px rounded-3xl"
+        style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.16), 0 30px 80px -30px rgba(0,0,0,0.9)" }}
+      />
+      <div className="relative overflow-hidden rounded-[1.25rem] bg-[#070810]">
+        <div className="flex items-center gap-2 border-b border-white/[0.07] px-4 py-2.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-white/20" />
+          <span className="h-1.5 w-1.5 rounded-full bg-white/20" />
+          <span className="ml-2 font-mono text-[10px] tracking-wider text-white/30">focusflow / session</span>
+        </div>
 
-      <div className="relative flex items-center justify-center aspect-[4/3] sm:aspect-video" style={{ background: CANVAS }}>
-        {/* image d'ambiance très effacée : la session tourne toujours sur un paysage */}
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-[0.14] bg-cover bg-center grayscale"
-          style={{ backgroundImage: "url(https://picsum.photos/seed/focusflow-kyoto/1200/800)" }}
-        />
-        <div className="relative flex flex-col items-center gap-5 px-6">
-          <div className="relative w-28 h-28 sm:w-32 sm:h-32">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="44" fill="none" stroke="#E6E4DF" strokeWidth="3" />
+        <div className="relative flex aspect-[4/3] flex-col items-center justify-center gap-6">
+          <div
+            aria-hidden
+            className="absolute inset-0 bg-cover bg-center opacity-[0.18] grayscale"
+            style={{ backgroundImage: "url(https://picsum.photos/seed/focusflow-night-kyoto/900/700)" }}
+          />
+          <div className="relative h-32 w-32">
+            <motion.span
+              aria-hidden
+              className="absolute inset-0 rounded-full"
+              style={{ background: "radial-gradient(circle, rgba(255,180,110,0.20), transparent 70%)" }}
+              animate={reduce ? undefined : { scale: [1, 1.14, 1], opacity: [0.55, 0.95, 0.55] }}
+              transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <svg className="relative h-full w-full -rotate-90" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="3" />
               <circle
                 cx="50"
                 cy="50"
                 r="44"
                 fill="none"
-                stroke={isBreak ? "#346538" : INK}
+                stroke="#ffc38a"
                 strokeWidth="3"
                 strokeLinecap="round"
                 strokeDasharray={dash}
@@ -207,390 +215,555 @@ function SessionPreview({ phase = "Focus" }: { phase?: "Focus" | "Pause" }) {
               />
             </svg>
             <span className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="font-mono text-2xl sm:text-[28px] tabular-nums" style={{ color: INK }}>
+              <span className="font-mono text-[28px] tabular-nums text-white">
                 {mm}:{ss}
               </span>
-              <span className="font-mono text-[10px] uppercase tracking-[0.12em] mt-1" style={{ color: MUTED }}>
-                {phase}
-              </span>
+              <span className="mt-1 font-mono text-[9px] uppercase tracking-[0.2em] text-white/35">Focus</span>
             </span>
           </div>
 
-          <span
-            className="flex items-center gap-2.5 rounded-md bg-white px-3 py-1.5 max-w-[85%]"
-            style={{ border: `1px solid ${LINE}` }}
-          >
-            <span className="flex items-end gap-[2px] h-3 shrink-0" aria-hidden>
+          <span className="relative flex max-w-[80%] items-center gap-2.5 rounded-full border border-white/10 bg-black/50 px-3.5 py-2 backdrop-blur">
+            <span className="flex h-3 items-end gap-[2px]" aria-hidden>
               {[1.2, 1.5, 1.35].map((d, i) => (
                 <span
                   key={i}
-                  className="anim-eq w-[2px] h-full rounded-full"
-                  style={{
-                    background: INK,
-                    animationDuration: `${d}s`,
-                    animationDelay: `${-i * 0.45}s`,
-                    animationPlayState: isBreak ? "paused" : "running",
-                  }}
+                  className="anim-eq w-[2px] rounded-full bg-[#ffc38a]"
+                  style={{ height: "100%", animationDuration: `${d}s`, animationDelay: `${-i * 0.45}s` }}
                 />
               ))}
             </span>
-            <span key={track} className="anim-track-in text-[11px] truncate" style={{ color: MUTED }}>
-              {isBreak ? "Respiration guidée — 4·4·4·4" : TRACKS[track]}
+            <span key={track} className="anim-track-in truncate text-[11px] text-white/60">
+              {TRACKS[track]}
             </span>
           </span>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
-/* ── Contenu ───────────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   Manifeste : les mots s'allument un par un, au rythme du scroll
+   ══════════════════════════════════════════════════════════════════════════ */
 
-interface Feature {
-  title: string;
-  desc: string;
-  icon: React.ReactNode;
-  span?: boolean;
+function ScrubbedText({ text }: { text: string }) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start 0.85", "end 0.45"] });
+  const words = text.split(" ");
+
+  return (
+    <p
+      ref={ref}
+      className="mx-auto max-w-5xl text-balance text-center text-[clamp(1.5rem,3.4vw,2.9rem)] font-medium leading-[1.32] tracking-[-0.02em] text-white"
+    >
+      {words.map((w, i) => (
+        <Word key={`${w}-${i}`} progress={scrollYProgress} index={i} total={words.length}>
+          {w}
+        </Word>
+      ))}
+    </p>
+  );
 }
 
-const FEATURES: Feature[] = [
-  {
-    title: "Timer et musique dans la même fenêtre",
-    desc: "Pomodoro classic, deep, custom — ou Flowtime, un chrono libre dont la pause se calcule sur le temps réellement travaillé. Le lecteur reste plein écran derrière : catalogue lofi, playlists YouTube, Spotify Premium, streams Twitch.",
-    span: true,
-    icon: (
-      <>
-        <circle cx="12" cy="12" r="8.5" />
-        <path d="M12 7.5V12l3 2.2" />
-      </>
-    ),
-  },
-  {
-    title: "File d'attente et playlists",
-    desc: "Tes titres exacts, dans ton ordre, sans que YouTube reprenne la main.",
-    icon: <path d="M4 6h11M4 11h11M4 16h7M19 8v9.2M19 17.2a2 2 0 1 1-2 2" />,
-  },
-  {
-    title: "Tâches, projets, planning",
-    desc: "Kanban, budgets de pomodoros, blocs hebdo synchronisables au calendrier.",
-    icon: (
-      <>
-        <path d="M9.5 12.5l2 2 4.5-5" />
-        <rect x="3.5" y="4.5" width="17" height="16" rx="2.5" />
-      </>
-    ),
-  },
-  {
-    title: "Statistiques et Focus Score",
-    desc: "Heatmap, séries, distractions marquées, récap hebdomadaire, export CSV.",
-    icon: <path d="M4 20V4M4 20h16M8 16l3.5-4.5 3 2.5L20 8" />,
-  },
-  {
-    title: "Amis en direct",
-    desc: "Ajout par code, classement de la semaine, présence « en focus » et chat.",
-    icon: (
-      <>
-        <circle cx="9" cy="8" r="3.2" />
-        <path d="M3.5 19.5v-1.2a4 4 0 0 1 4-4h3a4 4 0 0 1 4 4v1.2M16 5.4a3.2 3.2 0 0 1 0 6.2M17.5 14.4a4 4 0 0 1 3 3.9v1.2" />
-      </>
-    ),
-  },
-];
+function Word({
+  progress,
+  index,
+  total,
+  children,
+}: {
+  progress: MotionValue<number>;
+  index: number;
+  total: number;
+  children: React.ReactNode;
+}) {
+  const start = index / total;
+  const opacity = useTransform(progress, [start, start + 1 / total], [0.14, 1]);
+  return (
+    <motion.span style={{ opacity }} className="inline-block">
+      {children}
+      <span className="inline-block w-[0.28em]" />
+    </motion.span>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Pile d'étapes : chacune se colle en haut, la précédente recule
+   ══════════════════════════════════════════════════════════════════════════ */
 
 const STEPS = [
   {
     n: "01",
     title: "Choisis ton ambiance",
-    desc: "Un paysage du catalogue, ta playlist YouTube, Spotify ou un stream Twitch.",
-    phase: "Focus" as const,
+    body: "Un paysage du catalogue, ta playlist YouTube, un album Spotify ou un stream Twitch. La pluie sur Osaka, un train de nuit, une bibliothèque à Séoul.",
+    seed: "focusflow-step-ambiance",
   },
   {
     n: "02",
-    title: "Lance la session",
-    desc: "Ton rythme Pomodoro, tes tâches du jour, et l'écran ne montre plus que ça.",
-    phase: "Focus" as const,
+    title: "Pose ton rythme",
+    body: "Pomodoro classique, sessions longues, ou Flowtime qui te laisse aller au bout de ton élan puis calcule la pause que tu as méritée.",
+    seed: "focusflow-step-rythme",
   },
   {
     n: "03",
-    title: "Respire, puis recommence",
-    desc: "Pause guidée, objectif quotidien, journal d'humeur et récap de la semaine.",
-    phase: "Pause" as const,
+    title: "Laisse la nuit passer",
+    body: "Respiration guidée pendant les pauses, journal d'humeur, objectif du jour, récap de la semaine. Au matin, tu sais exactement ce que tu as fait.",
+    seed: "focusflow-step-nuit",
   },
 ];
 
-const FAQ = [
-  {
-    q: "Faut-il un compte pour s'en servir ?",
-    a: "Non. Tout fonctionne en local dans le navigateur : timer, catalogue, tâches, statistiques. Le compte Google sert uniquement à synchroniser ta progression entre plusieurs appareils et à retrouver tes amis.",
-  },
-  {
-    q: "C'est gratuit jusqu'où ?",
-    a: "Entièrement. Pas d'abonnement, pas de publicité, pas de fonctionnalité réservée. Le coach de planification tourne en local par défaut, et l'application n'a besoin d'aucune clé API pour lire de la musique.",
-  },
-  {
-    q: "Que faut-il pour Spotify et Twitch ?",
-    a: "Spotify demande un compte Premium (contrainte du Web Playback SDK). Twitch fonctionne avec un compte gratuit, en direct comme en rediffusion. YouTube ne demande rien.",
-  },
-  {
-    q: "Qu'est-ce que mes amis voient de moi ?",
-    a: "Des agrégats seulement : minutes de la semaine, pomodoros, série, et si tu es en focus. Jamais tes tâches, ton journal, tes projets ni le contenu de tes sessions.",
-  },
-];
+function StepStack() {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
 
-function FaqItem({ q, a, open, onToggle }: { q: string; a: string; open: boolean; onToggle: () => void }) {
   return (
-    <div style={{ borderBottom: `1px solid ${LINE}` }}>
-      <button onClick={onToggle} className="w-full flex items-start gap-6 py-6 text-left group" aria-expanded={open}>
-        <span className="flex-1 text-[17px] tracking-tight transition-colors" style={{ color: open ? INK : "#3B3B38" }}>
-          {q}
-        </span>
-        <span className="shrink-0 mt-1" aria-hidden>
-          <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke={MUTED} strokeWidth={1.6} strokeLinecap="round">
-            <path d="M2.5 8h11" />
-            {!open && <path d="M8 2.5v11" />}
-          </svg>
-        </span>
-      </button>
-      <div
-        className="grid transition-[grid-template-rows] duration-300 ease-out"
-        style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
-      >
-        <div className="overflow-hidden">
-          <p className="pb-6 pr-10 text-[15px] leading-[1.65] max-w-2xl" style={{ color: MUTED }}>
-            {a}
-          </p>
-        </div>
-      </div>
+    <div ref={ref} className="relative">
+      {STEPS.map((s, i) => (
+        <StepCard key={s.n} step={s} index={i} total={STEPS.length} progress={scrollYProgress} />
+      ))}
     </div>
   );
 }
 
-export default function LandingPage() {
-  const [activeStep, setActiveStep] = useState(0);
-  const [openFaq, setOpenFaq] = useState<number | null>(0);
+function StepCard({
+  step,
+  index,
+  total,
+  progress,
+}: {
+  step: (typeof STEPS)[number];
+  index: number;
+  total: number;
+  progress: MotionValue<number>;
+}) {
+  const reduce = useReducedMotion();
+  const isLast = index === total - 1;
+  // La carte recule quand la SUIVANTE arrive : segment [i/total, (i+1)/total].
+  const scale = useTransform(progress, [index / total, (index + 1) / total], [1, isLast ? 1 : 0.93]);
+  const opacity = useTransform(progress, [index / total, (index + 1) / total], [1, isLast ? 1 : 0.35]);
 
   return (
-    <div className="relative min-h-screen font-sans overflow-x-hidden" style={{ background: CANVAS, color: INK }}>
-      {/* Nappe lumineuse fixe, très lente, très faible — juste de quoi éviter
-          un aplat parfaitement mort derrière le hero. */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div
-          className="anim-drift absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(150,120,80,0.06), transparent 65%)" }}
-        />
-      </div>
+    <div className="sticky top-[14vh] mb-6 last:mb-0">
+      <motion.article
+        style={reduce ? undefined : { scale, opacity, transformOrigin: "top center" }}
+        className="group relative grid gap-10 overflow-hidden rounded-[2rem] border border-white/10 bg-[#080a12]/85 p-8 backdrop-blur-xl md:grid-cols-[1fr_minmax(0,20rem)] md:items-center md:p-12"
+      >
+        <div className="max-w-xl">
+          <span className="font-mono text-[11px] tracking-[0.2em] text-[#ffc38a]/70">{step.n}</span>
+          <h3 className="mt-5 text-[clamp(1.7rem,3.2vw,2.6rem)] font-semibold leading-[1.08] tracking-[-0.03em] text-white">
+            {step.title}
+          </h3>
+          <p className="mt-5 max-w-md text-[15px] leading-relaxed text-white/50">{step.body}</p>
+        </div>
+        <div className="relative aspect-[4/3] overflow-hidden rounded-2xl md:aspect-[3/4]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`https://picsum.photos/seed/${step.seed}/900/1200`}
+            alt=""
+            loading="lazy"
+            className="h-full w-full object-cover opacity-70 contrast-125 grayscale transition-all duration-700 ease-out group-hover:scale-105 group-hover:opacity-95 group-hover:grayscale-0"
+          />
+          <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#05060c] via-transparent to-transparent" aria-hidden />
+        </div>
+      </motion.article>
+    </div>
+  );
+}
 
-      <div className="relative">
-        {/* Header */}
-        <header
-          className="sticky top-0 z-30 backdrop-blur-md"
-          style={{ background: "rgba(247,246,243,0.85)", borderBottom: `1px solid ${LINE}` }}
-        >
-          <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-            <Wordmark />
-            <nav className="hidden md:flex items-center gap-8 text-[13px]" style={{ color: MUTED }}>
-              <a href="#produit" className="hover:text-[#1B1B19] transition-colors">Produit</a>
-              <a href="#methode" className="hover:text-[#1B1B19] transition-colors">Méthode</a>
-              <a href="#questions" className="hover:text-[#1B1B19] transition-colors">Questions</a>
-            </nav>
-            <GoogleButton label="Se connecter" size="sm" />
-          </div>
-        </header>
+/* ══════════════════════════════════════════════════════════════════════════
+   Accordéon horizontal : les quatre façons de remplir le silence
+   ══════════════════════════════════════════════════════════════════════════ */
 
-        {/* Hero */}
-        <section className="max-w-5xl mx-auto px-6 pt-20 pb-16 sm:pt-32 sm:pb-24">
-          <Reveal>
-            <Tag tone="green">Gratuit · sans compte requis</Tag>
-          </Reveal>
+const SOURCES = [
+  {
+    key: "catalogue",
+    title: "Catalogue",
+    line: "Une cinquantaine de paysages choisis à la main : Tokyo, Osaka, Kyoto, Jeju, Ha Long, Hong Kong.",
+    seed: "focusflow-source-catalogue",
+  },
+  {
+    key: "youtube",
+    title: "YouTube",
+    line: "Tes playlists et tes vidéos, jouées dans ton ordre grâce à la file d'attente FocusFlow.",
+    seed: "focusflow-source-youtube",
+  },
+  {
+    key: "spotify",
+    title: "Spotify",
+    line: "Ta bibliothèque Premium se lit dans la session, sans jamais changer d'onglet.",
+    seed: "focusflow-source-spotify",
+  },
+  {
+    key: "twitch",
+    title: "Twitch",
+    line: "Un live ou une rediffusion en fond, pour travailler à côté de quelqu'un.",
+    seed: "focusflow-source-twitch",
+  },
+];
 
-          <Reveal delay={60}>
-            <h1 className="font-serif mt-7 text-[44px] sm:text-[68px] leading-[1.04] tracking-[-0.03em] max-w-3xl">
-              La musique et le timer,
-              <br />
-              dans la même fenêtre.
-            </h1>
-          </Reveal>
-
-          <Reveal delay={120}>
-            <p className="mt-7 max-w-xl text-[16px] sm:text-[17px] leading-[1.6]" style={{ color: MUTED }}>
-              FocusFlow réunit un Pomodoro et un lecteur multi-sources — lofi YouTube, Spotify, Twitch — sur un
-              seul écran. Autour, ce qu&apos;il faut pour tenir la distance : tâches, planning, statistiques, et
-              des amis qui travaillent en même temps que toi.
-            </p>
-          </Reveal>
-
-          <Reveal delay={180}>
-            <div className="mt-10 flex flex-wrap items-center gap-4">
-              <GoogleButton label="Commencer" />
-              <a
-                href="#produit"
-                className="inline-flex items-center gap-2 rounded-md bg-white px-5 py-3 text-sm font-medium transition-colors hover:bg-[#F0EFEB]"
-                style={{ border: `1px solid ${LINE}`, color: INK }}
-              >
-                Voir ce qu&apos;il y a dedans
-                <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M8 2.5v11M3.5 9.5L8 14l4.5-4.5" />
-                </svg>
-              </a>
-            </div>
-          </Reveal>
-
-          <Reveal delay={240}>
-            <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px]" style={{ color: MUTED }}>
-              <Key>⌘</Key>
-              <Key>K</Key>
-              <span className="ml-1">pour atteindre n&apos;importe quelle section au clavier.</span>
-            </p>
-          </Reveal>
-
-          <Reveal delay={300} className="mt-16 sm:mt-20">
-            <SessionPreview />
-          </Reveal>
-        </section>
-
-        {/* Bandeau de faits */}
-        <Reveal as="section" className="max-w-5xl mx-auto px-6">
-          <div className="grid grid-cols-2 sm:grid-cols-4" style={{ borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
-            {[
-              ["5", "sources audio"],
-              ["4", "modes de timer"],
-              ["0 €", "pour tout, toujours"],
-              ["100 %", "utilisable hors compte"],
-            ].map(([v, l], i) => (
-              <div
-                key={l}
-                className="py-8 px-5"
-                style={{ borderLeft: i === 0 ? undefined : `1px solid ${LINE}` }}
-              >
-                <p className="font-serif text-[30px] leading-none tracking-tight">{v}</p>
-                <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.09em]" style={{ color: MUTED }}>
-                  {l}
-                </p>
-              </div>
-            ))}
-          </div>
-        </Reveal>
-
-        {/* Bento produit */}
-        <section id="produit" className="max-w-5xl mx-auto px-6 py-24 sm:py-32">
-          <Reveal>
-            <Tag tone="blue">Produit</Tag>
-            <h2 className="font-serif mt-6 text-[34px] sm:text-[46px] leading-[1.08] tracking-[-0.03em] max-w-2xl">
-              Tout ce qui sert à se concentrer, et rien d&apos;autre.
-            </h2>
-          </Reveal>
-
-          <div className="mt-14 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {FEATURES.map((f, i) => (
-              <Reveal
-                key={f.title}
-                delay={i * 80}
+function SourceAccordion() {
+  const [open, setOpen] = useState(0);
+  return (
+    <div className="flex flex-col gap-2 md:h-[60vh] md:min-h-[26rem] md:flex-row">
+      {SOURCES.map((s, i) => {
+        const active = open === i;
+        return (
+          <button
+            key={s.key}
+            onMouseEnter={() => setOpen(i)}
+            onFocus={() => setOpen(i)}
+            onClick={() => setOpen(i)}
+            aria-expanded={active}
+            className={cn(
+              "group relative overflow-hidden rounded-2xl border border-white/10 text-left transition-all duration-700 ease-out",
+              active ? "h-[18rem] md:h-auto md:flex-[3.2]" : "h-[8.5rem] md:h-auto md:flex-[1]"
+            )}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`https://picsum.photos/seed/${s.seed}/1200/1600`}
+              alt=""
+              loading="lazy"
+              className={cn(
+                "absolute inset-0 h-full w-full object-cover transition-all duration-700 ease-out",
+                active ? "scale-105 opacity-60 grayscale-0" : "opacity-35 grayscale"
+              )}
+            />
+            <span className="absolute inset-0 bg-gradient-to-t from-[#05060c] via-[#05060c]/55 to-transparent" aria-hidden />
+            <span className="relative flex h-full flex-col justify-end p-6">
+              <span className="text-xl font-semibold tracking-tight text-white md:text-2xl">{s.title}</span>
+              <span
                 className={cn(
-                  "group rounded-xl bg-white p-7 sm:p-9 transition-shadow duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]",
-                  f.span && "sm:col-span-2"
+                  "mt-2 max-w-sm text-sm leading-relaxed text-white/60 transition-all duration-500",
+                  active ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
                 )}
               >
-                <span className="flex w-9 h-9 items-center justify-center rounded-md" style={{ background: CANVAS }}>
-                  <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
-                    {f.icon}
-                  </svg>
-                </span>
-                <h3 className="mt-6 text-[17px] tracking-tight" style={{ color: INK }}>
-                  {f.title}
-                </h3>
-                <p className="mt-2.5 text-[14px] leading-[1.65]" style={{ color: MUTED }}>
-                  {f.desc}
-                </p>
-              </Reveal>
-            ))}
-          </div>
-        </section>
-
-        {/* Méthode */}
-        <section id="methode" className="max-w-5xl mx-auto px-6 pb-24 sm:pb-32">
-          <Reveal>
-            <Tag tone="yellow">Méthode</Tag>
-            <h2 className="font-serif mt-6 text-[34px] sm:text-[46px] leading-[1.08] tracking-[-0.03em]">
-              Trois gestes, puis on ne pense plus à l&apos;outil.
-            </h2>
-          </Reveal>
-
-          <div className="mt-14 grid md:grid-cols-2 gap-10 md:gap-14 items-center">
-            <Reveal>
-              <SessionPreview phase={STEPS[activeStep].phase} />
-            </Reveal>
-            <ul className="flex flex-col">
-              {STEPS.map((s, i) => (
-                <Reveal
-                  as="li"
-                  key={s.n}
-                  delay={i * 90}
-                  className="cursor-default"
-                >
-                  <div
-                    onMouseEnter={() => setActiveStep(i)}
-                    className="flex gap-6 py-7 transition-opacity"
-                    style={{
-                      borderTop: i === 0 ? undefined : `1px solid ${LINE}`,
-                      opacity: i === activeStep ? 1 : 0.55,
-                    }}
-                  >
-                    <span className="font-mono text-[11px] pt-1 tabular-nums" style={{ color: MUTED }}>
-                      {s.n}
-                    </span>
-                    <div>
-                      <h3 className="text-[17px] tracking-tight">{s.title}</h3>
-                      <p className="mt-2 text-[14px] leading-[1.65]" style={{ color: MUTED }}>
-                        {s.desc}
-                      </p>
-                    </div>
-                  </div>
-                </Reveal>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        {/* Questions */}
-        <section id="questions" className="max-w-3xl mx-auto px-6 pb-24 sm:pb-32">
-          <Reveal>
-            <h2 className="font-serif text-[34px] sm:text-[46px] leading-[1.08] tracking-[-0.03em]">Questions</h2>
-          </Reveal>
-          <Reveal delay={80} className="mt-10" style={{ borderTop: `1px solid ${LINE}` }}>
-            {FAQ.map((f, i) => (
-              <FaqItem key={f.q} q={f.q} a={f.a} open={openFaq === i} onToggle={() => setOpenFaq(openFaq === i ? null : i)} />
-            ))}
-          </Reveal>
-        </section>
-
-        {/* Dernière invitation */}
-        <section className="max-w-5xl mx-auto px-6 pb-24 sm:pb-32">
-          <Reveal className="rounded-xl bg-white px-8 py-16 sm:px-16 sm:py-20 text-center" style={{ border: `1px solid ${LINE}` }}>
-            <h2 className="font-serif text-[36px] sm:text-[52px] leading-[1.06] tracking-[-0.03em]">
-              Une heure de vrai calme,
-              <br />
-              à partir de maintenant.
-            </h2>
-            <p className="mt-5 mx-auto max-w-md text-[15px] leading-[1.6]" style={{ color: MUTED }}>
-              Ouvre une session, choisis un paysage, laisse tourner. Ton compte Google sert seulement à retrouver
-              ta progression ailleurs.
-            </p>
-            <div className="mt-9 flex justify-center">
-              <GoogleButton label="Commencer" />
-            </div>
-          </Reveal>
-        </section>
-
-        {/* Footer */}
-        <footer style={{ borderTop: `1px solid ${LINE}` }}>
-          <div className="max-w-5xl mx-auto px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-5">
-            <Wordmark />
-            <p className="font-mono text-[11px]" style={{ color: MUTED }}>
-              Pomodoro · Lofi · Focus — © {new Date().getFullYear()}
-            </p>
-          </div>
-        </footer>
-      </div>
+                {s.line}
+              </span>
+            </span>
+          </button>
+        );
+      })}
     </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Bento (grid-flow-dense, 4 x 2 : 2x2 + quatre 1x1, zéro cellule vide)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const CELL =
+  "group relative overflow-hidden rounded-3xl border border-white/10 bg-[#080a12]/80 p-7 backdrop-blur-xl transition-colors duration-500 hover:border-white/25";
+
+function Bento() {
+  return (
+    <div className="grid grid-flow-dense grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:grid-rows-2">
+      <article className={cn(CELL, "flex flex-col justify-between gap-10 p-9 sm:col-span-2 lg:row-span-2")}>
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-40 transition-opacity duration-700 group-hover:opacity-70"
+          style={{ background: "radial-gradient(90% 70% at 20% 0%, rgba(255,170,90,0.16), transparent 65%)" }}
+        />
+        <div className="relative">
+          <h3 className="text-[clamp(1.4rem,2.3vw,1.95rem)] font-semibold leading-[1.12] tracking-[-0.025em] text-white">
+            La musique et le timer ne sont plus dans deux onglets.
+          </h3>
+          <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-white/45">
+            Le lecteur occupe l&apos;écran, le timer vit dessus, tes tâches restent à portée de main. Plus rien à
+            surveiller ailleurs.
+          </p>
+        </div>
+        <div className="relative aspect-[16/10] overflow-hidden rounded-2xl border border-white/10">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://picsum.photos/seed/focusflow-bento-session/1200/760"
+            alt=""
+            loading="lazy"
+            className="h-full w-full object-cover opacity-65 contrast-125 grayscale transition-all duration-700 ease-out group-hover:scale-105 group-hover:opacity-90 group-hover:grayscale-0"
+          />
+        </div>
+      </article>
+
+      <article className={CELL}>
+        <h3 className="text-lg font-semibold tracking-tight text-white">Flowtime</h3>
+        <p className="mt-3 text-sm leading-relaxed text-white/45">
+          Quand l&apos;élan est là, le chrono monte au lieu de descendre, et la pause se calcule sur ce que tu as
+          vraiment donné.
+        </p>
+        <span className="mt-7 block font-mono text-[34px] leading-none tabular-nums text-white/25 transition-colors duration-500 group-hover:text-[#ffc38a]/75">
+          52:14
+        </span>
+      </article>
+
+      <article className={CELL}>
+        <h3 className="text-lg font-semibold tracking-tight text-white">Ta file, ton ordre</h3>
+        <p className="mt-3 text-sm leading-relaxed text-white/45">
+          Les titres que tu as choisis, joués dans la séquence que tu as posée. YouTube ne reprend pas la main.
+        </p>
+        <span className="mt-7 flex flex-col gap-2" aria-hidden>
+          {[76, 54, 88].map((w, i) => (
+            <span
+              key={i}
+              className="h-1 rounded-full bg-white/15 transition-colors duration-500 group-hover:bg-white/35"
+              style={{ width: `${w}%`, transitionDelay: `${i * 70}ms` }}
+            />
+          ))}
+        </span>
+      </article>
+
+      <article className={CELL}>
+        <h3 className="text-lg font-semibold tracking-tight text-white">Ce que tu as fait</h3>
+        <p className="mt-3 text-sm leading-relaxed text-white/45">
+          Séries, heatmap, score de concentration, récap de la semaine à partager.
+        </p>
+        <span className="mt-7 flex h-12 items-end gap-1.5" aria-hidden>
+          {[30, 62, 44, 88, 52, 74, 96].map((h, i) => (
+            <span
+              key={i}
+              className="flex-1 rounded-sm bg-white/15 transition-colors duration-500 group-hover:bg-[#ffc38a]/60"
+              style={{ height: `${h}%`, transitionDelay: `${i * 45}ms` }}
+            />
+          ))}
+        </span>
+      </article>
+
+      <article className={CELL}>
+        <h3 className="text-lg font-semibold tracking-tight text-white">Personne ne travaille seul</h3>
+        <p className="mt-3 text-sm leading-relaxed text-white/45">
+          Ajoute tes amis par code, vois qui est en focus, compare la semaine, écris-leur sans quitter la page.
+        </p>
+        <span className="mt-7 flex items-center gap-3" aria-hidden>
+          <span className="flex -space-x-2">
+            {["a", "b", "c"].map((s) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={s}
+                src={`https://picsum.photos/seed/focusflow-friend-${s}/80/80`}
+                alt=""
+                loading="lazy"
+                className="h-8 w-8 rounded-full border border-white/20 object-cover grayscale transition-all duration-500 group-hover:grayscale-0"
+              />
+            ))}
+          </span>
+          <span className="flex h-8 items-center rounded-full border border-white/15 bg-white/[0.06] px-3 font-mono text-[10px] text-white/50">
+            en focus
+          </span>
+        </span>
+      </article>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Page
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const PLACES = ["Kyoto", "Osaka", "Hong Kong", "Jeju", "Ha Long", "Taipei", "Shanghai", "Bali", "Katmandou", "Guilin"];
+
+export default function LandingPage() {
+  const reduce = useReducedMotion();
+
+  // Position du pointeur dans le hero, normalisée (-0.5 → 0.5), en MotionValue.
+  const heroRef = useRef<HTMLElement>(null);
+  const px = useMotionValue(0);
+  const py = useMotionValue(0);
+  const spotX = useSpring(useTransform(px, (v) => (v + 0.5) * 100), { stiffness: 90, damping: 20 });
+  const spotY = useSpring(useTransform(py, (v) => (v + 0.5) * 100), { stiffness: 90, damping: 20 });
+  const spotlight = useMotionTemplate`radial-gradient(44rem circle at ${spotX}% ${spotY}%, rgba(255,183,110,0.13), transparent 62%)`;
+
+  // Parallaxe du contenu du hero pendant qu'il quitte l'écran.
+  const { scrollYProgress: heroP } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
+  const heroY = useTransform(heroP, [0, 1], [0, 110]);
+  const heroFade = useTransform(heroP, [0, 0.8], [1, 0]);
+
+  return (
+    <MotionConfig reducedMotion="user">
+      <main className="relative w-full max-w-full overflow-x-hidden bg-[#05060c] text-white">
+        {/* Fond : la ville, et la nuit qui tombe au fil du scroll */}
+        <div className="pointer-events-none fixed inset-0 z-0">
+          <CityBackdrop />
+        </div>
+
+        <div className="relative z-10">
+          {/* Navigation : pilule flottante */}
+          <header className="fixed inset-x-0 top-4 z-40 flex justify-center px-4">
+            <nav className="flex w-full max-w-3xl items-center justify-between gap-6 rounded-full border border-white/12 bg-[#080a12]/70 py-2 pl-5 pr-2 backdrop-blur-xl">
+              <Wordmark />
+              <div className="hidden items-center gap-7 text-[13px] text-white/45 md:flex">
+                <a href="#produit" className="transition-colors hover:text-white">Produit</a>
+                <a href="#sources" className="transition-colors hover:text-white">Sources</a>
+                <a href="#deroule" className="transition-colors hover:text-white">Déroulé</a>
+              </div>
+              <Magnetic
+                onClick={() => signInWithGoogle()}
+                strength={8}
+                className="rounded-full bg-white px-5 py-2.5 text-[13px] font-semibold text-[#08090f] transition-colors hover:bg-white/90"
+              >
+                Se connecter
+              </Magnetic>
+            </nav>
+          </header>
+
+          {/* Attention : hero asymétrique, le curseur éclaire la ville */}
+          <section
+            ref={heroRef}
+            onPointerMove={(e) => {
+              if (reduce) return;
+              const r = e.currentTarget.getBoundingClientRect();
+              px.set((e.clientX - r.left) / r.width - 0.5);
+              py.set((e.clientY - r.top) / r.height - 0.5);
+            }}
+            className="relative flex min-h-[100dvh] items-center px-5 pb-24 pt-32 sm:px-8"
+          >
+            <motion.span aria-hidden className="pointer-events-none absolute inset-0" style={reduce ? undefined : { background: spotlight }} />
+
+            <motion.div
+              style={reduce ? undefined : { y: heroY, opacity: heroFade }}
+              className="relative mx-auto grid w-full max-w-7xl items-center gap-16 lg:grid-cols-[minmax(0,1fr)_auto]"
+            >
+              <div className="w-full max-w-5xl">
+                <motion.h1
+                  initial={reduce ? false : { opacity: 0, y: 26 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 1, ease: EASE }}
+                  className="text-[clamp(2.8rem,6.6vw,5.6rem)] font-semibold leading-[1] tracking-[-0.035em] [text-shadow:0_4px_40px_rgba(0,0,0,0.75)]"
+                >
+                  Le monde s&apos;éteint,
+                  <br />
+                  ta
+                  <span
+                    className="mx-3 inline-block h-[0.6em] w-[1.4em] -translate-y-[0.06em] rounded-full bg-cover bg-center align-middle grayscale-[0.35]"
+                    style={{ backgroundImage: "url(https://picsum.photos/seed/focusflow-neon-street/400/240)" }}
+                    aria-hidden
+                  />
+                  session commence.
+                </motion.h1>
+
+                <motion.p
+                  initial={reduce ? false : { opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.9, delay: 0.15, ease: EASE }}
+                  className="mt-8 max-w-md text-[17px] leading-relaxed text-white/60 [text-shadow:0_1px_20px_rgba(0,0,0,0.9)]"
+                >
+                  Un timer Pomodoro et ta musique dans le même écran. Le reste du bruit attend dehors.
+                </motion.p>
+
+                <motion.div
+                  initial={reduce ? false : { opacity: 0, y: 18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.9, delay: 0.26, ease: EASE }}
+                  className="mt-11 flex flex-wrap items-center gap-4"
+                >
+                  <GoogleCta label="Commencer" />
+                  <a
+                    href="#produit"
+                    className="rounded-full border border-white/25 px-7 py-4 text-sm font-semibold tracking-tight text-white transition-colors hover:border-white/60 hover:bg-white/[0.06]"
+                  >
+                    Découvrir
+                  </a>
+                </motion.div>
+              </div>
+
+              <motion.div
+                initial={reduce ? false : { opacity: 0, y: 40, rotate: -2 }}
+                animate={{ opacity: 1, y: 0, rotate: -1.2 }}
+                transition={{ duration: 1.2, delay: 0.32, ease: EASE }}
+                className="hidden justify-self-end lg:block"
+              >
+                <SessionCard px={px} py={py} />
+              </motion.div>
+            </motion.div>
+          </section>
+
+          {/* Les lieux du catalogue, en défilement continu */}
+          <div className="relative overflow-hidden border-y border-white/[0.07] bg-[#05060c]/50 py-6 backdrop-blur-sm">
+            <div className="anim-marquee flex w-max items-center gap-10 pr-10">
+              {[...PLACES, ...PLACES].map((p, i) => (
+                <span key={`${p}-${i}`} className="flex items-center gap-10 font-mono text-[12px] uppercase tracking-[0.22em] text-white/25">
+                  {p}
+                  <span className="h-1 w-1 rounded-full bg-white/15" aria-hidden />
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Interest : bento */}
+          <section id="produit" className="mx-auto w-full max-w-7xl px-5 py-32 sm:px-8 md:py-48">
+            <motion.h2
+              initial={reduce ? false : { opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.8, ease: EASE }}
+              className="mb-16 max-w-4xl text-[clamp(2rem,4.2vw,3.3rem)] font-semibold leading-[1.05] tracking-[-0.03em]"
+            >
+              Tout ce qui sert à tenir une heure, réuni au même endroit.
+            </motion.h2>
+            <Bento />
+          </section>
+
+          {/* Desire : manifeste dont les mots s'allument */}
+          <section className="mx-auto w-full max-w-7xl px-5 py-32 sm:px-8 md:py-48">
+            <ScrubbedText text="Tu ouvres un onglet pour la musique, un autre pour le minuteur, un troisième pour la liste. Puis tu ouvres celui de trop. FocusFlow referme tout ça dans un seul écran, et te rend ta soirée." />
+          </section>
+
+          {/* Desire : sources en accordéon horizontal */}
+          <section id="sources" className="mx-auto w-full max-w-7xl px-5 pb-32 sm:px-8 md:pb-48">
+            <motion.h2
+              initial={reduce ? false : { opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.8, ease: EASE }}
+              className="mb-14 max-w-3xl text-[clamp(1.8rem,3.4vw,2.7rem)] font-semibold leading-[1.1] tracking-[-0.03em]"
+            >
+              Quatre façons de remplir le silence.
+            </motion.h2>
+            <SourceAccordion />
+          </section>
+
+          {/* Desire : la pile d'étapes */}
+          <section id="deroule" className="mx-auto w-full max-w-7xl px-5 pb-32 sm:px-8 md:pb-48">
+            <motion.h2
+              initial={reduce ? false : { opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.8, ease: EASE }}
+              className="mb-16 max-w-3xl text-[clamp(1.8rem,3.4vw,2.7rem)] font-semibold leading-[1.1] tracking-[-0.03em]"
+            >
+              Une soirée de travail, du début à la fin.
+            </motion.h2>
+            <StepStack />
+          </section>
+
+          {/* Action */}
+          <section className="mx-auto w-full max-w-7xl px-5 py-32 text-center sm:px-8 md:py-48">
+            <motion.div
+              initial={reduce ? false : { opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.9, ease: EASE }}
+            >
+              <h2 className="mx-auto max-w-5xl text-[clamp(2.5rem,6.4vw,5rem)] font-semibold leading-[1] tracking-[-0.035em]">
+                Il fait nuit. Tu as une heure devant toi.
+              </h2>
+              <p className="mx-auto mt-8 max-w-md text-[15px] leading-relaxed text-white/50">
+                Gratuit, sans publicité, utilisable même sans compte. Google sert seulement à retrouver ta progression
+                d&apos;un appareil à l&apos;autre.
+              </p>
+              <div className="mt-12 flex justify-center">
+                <GoogleCta label="Ouvrir une session" />
+              </div>
+            </motion.div>
+          </section>
+
+          <footer className="border-t border-white/[0.07] bg-[#05060c]/70 backdrop-blur-sm">
+            <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-5 px-5 py-10 sm:flex-row sm:px-8">
+              <Wordmark />
+              <p className="font-mono text-[11px] tracking-wider text-white/25">
+                Pomodoro · Lofi · Focus. © {new Date().getFullYear()}
+              </p>
+            </div>
+          </footer>
+        </div>
+      </main>
+    </MotionConfig>
   );
 }

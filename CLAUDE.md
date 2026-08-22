@@ -182,6 +182,34 @@ Flux type d'une feature : `product-lead` (spec) → `state-architect`/`backend-e
 - Icônes **SVG inline** (pas d'images), styles via tokens Tailwind + `cn()`.
 - Dates locales : helper `localToday()` / `localDate()` (format `YYYY-MM-DD`).
 
+### Langage visuel (refonte 2026-08-22)
+
+- **Deux surfaces, deux langages assumés.** La **landing** (`LandingPage.tsx`) est sombre et
+  cinématique (night city, blancs/noirs écrits en dur) : elle n'utilise **jamais** les tokens
+  `foreground`/`background`. Le **site connecté** vit entièrement sur les tokens et suit le thème.
+- **Un seul accent dans l'app** : token `--focus` (utilitaires `text-focus` / `bg-focus` /
+  `border-focus`), défini clair et sombre dans `globals.css`. Tout le reste s'exprime en niveaux de
+  `foreground`. Restent légitimes car **sémantiques** : couleurs de marque (Spotify/Twitch), couleur
+  choisie par l'utilisateur (projets, routines), pastilles d'humeur, rouge destructif.
+- **Échelle de rayons** : panneaux/tuiles `rounded-2xl`, cartes média `rounded-xl`, contrôles
+  `rounded-lg`/`rounded-xl`. Ne pas mélanger.
+- **Micro-labels** : `font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/35` (unifié
+  partout). Les **chiffres** sont en `font-mono tabular-nums`.
+- **Sous-navigations** = contrôle segmenté avec indicateur qui glisse (`motion` `layoutId`) :
+  `SubTabs`, `MediaTab`, rail `AppNav`. Un `layoutId` par instance (cf. `useId()` dans `SubTabs`).
+- **Mouvement motivé uniquement** : cascade d'entrée (hiérarchie), barres/jauges qui poussent (le
+  chiffre devient forme), pression tactile au clic. Toujours dégradé via `useReducedMotion()` ou
+  `motion-safe:`. Pas d'animation en boucle décorative dans l'app (la landing, elle, est
+  volontairement très animée).
+- **Moteur d'animation unique : `motion/react`.** Ne pas ajouter GSAP : `CityBackdrop` et la landing
+  pilotent déjà le scroll avec `useScroll`, deux moteurs se disputeraient les frames.
+- **Position du pointeur = MotionValue, jamais un `useState`** (sinon re-render de l'arbre à chaque
+  pixel parcouru).
+- **Densité du dashboard : basse (3/10)** — voir l'en-tête de `TodayDashboard.tsx`. Avant d'ajouter
+  une tuile, se demander laquelle retirer.
+- **Zéro em-dash (`—`) dans les textes visibles** (et toujours zéro emoji) : virgule, point, ou
+  passage à la ligne.
+
 ## Structure des fichiers clés
 
 ```
@@ -633,3 +661,53 @@ Retours utilisateur « UX moins générée par IA » :
 `npx tsc --noEmit` et `npm run build` verts (erreurs lint pré-existantes inchangées : summary.tsx:94,
 StatsSection.tsx:53, insights.tsx:102).
 
+
+## Journal de session — 2026-08-22 (refonte UI globale : landing minimaliste + app dynamique)
+
+Deux directions distinctes et assumées (cf. « Langage visuel » dans les conventions).
+
+1. **Landing entièrement refaite** (`components/LandingPage.tsx`), direction **night city, très
+   interactive** (dials : variance 8-9 / motion 8 / densité 3). Le fond reste `CityBackdrop`
+   (photo de ville en `fixed`, la **nuit tombe au scroll** : la photo descend, le couchant s'efface,
+   les fenêtres s'allument, un rail d'heure avance) — fichier **restauré** après une première
+   tentative claire/éditoriale abandonnée.
+   Chorégraphie, entièrement en **`motion/react`** (pas de GSAP : deux moteurs de scroll sur la même
+   page se disputeraient les frames) :
+   - **halo qui suit le curseur** dans le hero et **carte de session inclinée en 3D** vers le
+     pointeur — via `useMotionValue`/`useSpring`, **jamais** de `useState` pour la position ;
+   - **boutons magnétiques** (`Magnetic`) ; nav en **pilule flottante** ;
+   - **manifeste scrubé** : les mots s'allument un par un au fil du scroll (`ScrubbedText`/`Word`) ;
+   - **pile d'étapes** : chaque carte se colle en haut (`sticky`) et la précédente recule
+     (`StepStack`/`StepCard`) ;
+   - **accordéon horizontal** des 4 sources (replié en vertical sous `md`) ;
+   - **marquee** des lieux du catalogue (`.anim-marquee`, une seule de la page) ;
+   - bento `grid-flow-dense` 4×2 (une tuile 2×2 + quatre 1×1, zéro cellule vide).
+   Hero : H1 en `clamp()` sur `max-w-5xl`, 2 lignes, avec une **image en pilule DANS le titre**.
+   ⚠️ La landing n'utilise PAS les tokens de thème (blancs/noirs écrits en dur, elle est sombre par
+   nature). La police serif (Instrument Serif) de la tentative précédente a été retirée ;
+   il reste **Geist + Geist Mono**.
+2. **Accent unique du site connecté** : token `--focus` (`globals.css`, clair + sombre) exposé en
+   `--color-focus`. Migrés dessus : `GoalRing`, heatmap + barres 7 jours + succès de `StatsSection`,
+   XP/jardin/défis de `ProgressionPanel`, dashboard. Fin de l'arc-en-ciel emerald/violet/sky/orange
+   pour le décoratif ; les couleurs **sémantiques** (marques, projets, humeurs) sont conservées.
+3. **Dashboard `TodayDashboard` réécrit** en bento asymétrique (grille 12 colonnes) :
+   objectif (5 col) + **semaine en barres** (7 col, `getLast7Days`, aujourd'hui en accent) avec
+   3 métriques nues sous filet ; carte « Reprendre » avec la **vraie miniature YouTube** ; sprint ;
+   **rail horaire du jour** (blocs placés de 6h à 24h + curseur « maintenant ») ; prochaine tâche ;
+   projet actif ; routines en pastilles ; récap + réflexion. Entrée en cascade et pression tactile
+   via `motion/react` (`useReducedMotion` partout). Ajout d'un **squelette d'hydratation**
+   (`DashboardSkeleton`) au lieu du `return null`.
+4. **Navigation** : `AppNav` et `SubTabs`/`MediaTab` passent en contrôles segmentés avec indicateur
+   qui glisse (`layoutId`) ; filet d'accent sur le rail desktop. Filtres de mood du catalogue en
+   pastilles bordées. En-tête de section en micro-label mono.
+5. **Micro-labels unifiés** : les 53 occurrences de `uppercase tracking-widest` du projet passent en
+   `font-mono uppercase tracking-[0.14em]`.
+6. **Passe « densité 3 » sur le dashboard** (retour utilisateur : « tout est très paqué ») : gaps
+   `gap-8/10`, tuiles `rounded-3xl p-7/8`, anneau d'objectif à 132 px, barres de semaine à 144 px,
+   chiffres à 28 px, **2 métriques au lieu de 3** (l'heure de pointe redescend en ligne de contexte),
+   rail horaire plus haut, et `<main>` de `app/page.tsx` en `py-8 sm:py-12`.
+
+`npx tsc --noEmit` et `npm run build` verts ; `npm run lint` au niveau baseline (4 erreurs
+pré-existantes : summary, StatsSection, insights, TodoStatusDropdown).
+**Vérification navigateur non faite** (extension Chrome indisponible dans cette session) : le rendu
+visuel reste à valider à l'œil.
