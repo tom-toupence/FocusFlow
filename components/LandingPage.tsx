@@ -202,7 +202,7 @@ function Floating({
   return (
     <motion.div
       className={cn("absolute", className)}
-      style={{ transform: `translateZ(${z}px)`, transformStyle: "preserve-3d" }}
+      style={{ z, transformStyle: "preserve-3d" }}
       animate={reduce ? undefined : { y: [0, -drift, 0] }}
       transition={{ duration, repeat: Infinity, ease: "easeInOut" }}
     >
@@ -472,7 +472,6 @@ const SOURCE_TABS = [
 
 function SourceShowcase() {
   const [tab, setTab] = useState<(typeof SOURCE_TABS)[number]["key"]>("catalogue");
-  const active = SOURCE_TABS.find((t) => t.key === tab)!;
 
   return (
     <div className="grid gap-10 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-16">
@@ -507,7 +506,7 @@ function SourceShowcase() {
                   on ? "max-h-24 opacity-100" : "max-h-0 overflow-hidden opacity-0"
                 )}
               >
-                {active.key === t.key ? t.line : t.line}
+                {t.line}
               </span>
             </button>
           );

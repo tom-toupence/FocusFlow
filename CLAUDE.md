@@ -711,3 +711,43 @@ Deux directions distinctes et assumées (cf. « Langage visuel » dans les conve
 pré-existantes : summary, StatsSection, insights, TodoStatusDropdown).
 **Vérification navigateur non faite** (extension Chrome indisponible dans cette session) : le rendu
 visuel reste à valider à l'œil.
+
+
+## Journal de session — 2026-08-22 (2e passe : landing 3D « night city » + dashboard réorganisé)
+
+Retour utilisateur sur la 1re passe : la landing « n'était pas raccord » (photos picsum aléatoires →
+effet site de voyage, un phare pour illustrer Twitch), et le dashboard restait trop dense.
+
+1. **Landing refaite de zéro** (`components/LandingPage.tsx`), archétypes « Ethereal Glass » +
+   « Z-Axis Cascade », dials imposés variance 9 / motion 8 / densité 3.
+   - **RÈGLE D'IMAGERIE, à tenir** : plus AUCUNE photo générique (picsum banni de la page). Toutes les
+     images viennent des **vraies vignettes YouTube du catalogue** (`data/videos.ts` →
+     `https://i.ytimg.com/vi/<id>/hqdefault.jpg`, IDs vérifiés 200). Le produit s'illustre lui-même.
+     Les sources externes (YouTube/Spotify/Twitch) ne sont PAS illustrées par des photos mais par
+     **leur marque en SVG inline + un fragment de leur interface** (file d'attente, lignes de
+     playlist, badge Live + chat).
+   - **Scène 3D** dans le hero (`HeroScene`) : vraie perspective `preserve-3d`, satellites en
+     profondeur via la prop `z` de motion (⚠️ **jamais** `transform: translateZ()` en CSS brut :
+     motion recompose `transform` et l'écraserait), dérive en boucle, orientation vers le curseur.
+   - **Carrousel 3D du catalogue** (`Carousel3D`) : 12 vidéos réelles disposées en cylindre
+     (`rotateY(i·step) translateZ(430px)`), **tirable à la souris/au doigt** (Pointer Events +
+     `requestAnimationFrame` pour la dérive, `useMotionValue` → aucun state par frame).
+   - **Minuteur jouable** (`TryPomodoro`) : un vrai Pomodoro fonctionnel sur la landing (3 presets,
+     lecture/pause/reset) — la démo la plus honnête possible.
+   - Aussi : nav en île de verre, CTA « island » (icône nichée + magnétisme), double-bezel sur toutes
+     les cartes, heatmap déterministe (⚠️ pas de `Math.random` au rendu, sinon mismatch SSR),
+     marquee des pays du catalogue, entrées au scroll en montée + flou.
+2. **Dashboard réorganisé** (`components/TodayDashboard.tsx`) autour d'**UNE décision**. Le défaut
+   corrigé : cinq façons concurrentes de lancer une session, toutes de poids visuel égal, au milieu
+   d'une dizaine de tuiles pairs. Nouvelle structure : **1. la décision** (carte unique, une seule
+   action primaire choisie par priorité sprint > reprise > choisir une ambiance, la prochaine tâche
+   affichée dedans, les autres chemins en liens discrets) → **2. l'état** (objectif + série + focus
+   du jour, en bande typographique sans cartes) → **3. le contexte** (semaine en barres, rail horaire)
+   → **4. le reste** (projet, routines, réflexion, récap, poids visuel réduit sous un filet).
+   Ajout d'anneaux de focus clavier (`FOCUS_RING`) et d'un état vide pédagogique pour le planning.
+3. Police serif retirée (plus utilisée) ; il reste **Geist + Geist Mono**.
+
+`npx tsc --noEmit` et `npm run build` verts ; `npm run lint` = les 4 mêmes erreurs pré-existantes
+(auth/twitch/callback, summary, StatsSection, TodoStatusDropdown), aucune nouvelle.
+**Vérification navigateur toujours pas faite** (pas d'extension Chrome dans la session) : rendu à
+valider à l'œil.
