@@ -44,16 +44,16 @@ export default function GoalRing({
           className={cn(
             // transition-colors seulement : le dashoffset est déjà animé en JS
             // (useCountUp) — une transition CSS par-dessus le ferait traîner.
-            "transition-colors duration-700",
-            progress.reached ? "text-emerald-400" : "text-violet-400"
+            "transition-colors duration-700 text-focus",
+            !progress.reached && "opacity-80"
           )}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         {progress.reached ? (
           <>
-            <svg className="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider">Atteint</span>
+            <svg className="w-4 h-4 text-focus" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <span className="text-[10px] font-semibold text-focus uppercase tracking-wider">Atteint</span>
           </>
         ) : (
           <>

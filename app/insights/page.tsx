@@ -173,7 +173,7 @@ export function InsightsContent() {
 
         {/* Focus by hour */}
         <section className="flex flex-col gap-3">
-          <h2 className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">Focus par heure de la journée</h2>
+          <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Focus par heure de la journée</h2>
           <div className="flex items-end gap-0.5 h-32 bg-foreground/[0.02] rounded-xl p-3">
             {byHour.map((m, h) => (
               <div key={h} className="flex-1 flex flex-col items-center justify-end gap-1 group relative h-full">
@@ -190,7 +190,7 @@ export function InsightsContent() {
 
         {/* Focus by weekday */}
         <section className="flex flex-col gap-3">
-          <h2 className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">Focus par jour de la semaine</h2>
+          <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Focus par jour de la semaine</h2>
           <div className="flex items-end gap-2 h-28">
             {byWeekday.map((m, i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
@@ -209,7 +209,7 @@ export function InsightsContent() {
 
         {/* Focus Score trend */}
         <section className="flex flex-col gap-3">
-          <h2 className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">Évolution du Focus Score</h2>
+          <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Évolution du Focus Score</h2>
           {activeTrend.length === 0 ? (
             <p className="text-xs text-foreground/30 py-6 text-center">Pas encore assez de données. Marque tes distractions pendant les sessions (touche D).</p>
           ) : (
@@ -235,7 +235,7 @@ export function InsightsContent() {
 
         {/* Humeur ↔ focus */}
         <section className="flex flex-col gap-3">
-          <h2 className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">Humeur et concentration</h2>
+          <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Humeur et concentration</h2>
           {!hasMoodData ? (
             <p className="text-xs text-foreground/30 py-6 text-center">Pas encore de réflexions. Note ton humeur en fin de session (résumé) pour voir le lien avec ton focus.</p>
           ) : (
@@ -262,7 +262,7 @@ export function InsightsContent() {
 
         {/* Export */}
         <section className="flex flex-col gap-3">
-          <h2 className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">Exporter mes données</h2>
+          <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Exporter mes données</h2>
           <div className="flex flex-wrap gap-2">
             <ExportButton label="Stats (CSV)" onClick={() => exportStatsCsv(days)} />
             <ExportButton label="Historique (CSV)" onClick={() => exportHistoryCsv(history)} />
@@ -283,7 +283,7 @@ function Highlight({ label, value, sub, accent }: { label: string; value: string
   }[accent];
   return (
     <div className="flex flex-col gap-1 px-4 py-3.5 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.08]">
-      <span className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest leading-tight">{label}</span>
+      <span className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] leading-tight">{label}</span>
       <span className={cn("text-2xl font-light tabular-nums tracking-tight", accentText)}>{value}</span>
       <span className="text-[11px] text-foreground/30 leading-tight">{sub}</span>
     </div>

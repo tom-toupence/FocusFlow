@@ -72,7 +72,7 @@ function StatCard({
   const display = num != null ? (format ?? String)(Math.round(animated)) : value;
   return (
     <div className="flex flex-col gap-1 px-5 py-4 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.08]">
-      <span className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">{label}</span>
+      <span className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">{label}</span>
       <span className={cn("text-3xl font-light tabular-nums tracking-tight", accent ?? "text-foreground")}>{display}</span>
       {sub && <span className="text-[11px] text-foreground/30 leading-tight">{sub}</span>}
     </div>
@@ -164,7 +164,7 @@ export default function SummaryPage() {
 
         {/* ── Session stats ─────────────────────────────────────────────────── */}
         <section className="flex flex-col gap-3">
-          <h2 className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">Cette session</h2>
+          <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Cette session</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard
               label="Durée totale"
@@ -214,7 +214,7 @@ export default function SummaryPage() {
         {/* Pomodoro dots */}
         {sessionsCompleted > 0 && (
           <section className="flex flex-col gap-3">
-            <h2 className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">Pomodoros complétés</h2>
+            <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Pomodoros complétés</h2>
             <div className="flex gap-2 flex-wrap">
               {Array.from({ length: sessionsCompleted }).map((_, i) => (
                 <div
@@ -234,7 +234,7 @@ export default function SummaryPage() {
         {/* Todos completed this session */}
         {todosCompletedThisSession.length > 0 && (
           <section className="flex flex-col gap-3">
-            <h2 className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">
+            <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">
               Accomplissements de la session
             </h2>
             <div className="flex flex-col gap-1.5">
@@ -254,7 +254,7 @@ export default function SummaryPage() {
 
         {/* ── Daily goal ────────────────────────────────────────────────────── */}
         <section className="flex flex-col gap-3">
-          <h2 className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">Objectif du jour</h2>
+          <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Objectif du jour</h2>
           <div className="flex items-center gap-5 px-5 py-4 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.08]">
             <GoalRing progress={goalProgress} size={104} />
             <div className="flex flex-col gap-1">
@@ -274,7 +274,7 @@ export default function SummaryPage() {
 
         {/* ── Historical stats ──────────────────────────────────────────────── */}
         <section className="flex flex-col gap-3">
-          <h2 className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">Stats globales</h2>
+          <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Stats globales</h2>
           <div className="grid grid-cols-3 gap-3">
             <StatCard
               label="Aujourd'hui"
@@ -299,7 +299,7 @@ export default function SummaryPage() {
 
         {/* ── Heatmap ───────────────────────────────────────────────────────── */}
         <section className="flex flex-col gap-3">
-          <h2 className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">Activité — 17 semaines</h2>
+          <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Activité — 17 semaines</h2>
           <div className="overflow-x-auto">
             <div className="inline-flex flex-col gap-1 min-w-0">
               {/* Month labels */}

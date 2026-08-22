@@ -21,7 +21,7 @@ export default function JournalReflection({ pomodoros }: { pomodoros: number }) 
   if (saved) {
     return (
       <section className="flex flex-col gap-3">
-        <h2 className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">Réflexion</h2>
+        <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Réflexion</h2>
         <div className="flex items-center gap-3 px-5 py-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/15">
           <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: MOODS.find((m) => m.value === mood)?.color }} />
           <p className="text-sm text-foreground/70">Réflexion enregistrée. À retrouver dans ton journal.</p>
@@ -32,7 +32,7 @@ export default function JournalReflection({ pomodoros }: { pomodoros: number }) 
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">Comment s&apos;est passée cette session ?</h2>
+      <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Comment s&apos;est passée cette session ?</h2>
       <div className="px-5 py-4 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.08] flex flex-col gap-4">
         {/* Mood */}
         <div className="flex items-center justify-center gap-2">

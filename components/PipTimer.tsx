@@ -121,7 +121,7 @@ export default function PipTimer({
                   isBreak ? "bg-emerald-400" : isRunning ? "bg-red-400 animate-pulse" : "bg-amber-400"
                 )}
               />
-              <span className="text-[10px] uppercase tracking-widest text-white/40">
+              <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-white/40">
                 {isBreak ? "Pause" : isFlowtime ? "Flow" : "Focus"}
               </span>
             </div>

@@ -32,12 +32,14 @@ function getIntensity(minutes: number): number {
   return 4;
 }
 
+// Échelle d'intensité : un seul accent, quatre opacités (pas de dégradé
+// multi-teintes qui laisserait croire à des catégories différentes).
 const intensityClasses = [
   "bg-foreground/5",
-  "bg-emerald-900/60",
-  "bg-emerald-700/70",
-  "bg-emerald-500/80",
-  "bg-emerald-400",
+  "bg-focus/25",
+  "bg-focus/45",
+  "bg-focus/70",
+  "bg-focus",
 ];
 
 const dayLabels = ["L", "M", "M", "J", "V", "S", "D"];
@@ -94,7 +96,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
 
   return (
     <section className={cn(embedded ? "pb-8" : "border-t border-foreground/[0.06] py-8 px-6 max-w-7xl mx-auto w-full")}>
-      {!embedded && <h2 className="text-sm font-semibold text-foreground/30 uppercase tracking-widest mb-6">Activité</h2>}
+      {!embedded && <h2 className="text-sm font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-6">Activité</h2>}
 
       {/* ── Niveau, jardin & défis ────────────────────────────────────────────── */}
       <ProgressionPanel />
@@ -153,25 +155,22 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
           label="Aujourd'hui"
           value={formatMinutes(today.minutesWorked)}
           sub={`${today.sessions} session${today.sessions !== 1 ? "s" : ""}`}
-          accent="emerald"
+          highlight
         />
         <StatCard
           label="Cette semaine"
           value={formatMinutes(week.minutesWorked)}
           sub={`${week.sessions} sessions`}
-          accent="sky"
         />
         <StatCard
           label="Série en cours"
           value={`${streak} jour${streak !== 1 ? "s" : ""}`}
           sub={streak >= 7 ? "En feu" : streak > 0 ? "Continue" : "Démarre aujourd'hui"}
-          accent="orange"
         />
         <StatCard
           label="Meilleur jour"
-          value={bestDay ? formatMinutes(bestDay.minutesWorked) : "—"}
+          value={bestDay ? formatMinutes(bestDay.minutesWorked) : "-"}
           sub={bestDay ? formatDate(bestDay.date) : "Aucune session"}
-          accent="violet"
         />
       </div>
 
@@ -219,7 +218,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
 
       {/* ── 7 derniers jours ─────────────────────────────────────────────────── */}
       <div className="mb-8">
-        <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-4">7 derniers jours</p>
+        <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-4">7 derniers jours</p>
         <div className="flex items-end gap-2 h-24">
           {last7.map((day) => {
             const pct = maxMinutes7 > 0 ? day.minutes / maxMinutes7 : 0;
@@ -232,7 +231,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
                     className={cn(
                       "w-full rounded-md transition-all",
                       day.minutes > 0
-                        ? isToday ? "bg-emerald-400" : "bg-emerald-600/70"
+                        ? isToday ? "bg-focus" : "bg-foreground/25"
                         : "bg-foreground/[0.05]"
                     )}
                     style={{ height: `${Math.max(pct * 100, day.minutes > 0 ? 8 : 4)}%` }}
@@ -259,7 +258,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
       {/* ── Top lectures ─────────────────────────────────────────────────────── */}
       {topPlays.length > 0 && (
         <div className="mb-8">
-          <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-4">Top lectures</p>
+          <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-4">Top lectures</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {topPlays.map((play) => (
               <div key={play.mediaKey} className="flex items-center gap-3 bg-foreground/[0.03] border border-foreground/[0.06] rounded-xl p-3 min-w-0">
@@ -286,7 +285,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
       {/* ── Écoutes récentes ─────────────────────────────────────────────────── */}
       {recentPlays.length > 0 && (
         <div className="mb-8">
-          <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-4">Écoutes récentes</p>
+          <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-4">Écoutes récentes</p>
           <div className="flex flex-col gap-1.5">
             {recentPlays.map((entry) => (
               <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-foreground/[0.02] hover:bg-foreground/[0.04] transition-colors group">
@@ -316,7 +315,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
       {/* ── Succès / Badges ──────────────────────────────────────────────────── */}
       <div className="mb-8">
         <div className="flex items-baseline justify-between mb-4">
-          <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest">Succès</p>
+          <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Succès</p>
           <span className="text-[10px] text-foreground/25">{Object.keys(unlocked).length}/{ACHIEVEMENTS.length}</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -329,11 +328,11 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
                 className={cn(
                   "flex items-center gap-2.5 rounded-xl p-3 border transition-colors min-w-0",
                   isUnlocked
-                    ? "bg-amber-500/[0.07] border-amber-500/20"
+                    ? "bg-focus/[0.08] border-focus/25"
                     : "bg-foreground/[0.02] border-foreground/[0.06]"
                 )}
               >
-                <svg className={cn("w-5 h-5 flex-shrink-0 transition-all", isUnlocked ? "text-amber-400" : "text-foreground/25")} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7}>
+                <svg className={cn("w-5 h-5 flex-shrink-0 transition-all", isUnlocked ? "text-focus" : "text-foreground/25")} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7}>
                   <circle cx="12" cy="8" r="6" /><path d="M15.5 13.5L17 22l-5-3-5 3 1.5-8.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 <div className="min-w-0">
@@ -350,7 +349,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
 
       {/* ── Heatmap calendar ─────────────────────────────────────────────────── */}
       <div>
-        <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-4">Calendrier</p>
+        <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-4">Calendrier</p>
         <div className="overflow-x-auto pb-2">
           <div className="inline-flex flex-col gap-1 min-w-max">
             {/* Month labels */}
@@ -431,18 +430,18 @@ function PlayTypeIcon({ type, small }: { type: PlayType; small?: boolean }) {
   );
 }
 
-function StatCard({ label, value, sub, accent }: { label: string; value: string; sub: string; accent: "emerald" | "sky" | "orange" | "violet" }) {
-  const accentClasses = {
-    emerald: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
-    sky: "bg-sky-500/10 border-sky-500/20 text-sky-400",
-    orange: "bg-orange-500/10 border-orange-500/20 text-orange-400",
-    violet: "bg-violet-500/10 border-violet-500/20 text-violet-400",
-  };
+/** `highlight` : la seule tuile qui porte l'accent (le chiffre du jour). */
+function StatCard({ label, value, sub, highlight = false }: { label: string; value: string; sub: string; highlight?: boolean }) {
   return (
-    <div className={cn("border rounded-xl p-4", accentClasses[accent])}>
-      <p className="text-[11px] opacity-70 mb-1">{label}</p>
-      <p className="text-xl font-semibold text-foreground tracking-tight">{value}</p>
-      <p className="text-[11px] opacity-60 mt-0.5">{sub}</p>
+    <div
+      className={cn(
+        "rounded-xl border p-4",
+        highlight ? "border-focus/25 bg-focus/[0.07]" : "border-foreground/[0.08] bg-foreground/[0.025]"
+      )}
+    >
+      <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-foreground/35">{label}</p>
+      <p className="mt-1.5 text-xl font-semibold tracking-tight text-foreground tabular-nums">{value}</p>
+      <p className="mt-0.5 text-[11px] text-foreground/40">{sub}</p>
     </div>
   );
 }

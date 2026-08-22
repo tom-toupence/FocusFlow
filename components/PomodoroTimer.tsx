@@ -108,7 +108,7 @@ export default function PomodoroTimer() {
           <span className={cn("text-6xl font-thin tabular-nums tracking-tight", accentColor)}>
             {formatTime(secondsLeft)}
           </span>
-          <span className="text-white/40 text-xs mt-2 font-medium uppercase tracking-widest">
+          <span className="text-white/40 text-xs mt-2 font-medium font-mono uppercase tracking-[0.14em]">
             {modeLabels[mode]}
           </span>
         </div>

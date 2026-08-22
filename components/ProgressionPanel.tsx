@@ -17,11 +17,11 @@ function PlantGlyph({ plant }: { plant: Plant | null }) {
   }
   // Croissance figurée par un point vert qui grossit et fonce selon le palier.
   const size = plant.stage === 3 ? "w-5 h-5" : plant.stage === 2 ? "w-3.5 h-3.5" : "w-2 h-2";
-  const shade = plant.stage === 3 ? "bg-emerald-400" : plant.stage === 2 ? "bg-emerald-400/80" : "bg-emerald-400/55";
+  const shade = plant.stage === 3 ? "bg-focus" : plant.stage === 2 ? "bg-focus/75" : "bg-focus/50";
   return (
     <div className="flex flex-col items-center justify-end h-12">
       <span className={cn(size, shade, "rounded-full")} />
-      <div className="w-6 h-1.5 rounded-full bg-emerald-900/40 mt-1" />
+      <div className="w-6 h-1.5 rounded-full bg-focus/20 mt-1" />
     </div>
   );
 }
@@ -41,8 +41,8 @@ export default function ProgressionPanel() {
       {/* ── Level & XP ─────────────────────────────────────────────────────── */}
       <div className="bg-foreground/[0.03] border border-foreground/[0.06] rounded-2xl p-5 flex flex-col gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500/30 to-indigo-500/20 border border-violet-500/30 flex items-center justify-center flex-shrink-0">
-            <span className="text-lg font-bold text-violet-200 tabular-nums">{level.level}</span>
+          <div className="w-12 h-12 rounded-2xl bg-focus/12 border border-focus/25 flex items-center justify-center flex-shrink-0">
+            <span className="font-mono text-lg font-semibold text-focus tabular-nums">{level.level}</span>
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">Niveau {level.level} · {level.title}</p>
@@ -52,7 +52,7 @@ export default function ProgressionPanel() {
         <div>
           <div className="h-2 rounded-full bg-foreground/[0.06] overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-400 transition-all duration-700"
+              className="h-full rounded-full bg-focus transition-all duration-700"
               style={{ width: `${Math.round(level.progress * 100)}%` }}
             />
           </div>
@@ -91,15 +91,15 @@ export default function ProgressionPanel() {
           {challenges.map((c) => (
             <div key={c.id} className={cn(
               "rounded-xl p-3 border",
-              c.done ? "bg-emerald-500/[0.07] border-emerald-500/20" : "bg-foreground/[0.02] border-foreground/[0.06]"
+              c.done ? "bg-focus/[0.08] border-focus/25" : "bg-foreground/[0.02] border-foreground/[0.06]"
             )}>
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-[11px] text-foreground/60 leading-tight flex-1">{c.label}</span>
-                {c.done && <span className="text-emerald-400 text-xs">✓</span>}
+                {c.done && <span className="text-focus text-xs">✓</span>}
               </div>
               <div className="h-1.5 rounded-full bg-foreground/[0.06] overflow-hidden">
                 <div
-                  className={cn("h-full rounded-full transition-all duration-700", c.done ? "bg-emerald-400" : "bg-foreground/40")}
+                  className={cn("h-full rounded-full transition-all duration-700", c.done ? "bg-focus" : "bg-foreground/40")}
                   style={{ width: `${(c.current / c.target) * 100}%` }}
                 />
               </div>

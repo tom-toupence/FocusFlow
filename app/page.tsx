@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "motion/react";
 import { VideoMood, moodLabels, moodColors, extractYouTubeId, getVideoColor, Video, defaultVideos } from "@/data/videos";
 import { useSessionStore } from "@/store/sessionStore";
 import { usePlaylistStore, SavedPlaylist, extractPlaylistId, extractFirstVideoId, fetchPlaylistMeta, isRadioMix } from "@/store/playlistStore";
@@ -699,7 +700,7 @@ function CompletedTodosBacklog() {
   return (
     <section className="pt-8 pb-8">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-foreground/30 uppercase tracking-widest">Tâches accomplies</h2>
+        <h2 className="text-sm font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Tâches accomplies</h2>
         <button
           onClick={() => done.forEach((t) => deleteTodo(t.id))}
           className="text-xs text-foreground/20 hover:text-foreground/50 transition-colors"
@@ -710,7 +711,7 @@ function CompletedTodosBacklog() {
       <div className="flex flex-col gap-4">
         {Object.entries(groups).sort(([a], [b]) => b.localeCompare(a)).map(([date, items]) => (
           <div key={date}>
-            <p className="text-[10px] text-foreground/25 uppercase tracking-widest mb-2">{date}</p>
+            <p className="text-[10px] text-foreground/25 font-mono uppercase tracking-[0.14em] mb-2">{date}</p>
             <div className="flex flex-col gap-1">
               {items.map((t) => (
                 <div key={t.id} className="flex items-center gap-3 px-3 py-2 rounded-xl bg-foreground/[0.02] group">
@@ -869,20 +870,28 @@ function TwitchChannelCard({
 function MediaTab({ id, label, accent, badge }: { id: MediaSource; label: string; accent?: "spotify" | "twitch"; badge?: string }) {
   const { mediaSource, openMedia } = useNavStore();
   const active = mediaSource === id;
-  const activeCls = accent === "spotify" ? "bg-[#1db954]/15 text-[#1db954]"
-    : accent === "twitch" ? "bg-[#9146ff]/15 text-[#9146ff]"
-    : "bg-foreground/15 text-foreground";
+  // La couleur de marque n'est portée que par l'onglet actif : elle dit QUELLE
+  // plateforme est ouverte, elle ne décore pas la barre.
+  const activeText = accent === "spotify" ? "text-[#1db954]" : accent === "twitch" ? "text-[#9146ff]" : "text-foreground";
   return (
     <button
       onClick={() => openMedia(id)}
       className={cn(
-        "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5",
-        active ? activeCls : "text-foreground/40 hover:text-foreground/70 bg-foreground/5"
+        "relative flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold transition-colors",
+        active ? activeText : "text-foreground/40 hover:text-foreground/75"
       )}
     >
-      {label}
+      {/* Indicateur qui glisse d'un onglet à l'autre (état, pas décor) */}
+      {active && (
+        <motion.span
+          layoutId="media-tab-pill"
+          className="absolute inset-0 rounded-lg bg-foreground/[0.1]"
+          transition={{ type: "spring", stiffness: 420, damping: 34 }}
+        />
+      )}
+      <span className="relative">{label}</span>
       {badge && (
-        <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", active ? "bg-black/10" : "bg-foreground/10")}>
+        <span className="relative rounded-full bg-foreground/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground/55">
           {badge}
         </span>
       )}
@@ -1110,9 +1119,9 @@ export default function LandingPage() {
       <AppNav />
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Header */}
-        <header className="sticky top-0 z-20 bg-background/90 backdrop-blur-md border-b border-foreground/[0.06] px-4 sm:px-6 h-14 flex items-center justify-between">
+        <header className="sticky top-0 z-20 bg-background/85 backdrop-blur-md border-b border-foreground/[0.06] px-4 sm:px-6 h-14 flex items-center justify-between">
           <span className="text-sm font-semibold text-foreground/90 tracking-tight md:hidden">FocusFlow</span>
-          <span className="hidden md:block text-sm font-semibold text-foreground/70 tracking-tight">{sectionTitle}</span>
+          <span className="hidden md:block font-mono text-[11px] uppercase tracking-[0.16em] text-foreground/45">{sectionTitle}</span>
           <div className="flex items-center gap-2">
             <button
               onClick={() => useCommandPalette.getState().setOpen(true)}
@@ -1150,7 +1159,7 @@ export default function LandingPage() {
         <main className="flex-1 px-4 sm:px-6 py-6 sm:py-8 max-w-6xl mx-auto w-full pb-24 md:pb-10">
         {/* Sous-sélecteur de sources (section Écouter) */}
         {section === "ecouter" && (
-          <div className="flex gap-1.5 mb-6 flex-wrap">
+          <div className="mb-7 inline-flex flex-wrap gap-1 rounded-xl border border-foreground/[0.08] bg-foreground/[0.025] p-1">
             <MediaTab id="catalogue" label="Catalogue" />
             <MediaTab id="discover" label="Découvrir" />
             <MediaTab id="library" label="Ma bibliothèque" badge={hasLibraryContent ? `${customVideos.length + playlists.length + localPlaylists.length}` : undefined} />
@@ -1183,8 +1192,10 @@ export default function LandingPage() {
               <button
                 onClick={() => setActiveFilter(null)}
                 className={cn(
-                  "px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all",
-                  activeFilter === null ? "bg-foreground/15 text-foreground" : "text-foreground/40 hover:text-foreground/70 bg-foreground/5"
+                  "rounded-lg border px-3.5 py-1.5 text-xs font-medium transition-colors",
+                  activeFilter === null
+                    ? "border-foreground/20 bg-foreground/[0.1] text-foreground"
+                    : "border-foreground/[0.08] bg-foreground/[0.025] text-foreground/45 hover:border-foreground/20 hover:text-foreground/80"
                 )}
               >
                 Tout
@@ -1194,8 +1205,10 @@ export default function LandingPage() {
                   key={m}
                   onClick={() => setActiveFilter(activeFilter === m ? null : m)}
                   className={cn(
-                    "px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all",
-                    activeFilter === m ? "bg-foreground/15 text-foreground" : "text-foreground/40 hover:text-foreground/70 bg-foreground/5"
+                    "rounded-lg border px-3.5 py-1.5 text-xs font-medium transition-colors",
+                    activeFilter === m
+                      ? "border-foreground/20 bg-foreground/[0.1] text-foreground"
+                      : "border-foreground/[0.08] bg-foreground/[0.025] text-foreground/45 hover:border-foreground/20 hover:text-foreground/80"
                   )}
                 >
                   {moodLabels[m]}
@@ -1232,7 +1245,7 @@ export default function LandingPage() {
 
             {/* Mes playlists — collections locales, nommées, créées depuis AddToMenu */}
             <section className="mb-10">
-              <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-4">Mes playlists</p>
+              <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-4">Mes playlists</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                 <button
                   onClick={() => setShowNewLocalPlaylistModal(true)}
@@ -1259,7 +1272,7 @@ export default function LandingPage() {
             {/* Playlists YouTube — playlists/mixes YouTube référencées (pas modifiables) */}
             <section className="mb-10">
               <div className="flex items-center justify-between mb-4">
-                <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest">Playlists YouTube</p>
+                <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Playlists YouTube</p>
                 <button
                   onClick={() => setShowAddPlaylistModal(true)}
                   className="text-xs text-foreground/40 hover:text-foreground transition-colors flex items-center gap-1"
@@ -1289,7 +1302,7 @@ export default function LandingPage() {
             {/* Vidéos */}
             <section>
               <div className="flex items-center justify-between mb-4">
-                <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest">Vidéos</p>
+                <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Vidéos</p>
                 <button
                   onClick={() => setShowAddModal(true)}
                   className="text-xs text-foreground/40 hover:text-foreground transition-colors flex items-center gap-1"
@@ -1614,7 +1627,7 @@ export default function LandingPage() {
                   {/* Live now */}
                   {followedChannels.some((c) => c.isLive) && (
                     <section>
-                      <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-4 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
                         En direct maintenant
                       </p>
@@ -1632,7 +1645,7 @@ export default function LandingPage() {
                   )}
                   {/* All followed */}
                   <section>
-                    <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-4">Mes abonnements</p>
+                    <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-4">Mes abonnements</p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                       {followedChannels.map((ch) => (
                         <TwitchChannelCard
@@ -1650,7 +1663,7 @@ export default function LandingPage() {
 
             {/* VOD / Rediffusion */}
             <div className="mt-10">
-              <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-1">Rediffusion (VOD)</p>
+              <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-1">Rediffusion (VOD)</p>
               <p className="text-xs text-foreground/30 mb-4">
                 {"Colle le lien d'une rediffusion Twitch. Les VODs abonné uniquement nécessitent un abonnement actif au streamer."}
               </p>

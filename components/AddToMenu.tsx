@@ -105,7 +105,7 @@ export default function AddToMenu({
       <MenuButton label="Ma bibliothèque" done={inLibrary} onClick={handleAddLibrary} icon={<LibraryGlyph />} />
 
       <div className="h-px bg-foreground/10 my-1 mx-2" />
-      <p className="px-3 pt-0.5 pb-1.5 text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">
+      <p className="px-3 pt-0.5 pb-1.5 text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">
         Ajouter à une playlist
       </p>
       {playlists.length > 0 && (

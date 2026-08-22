@@ -105,7 +105,7 @@ export default function TodoList() {
     <div className="flex flex-col gap-3 h-full">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-white/30 uppercase tracking-widest">
+        <p className="text-xs font-semibold text-white/30 font-mono uppercase tracking-[0.14em]">
           Tâches
         </p>
         {done.length > 0 && (

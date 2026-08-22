@@ -163,7 +163,7 @@ export default function CoachModal({
           <>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <p className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">
+                <p className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">
                   {tasks.length} tâche{tasks.length > 1 ? "s" : ""} proposée{tasks.length > 1 ? "s" : ""}
                 </p>
                 <span className={cn(

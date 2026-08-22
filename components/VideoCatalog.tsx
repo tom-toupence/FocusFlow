@@ -29,7 +29,7 @@ export default function VideoCatalog() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-white/30 uppercase tracking-widest">Catalogue</p>
+        <p className="text-xs font-semibold text-white/30 font-mono uppercase tracking-[0.14em]">Catalogue</p>
         <span className="text-[10px] text-white/20">{filtered.length} vidéos</span>
       </div>
 

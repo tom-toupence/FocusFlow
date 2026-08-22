@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import SupabaseProvider from "@/components/SupabaseProvider";
 import AuthGate from "@/components/AuthGate";
@@ -14,6 +14,17 @@ import PresenceProvider from "@/components/PresenceProvider";
 const geist = Geist({
   variable: "--font-geist",
   subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument",
+  subsets: ["latin"],
+  weight: "400",
 });
 
 // `viewport-fit=cover` active env(safe-area-inset-*) sur iPhone à encoche —
@@ -35,7 +46,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className={`${geist.variable} h-full dark`}>
+    <html lang="fr" className={`${geist.variable} ${geistMono.variable} ${instrumentSerif.variable} h-full dark`}>
       <head>
         {/* Apply saved theme before first paint to avoid flash */}
         <script dangerouslySetInnerHTML={{ __html: `try{var t=JSON.parse(localStorage.getItem('focusflow-theme')||'{}').state?.theme;if(t==='light')document.documentElement.classList.remove('dark');else document.documentElement.classList.add('dark');}catch(e){}` }} />

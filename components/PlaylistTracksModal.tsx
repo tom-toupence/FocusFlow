@@ -106,7 +106,7 @@ export default function PlaylistTracksModal({
           {/* ── Titres ajoutés par l'utilisateur ──────────────────────────── */}
           {extras.length > 0 && (
             <div>
-              <p className="text-[11px] font-semibold text-foreground/30 uppercase tracking-widest px-2 mb-2">
+              <p className="text-[11px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] px-2 mb-2">
                 Ajoutés par toi — joués à la suite
               </p>
               <div className="flex flex-col gap-1">
@@ -128,7 +128,7 @@ export default function PlaylistTracksModal({
           {/* ── Recommandations liées ─────────────────────────────────────── */}
           {recs !== null && recs.length > 0 && (
             <div>
-              <p className="text-[11px] font-semibold text-foreground/30 uppercase tracking-widest px-2 mb-2">
+              <p className="text-[11px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] px-2 mb-2">
                 Recommandations liées
               </p>
               <div className="flex flex-col gap-1">

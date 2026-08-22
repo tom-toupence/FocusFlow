@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion, useReducedMotion, type Variants } from "motion/react";
 import { useGoalStore, getTodayProgress } from "@/store/goalStore";
-import { useStatsStore, getTodayStats, getStreak } from "@/store/statsStore";
+import { useStatsStore, getTodayStats, getStreak, getLast7Days } from "@/store/statsStore";
 import { usePlayHistoryStore } from "@/store/playHistoryStore";
 import { useSessionStore } from "@/store/sessionStore";
 import { useRoutineStore } from "@/store/routineStore";
@@ -24,11 +25,203 @@ import { useTimerStore } from "@/store/timerStore";
 import GoalRing from "@/components/GoalRing";
 import { cn } from "@/lib/utils";
 
+// Tableau de bord « Aujourd'hui » : bento asymétrique plutôt qu'une pile de
+// cartes identiques. Un seul accent (token `focus`), le reste en niveaux de
+// foreground. Le mouvement est motivé : entrée en cascade (hiérarchie de
+// lecture), barres de la semaine qui poussent (le chiffre devient une forme),
+// pression tactile sur les actions. Tout se replie sous prefers-reduced-motion.
+
 function fmtMin(min: number): string {
   if (min <= 0) return "0 min";
   const h = Math.floor(min / 60);
   const m = min % 60;
   return h > 0 ? `${h}h${m > 0 ? ` ${m}m` : ""}` : `${m} min`;
+}
+
+const EASE = [0.16, 1, 0.3, 1] as const;
+
+const container: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.05, delayChildren: 0.02 } },
+};
+const tile: Variants = {
+  hidden: { opacity: 0, y: 14 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } },
+};
+
+/** Conteneur de tuile : bordure fine, pas d'ombre portée, léger lift au survol. */
+function Tile({
+  className,
+  children,
+  interactive = false,
+  onClick,
+}: {
+  className?: string;
+  children: React.ReactNode;
+  interactive?: boolean;
+  onClick?: () => void;
+}) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.div
+      variants={tile}
+      whileHover={interactive && !reduce ? { y: -2 } : undefined}
+      transition={{ type: "spring", stiffness: 320, damping: 26 }}
+      onClick={onClick}
+      className={cn(
+        "relative rounded-2xl border border-foreground/[0.08] bg-foreground/[0.025] p-5",
+        interactive && "cursor-pointer hover:border-foreground/20 hover:bg-foreground/[0.05] transition-colors",
+        className
+      )}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/35">{children}</p>;
+}
+
+function PlayIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+/** Bouton d'action principal : pression physique au clic. */
+function PrimaryAction({
+  onClick,
+  children,
+  className,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition-all hover:bg-foreground/90 motion-safe:active:translate-y-px motion-safe:active:scale-[0.98]",
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Semaine en barres : les 7 derniers jours, aujourd'hui en accent. */
+function WeekBars({ data, unitMax }: { data: { date: string; minutes: number; label: string }[]; unitMax: number }) {
+  const reduce = useReducedMotion();
+  const today = localToday();
+  return (
+    <div className="flex items-end gap-1.5 h-24">
+      {data.map((d, i) => {
+        const ratio = unitMax > 0 ? d.minutes / unitMax : 0;
+        const isToday = d.date === today;
+        return (
+          <div key={d.date} className="group flex flex-1 flex-col items-center gap-2">
+            <div className="relative flex w-full flex-1 items-end">
+              <motion.div
+                initial={reduce ? false : { scaleY: 0 }}
+                animate={{ scaleY: 1 }}
+                transition={{ duration: 0.55, delay: 0.1 + i * 0.045, ease: EASE }}
+                style={{ height: `${Math.max(ratio * 100, d.minutes > 0 ? 6 : 2)}%`, transformOrigin: "bottom" }}
+                className={cn(
+                  "w-full rounded-md",
+                  isToday ? "bg-focus" : d.minutes > 0 ? "bg-foreground/25" : "bg-foreground/[0.07]"
+                )}
+              />
+              <span className="pointer-events-none absolute -top-5 left-1/2 -translate-x-1/2 font-mono text-[10px] tabular-nums text-foreground/50 opacity-0 transition-opacity group-hover:opacity-100">
+                {d.minutes}
+              </span>
+            </div>
+            <span
+              className={cn(
+                "font-mono text-[10px] uppercase",
+                isToday ? "text-foreground/70" : "text-foreground/30"
+              )}
+            >
+              {d.label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Métrique nue : pas de carte, juste du rythme typographique. */
+function Metric({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="min-w-0">
+      <Label>{label}</Label>
+      <p className="mt-1.5 font-mono text-xl tabular-nums tracking-tight text-foreground">{value}</p>
+      {sub && <p className="mt-0.5 truncate text-[11px] text-foreground/35">{sub}</p>}
+    </div>
+  );
+}
+
+function CountMetric({ label, num, format, sub }: {
+  label: string;
+  num: number;
+  format: (v: number) => string;
+  sub?: string;
+}) {
+  const animated = useCountUp(num);
+  return <Metric label={label} value={format(Math.round(animated))} sub={sub} />;
+}
+
+/** Rail horaire du jour : les blocs planifiés placés sur 6h → 24h. */
+function DayRail({ blocks }: { blocks: { id: string; startMin: number; durationMin: number; label?: string }[] }) {
+  const reduce = useReducedMotion();
+  const START = 6 * 60;
+  const END = 24 * 60;
+  const span = END - START;
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const nowPct = ((nowMin - START) / span) * 100;
+
+  return (
+    <div className="mt-4">
+      <div className="relative h-9 rounded-lg bg-foreground/[0.05]">
+        {blocks.map((b, i) => {
+          const left = ((b.startMin - START) / span) * 100;
+          const width = (b.durationMin / span) * 100;
+          if (left > 100 || left + width < 0) return null;
+          return (
+            <motion.div
+              key={b.id}
+              initial={reduce ? false : { opacity: 0, scaleX: 0.6 }}
+              animate={{ opacity: 1, scaleX: 1 }}
+              transition={{ duration: 0.45, delay: 0.15 + i * 0.06, ease: EASE }}
+              style={{
+                left: `${Math.max(left, 0)}%`,
+                width: `${Math.max(Math.min(width, 100 - Math.max(left, 0)), 2.5)}%`,
+                transformOrigin: "left",
+              }}
+              className="absolute inset-y-1 flex items-center overflow-hidden rounded-md bg-focus/25 px-2"
+              title={`${formatMinOfDay(b.startMin)} · ${b.durationMin} min · ${b.label || "Focus"}`}
+            >
+              <span className="truncate text-[10px] font-medium text-foreground/75">{b.label || "Focus"}</span>
+            </motion.div>
+          );
+        })}
+        {nowPct >= 0 && nowPct <= 100 && (
+          <span className="absolute inset-y-0 w-px bg-foreground/50" style={{ left: `${nowPct}%` }} aria-hidden />
+        )}
+      </div>
+      <div className="mt-1.5 flex justify-between font-mono text-[10px] text-foreground/25">
+        <span>06h</span>
+        <span>12h</span>
+        <span>18h</span>
+        <span>00h</span>
+      </div>
+    </div>
+  );
 }
 
 export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab: "catalogue" | "organisation") => void }) {
@@ -47,35 +240,34 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
   const [mounted, setMounted] = useState(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
+  if (!mounted) return <DashboardSkeleton />;
 
   const today = getTodayStats(days);
   const streak = getStreak(days);
   const progress = getTodayProgress(days, unit, target);
+  const week = getLast7Days(days);
+  const weekMax = Math.max(...week.map((d) => d.minutes), 25);
+  const weekTotal = week.reduce((s, d) => s + d.minutes, 0);
   const nextTask = todos.find((t) => t.status !== "done") ?? null;
+  const openTasks = todos.filter((t) => t.status !== "done").length;
   const activeProject = projects.find((p) => p.id === activeProjectId) ?? null;
   const todayBlocks = blocksForDate(blocks, localToday()).filter((b) => !b.done);
   const recentJournal = journal[0] ?? null;
 
-  // Peak productive hour from play history
   const byHour = Array(24).fill(0) as number[];
   for (const e of entries) byHour[new Date(e.timestamp).getHours()] += e.minutes;
   const maxHour = Math.max(...byHour);
   const peakHour = maxHour > 0 ? byHour.indexOf(maxHour) : null;
   const currentHour = new Date().getHours();
 
-  const hour = new Date().getHours();
-  const greeting = hour < 6 ? "Bonne nuit" : hour < 12 ? "Bonjour" : hour < 18 ? "Bon après-midi" : "Bonsoir";
+  const greeting = currentHour < 6 ? "Bonne nuit" : currentHour < 12 ? "Bonjour" : currentHour < 18 ? "Bon après-midi" : "Bonsoir";
 
-  // Weekly recap banner: last completed week had focus time and hasn't been viewed yet
   const lastWeek = weekDates(-1);
   const lastWeekMinutes = lastWeek.reduce((s, d) => s + (days[d]?.minutesWorked ?? 0), 0);
   const showWrappedBanner = lastWeekMinutes > 0 && lastSeenWeekStart !== lastWeek[0];
 
-  // Let the user pick their video / ambiance first (the catalogue routes to /settings on select).
   const startSession = () => onNavigateTab("catalogue");
 
-  // Suggestion locale : reprendre la vidéo la plus relancée (cf. lib/suggestions).
   const suggestion = topRepeatedVideo(entries);
   const suggestedVideo = suggestion ? getAllVideos().find((v) => v.youtubeId === suggestion.youtubeId) : null;
   const suggestionTimely = suggestion?.peakHour != null && Math.abs(currentHour - suggestion.peakHour) <= 1;
@@ -94,238 +286,312 @@ export default function TodayDashboard({ onNavigateTab }: { onNavigateTab: (tab:
     router.push("/session");
   };
 
+  const sprintStatus = sprint ? getSprintStatus(sprint, blocks) : null;
+
   return (
-    <div className="flex flex-col gap-6 dash-stagger">
-      {/* Hero */}
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+    <motion.div variants={container} initial="hidden" animate="show" className="flex flex-col gap-3">
+      {/* En-tête */}
+      <motion.div variants={tile} className="mb-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-foreground tracking-tight">{greeting}</h1>
-          <p className="text-foreground/40 mt-1 text-sm capitalize">
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-foreground/35">
             {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
           </p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-[40px] sm:leading-[1.05]">
+            {greeting}
+          </h1>
         </div>
-        <button
-          onClick={startSession}
-          className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-foreground text-background font-semibold text-sm hover:bg-foreground/90 transition-all shadow-lg shadow-black/20 motion-safe:active:scale-[0.97]"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+        <PrimaryAction onClick={startSession} className="px-6 py-3 shadow-lg shadow-black/10">
+          <PlayIcon />
           Démarrer une session
-        </button>
-      </div>
+        </PrimaryAction>
+      </motion.div>
 
-      {/* Weekly recap banner */}
-      {showWrappedBanner && (
-        <button
-          onClick={() => router.push("/wrapped")}
-          className="flex items-center gap-3 px-5 py-4 rounded-2xl bg-gradient-to-r from-violet-600/20 via-fuchsia-600/10 to-transparent border border-violet-500/25 hover:border-violet-500/50 transition-all text-left group"
-        >
-          <span className="w-9 h-9 flex-shrink-0 rounded-lg bg-violet-500/15 text-violet-300 flex items-center justify-center">
-            <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M3 3v18h18M7 15l3-4 3 3 4-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground">Ton récap de la semaine est prêt</p>
-            <p className="text-xs text-foreground/45">Temps de focus, meilleur jour, badges… et une carte à partager.</p>
-          </div>
-          <span className="text-xs text-violet-300 font-medium flex-shrink-0 group-hover:translate-x-0.5 transition-transform">Voir →</span>
-        </button>
-      )}
-
-      {/* Suggestion : reprendre la session habituelle */}
+      {/* Reprise : la vidéo la plus relancée, avec sa vraie miniature */}
       {suggestedVideo && (
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 rounded-2xl bg-gradient-to-r from-sky-500/[0.08] to-transparent border border-sky-500/20">
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-foreground/40 uppercase tracking-widest mb-0.5">
-              ↻ {suggestionTimely ? "C'est ton heure habituelle" : "Reprendre ta session habituelle"}
-            </p>
-            <p className="text-sm font-medium text-foreground truncate">{suggestedVideo.title}</p>
-            <p className="text-xs text-foreground/45 mt-0.5">
-              Lancée {suggestion!.count} fois{suggestion!.peakHour != null ? ` · souvent vers ${suggestion!.peakHour}h` : ""}
-            </p>
+        <Tile className="overflow-hidden p-0" interactive onClick={launchSuggested}>
+          <div className="flex items-stretch gap-4">
+            <div className="relative w-28 shrink-0 overflow-hidden sm:w-44">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://i.ytimg.com/vi/${suggestedVideo.youtubeId}/mqdefault.jpg`}
+                alt=""
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
+              <span className="absolute inset-0 flex items-center justify-center bg-black/35 text-white">
+                <PlayIcon className="w-6 h-6" />
+              </span>
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 py-4 pr-5">
+              <Label>{suggestionTimely ? "C'est ton heure habituelle" : "Reprendre"}</Label>
+              <p className="truncate text-[15px] font-medium text-foreground">{suggestedVideo.title}</p>
+              <p className="text-xs text-foreground/40">
+                Lancée {suggestion!.count} fois
+                {suggestion!.peakHour != null ? `, souvent vers ${suggestion!.peakHour}h` : ""}
+              </p>
+            </div>
           </div>
-          <button
-            onClick={launchSuggested}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-foreground text-background font-semibold text-sm hover:bg-foreground/90 transition-all flex-shrink-0 motion-safe:active:scale-[0.97]"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-            Reprendre
-          </button>
-        </div>
+        </Tile>
       )}
 
-      {/* Top row: goal + stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        {/* Goal */}
-        <div className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.08]">
-          <GoalRing progress={progress} size={88} stroke={8} />
-          <div>
-            <p className="text-xs font-semibold text-foreground/40 uppercase tracking-widest">Objectif du jour</p>
-            <p className="text-sm text-foreground/70 mt-1 leading-snug">
-              {progress.reached ? "Atteint, bravo" : `Encore ${unit === "minutes" ? `${Math.max(0, target - progress.value)} min` : `${Math.max(0, target - progress.value)} pomodoro${target - progress.value !== 1 ? "s" : ""}`}`}
+      {/* Bento principal : objectif (5) + semaine (7) */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+        <Tile className="flex items-center gap-5 lg:col-span-5">
+          <GoalRing progress={progress} size={104} stroke={9} />
+          <div className="min-w-0">
+            <Label>Objectif du jour</Label>
+            <p className="mt-2 text-[15px] leading-snug text-foreground/80">
+              {progress.reached
+                ? "Atteint. Le reste est du bonus."
+                : `Encore ${Math.max(0, target - progress.value)} ${unit === "minutes" ? "min" : `pomodoro${target - progress.value !== 1 ? "s" : ""}`}`}
             </p>
+            <button
+              onClick={startSession}
+              className="mt-3 font-mono text-[11px] uppercase tracking-[0.12em] text-focus transition-opacity hover:opacity-70"
+            >
+              Lancer maintenant
+            </button>
           </div>
-        </div>
-        {/* Streak + today */}
-        <div className="grid grid-cols-2 gap-3 lg:col-span-2">
-          <Stat label="Série" num={streak} format={(v) => `${v}j`} accent="text-orange-300" sub={streak >= 7 ? "en feu" : streak > 0 ? "continue" : "démarre"} />
-          <Stat label="Focus aujourd'hui" num={today.minutesWorked} format={fmtMin} accent="text-emerald-300" sub={`${today.sessions} session${today.sessions !== 1 ? "s" : ""}`} />
-        </div>
+        </Tile>
+
+        <Tile className="lg:col-span-7">
+          <div className="flex items-start justify-between gap-4">
+            <Label>Sept derniers jours</Label>
+            <p className="font-mono text-[11px] tabular-nums text-foreground/40">{fmtMin(weekTotal)}</p>
+          </div>
+          <div className="mt-5">
+            <WeekBars data={week} unitMax={weekMax} />
+          </div>
+          <div className="mt-5 grid grid-cols-3 gap-4 border-t border-foreground/[0.07] pt-4">
+            <CountMetric label="Série" num={streak} format={(v) => `${v} j`} sub={streak >= 7 ? "solide" : streak > 0 ? "en cours" : "à relancer"} />
+            <CountMetric label="Aujourd'hui" num={today.minutesWorked} format={fmtMin} sub={`${today.sessions} session${today.sessions !== 1 ? "s" : ""}`} />
+            <Metric
+              label="Heure forte"
+              value={peakHour !== null ? `${peakHour}h` : "-"}
+              sub={peakHour !== null && Math.abs(currentHour - peakHour) <= 1 ? "c'est maintenant" : "d'après ton historique"}
+            />
+          </div>
+        </Tile>
       </div>
 
-      {/* Active sprint: today's block + Go */}
-      {sprint && (() => {
-        const st = getSprintStatus(sprint, blocks);
-        return (
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 rounded-2xl bg-gradient-to-r from-rose-500/[0.08] to-transparent border border-rose-500/20">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground/40 uppercase tracking-widest mb-0.5">
-                Sprint · {st.overdue ? "deadline dépassée" : `J-${st.daysLeft}`} · {st.blocksDone}/{st.blocksTotal} blocs
-              </p>
-              <p className="text-sm font-medium text-foreground truncate">{sprint.objective}</p>
-              {st.todayBlock ? (
-                <p className="text-xs text-foreground/45 mt-0.5">
-                  Aujourd&apos;hui : {formatMinOfDay(st.todayBlock.startMin)} · {st.todayBlock.durationMin} min
-                  {st.missed > 0 && <span className="text-amber-500/90"> · {st.missed} bloc{st.missed > 1 ? "s" : ""} en retard</span>}
-                </p>
+      {/* Sprint actif */}
+      {sprint && sprintStatus && (
+        <Tile className="flex flex-col gap-4 border-focus/25 bg-focus/[0.05] sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1">
+            <Label>
+              Sprint · {sprintStatus.overdue ? "deadline dépassée" : `J-${sprintStatus.daysLeft}`} · {sprintStatus.blocksDone}/{sprintStatus.blocksTotal} blocs
+            </Label>
+            <p className="mt-1.5 truncate text-[15px] font-medium text-foreground">{sprint.objective}</p>
+            <p className="mt-0.5 text-xs text-foreground/45">
+              {sprintStatus.todayBlock ? (
+                <>
+                  Aujourd&apos;hui : {formatMinOfDay(sprintStatus.todayBlock.startMin)}, {sprintStatus.todayBlock.durationMin} min
+                  {sprintStatus.missed > 0 && `, ${sprintStatus.missed} bloc${sprintStatus.missed > 1 ? "s" : ""} en retard`}
+                </>
+              ) : sprintStatus.missed > 0 ? (
+                `${sprintStatus.missed} bloc${sprintStatus.missed > 1 ? "s" : ""} en retard, recalcule depuis Organisation`
               ) : (
-                <p className="text-xs text-foreground/45 mt-0.5">
-                  {st.missed > 0 ? `${st.missed} bloc${st.missed > 1 ? "s" : ""} en retard — recalcule depuis l’onglet Organisation` : "Rien de prévu aujourd’hui — repos mérité"}
-                </p>
+                "Rien de prévu aujourd'hui, repos mérité"
               )}
-            </div>
-            {st.todayBlock && (
+            </p>
+          </div>
+          {sprintStatus.todayBlock && (
+            <PrimaryAction
+              onClick={() => {
+                launchSprintSession(sprint, sprintStatus.todayBlock!.durationMin);
+                router.push("/session");
+              }}
+            >
+              <PlayIcon />
+              Lancer le bloc
+            </PrimaryAction>
+          )}
+        </Tile>
+      )}
+
+      {/* Journée : rail horaire (7) + prochaine tâche (5) */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+        <Tile className="lg:col-span-7">
+          <div className="flex items-center justify-between gap-4">
+            <Label>Ta journée</Label>
+            <button
+              onClick={() => onNavigateTab("organisation")}
+              className="text-[11px] text-foreground/40 transition-colors hover:text-foreground"
+            >
+              Planning
+            </button>
+          </div>
+          {todayBlocks.length > 0 ? (
+            <>
+              <DayRail blocks={todayBlocks} />
+              <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5">
+                {todayBlocks.slice(0, 4).map((b) => (
+                  <span key={b.id} className="flex items-center gap-2 text-xs text-foreground/60">
+                    <span className="font-mono tabular-nums text-foreground/35">{formatMinOfDay(b.startMin)}</span>
+                    {b.label || "Focus"}
+                  </span>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="mt-4 flex flex-col items-start gap-3 rounded-xl border border-dashed border-foreground/10 px-4 py-6">
+              <p className="text-sm text-foreground/45">Aucun bloc posé aujourd&apos;hui.</p>
               <button
-                onClick={() => {
-                  launchSprintSession(sprint, st.todayBlock!.durationMin);
-                  router.push("/session");
-                }}
-                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-foreground text-background font-semibold text-sm hover:bg-foreground/90 transition-all shadow-lg shadow-black/20 flex-shrink-0"
+                onClick={() => onNavigateTab("organisation")}
+                className="rounded-lg border border-foreground/12 px-3 py-1.5 text-xs text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground"
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-                Go
+                Poser un bloc
               </button>
+            </div>
+          )}
+        </Tile>
+
+        <Tile className="flex flex-col lg:col-span-5">
+          <div className="flex items-center justify-between gap-4">
+            <Label>Prochaine tâche</Label>
+            {openTasks > 0 && (
+              <span className="font-mono text-[11px] tabular-nums text-foreground/35">{openTasks} en attente</span>
             )}
           </div>
-        );
-      })()}
-
-      {/* Suggestion */}
-      {peakHour !== null && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-violet-500/[0.07] border border-violet-500/15">
-          <svg className="w-4 h-4 flex-shrink-0 text-violet-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          <p className="text-xs text-foreground/60 leading-snug">
-            Tu es souvent le plus concentré vers <strong className="text-violet-300">{peakHour}h</strong>.
-            {Math.abs(currentHour - peakHour) <= 1 ? " C'est le moment idéal — lance-toi !" : " Garde un créneau pour tes tâches importantes."}
-          </p>
-        </div>
-      )}
-
-      {/* Next task + planned blocks */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="px-5 py-4 rounded-2xl bg-foreground/[0.03] border border-foreground/[0.06]">
-          <p className="text-xs font-semibold text-foreground/40 uppercase tracking-widest mb-3">Prochaine tâche</p>
           {nextTask ? (
-            <div className="flex items-center gap-3">
-              <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
-              <span className="flex-1 text-sm text-foreground/80 min-w-0 break-words">{nextTask.text}</span>
-              <button onClick={startSession} className="text-xs text-foreground/40 hover:text-foreground transition-colors flex-shrink-0">Faire →</button>
+            <div className="mt-4 flex flex-1 flex-col justify-between gap-4">
+              <p className="text-[15px] leading-snug text-foreground/85">{nextTask.text}</p>
+              <button
+                onClick={startSession}
+                className="self-start font-mono text-[11px] uppercase tracking-[0.12em] text-focus transition-opacity hover:opacity-70"
+              >
+                Attaquer celle-ci
+              </button>
             </div>
           ) : (
-            <p className="text-sm text-foreground/30">Aucune tâche en attente. <button onClick={startSession} className="text-foreground/50 hover:text-foreground underline">Planifier</button></p>
-          )}
-        </div>
-        <div className="px-5 py-4 rounded-2xl bg-foreground/[0.03] border border-foreground/[0.06]">
-          <p className="text-xs font-semibold text-foreground/40 uppercase tracking-widest mb-3">Blocs planifiés aujourd&apos;hui</p>
-          {todayBlocks.length > 0 ? (
-            <div className="flex flex-col gap-1.5">
-              {todayBlocks.slice(0, 3).map((b) => (
-                <div key={b.id} className="flex items-center gap-2 text-sm text-foreground/70">
-                  <span className="text-[11px] text-foreground/40 tabular-nums w-10">{formatMinOfDay(b.startMin)}</span>
-                  <span className="flex-1 truncate">{b.label || "Focus"}</span>
-                  <span className="text-[10px] text-foreground/30">{b.durationMin}m</span>
-                </div>
-              ))}
+            <div className="mt-4 flex flex-1 flex-col items-start justify-center gap-3 rounded-xl border border-dashed border-foreground/10 px-4 py-6">
+              <p className="text-sm text-foreground/45">Ta liste est vide.</p>
+              <button
+                onClick={startSession}
+                className="rounded-lg border border-foreground/12 px-3 py-1.5 text-xs text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground"
+              >
+                Planifier une tâche
+              </button>
             </div>
-          ) : (
-            <p className="text-sm text-foreground/30">Rien de planifié. <button onClick={() => onNavigateTab("organisation")} className="text-foreground/50 hover:text-foreground underline">Voir l&apos;organisation</button></p>
           )}
-        </div>
+        </Tile>
       </div>
 
-      {/* Routines */}
-      {routines.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-foreground/40 uppercase tracking-widest mb-3">Lancer une routine</p>
-          <div className="flex flex-wrap gap-2">
-            {routines.map((r) => (
-              <button
-                key={r.id}
-                onClick={() => { applyRoutine(r); router.push("/settings"); }}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-foreground/[0.04] hover:bg-foreground/[0.08] border border-foreground/10 text-sm text-foreground/80 transition-all"
-              >
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: r.color || "#818cf8" }} />
-                <span className="font-medium">{r.name}</span>
-                <span className="text-[10px] text-foreground/35">{r.workDuration}min</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Active project */}
+      {/* Projet actif */}
       {activeProject && (() => {
         const st = getProjectStatus(activeProject);
         return (
-          <div className="px-5 py-4 rounded-2xl bg-foreground/[0.03] border border-foreground/[0.06]">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ background: activeProject.color }} />
+          <Tile>
+            <div className="flex flex-wrap items-baseline justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: activeProject.color }} aria-hidden />
                 <p className="text-sm font-semibold text-foreground">{activeProject.name}</p>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-foreground/10 text-foreground/40">projet actif</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-foreground/35">projet actif</span>
               </div>
-              <span className="text-xs text-foreground/40 tabular-nums">{activeProject.pomodorosDone}/{activeProject.pomodoroBudget} pomodoros</span>
+              <span className="font-mono text-xs tabular-nums text-foreground/45">
+                {activeProject.pomodorosDone}/{activeProject.pomodoroBudget}
+              </span>
             </div>
-            <div className="h-2 rounded-full bg-foreground/[0.06] overflow-hidden">
-              <div className="h-full rounded-full transition-all" style={{ width: `${st.pct * 100}%`, background: activeProject.color }} />
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-foreground/[0.07]">
+              <motion.div
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: Math.min(st.pct, 1) }}
+                transition={{ duration: 0.7, ease: EASE, delay: 0.2 }}
+                style={{ background: activeProject.color, transformOrigin: "left" }}
+                className="h-full w-full rounded-full"
+              />
             </div>
             {st.daysLeft !== null && (
-              <p className="text-[11px] text-foreground/40 mt-2">
-                {st.overdue ? "Deadline dépassée" : `${st.daysLeft}j restants · vise ${st.perDayNeeded} pomodoro${(st.perDayNeeded ?? 0) > 1 ? "s" : ""}/jour`}
-                {!st.overdue && (st.onTrack ? " · sur la bonne voie ✓" : " · prends de l'avance")}
+              <p className="mt-2.5 text-[11px] text-foreground/40">
+                {st.overdue
+                  ? "Deadline dépassée"
+                  : `${st.daysLeft} j restants, vise ${st.perDayNeeded} pomodoro${(st.perDayNeeded ?? 0) > 1 ? "s" : ""} par jour`}
+                {!st.overdue && (st.onTrack ? ", sur la bonne voie" : ", prends de l'avance")}
               </p>
             )}
-          </div>
+          </Tile>
         );
       })()}
 
-      {/* Recent reflection */}
-      {recentJournal && (
-        <div className="px-5 py-4 rounded-2xl bg-foreground/[0.03] border border-foreground/[0.06]">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-foreground/40 uppercase tracking-widest">Dernière réflexion</p>
-            <span className="w-3 h-3 rounded-full" title={MOODS.find((m) => m.value === recentJournal.mood)?.label} style={{ background: MOODS.find((m) => m.value === recentJournal.mood)?.color }} />
+      {/* Routines : rangée de pastilles, pas une grille de cartes */}
+      {routines.length > 0 && (
+        <motion.div variants={tile}>
+          <Label>Routines</Label>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {routines.map((r) => (
+              <button
+                key={r.id}
+                onClick={() => {
+                  applyRoutine(r);
+                  router.push("/settings");
+                }}
+                className="group flex items-center gap-2.5 rounded-xl border border-foreground/[0.09] bg-foreground/[0.025] px-4 py-2.5 text-sm text-foreground/80 transition-all hover:border-foreground/25 hover:bg-foreground/[0.06] motion-safe:active:scale-[0.98]"
+              >
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: r.color || "currentColor" }} aria-hidden />
+                <span className="font-medium">{r.name}</span>
+                <span className="font-mono text-[10px] tabular-nums text-foreground/35">{r.workDuration}min</span>
+              </button>
+            ))}
           </div>
-          {recentJournal.wentWell && <p className="text-sm text-foreground/70 leading-snug">{recentJournal.wentWell}</p>}
-          {recentJournal.blockers && <p className="text-sm text-foreground/50 leading-snug mt-1">{recentJournal.blockers}</p>}
+        </motion.div>
+      )}
+
+      {/* Bas de page : récap hebdo + dernière réflexion */}
+      {(showWrappedBanner || recentJournal) && (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {showWrappedBanner && (
+            <Tile interactive onClick={() => router.push("/wrapped")} className="flex items-center gap-4">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-focus/15 text-focus">
+                <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 20V4M4 20h16M8 16l3.5-4.5 3 2.5L20 8" />
+                </svg>
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">Ton récap de la semaine est prêt</p>
+                <p className="text-xs text-foreground/45">Temps de focus, meilleur jour, badges, carte à partager.</p>
+              </div>
+            </Tile>
+          )}
+          {recentJournal && (
+            <Tile>
+              <div className="flex items-center justify-between">
+                <Label>Dernière réflexion</Label>
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  title={MOODS.find((m) => m.value === recentJournal.mood)?.label}
+                  style={{ background: MOODS.find((m) => m.value === recentJournal.mood)?.color }}
+                  aria-hidden
+                />
+              </div>
+              {recentJournal.wentWell && <p className="mt-3 text-sm leading-snug text-foreground/75">{recentJournal.wentWell}</p>}
+              {recentJournal.blockers && <p className="mt-1.5 text-sm leading-snug text-foreground/45">{recentJournal.blockers}</p>}
+            </Tile>
+          )}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 
-function Stat({ label, num, format, sub, accent }: {
-  label: string;
-  num: number;
-  format: (v: number) => string;
-  sub: string;
-  accent: string;
-}) {
-  // Count-up au montage (le parent est gaté par `mounted` → pas de mismatch).
-  const animated = useCountUp(num);
+/** Squelette au premier rendu (le store persisté n'est pas encore hydraté). */
+function DashboardSkeleton() {
   return (
-    <div className="flex flex-col gap-1 px-5 py-4 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.08]">
-      <span className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest">{label}</span>
-      <span className={cn("text-2xl font-light tabular-nums tracking-tight", accent)}>{format(Math.round(animated))}</span>
-      <span className="text-[11px] text-foreground/30">{sub}</span>
+    <div className="flex flex-col gap-3" aria-hidden>
+      <div className="mb-2 flex items-end justify-between gap-4">
+        <div className="flex flex-col gap-3">
+          <span className="anim-skeleton block h-3 w-40 rounded bg-foreground/10" />
+          <span className="anim-skeleton block h-9 w-52 rounded bg-foreground/10" />
+        </div>
+        <span className="anim-skeleton block h-11 w-48 rounded-xl bg-foreground/10" />
+      </div>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+        <span className="anim-skeleton block h-[164px] rounded-2xl bg-foreground/[0.06] lg:col-span-5" />
+        <span className="anim-skeleton block h-[164px] rounded-2xl bg-foreground/[0.06] lg:col-span-7" />
+      </div>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+        <span className="anim-skeleton block h-32 rounded-2xl bg-foreground/[0.06] lg:col-span-7" />
+        <span className="anim-skeleton block h-32 rounded-2xl bg-foreground/[0.06] lg:col-span-5" />
+      </div>
     </div>
   );
 }

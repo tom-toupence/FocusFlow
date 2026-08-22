@@ -73,7 +73,7 @@ export default function SprintWizard() {
       <section className="rounded-2xl border border-foreground/[0.08] bg-gradient-to-br from-rose-500/[0.06] to-transparent p-5">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-foreground/40 uppercase tracking-widest mb-1">
+            <p className="text-xs font-semibold text-foreground/40 font-mono uppercase tracking-[0.14em] mb-1">
               Sprint en cours · {st.overdue ? "deadline dépassée" : `J-${st.daysLeft}`}
             </p>
             <h2 className="text-base font-semibold text-foreground leading-snug">{sprint.objective}</h2>
@@ -217,7 +217,7 @@ export default function SprintWizard() {
             {plan && !loading && (
               <div className="flex flex-col gap-3 border-t border-foreground/[0.08] pt-4">
                 <div className="flex items-center gap-2">
-                  <p className="text-xs font-semibold text-foreground/40 uppercase tracking-widest">Plan proposé</p>
+                  <p className="text-xs font-semibold text-foreground/40 font-mono uppercase tracking-[0.14em]">Plan proposé</p>
                   <span className={cn(
                     "text-[10px] px-1.5 py-0.5 rounded-md font-medium",
                     plan.source === "ai" ? "bg-violet-500/15 text-violet-400" : "bg-foreground/10 text-foreground/40"

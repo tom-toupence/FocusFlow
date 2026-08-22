@@ -38,6 +38,13 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Accent UNIQUE du site connecté (« focus »). Tout ce qui doit ressortir
+     dans l'app — anneau d'objectif, barre du jour, indicateur de nav actif —
+     passe par lui. Pas de second accent : le reste vit en niveaux de
+     foreground. */
+  --focus: oklch(0.52 0.11 172);
+  --focus-contrast: oklch(0.99 0 0);
 }
 
 * {
@@ -62,6 +69,8 @@
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: var(--font-sans);
+  --font-serif: var(--font-instrument), "Instrument Serif", Georgia, serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -93,6 +102,8 @@
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
+  --color-focus: var(--focus);
+  --color-focus-contrast: var(--focus-contrast);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -134,6 +145,9 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  --focus: oklch(0.82 0.13 172);
+  --focus-contrast: oklch(0.16 0.02 172);
 }
 
 /* ── Teinte d'ambiance (refonte UX) ──────────────────────────────────────
@@ -212,6 +226,28 @@
 .anim-track-in    { animation: trackIn 0.35s ease-out both; }
 .anim-halo-pulse  { animation: haloPulse 0.9s ease-out; }
 
+/* Landing — révélation au scroll (IntersectionObserver → data-shown).
+   Un seul couple opacity/transform, délai en cascade via --reveal-delay. */
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+.reveal[data-shown="true"] { opacity: 1; transform: none; }
+
+@keyframes slowDrift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(4%, -3%, 0) scale(1.12); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+.anim-drift { animation: slowDrift 28s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .anim-drift { animation: none; }
+}
+
 /* Landing — chambre : volutes d'encens et respiration de la lampe.
    Volontairement LENTES : dans une pièce calme, rien ne s'agite. */
 @keyframes smokeRise {
@@ -232,17 +268,6 @@
   .anim-smoke { opacity: 0.18; }
 }
 
-/* Entrée en cascade des cartes du tableau de bord (au montage seulement).
-   Délais échelonnés sur les enfants directs. Neutralisé en reduced-motion. */
-.dash-stagger > * { animation: cascadeIn 0.5s ease-out backwards; }
-.dash-stagger > *:nth-child(1) { animation-delay: 0.03s; }
-.dash-stagger > *:nth-child(2) { animation-delay: 0.08s; }
-.dash-stagger > *:nth-child(3) { animation-delay: 0.13s; }
-.dash-stagger > *:nth-child(4) { animation-delay: 0.18s; }
-.dash-stagger > *:nth-child(5) { animation-delay: 0.23s; }
-.dash-stagger > *:nth-child(6) { animation-delay: 0.28s; }
-.dash-stagger > *:nth-child(n+7) { animation-delay: 0.32s; }
-
 /* Onglet caché → les animations d'ambiance ne tournent pas pour rien */
 :root[data-tab-hidden] .anim-aurora,
 :root[data-tab-hidden] .anim-aurora-slow {
@@ -256,7 +281,7 @@
   .anim-aurora, .anim-aurora-slow, .anim-ambient-in, .anim-bloom,
   .anim-eq, .anim-track-in, .anim-halo-pulse,
   .anim-section-in, .anim-cascade, .anim-skeleton,
-  .anim-toast-in, .anim-toast-out, .dash-stagger > * {
+  .anim-toast-in, .anim-toast-out {
     animation: none !important;
   }
 }

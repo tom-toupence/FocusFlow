@@ -197,7 +197,7 @@ export default function DiscoverPanel() {
       {isSearching ? (
         <>
           <div className="flex items-center justify-between -mt-2">
-            <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest">Résultats pour « {query.trim()} »</p>
+            <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Résultats pour « {query.trim()} »</p>
             <button onClick={() => setQuery("")} className="text-xs text-foreground/40 hover:text-foreground transition-colors">
               Effacer
             </button>
@@ -249,7 +249,7 @@ export default function DiscoverPanel() {
         sections.map((section) => (
           <section key={section.label}>
             <div className="flex items-baseline gap-2 mb-4 flex-wrap">
-              <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest">{section.label}</p>
+              <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">{section.label}</p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {section.videos.map((v) => (

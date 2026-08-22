@@ -1,42 +1,89 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, useScroll, useTransform, useReducedMotion, MotionConfig, type Variants } from "motion/react";
 import { signInWithGoogle } from "@/lib/supabase";
-import CityBackdrop from "@/components/CityBackdrop";
 import { cn } from "@/lib/utils";
 
-// Landing (AuthGate, non connecté). Hero = texte + `HeroStage` (la fenêtre sur
-// la ville et le laptop en CSS 3D qui fait tourner la vraie session). Le reste
-// de la page est chorégraphié au scroll avec `motion` : parallaxe du hero,
-// révélations en cascade. Thème sombre, zéro emoji, icônes en SVG inline.
-// Reduced-motion : `MotionConfig reducedMotion="user"` → tout se dégrade en
-// simples fondus, sans mouvement.
+// Landing (AuthGate, non connecté) — direction « minimalisme utilitaire » :
+// canvas chaud clair, titrage en serif éditorial, tout le reste en 1px de
+// bordure. Aucune ombre lourde, aucun dégradé, aucun emoji. Le mouvement se
+// limite à des révélations au scroll (IntersectionObserver) et à une seule
+// nappe lumineuse fixe qui dérive très lentement.
+//
+// ⚠️ La page est volontairement en palette claire FIXE (indépendante du thème
+// de l'app) : les couleurs sont écrites en dur, jamais via les tokens
+// foreground/background, qui sont sombres ici (<html class="dark">).
 
-const EASE = [0.22, 1, 0.36, 1] as const;
+const INK = "#1B1B19";
+const MUTED = "#787774";
+const LINE = "#E6E4DF";
+const CANVAS = "#F7F6F3";
 
-const reveal: Variants = {
-  hidden: { opacity: 0, y: 26 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE } },
-};
-const stagger: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.09 } },
-};
+/* ── Révélation au scroll ──────────────────────────────────────────────── */
 
-function GoogleButton({ label = "Continuer avec Google", full = false }: { label?: string; full?: boolean }) {
+function Reveal({
+  children,
+  delay = 0,
+  className,
+  style,
+  as: Tag = "div",
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
+  style?: React.CSSProperties;
+  as?: "div" | "section" | "li" | "header";
+}) {
+  const ref = useRef<HTMLElement | null>(null);
+  const [shown, setShown] = useState(false);
+  const Comp = Tag as React.ElementType;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShown(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "-60px 0px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <Comp
+      ref={ref}
+      data-shown={shown}
+      className={cn("reveal", className)}
+      style={{ ...style, "--reveal-delay": `${delay}ms` } as React.CSSProperties}
+    >
+      {children}
+    </Comp>
+  );
+}
+
+/* ── Primitives ────────────────────────────────────────────────────────── */
+
+function GoogleButton({ label = "Continuer avec Google", size = "md" }: { label?: string; size?: "sm" | "md" }) {
   const [loading, setLoading] = useState(false);
   return (
     <button
-      onClick={async () => { setLoading(true); await signInWithGoogle(); }}
+      onClick={async () => {
+        setLoading(true);
+        await signInWithGoogle();
+      }}
       disabled={loading}
       className={cn(
-        "group inline-flex items-center justify-center gap-3 px-5 py-3 rounded-xl bg-white text-[#0a0a0c] font-semibold text-sm hover:bg-white/90 transition-all shadow-lg shadow-black/40 disabled:opacity-60 motion-safe:active:scale-[0.98]",
-        full && "w-full"
+        "inline-flex items-center justify-center gap-2.5 rounded-md bg-[#1B1B19] text-white font-medium transition-colors hover:bg-[#333331] disabled:opacity-60 motion-safe:active:scale-[0.98]",
+        size === "sm" ? "px-4 py-2 text-[13px]" : "px-5 py-3 text-sm"
       )}
     >
       {loading ? (
-        <div className="w-4 h-4 rounded-full border-2 border-black/20 border-t-black/70 animate-spin" />
+        <span className="w-3.5 h-3.5 rounded-full border-2 border-white/25 border-t-white/80 animate-spin" />
       ) : (
         <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden>
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -45,23 +92,55 @@ function GoogleButton({ label = "Continuer avec Google", full = false }: { label
           <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
         </svg>
       )}
-      {loading ? "Redirection…" : label}
+      {loading ? "Redirection" : label}
     </button>
   );
 }
 
-function Logo() {
+function Wordmark() {
   return (
-    <div className="flex items-center gap-2.5">
-      <div className="w-8 h-8 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center">
-        <svg className="w-[18px] h-[18px] text-white/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
-          <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" strokeLinecap="round" strokeLinejoin="round" />
+    <span className="flex items-center gap-2.5">
+      <span className="w-7 h-7 rounded-md border flex items-center justify-center bg-white" style={{ borderColor: LINE }}>
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth={2} strokeLinecap="round">
+          <circle cx="12" cy="12" r="8.5" />
+          <path d="M12 7.5V12l3 2.2" />
         </svg>
-      </div>
-      <span className="text-[15px] font-semibold text-white tracking-tight">FocusFlow</span>
-    </div>
+      </span>
+      <span className="text-[15px] font-medium tracking-tight" style={{ color: INK }}>
+        FocusFlow
+      </span>
+    </span>
   );
 }
+
+function Tag({ tone = "blue", children }: { tone?: "blue" | "green" | "yellow"; children: React.ReactNode }) {
+  const tones = {
+    blue: { bg: "#E1F3FE", fg: "#1F6C9F" },
+    green: { bg: "#EDF3EC", fg: "#346538" },
+    yellow: { bg: "#FBF3DB", fg: "#956400" },
+  }[tone];
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.09em]"
+      style={{ background: tones.bg, color: tones.fg }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function Key({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd
+      className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded font-mono text-[11px] bg-white"
+      style={{ border: `1px solid ${LINE}`, color: MUTED }}
+    >
+      {children}
+    </kbd>
+  );
+}
+
+/* ── Aperçu de session (chrome de fenêtre) ─────────────────────────────── */
 
 const TRACKS = [
   "Lofi hip hop — beats to study",
@@ -70,24 +149,20 @@ const TRACKS = [
   "Deep focus — piano & strings",
 ];
 
-// Mockup de session « vivant » : timer qui décompte (boucle ~3 min pour une
-// progression visible), equalizer pseudo-réactif, titre qui défile. Pur
-// transform/opacity. `phase` (Focus/Pause) piloté par la section scrollytelling.
-// `bare` : rend uniquement l'écran (sans la fenêtre de navigateur) pour être
-// affiché DANS la dalle du laptop du hero — c'est le produit lui-même qui sert
-// de démo, pas une illustration.
-function LivingMockup({ phase = "Focus", bare = false }: { phase?: "Focus" | "Pause"; bare?: boolean }) {
+function SessionPreview({ phase = "Focus" }: { phase?: "Focus" | "Pause" }) {
   const TOTAL = 180;
   const [remaining, setRemaining] = useState(TOTAL);
   const [track, setTrack] = useState(0);
-  const reduce = useReducedMotion();
 
   useEffect(() => {
-    if (reduce) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const t = setInterval(() => setRemaining((r) => (r <= 1 ? TOTAL : r - 1)), 1000);
-    const k = setInterval(() => setTrack((i) => (i + 1) % TRACKS.length), 4500);
-    return () => { clearInterval(t); clearInterval(k); };
-  }, [reduce]);
+    const k = setInterval(() => setTrack((i) => (i + 1) % TRACKS.length), 5000);
+    return () => {
+      clearInterval(t);
+      clearInterval(k);
+    };
+  }, []);
 
   const progress = 1 - remaining / TOTAL;
   const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
@@ -95,304 +170,427 @@ function LivingMockup({ phase = "Focus", bare = false }: { phase?: "Focus" | "Pa
   const dash = 276;
   const isBreak = phase === "Pause";
 
-  const screen = (
-    <div className={cn("relative flex items-center justify-center overflow-hidden", bare ? "h-full w-full" : "aspect-video")}>
-          {/* fond ambiant qui dérive lentement */}
-          <motion.div
-            aria-hidden
-            className="absolute inset-0"
-            style={{ background: "radial-gradient(ellipse at 30% 20%, rgba(99,102,241,0.20), transparent 55%), radial-gradient(ellipse at 80% 90%, rgba(236,72,153,0.15), transparent 55%)" }}
-            animate={reduce ? undefined : { scale: [1, 1.08, 1], opacity: [0.85, 1, 0.85] }}
-            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <div className="relative flex flex-col items-center gap-4">
-            <div className="relative w-28 h-28 sm:w-36 sm:h-36">
-              {/* halo pulsé derrière l'anneau */}
-              <motion.div
-                aria-hidden
-                className="absolute inset-0 rounded-full"
-                style={{ background: `radial-gradient(circle, ${isBreak ? "rgba(52,211,153,0.25)" : "rgba(139,92,246,0.28)"}, transparent 70%)` }}
-                animate={reduce ? undefined : { scale: [1, 1.15, 1], opacity: [0.5, 0.9, 0.5] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              />
-              <svg className="relative w-full h-full -rotate-90" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="5" />
-                <circle
-                  cx="50" cy="50" r="44" fill="none" stroke="url(#hgr)" strokeWidth="5" strokeLinecap="round"
-                  strokeDasharray={dash} strokeDashoffset={dash * (1 - progress)}
-                  style={{ transition: "stroke-dashoffset 1s linear" }}
-                />
-                <defs>
-                  <linearGradient id="hgr" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0" stopColor={isBreak ? "#6ee7b7" : "#a5b4fc"} />
-                    <stop offset="1" stopColor={isBreak ? "#34d399" : "#f0abfc"} />
-                  </linearGradient>
-                </defs>
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl sm:text-4xl font-semibold tabular-nums text-white">{mm}:{ss}</span>
-                <span className="text-[10px] uppercase tracking-widest text-white/40 mt-1">{phase}</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/40 border border-white/10 backdrop-blur min-w-0 max-w-[80%]">
-              <MiniEq playing={!reduce && !isBreak} />
-              <motion.span
-                key={track}
-                initial={reduce ? false : { opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className="text-[11px] text-white/60 truncate"
-              >
-                {isBreak ? "Respiration guidée — 4·4·4·4" : TRACKS[track]}
-              </motion.span>
-            </div>
-          </div>
-    </div>
-  );
-
-  if (bare) return screen;
-
   return (
-    <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-white/[0.01] p-3 shadow-2xl shadow-black/50">
-      <div className="rounded-xl overflow-hidden bg-[#0c0c10] border border-white/[0.06]">
-        <div className="flex items-center gap-1.5 px-3.5 h-9 border-b border-white/[0.06]">
-          <span className="w-2.5 h-2.5 rounded-full bg-white/15" />
-          <span className="w-2.5 h-2.5 rounded-full bg-white/15" />
-          <span className="w-2.5 h-2.5 rounded-full bg-white/15" />
-          <span className="ml-3 text-[11px] text-white/30">focusflow · session</span>
+    <div className="rounded-xl overflow-hidden bg-white" style={{ border: `1px solid ${LINE}` }}>
+      {/* Chrome de fenêtre */}
+      <div className="flex items-center gap-1.5 px-3.5 h-9" style={{ borderBottom: `1px solid ${LINE}` }}>
+        <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#E0DEDA" }} />
+        <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#E0DEDA" }} />
+        <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#E0DEDA" }} />
+        <span className="ml-3 font-mono text-[10px]" style={{ color: MUTED }}>
+          focusflow / session
+        </span>
+      </div>
+
+      <div className="relative flex items-center justify-center aspect-[4/3] sm:aspect-video" style={{ background: CANVAS }}>
+        {/* image d'ambiance très effacée : la session tourne toujours sur un paysage */}
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-[0.14] bg-cover bg-center grayscale"
+          style={{ backgroundImage: "url(https://picsum.photos/seed/focusflow-kyoto/1200/800)" }}
+        />
+        <div className="relative flex flex-col items-center gap-5 px-6">
+          <div className="relative w-28 h-28 sm:w-32 sm:h-32">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="44" fill="none" stroke="#E6E4DF" strokeWidth="3" />
+              <circle
+                cx="50"
+                cy="50"
+                r="44"
+                fill="none"
+                stroke={isBreak ? "#346538" : INK}
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeDasharray={dash}
+                strokeDashoffset={dash * (1 - progress)}
+                style={{ transition: "stroke-dashoffset 1s linear" }}
+              />
+            </svg>
+            <span className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="font-mono text-2xl sm:text-[28px] tabular-nums" style={{ color: INK }}>
+                {mm}:{ss}
+              </span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.12em] mt-1" style={{ color: MUTED }}>
+                {phase}
+              </span>
+            </span>
+          </div>
+
+          <span
+            className="flex items-center gap-2.5 rounded-md bg-white px-3 py-1.5 max-w-[85%]"
+            style={{ border: `1px solid ${LINE}` }}
+          >
+            <span className="flex items-end gap-[2px] h-3 shrink-0" aria-hidden>
+              {[1.2, 1.5, 1.35].map((d, i) => (
+                <span
+                  key={i}
+                  className="anim-eq w-[2px] h-full rounded-full"
+                  style={{
+                    background: INK,
+                    animationDuration: `${d}s`,
+                    animationDelay: `${-i * 0.45}s`,
+                    animationPlayState: isBreak ? "paused" : "running",
+                  }}
+                />
+              ))}
+            </span>
+            <span key={track} className="anim-track-in text-[11px] truncate" style={{ color: MUTED }}>
+              {isBreak ? "Respiration guidée — 4·4·4·4" : TRACKS[track]}
+            </span>
+          </span>
         </div>
-        {screen}
       </div>
     </div>
   );
 }
 
-function MiniEq({ playing }: { playing: boolean }) {
-  const bars = [1.2, 1.5, 1.35];
-  return (
-    <span className="flex items-end gap-[2px] h-3 flex-shrink-0" aria-hidden>
-      {bars.map((d, i) => (
-        <span
-          key={i}
-          className="anim-eq w-[3px] h-full rounded-full bg-emerald-400"
-          style={{ animationDuration: `${d}s`, animationDelay: `${-i * 0.45}s`, animationPlayState: playing ? "running" : "paused" }}
-        />
-      ))}
-    </span>
-  );
+/* ── Contenu ───────────────────────────────────────────────────────────── */
+
+interface Feature {
+  title: string;
+  desc: string;
+  icon: React.ReactNode;
+  span?: boolean;
 }
 
-interface Feature { icon: React.ReactNode; title: string; desc: string; accent: string; }
-
 const FEATURES: Feature[] = [
-  { accent: "text-indigo-300", title: "Timer Pomodoro & Flowtime", desc: "Presets classic / deep / custom, ou le mode Flowtime (chrono libre, pause méritée). Timer flottant Picture-in-Picture toujours visible.", icon: <path d="M12 8v4l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z" strokeLinecap="round" strokeLinejoin="round" /> },
-  { accent: "text-rose-300", title: "Lecteur multi-sources", desc: "Catalogue lofi/ambient curated par mood, playlists & vidéos YouTube, Spotify Premium et streams Twitch — dans la même vue plein écran que le timer.", icon: <path d="M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm12-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" strokeLinecap="round" strokeLinejoin="round" /> },
-  { accent: "text-emerald-300", title: "Tâches, projets & planning", desc: "Kanban de tâches, projets à deadline, planning hebdo (time-blocking) synchronisable à ton calendrier iPhone/Google, mode Sprint généré pour une échéance.", icon: <path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" strokeLinecap="round" strokeLinejoin="round" /> },
-  { accent: "text-sky-300", title: "Stats & Focus Score", desc: "Heatmap, séries, objectif quotidien, marquage des distractions et Focus Score, dashboard d'insights détaillé, export CSV/JSON, récap hebdo « Wrapped » partageable.", icon: <path d="M3 3v18h18M7 15l3-4 3 3 4-6" strokeLinecap="round" strokeLinejoin="round" /> },
-  { accent: "text-amber-300", title: "Amis & temps réel", desc: "Ajoute des amis par code, un classement hebdo, la présence « en ligne / en focus » en direct, ce que chacun écoute, et un chat intégré façon launcher.", icon: <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm14 10v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" strokeLinecap="round" strokeLinejoin="round" /> },
-  { accent: "text-violet-300", title: "Bien-être & gamification", desc: "Respiration guidée pendant les pauses, journal d'humeur, coach de planification (local ou IA), XP & niveaux, jardin de focus, badges et défis hebdomadaires.", icon: <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 1 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" strokeLinecap="round" strokeLinejoin="round" /> },
+  {
+    title: "Timer et musique dans la même fenêtre",
+    desc: "Pomodoro classic, deep, custom — ou Flowtime, un chrono libre dont la pause se calcule sur le temps réellement travaillé. Le lecteur reste plein écran derrière : catalogue lofi, playlists YouTube, Spotify Premium, streams Twitch.",
+    span: true,
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M12 7.5V12l3 2.2" />
+      </>
+    ),
+  },
+  {
+    title: "File d'attente et playlists",
+    desc: "Tes titres exacts, dans ton ordre, sans que YouTube reprenne la main.",
+    icon: <path d="M4 6h11M4 11h11M4 16h7M19 8v9.2M19 17.2a2 2 0 1 1-2 2" />,
+  },
+  {
+    title: "Tâches, projets, planning",
+    desc: "Kanban, budgets de pomodoros, blocs hebdo synchronisables au calendrier.",
+    icon: (
+      <>
+        <path d="M9.5 12.5l2 2 4.5-5" />
+        <rect x="3.5" y="4.5" width="17" height="16" rx="2.5" />
+      </>
+    ),
+  },
+  {
+    title: "Statistiques et Focus Score",
+    desc: "Heatmap, séries, distractions marquées, récap hebdomadaire, export CSV.",
+    icon: <path d="M4 20V4M4 20h16M8 16l3.5-4.5 3 2.5L20 8" />,
+  },
+  {
+    title: "Amis en direct",
+    desc: "Ajout par code, classement de la semaine, présence « en focus » et chat.",
+    icon: (
+      <>
+        <circle cx="9" cy="8" r="3.2" />
+        <path d="M3.5 19.5v-1.2a4 4 0 0 1 4-4h3a4 4 0 0 1 4 4v1.2M16 5.4a3.2 3.2 0 0 1 0 6.2M17.5 14.4a4 4 0 0 1 3 3.9v1.2" />
+      </>
+    ),
+  },
 ];
 
 const STEPS = [
-  { n: "1", title: "Choisis ton ambiance", desc: "Un paysage lofi du catalogue, ta playlist YouTube, Spotify ou un stream Twitch — l'app devient ta bulle sonore.", phase: "Focus" as const },
-  { n: "2", title: "Lance ta session", desc: "Règle ton rythme Pomodoro, ajoute tes tâches, et travaille en plein écran, musique et timer réunis.", phase: "Focus" as const },
-  { n: "3", title: "Respire, puis recommence", desc: "Pauses guidées, objectif quotidien, badges et récap hebdo — et compare ta semaine avec tes amis.", phase: "Pause" as const },
+  {
+    n: "01",
+    title: "Choisis ton ambiance",
+    desc: "Un paysage du catalogue, ta playlist YouTube, Spotify ou un stream Twitch.",
+    phase: "Focus" as const,
+  },
+  {
+    n: "02",
+    title: "Lance la session",
+    desc: "Ton rythme Pomodoro, tes tâches du jour, et l'écran ne montre plus que ça.",
+    phase: "Focus" as const,
+  },
+  {
+    n: "03",
+    title: "Respire, puis recommence",
+    desc: "Pause guidée, objectif quotidien, journal d'humeur et récap de la semaine.",
+    phase: "Pause" as const,
+  },
 ];
 
-function SectionTitle({ title, sub }: { title: string; sub?: string }) {
+const FAQ = [
+  {
+    q: "Faut-il un compte pour s'en servir ?",
+    a: "Non. Tout fonctionne en local dans le navigateur : timer, catalogue, tâches, statistiques. Le compte Google sert uniquement à synchroniser ta progression entre plusieurs appareils et à retrouver tes amis.",
+  },
+  {
+    q: "C'est gratuit jusqu'où ?",
+    a: "Entièrement. Pas d'abonnement, pas de publicité, pas de fonctionnalité réservée. Le coach de planification tourne en local par défaut, et l'application n'a besoin d'aucune clé API pour lire de la musique.",
+  },
+  {
+    q: "Que faut-il pour Spotify et Twitch ?",
+    a: "Spotify demande un compte Premium (contrainte du Web Playback SDK). Twitch fonctionne avec un compte gratuit, en direct comme en rediffusion. YouTube ne demande rien.",
+  },
+  {
+    q: "Qu'est-ce que mes amis voient de moi ?",
+    a: "Des agrégats seulement : minutes de la semaine, pomodoros, série, et si tu es en focus. Jamais tes tâches, ton journal, tes projets ni le contenu de tes sessions.",
+  },
+];
+
+function FaqItem({ q, a, open, onToggle }: { q: string; a: string; open: boolean; onToggle: () => void }) {
   return (
-    <motion.div
-      variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }}
-      className="max-w-2xl mb-12"
-    >
-      <h2 className="text-2xl sm:text-4xl font-semibold text-white tracking-tight">{title}</h2>
-      {sub && <p className="text-white/45 mt-4 text-sm sm:text-base leading-relaxed">{sub}</p>}
-    </motion.div>
+    <div style={{ borderBottom: `1px solid ${LINE}` }}>
+      <button onClick={onToggle} className="w-full flex items-start gap-6 py-6 text-left group" aria-expanded={open}>
+        <span className="flex-1 text-[17px] tracking-tight transition-colors" style={{ color: open ? INK : "#3B3B38" }}>
+          {q}
+        </span>
+        <span className="shrink-0 mt-1" aria-hidden>
+          <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke={MUTED} strokeWidth={1.6} strokeLinecap="round">
+            <path d="M2.5 8h11" />
+            {!open && <path d="M8 2.5v11" />}
+          </svg>
+        </span>
+      </button>
+      <div
+        className="grid transition-[grid-template-rows] duration-300 ease-out"
+        style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
+      >
+        <div className="overflow-hidden">
+          <p className="pb-6 pr-10 text-[15px] leading-[1.65] max-w-2xl" style={{ color: MUTED }}>
+            {a}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
 export default function LandingPage() {
-  const reduce = useReducedMotion();
-
-  // Parallax du hero (progression de scroll de la section hero).
-  const heroRef = useRef<HTMLElement | null>(null);
-  const { scrollYProgress: heroP } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
-  const contentY = useTransform(heroP, [0, 1], [0, 90]);
-  const contentOpacity = useTransform(heroP, [0, 0.85], [1, 0]);
-  const cueOpacity = useTransform(heroP, [0, 0.15], [1, 0]);
-
-  // « En trois étapes » : l'étape active pilote la phase du timer de l'aperçu.
-  // Elle suit le scroll dans la section, et le survol la force.
-  const scrollyRef = useRef<HTMLDivElement | null>(null);
-  const { scrollYProgress: storyP } = useScroll({ target: scrollyRef, offset: ["start center", "end center"] });
-  const [active, setActive] = useState(0);
-  useEffect(() => {
-    return storyP.on("change", (v) => setActive(v > 0.62 ? 2 : v > 0.3 ? 1 : 0));
-  }, [storyP]);
-  const phase = STEPS[active].phase;
+  const [activeStep, setActiveStep] = useState(0);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   return (
-    <MotionConfig reducedMotion="user">
-      {/* ⚠️ Aucune couche en z-index NÉGATIF ici : `body` a un fond opaque
-          (`@apply bg-background`), donc un `-z-10` serait peint DERRIÈRE lui et
-          resterait invisible. Le fond est en z-0 et le contenu en z-10. */}
-      <div className="relative min-h-screen text-white overflow-x-hidden">
-        {/* FOND PLEIN ÉCRAN : la photo de ville traversée par le scroll, sur laquelle
-            la nuit tombe. Voir CityBackdrop. */}
-        <div className="pointer-events-none fixed inset-0 z-0">
-          <CityBackdrop />
-        </div>
-        {/* Voile de lisibilité côté texte (le titre est à gauche, la baie à droite) */}
-        {/* (Pas de voile ici : la lisibilité est gérée dans `CityBackdrop`, en un
-            seul endroit. Il y en avait un second à 0,94 d'opacité, hérité d'une
-            version précédente, qui noircissait tout le bord gauche.) */}
-        {/* Tout le contenu passe au-dessus du fond */}
-        <div className="relative z-10">
+    <div className="relative min-h-screen font-sans overflow-x-hidden" style={{ background: CANVAS, color: INK }}>
+      {/* Nappe lumineuse fixe, très lente, très faible — juste de quoi éviter
+          un aplat parfaitement mort derrière le hero. */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div
+          className="anim-drift absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(150,120,80,0.06), transparent 65%)" }}
+        />
+      </div>
 
+      <div className="relative">
         {/* Header */}
-        <header className="sticky top-0 z-30 bg-[#07080f]/92 border-b border-white/[0.06]">
-          <div className="max-w-6xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
-            <Logo />
-            <nav className="hidden md:flex items-center gap-7 text-sm text-white/50">
-              <a href="#features" className="hover:text-white transition-colors">Fonctionnalités</a>
-              <a href="#how" className="hover:text-white transition-colors">Comment ça marche</a>
+        <header
+          className="sticky top-0 z-30 backdrop-blur-md"
+          style={{ background: "rgba(247,246,243,0.85)", borderBottom: `1px solid ${LINE}` }}
+        >
+          <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+            <Wordmark />
+            <nav className="hidden md:flex items-center gap-8 text-[13px]" style={{ color: MUTED }}>
+              <a href="#produit" className="hover:text-[#1B1B19] transition-colors">Produit</a>
+              <a href="#methode" className="hover:text-[#1B1B19] transition-colors">Méthode</a>
+              <a href="#questions" className="hover:text-[#1B1B19] transition-colors">Questions</a>
             </nav>
-            <GoogleButton label="Se connecter" />
+            <GoogleButton label="Se connecter" size="sm" />
           </div>
         </header>
 
-        {/* Hero — texte à gauche, aperçu de session à droite. */}
-        <section ref={heroRef} className="relative">
-          <motion.div
-            style={reduce ? undefined : { y: contentY, opacity: contentOpacity }}
-            className="relative max-w-6xl mx-auto px-5 sm:px-8 min-h-[calc(100vh-4rem)] grid lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] gap-12 items-center pb-24"
-          >
-            <div className="max-w-xl">
-              <motion.div variants={reveal} initial="hidden" animate="show" className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/10 text-[12px] text-white/60 mb-8">
-                Gratuit, sans publicité — fonctionne même sans compte
-              </motion.div>
-              <motion.h1 variants={reveal} initial="hidden" animate="show" transition={{ delay: 0.05 }} className="text-4xl sm:text-6xl font-semibold tracking-tight leading-[1.05] [text-shadow:0_2px_30px_rgba(0,0,0,0.7)]">
-                Ta bulle de concentration, musique et timer réunis.
-              </motion.h1>
-              <motion.p variants={reveal} initial="hidden" animate="show" transition={{ delay: 0.12 }} className="mt-6 text-base sm:text-lg text-white/70 leading-relaxed [text-shadow:0_1px_16px_rgba(0,0,0,0.85)]">
-                FocusFlow réunit un timer Pomodoro et un lecteur multi-sources — lofi YouTube, Spotify,
-                Twitch — dans une seule vue plein écran. Avec des statistiques, un coach de planification,
-                des amis et un catalogue d&apos;ambiances pour tenir la distance.
-              </motion.p>
-              <motion.div variants={reveal} initial="hidden" animate="show" transition={{ delay: 0.19 }} className="mt-9 flex flex-col sm:flex-row items-start gap-3">
-                <GoogleButton label="Commencer" />
-                <a href="#features" className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white/[0.05] border border-white/10 text-sm font-medium text-white/70 hover:text-white hover:bg-white/[0.08] transition-all">
-                  Voir les fonctionnalités
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                </a>
-              </motion.div>
-              <p className="mt-5 text-xs text-white/30">Ton compte Google sert uniquement à t&apos;identifier et synchroniser ta progression.</p>
-            </div>
+        {/* Hero */}
+        <section className="max-w-5xl mx-auto px-6 pt-20 pb-16 sm:pt-32 sm:pb-24">
+          <Reveal>
+            <Tag tone="green">Gratuit · sans compte requis</Tag>
+          </Reveal>
 
-            {/* L'aperçu de session : le produit lui-même, posé en carte de verre
-                sur la ville. Pas d'objet dessiné — juste l'interface, inclinée. */}
-            <motion.div
-              initial={reduce ? false : { opacity: 0, y: 30, rotate: -3 }}
-              animate={{ opacity: 1, y: 0, rotate: -1.6 }}
-              transition={{ duration: 1.1, delay: 0.3, ease: EASE }}
-              // `drop-shadow` est un filtre : coûteux sur un grand élément. La
-              // carte porte déjà son `box-shadow`, qui suffit.
-              className="hidden lg:block"
-            >
-              <LivingMockup />
-            </motion.div>
-          </motion.div>
+          <Reveal delay={60}>
+            <h1 className="font-serif mt-7 text-[44px] sm:text-[68px] leading-[1.04] tracking-[-0.03em] max-w-3xl">
+              La musique et le timer,
+              <br />
+              dans la même fenêtre.
+            </h1>
+          </Reveal>
 
-          {/* Indice de scroll */}
-          <motion.div style={reduce ? undefined : { opacity: cueOpacity }} className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 text-white/30">
-            <motion.svg animate={reduce ? undefined : { y: [0, 6, 0] }} transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }} className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 5v14M6 13l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></motion.svg>
-          </motion.div>
-        </section>
+          <Reveal delay={120}>
+            <p className="mt-7 max-w-xl text-[16px] sm:text-[17px] leading-[1.6]" style={{ color: MUTED }}>
+              FocusFlow réunit un Pomodoro et un lecteur multi-sources — lofi YouTube, Spotify, Twitch — sur un
+              seul écran. Autour, ce qu&apos;il faut pour tenir la distance : tâches, planning, statistiques, et
+              des amis qui travaillent en même temps que toi.
+            </p>
+          </Reveal>
 
-        {/* Fonctionnalités */}
-        <section id="features" className="max-w-6xl mx-auto px-5 sm:px-8 py-20 sm:py-28">
-          <SectionTitle
-            title="Tout ce qu'il faut pour se concentrer, au même endroit"
-            sub="Le timer, la musique, l'organisation, les statistiques et le social — réunis, sans friction, et gratuitement."
-          />
-          <motion.div
-            variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }}
-            className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"
-          >
-            {FEATURES.map((f) => (
-              <motion.div
-                key={f.title} variants={reveal}
-                whileHover={reduce ? undefined : { y: -4 }}
-                transition={{ type: "spring", stiffness: 300, damping: 24 }}
-                className="group rounded-2xl border border-white/[0.07] bg-[#0a0d18]/88 p-6 hover:bg-[#10141f]/92 hover:border-white/[0.12]"
+          <Reveal delay={180}>
+            <div className="mt-10 flex flex-wrap items-center gap-4">
+              <GoogleButton label="Commencer" />
+              <a
+                href="#produit"
+                className="inline-flex items-center gap-2 rounded-md bg-white px-5 py-3 text-sm font-medium transition-colors hover:bg-[#F0EFEB]"
+                style={{ border: `1px solid ${LINE}`, color: INK }}
               >
-                <div className={cn("w-11 h-11 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center mb-4", f.accent)}>
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7}>{f.icon}</svg>
-                </div>
-                <h3 className="text-[15px] font-semibold text-white mb-2">{f.title}</h3>
-                <p className="text-sm text-white/45 leading-relaxed">{f.desc}</p>
-              </motion.div>
-            ))}
-          </motion.div>
+                Voir ce qu&apos;il y a dedans
+                <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 2.5v11M3.5 9.5L8 14l4.5-4.5" />
+                </svg>
+              </a>
+            </div>
+          </Reveal>
+
+          <Reveal delay={240}>
+            <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px]" style={{ color: MUTED }}>
+              <Key>⌘</Key>
+              <Key>K</Key>
+              <span className="ml-1">pour atteindre n&apos;importe quelle section au clavier.</span>
+            </p>
+          </Reveal>
+
+          <Reveal delay={300} className="mt-16 sm:mt-20">
+            <SessionPreview />
+          </Reveal>
         </section>
 
-        {/* Comment ça marche — compact : mockup + 3 étapes lisibles d'un seul coup
-            d'œil (pas d'étalement sur plusieurs écrans). La carte survolée/active
-            pilote la phase du timer du mockup. */}
-        <section id="how" className="max-w-6xl mx-auto px-5 sm:px-8 py-20 sm:py-28">
-          <SectionTitle title="En trois étapes" />
-          <div ref={scrollyRef} className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
-            <LivingMockup phase={phase} />
-            <div className="flex flex-col gap-3">
-              {STEPS.map((s, i) => (
-                <motion.div
-                  key={s.n}
-                  variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }}
-                  onMouseEnter={() => setActive(i)}
-                  className={cn(
-                    "flex gap-4 rounded-2xl border p-5 transition-colors",
-                    i === active
-                      ? "border-white/[0.16] bg-[#10141f]/94"
-                      : "border-white/[0.07] bg-[#0a0d18]/88 hover:bg-[#10141f]/92"
-                  )}
-                >
-                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400/30 to-violet-400/20 border border-white/10 flex items-center justify-center text-[13px] font-semibold">{s.n}</span>
-                  <div>
-                    <h3 className="text-[15px] font-semibold text-white">{s.title}</h3>
-                    <p className="mt-1.5 text-sm text-white/50 leading-relaxed">{s.desc}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+        {/* Bandeau de faits */}
+        <Reveal as="section" className="max-w-5xl mx-auto px-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4" style={{ borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
+            {[
+              ["5", "sources audio"],
+              ["4", "modes de timer"],
+              ["0 €", "pour tout, toujours"],
+              ["100 %", "utilisable hors compte"],
+            ].map(([v, l], i) => (
+              <div
+                key={l}
+                className="py-8 px-5"
+                style={{ borderLeft: i === 0 ? undefined : `1px solid ${LINE}` }}
+              >
+                <p className="font-serif text-[30px] leading-none tracking-tight">{v}</p>
+                <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.09em]" style={{ color: MUTED }}>
+                  {l}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Reveal>
+
+        {/* Bento produit */}
+        <section id="produit" className="max-w-5xl mx-auto px-6 py-24 sm:py-32">
+          <Reveal>
+            <Tag tone="blue">Produit</Tag>
+            <h2 className="font-serif mt-6 text-[34px] sm:text-[46px] leading-[1.08] tracking-[-0.03em] max-w-2xl">
+              Tout ce qui sert à se concentrer, et rien d&apos;autre.
+            </h2>
+          </Reveal>
+
+          <div className="mt-14 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {FEATURES.map((f, i) => (
+              <Reveal
+                key={f.title}
+                delay={i * 80}
+                className={cn(
+                  "group rounded-xl bg-white p-7 sm:p-9 transition-shadow duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]",
+                  f.span && "sm:col-span-2"
+                )}
+              >
+                <span className="flex w-9 h-9 items-center justify-center rounded-md" style={{ background: CANVAS }}>
+                  <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+                    {f.icon}
+                  </svg>
+                </span>
+                <h3 className="mt-6 text-[17px] tracking-tight" style={{ color: INK }}>
+                  {f.title}
+                </h3>
+                <p className="mt-2.5 text-[14px] leading-[1.65]" style={{ color: MUTED }}>
+                  {f.desc}
+                </p>
+              </Reveal>
+            ))}
           </div>
         </section>
 
-        {/* CTA final */}
-        <section className="max-w-6xl mx-auto px-5 sm:px-8 pb-24">
-          <motion.div
-            variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }}
-            className="relative overflow-hidden rounded-3xl border border-white/[0.09] bg-[#0a0d18]/90 p-10 sm:p-16 text-center"
-          >
-            <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,_rgba(139,92,246,0.18),_transparent_60%)]" />
-            <h2 className="relative text-3xl sm:text-5xl font-semibold tracking-tight">Entre dans le flow.</h2>
-            <p className="relative max-w-md mx-auto mt-4 text-white/50 text-sm sm:text-base">
-              Crée ton espace de concentration en un clic. Gratuit, pour toujours.
+        {/* Méthode */}
+        <section id="methode" className="max-w-5xl mx-auto px-6 pb-24 sm:pb-32">
+          <Reveal>
+            <Tag tone="yellow">Méthode</Tag>
+            <h2 className="font-serif mt-6 text-[34px] sm:text-[46px] leading-[1.08] tracking-[-0.03em]">
+              Trois gestes, puis on ne pense plus à l&apos;outil.
+            </h2>
+          </Reveal>
+
+          <div className="mt-14 grid md:grid-cols-2 gap-10 md:gap-14 items-center">
+            <Reveal>
+              <SessionPreview phase={STEPS[activeStep].phase} />
+            </Reveal>
+            <ul className="flex flex-col">
+              {STEPS.map((s, i) => (
+                <Reveal
+                  as="li"
+                  key={s.n}
+                  delay={i * 90}
+                  className="cursor-default"
+                >
+                  <div
+                    onMouseEnter={() => setActiveStep(i)}
+                    className="flex gap-6 py-7 transition-opacity"
+                    style={{
+                      borderTop: i === 0 ? undefined : `1px solid ${LINE}`,
+                      opacity: i === activeStep ? 1 : 0.55,
+                    }}
+                  >
+                    <span className="font-mono text-[11px] pt-1 tabular-nums" style={{ color: MUTED }}>
+                      {s.n}
+                    </span>
+                    <div>
+                      <h3 className="text-[17px] tracking-tight">{s.title}</h3>
+                      <p className="mt-2 text-[14px] leading-[1.65]" style={{ color: MUTED }}>
+                        {s.desc}
+                      </p>
+                    </div>
+                  </div>
+                </Reveal>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* Questions */}
+        <section id="questions" className="max-w-3xl mx-auto px-6 pb-24 sm:pb-32">
+          <Reveal>
+            <h2 className="font-serif text-[34px] sm:text-[46px] leading-[1.08] tracking-[-0.03em]">Questions</h2>
+          </Reveal>
+          <Reveal delay={80} className="mt-10" style={{ borderTop: `1px solid ${LINE}` }}>
+            {FAQ.map((f, i) => (
+              <FaqItem key={f.q} q={f.q} a={f.a} open={openFaq === i} onToggle={() => setOpenFaq(openFaq === i ? null : i)} />
+            ))}
+          </Reveal>
+        </section>
+
+        {/* Dernière invitation */}
+        <section className="max-w-5xl mx-auto px-6 pb-24 sm:pb-32">
+          <Reveal className="rounded-xl bg-white px-8 py-16 sm:px-16 sm:py-20 text-center" style={{ border: `1px solid ${LINE}` }}>
+            <h2 className="font-serif text-[36px] sm:text-[52px] leading-[1.06] tracking-[-0.03em]">
+              Une heure de vrai calme,
+              <br />
+              à partir de maintenant.
+            </h2>
+            <p className="mt-5 mx-auto max-w-md text-[15px] leading-[1.6]" style={{ color: MUTED }}>
+              Ouvre une session, choisis un paysage, laisse tourner. Ton compte Google sert seulement à retrouver
+              ta progression ailleurs.
             </p>
-            <div className="relative mt-8 flex justify-center">
-              <GoogleButton label="Commencer gratuitement" />
+            <div className="mt-9 flex justify-center">
+              <GoogleButton label="Commencer" />
             </div>
-          </motion.div>
+          </Reveal>
         </section>
 
         {/* Footer */}
-        <footer className="border-t border-white/[0.06] bg-[#07080f]/92">
-          <div className="max-w-6xl mx-auto px-5 sm:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <Logo />
-            <p className="text-xs text-white/30">Pomodoro · Lofi · Focus — fait pour rester concentré. © {new Date().getFullYear()} FocusFlow</p>
+        <footer style={{ borderTop: `1px solid ${LINE}` }}>
+          <div className="max-w-5xl mx-auto px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-5">
+            <Wordmark />
+            <p className="font-mono text-[11px]" style={{ color: MUTED }}>
+              Pomodoro · Lofi · Focus — © {new Date().getFullYear()}
+            </p>
           </div>
         </footer>
-        </div>
       </div>
-    </MotionConfig>
+    </div>
   );
 }

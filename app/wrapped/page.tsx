@@ -27,7 +27,7 @@ function Panel({
 }) {
   return (
     <div className={cn("flex flex-col justify-end gap-1 p-6 rounded-3xl border border-foreground/[0.08] overflow-hidden relative", className)}>
-      <span className="text-[10px] font-semibold uppercase tracking-widest opacity-50">{label}</span>
+      <span className="text-[10px] font-semibold font-mono uppercase tracking-[0.14em] opacity-50">{label}</span>
       <span className={cn("font-extralight tracking-tight tabular-nums", big ? "text-6xl" : "text-4xl")}>{value}</span>
       {sub && <span className="text-xs opacity-50 leading-snug">{sub}</span>}
     </div>
@@ -92,7 +92,7 @@ export function WrappedContent() {
           {/* Title */}
           <div className="flex items-end justify-between gap-4 flex-wrap">
             <div>
-              <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-1">
+              <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-1">
                 {weekOffset === -1 ? "Ta semaine passée" : "Semaine en cours"} · {wrappedWeekLabel(data)}
               </p>
               <h1 className="text-3xl font-light text-foreground tracking-tight">
@@ -155,7 +155,7 @@ export function WrappedContent() {
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest mb-0.5">Ambiance préférée</p>
+                <p className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-0.5">Ambiance préférée</p>
                 <p className="text-sm font-medium text-foreground truncate">{data.topPlay.title}</p>
                 <p className="text-xs text-foreground/40 truncate">{data.topPlay.subtitle}</p>
               </div>
@@ -168,7 +168,7 @@ export function WrappedContent() {
           {/* Badges + mood + distractions */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="p-5 rounded-3xl border border-foreground/[0.08] bg-gradient-to-br from-amber-600/15 to-transparent">
-              <p className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest mb-2">Badges débloqués</p>
+              <p className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-2">Badges débloqués</p>
               {data.badges.length === 0 ? (
                 <p className="text-sm text-foreground/30">Aucun cette semaine</p>
               ) : (

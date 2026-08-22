@@ -979,7 +979,7 @@ export default function SessionPage() {
                 text={formatTime(isFlowtime ? flowSeconds : secondsLeft)}
                 className="text-2xl md:text-3xl font-light text-white tabular-nums tracking-tight drop-shadow-lg"
               />
-              <span className="text-white/30 text-[10px] uppercase tracking-widest">
+              <span className="text-white/30 text-[10px] font-mono uppercase tracking-[0.14em]">
                 {isFlowtime
                   ? `Flow · pause méritée ≈ ${earnedBreakMin} min`
                   : `Focus · ${sessionsCompleted} session${sessionsCompleted !== 1 ? "s" : ""}`}
@@ -1229,7 +1229,7 @@ export default function SessionPage() {
           {showHelp && (
             <div className="absolute top-20 right-3 md:right-5 w-80 max-w-[calc(100vw-1.5rem)] max-h-[60vh] overflow-y-auto bg-black/85 backdrop-blur-xl rounded-2xl border border-white/15 shadow-2xl shadow-black/80 z-30">
               <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-                <span className="text-xs font-semibold text-white/70 uppercase tracking-widest">Comment ça marche</span>
+                <span className="text-xs font-semibold text-white/70 font-mono uppercase tracking-[0.14em]">Comment ça marche</span>
                 <button onClick={() => setShowHelp(false)} className="text-white/40 hover:text-white transition-colors">
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />

@@ -464,7 +464,7 @@ export default function SettingsPage() {
         <div className="flex flex-col lg:flex-row gap-8">
         {/* Left: selected content */}
         <div className="w-full lg:w-64 flex-shrink-0">
-          <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-3">
+          <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-3">
             {isTwitchMode ? "Stream Twitch" : isSpotifyMode ? "Playlist Spotify" : isPlaylistMode ? "Playlist choisie" : "Vidéo choisie"}
           </p>
           <div ref={previewRef} className="rounded-xl overflow-hidden aspect-video relative">
@@ -620,7 +620,7 @@ export default function SettingsPage() {
         <div className="flex-1 flex flex-col gap-6">
           {/* Preset selector */}
           <div>
-            <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-3">Format Pomodoro</p>
+            <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-3">Format Pomodoro</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {presetConfig.map((p) => (
                 <button
@@ -644,7 +644,7 @@ export default function SettingsPage() {
 
           {/* Custom settings */}
           <div className={cn("transition-all duration-300", preset !== "custom" && "opacity-40 pointer-events-none")}>
-            <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest mb-3">Durées</p>
+            <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-3">Durées</p>
             <div className="rounded-xl border border-foreground/[0.08] bg-foreground/[0.02] px-4">
               <NumberInput label="Durée de focus" value={work} min={5} max={120} onChange={setWork} />
               <NumberInput label="Pause courte" value={shortBreak} min={1} max={30} onChange={setShortBreak} />
@@ -676,7 +676,7 @@ export default function SettingsPage() {
         {/* Tasks — Kanban (pleine largeur) */}
         <div>
             <div className="flex items-baseline gap-2 mb-1">
-              <p className="text-xs font-semibold text-foreground/30 uppercase tracking-widest">Tâches de la session</p>
+              <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Tâches de la session</p>
               <button
                 onClick={() => setShowCoach(true)}
                 className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-violet-500 dark:text-violet-300 text-[11px] font-medium transition-all"

@@ -40,7 +40,7 @@ export default function JournalTimeline() {
           {/* Mood vs focus */}
           {correlationDays.length > 1 && (
             <div className="mb-5 p-4 rounded-2xl bg-foreground/[0.03] border border-foreground/[0.06]">
-              <p className="text-[10px] font-semibold text-foreground/30 uppercase tracking-widest mb-3">Humeur vs focus</p>
+              <p className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-3">Humeur vs focus</p>
               <div className="flex items-end gap-2 h-20">
                 {correlationDays.map((d) => (
                   <div key={d.date} className="flex-1 flex flex-col items-center gap-1" title={`${fmtDate(d.date)} — ${Math.round(d.minutes)} min`}>

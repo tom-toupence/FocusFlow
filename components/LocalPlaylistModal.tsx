@@ -173,7 +173,7 @@ export default function LocalPlaylistModal({
           {/* ── Recommandations pour cette playlist ───────────────────────── */}
           {recs !== null && recs.length > 0 && (
             <div className="mt-4">
-              <p className="text-[11px] font-semibold text-foreground/30 uppercase tracking-widest px-2 mb-2">
+              <p className="text-[11px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] px-2 mb-2">
                 Recommandations pour cette playlist
               </p>
               <div className="flex flex-col gap-1">
