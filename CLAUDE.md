@@ -777,3 +777,25 @@ valider à l'œil.
   repose sur un fond stable. Toutes les opacités de texte remontées d'un cran (plus aucun `text-white/25`
   ni `/35`). **Heatmap refaite** : cases de 14 px, échelle à 5 paliers plus francs, initiales des jours
   et légende « moins / plus ».
+
+
+### Landing : bande infinie + « la page est un pomodoro » (même jour)
+
+- **Carrousel remplacé par une BANDE INFINIE** (`CatalogueBelt` / `BeltCard`). L'anneau fermé était
+  une impasse : dès qu'on masquait les dos de cartes, la moitié arrière disparaissait et le cadre se
+  vidait. Désormais les cartes défilent sur un axe horizontal, se replient modulo la longueur de la
+  bande (`((i·SLOT - offset) mod SPAN) - SPAN/2`), s'inclinent d'autant plus qu'elles s'éloignent du
+  centre (`rotateY` borné ±46°, `z` négatif) et s'effacent avant le raccord. **Le cadre est toujours
+  plein**, le pas `SLOT = largeur + 52` garantit l'absence de chevauchement. Chaque carte calcule sa
+  place via `useTransform` sur une MotionValue partagée : zéro re-render par frame, même en glissant.
+- **Idée maîtresse : la landing EST un pomodoro** (`SessionClock`, dans la nav). Le compteur part de
+  25:00 en haut de page et atteint 00:00 en bas : parcourir la page, c'est dérouler une session.
+  **Si le visiteur lance le minuteur jouable de la section démo, celui-ci prend le relais** et la nav
+  bascule sur son temps à lui (libellé « cette page » → « ta session »). Arrivé à zéro, le libellé
+  passe à « pause méritée » et le CTA final **sonne** (deux ondes qui s'échappent du bouton).
+  ⚠️ Deux règles tenues ici : (1) le minuteur alimente la nav par une **MotionValue**, jamais par un
+  state remonté — sinon toute la page se re-rendrait à chaque seconde ; (2) `SessionClock` ne fait pas
+  commuter `useTransform` d'une source à l'autre entre deux rendus, il **s'abonne explicitement** à la
+  bonne source dans un effet.
+- Micro-motion perpétuelle réservée à un usage sémantique : le point qui bat dans l'horloge ne bat que
+  lorsqu'une vraie session tourne.

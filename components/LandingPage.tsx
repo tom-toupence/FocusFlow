@@ -179,6 +179,106 @@ function Rise({
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   L'HORLOGE DE LA PAGE — la landing EST un pomodoro
+   ══════════════════════════════════════════════════════════════════════════
+
+   Idée directrice : sur un site de Pomodoro, le temps ne doit pas être un
+   argument, il doit être l'expérience. Le compteur logé dans la nav part de
+   25:00 en haut de page et atteint 00:00 en bas : parcourir la page, c'est
+   dérouler une session. Et si le visiteur lance le vrai minuteur de la section
+   démo, CELUI-CI PREND LE RELAIS — la page cesse de mimer le temps pour
+   afficher le sien.
+
+   Tout est piloté par MotionValue : le texte se met à jour sans jamais
+   re-rendre l'arbre React, même à la seconde. */
+
+const POMODORO_SECONDS = 25 * 60;
+const CLOCK_R = 13;
+const CLOCK_C = 2 * Math.PI * CLOCK_R;
+
+function SessionClock({
+  scrollProgress,
+  liveLeft,
+  liveTotal,
+  live,
+  done,
+}: {
+  scrollProgress: MotionValue<number>;
+  liveLeft: MotionValue<number>;
+  liveTotal: number;
+  live: boolean;
+  done: boolean;
+}) {
+  // UNE seule valeur affichée, alimentée par l'une ou l'autre source. On ne
+  // fait pas commuter `useTransform` d'une MotionValue à l'autre entre deux
+  // rendus : on s'abonne explicitement à la bonne source.
+  const seconds = useMotionValue(POMODORO_SECONDS);
+  const ratio = useMotionValue(0); // part écoulée, 0 → 1
+
+  useEffect(() => {
+    if (live) {
+      const apply = (v: number) => {
+        seconds.set(v);
+        ratio.set(liveTotal > 0 ? 1 - v / liveTotal : 0);
+      };
+      apply(liveLeft.get());
+      return liveLeft.on("change", apply);
+    }
+    const apply = (p: number) => {
+      const clamped = Math.max(0, Math.min(1, p));
+      seconds.set(POMODORO_SECONDS * (1 - clamped));
+      ratio.set(clamped);
+    };
+    apply(scrollProgress.get());
+    return scrollProgress.on("change", apply);
+  }, [live, liveTotal, liveLeft, scrollProgress, seconds, ratio]);
+
+  const mm = useTransform(seconds, (v) => String(Math.floor(Math.max(v, 0) / 60)).padStart(2, "0"));
+  const ss = useTransform(seconds, (v) => String(Math.floor(Math.max(v, 0) % 60)).padStart(2, "0"));
+  const label = useMotionTemplate`${mm}:${ss}`;
+  const dashOffset = useTransform(ratio, (v) => CLOCK_C * (1 - v));
+
+  return (
+    <span
+      className="flex items-center gap-2.5"
+      title={live ? "Ta session est en cours" : "La page se déroule comme une session de 25 minutes"}
+    >
+      <span className="relative flex h-8 w-8 items-center justify-center">
+        <svg viewBox="0 0 32 32" className="absolute inset-0 h-full w-full -rotate-90">
+          <circle cx="16" cy="16" r={CLOCK_R} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="2" />
+          <motion.circle
+            cx="16"
+            cy="16"
+            r={CLOCK_R}
+            fill="none"
+            stroke={done ? "#7fd4c1" : "#ffc38a"}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeDasharray={CLOCK_C}
+            style={{ strokeDashoffset: dashOffset }}
+          />
+        </svg>
+        {/* Micro-boucle perpétuelle : le point ne bat QUE quand une vraie
+            session tourne. Le mouvement dit un état, il ne décore pas. */}
+        {live && (
+          <motion.span
+            className="h-1.5 w-1.5 rounded-full bg-[#ffc38a]"
+            animate={{ scale: [1, 1.5, 1], opacity: [0.6, 1, 0.6] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          />
+        )}
+      </span>
+      <span className="flex flex-col leading-none">
+        <motion.span className="font-mono text-[13px] tabular-nums text-white">{done ? "00:00" : label}</motion.span>
+        <span className="mt-1 font-mono text-[8px] uppercase tracking-[0.16em] text-white/45">
+          {done ? "pause méritée" : live ? "ta session" : "cette page"}
+        </span>
+      </span>
+    </span>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    HERO — scène 3D : la session au centre, ses satellites en profondeur
    ══════════════════════════════════════════════════════════════════════════ */
 
@@ -338,7 +438,7 @@ function HeroScene({ px, py }: { px: MotionValue<number>; py: MotionValue<number
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   CATALOGUE — carrousel 3D des vraies vidéos, qu'on fait tourner à la main
+   CATALOGUE — bande sans fin, en perspective, qu'on fait défiler à la main
    ══════════════════════════════════════════════════════════════════════════ */
 
 // Dix cartes, dix pays : Hong Kong, Corée, Chine, Taïwan, Vietnam, Japon,
@@ -346,22 +446,72 @@ function HeroScene({ px, py }: { px: MotionValue<number>; py: MotionValue<number
 const CAROUSEL_IDS = ["hk-02", "driv-05", "cn-01", "tw-02", "vn-01", "abao-11", "no-01", "noma-07", "uk-01", "id-02"];
 const CAROUSEL = CAROUSEL_IDS.map((id) => defaultVideos.find((v) => v.id === id)!).filter(Boolean);
 
-function Carousel3D() {
-  const reduce = useReducedMotion();
-  const count = CAROUSEL.length;
-  const step = 360 / count;
-  // Rayon calculé pour que deux cartes voisines ne se touchent jamais :
-  // corde = 2·R·sin(180°/N) doit dépasser la largeur de carte + la respiration.
-  // N=10, carte 272 px, marge 56 px  ->  R >= 531. On prend 560.
-  const radius = 560;
-  const cardW = 272;
+// L'anneau fermé laissait forcément un trou : dès qu'on masquait les dos de
+// cartes, la moitié arrière disparaissait et le cadre se vidait. On passe donc
+// à une BANDE INFINIE : les cartes défilent en boucle sur un axe horizontal et
+// s'inclinent d'autant plus qu'elles s'éloignent du centre. Le cadre est
+// toujours plein, quel que soit l'angle.
+const CARD_W = 272; // px
+const GAP = 52;
+const SLOT = CARD_W + GAP; // pas entre deux cartes, garantit l'absence de chevauchement
+const SPAN = CAROUSEL.length * SLOT;
+const FADE = 820; // distance au centre où la carte s'efface (avant le raccord)
 
-  const angle = useMotionValue(0);
-  const smooth = useSpring(angle, { stiffness: 70, damping: 18, mass: 0.7 });
+/** Une carte de la bande : elle calcule sa propre place à partir du défilement. */
+function BeltCard({ video, index, offset }: { video: (typeof CAROUSEL)[number]; index: number; offset: MotionValue<number> }) {
+  // Position signée par rapport au centre, repliée sur la longueur de la bande :
+  // la carte qui sort à droite réapparaît à gauche, sans couture.
+  const dx = useTransform(offset, (o) => {
+    const raw = (((index * SLOT - o) % SPAN) + SPAN) % SPAN;
+    return raw - SPAN / 2;
+  });
+  const rotateY = useTransform(dx, (v) => Math.max(-46, Math.min(46, -v * 0.045)));
+  const z = useTransform(dx, (v) => -Math.abs(v) * 0.5);
+  const opacity = useTransform(dx, (v) => {
+    const a = Math.abs(v);
+    return a > FADE ? 0 : a > FADE - 220 ? (FADE - a) / 220 : 1;
+  });
+
+  return (
+    <motion.div
+      className="absolute left-1/2 top-1/2"
+      style={{
+        width: CARD_W,
+        height: 152,
+        marginLeft: -CARD_W / 2,
+        marginTop: -76,
+        x: dx,
+        rotateY,
+        z,
+        opacity,
+        transformStyle: "preserve-3d",
+      }}
+    >
+      <div className="group relative h-full w-full overflow-hidden rounded-2xl border border-white/15 bg-[#07080e] shadow-[0_18px_50px_-20px_rgba(0,0,0,0.9)]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={thumb(video.youtubeId)}
+          alt=""
+          loading="lazy"
+          draggable={false}
+          className="h-full w-full object-cover opacity-80 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-105 group-hover:opacity-100"
+        />
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/80 to-transparent px-4 pb-3 pt-12">
+          <span className="block truncate text-[13px] font-medium text-white">{video.title}</span>
+          <span className="mt-1 block truncate font-mono text-[10px] text-white/60">{video.country}</span>
+        </span>
+      </div>
+    </motion.div>
+  );
+}
+
+function CatalogueBelt() {
+  const reduce = useReducedMotion();
+  const offset = useMotionValue(0);
   const dragging = useRef(false);
   const lastX = useRef(0);
 
-  // Dérive lente en continu, interrompue pendant qu'on tire dessus.
+  // Dérive continue, suspendue tant qu'on tient la bande.
   useEffect(() => {
     if (reduce) return;
     let raf = 0;
@@ -369,25 +519,25 @@ function Carousel3D() {
     const loop = (now: number) => {
       const dt = now - prev;
       prev = now;
-      if (!dragging.current) angle.set(angle.get() + dt * 0.0042);
+      if (!dragging.current) offset.set(offset.get() + dt * 0.028);
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [angle, reduce]);
+  }, [offset, reduce]);
 
   const onDown = useCallback((e: React.PointerEvent) => {
     dragging.current = true;
     lastX.current = e.clientX;
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   }, []);
   const onMove = useCallback(
     (e: React.PointerEvent) => {
       if (!dragging.current) return;
-      angle.set(angle.get() + (e.clientX - lastX.current) * 0.22);
+      offset.set(offset.get() - (e.clientX - lastX.current));
       lastX.current = e.clientX;
     },
-    [angle]
+    [offset]
   );
   const onUp = useCallback(() => {
     dragging.current = false;
@@ -395,52 +545,19 @@ function Carousel3D() {
 
   return (
     <div
-      className="relative h-[22rem] cursor-grab select-none active:cursor-grabbing sm:h-[24rem]"
-      style={{ perspective: "1300px" }}
+      className="relative h-[15rem] cursor-grab select-none touch-pan-y active:cursor-grabbing sm:h-[17rem]"
+      style={{ perspective: "1200px" }}
       onPointerDown={onDown}
       onPointerMove={onMove}
       onPointerUp={onUp}
       onPointerCancel={onUp}
       onPointerLeave={onUp}
     >
-      {/* L'anneau est reculé de son propre rayon : la carte de devant retombe
-          donc sur le plan de l'écran, à sa taille réelle (sans ce recul, la
-          perspective la ferait exploser en taille). */}
-      <motion.div
-        className="absolute left-1/2 top-1/2 h-0 w-0"
-        style={{ transformStyle: "preserve-3d", rotateY: smooth, rotateX: -5, z: -radius }}
-      >
+      <div className="absolute inset-0" style={{ transformStyle: "preserve-3d" }}>
         {CAROUSEL.map((v, i) => (
-          <div
-            key={v.id}
-            className="absolute h-[9.5rem] -translate-x-1/2 -translate-y-1/2"
-            style={{
-              width: cardW,
-              transform: `rotateY(${i * step}deg) translateZ(${radius}px)`,
-              transformStyle: "preserve-3d",
-              // Sans ça, les cartes de l'autre côté de l'anneau nous montrent
-              // leur dos (image et texte en miroir), comme sur la capture.
-              backfaceVisibility: "hidden",
-            }}
-          >
-            <div className="group relative h-full w-full overflow-hidden rounded-2xl border border-white/15 bg-[#07080e] shadow-[0_18px_50px_-20px_rgba(0,0,0,0.9)]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={thumb(v.youtubeId)}
-                alt=""
-                loading="lazy"
-                draggable={false}
-                className="h-full w-full object-cover opacity-80 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-105 group-hover:opacity-100"
-              />
-              <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/80 to-transparent px-4 pb-3 pt-12">
-                <span className="block truncate text-[13px] font-medium text-white">{v.title}</span>
-                <span className="mt-1 block truncate font-mono text-[10px] text-white/72">{v.country}</span>
-              </span>
-            </div>
-          </div>
+          <BeltCard key={v.id} video={v} index={i} offset={offset} />
         ))}
-      </motion.div>
-
+      </div>
     </div>
   );
 }
@@ -670,7 +787,13 @@ function TwitchPane() {
    POMODORO JOUABLE — la démo la plus honnête possible : le vrai geste
    ══════════════════════════════════════════════════════════════════════════ */
 
-function TryPomodoro() {
+function TryPomodoro({
+  liveLeft,
+  onLiveChange,
+}: {
+  liveLeft: MotionValue<number>;
+  onLiveChange: (live: boolean, total: number) => void;
+}) {
   const PRESETS = [
     { label: "Classique", work: 25 },
     { label: "Profond", work: 50 },
@@ -693,6 +816,16 @@ function TryPomodoro() {
     return () => clearInterval(id);
   }, [running]);
 
+  // Le minuteur alimente l'horloge de la nav SANS re-rendre la page : la valeur
+  // transite par une MotionValue, pas par un state remonté.
+  useEffect(() => {
+    liveLeft.set(left);
+  }, [left, liveLeft]);
+
+  useEffect(() => {
+    onLiveChange(running, total);
+  }, [running, total, onLiveChange]);
+
   const progress = 1 - left / total;
   const dash = 2 * Math.PI * 52;
   const mm = String(Math.floor(left / 60)).padStart(2, "0");
@@ -708,6 +841,11 @@ function TryPomodoro() {
         <p className="mt-6 text-[16px] leading-relaxed text-white/65">
           Celui-ci fonctionne, ici, sans compte. C&apos;est exactement le moteur de la session : trois rythmes, un
           bouton, et le temps qui descend.
+        </p>
+        <p className="mt-4 text-[13px] leading-relaxed text-white/50">
+          {running
+            ? "Regarde la barre en haut : ta session a pris le relais du compteur de la page."
+            : "Lance-le, et le compteur en haut de page passera sur ton temps à toi."}
         </p>
         <div className="mt-9 flex flex-wrap gap-2">
           {PRESETS.map((p, i) => (
@@ -905,6 +1043,31 @@ export default function LandingPage() {
   const { scrollYProgress } = useScroll();
   const veil = useTransform(scrollYProgress, [0, 0.12], [0, 0.86]);
 
+  // L'horloge de la page. `liveLeft` est une MotionValue : le minuteur de la
+  // section démo l'alimente à la seconde sans provoquer un seul re-render ici.
+  const liveLeft = useMotionValue(POMODORO_SECONDS);
+  const [live, setLive] = useState(false);
+  const [liveTotal, setLiveTotal] = useState(POMODORO_SECONDS);
+  const onLiveChange = useCallback((on: boolean, total: number) => {
+    setLive(on);
+    setLiveTotal(total);
+  }, []);
+
+  // Fin de la « session de la page » : atteinte du bas, ou minuteur à zéro.
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    const unScroll = scrollYProgress.on("change", (v) => {
+      if (!live) setDone(v > 0.985);
+    });
+    const unLive = liveLeft.on("change", (v) => {
+      if (live) setDone(v <= 0);
+    });
+    return () => {
+      unScroll();
+      unLive();
+    };
+  }, [scrollYProgress, liveLeft, live]);
+
   const { scrollYProgress: heroP } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
   const heroY = useTransform(heroP, [0, 1], [0, 120]);
   const heroFade = useTransform(heroP, [0, 0.75], [1, 0]);
@@ -943,6 +1106,16 @@ export default function LandingPage() {
                 <a href="#catalogue" className="transition-colors duration-500 hover:text-white">Catalogue</a>
                 <a href="#sources" className="transition-colors duration-500 hover:text-white">Sources</a>
                 <a href="#minuteur" className="transition-colors duration-500 hover:text-white">Minuteur</a>
+              </div>
+              <span className="hidden h-8 w-px bg-white/10 sm:block" aria-hidden />
+              <div className="hidden sm:block">
+                <SessionClock
+                  scrollProgress={scrollYProgress}
+                  liveLeft={liveLeft}
+                  liveTotal={liveTotal}
+                  live={live}
+                  done={done}
+                />
               </div>
               <Cta label="Se connecter" onClick={() => signInWithGoogle()} className="py-1.5 pl-5 pr-1.5 text-[13px]" />
             </nav>
@@ -1019,7 +1192,7 @@ export default function LandingPage() {
               </p>
             </Rise>
             <Rise delay={0.1}>
-              <Carousel3D />
+              <CatalogueBelt />
             </Rise>
           </section>
 
@@ -1038,7 +1211,7 @@ export default function LandingPage() {
           {/* ── Minuteur jouable ─────────────────────────────────────────── */}
           <section id="minuteur" className="mx-auto w-full max-w-[86rem] px-4 pb-28 sm:px-8 md:pb-40">
             <Rise>
-              <TryPomodoro />
+              <TryPomodoro liveLeft={liveLeft} onLiveChange={onLiveChange} />
             </Rise>
           </section>
 
@@ -1064,7 +1237,23 @@ export default function LandingPage() {
                 Utilisable sans compte. Google sert seulement à retrouver ta progression d&apos;un appareil à
                 l&apos;autre.
               </p>
-              <div className="mt-12 flex justify-center">
+              <div className="relative mt-12 flex justify-center">
+                {/* La sonnerie : deux ondes qui partent du bouton quand les
+                    25 minutes de la page sont écoulées. Elle ne tourne pas en
+                    boucle décorative, elle marque un instant précis. */}
+                {done && !reduce && (
+                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
+                    {[0, 0.9].map((d) => (
+                      <motion.span
+                        key={d}
+                        className="absolute h-16 w-56 rounded-full border border-[#ffc38a]/40"
+                        initial={{ scale: 0.85, opacity: 0.65 }}
+                        animate={{ scale: 1.9, opacity: 0 }}
+                        transition={{ duration: 2.6, repeat: Infinity, delay: d, ease: "easeOut" }}
+                      />
+                    ))}
+                  </span>
+                )}
                 <Cta label="Ouvrir une session" onClick={() => signInWithGoogle()} />
               </div>
             </Rise>
