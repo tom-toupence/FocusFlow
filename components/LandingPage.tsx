@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   motion,
   useMotionValue,
@@ -78,7 +78,7 @@ function Bezel({
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.04] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-white/50">
+    <span className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.04] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-white/65">
       {children}
     </span>
   );
@@ -182,7 +182,8 @@ function Rise({
    HERO — scène 3D : la session au centre, ses satellites en profondeur
    ══════════════════════════════════════════════════════════════════════════ */
 
-const HERO_TRACKS = defaultVideos.filter((v) => ["abao-11", "abao-15", "cn-01", "driv-01"].includes(v.id));
+// Un pays différent à chaque rotation : le catalogue ne se résume pas au Japon.
+const HERO_TRACKS = defaultVideos.filter((v) => ["hk-02", "driv-05", "cn-01", "np-01", "abao-11"].includes(v.id));
 
 /** Élément flottant à une profondeur donnée : il dérive en boucle et suit la scène. */
 function Floating({
@@ -241,8 +242,9 @@ function HeroScene({ px, py }: { px: MotionValue<number>; py: MotionValue<number
       style={reduce ? undefined : { rotateX: rotX, rotateY: rotY, transformPerspective: 1400, transformStyle: "preserve-3d" }}
       className="relative h-[28rem] w-[22rem] sm:h-[30rem] sm:w-[26rem]"
     >
-      {/* Noyau : l'écran de session, avec la vraie vidéo du catalogue derrière */}
-      <Floating z={0} drift={10} duration={11} className="inset-x-0 top-8">
+      {/* Noyau : l'écran de session. Reculé d'un plan (z négatif) pour que les
+          satellites vivent DEVANT lui et restent lisibles. */}
+      <Floating z={-90} drift={10} duration={11} className="inset-x-0 top-10">
         <Bezel radius={2}>
           <div className="relative aspect-[4/3]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -275,7 +277,7 @@ function HeroScene({ px, py }: { px: MotionValue<number>; py: MotionValue<number
                   <span className="font-mono text-[26px] tabular-nums text-white">
                     {mm}:{ss}
                   </span>
-                  <span className="mt-1 font-mono text-[9px] uppercase tracking-[0.22em] text-white/35">Focus</span>
+                  <span className="mt-1 font-mono text-[9px] uppercase tracking-[0.22em] text-white/50">Focus</span>
                 </span>
               </div>
             </div>
@@ -284,12 +286,12 @@ function HeroScene({ px, py }: { px: MotionValue<number>; py: MotionValue<number
       </Floating>
 
       {/* Satellite avant-plan : le titre en cours */}
-      <Floating z={90} drift={16} duration={8} className="-left-6 bottom-14 w-[17rem] sm:-left-12">
-        <div className="flex items-center gap-3 rounded-2xl border border-white/12 bg-[#0a0c14]/85 p-2.5 backdrop-blur-xl">
+      <Floating z={130} drift={16} duration={8} className="-left-10 bottom-6 w-[17rem] sm:-left-20">
+        <div className="flex items-center gap-3 rounded-2xl border border-white/15 bg-[#0a0c14]/92 p-2.5 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={thumb(current.youtubeId)} alt="" className="h-11 w-11 shrink-0 rounded-xl object-cover" />
           <span className="min-w-0">
-            <span className="block truncate text-[12px] font-medium text-white/85">{current.title}</span>
+            <span className="block truncate text-[12px] font-medium text-white">{current.title}</span>
             <span className="mt-0.5 flex items-center gap-1.5">
               <span className="flex h-2.5 items-end gap-[2px]" aria-hidden>
                 {[1.2, 1.5, 1.35].map((d, i) => (
@@ -300,17 +302,17 @@ function HeroScene({ px, py }: { px: MotionValue<number>; py: MotionValue<number
                   />
                 ))}
               </span>
-              <span className="truncate font-mono text-[10px] text-white/35">{current.channel}</span>
+              <span className="truncate font-mono text-[10px] text-white/65">{current.channel}</span>
             </span>
           </span>
         </div>
       </Floating>
 
       {/* Satellite arrière-plan : la tâche en cours */}
-      <Floating z={-70} drift={12} duration={13} className="-right-4 top-0 w-[13rem] sm:-right-10">
-        <div className="rounded-2xl border border-white/10 bg-[#0a0c14]/70 p-4 backdrop-blur-xl">
-          <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/35">En cours</span>
-          <p className="mt-2 text-[13px] leading-snug text-white/80">Relire le chapitre 4</p>
+      <Floating z={95} drift={12} duration={13} className="-right-8 top-4 w-[13rem] sm:-right-16">
+        <div className="rounded-2xl border border-white/15 bg-[#0a0c14]/90 p-4 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+          <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/65">En cours</span>
+          <p className="mt-2 text-[13px] leading-snug text-white">Relire le chapitre 4</p>
           <span className="mt-3 flex gap-1" aria-hidden>
             {[1, 1, 1, 0].map((full, i) => (
               <span key={i} className={cn("h-1 flex-1 rounded-full", full ? "bg-[#ffc38a]/70" : "bg-white/12")} />
@@ -320,12 +322,12 @@ function HeroScene({ px, py }: { px: MotionValue<number>; py: MotionValue<number
       </Floating>
 
       {/* Satellite lointain : la présence d'un ami */}
-      <Floating z={-130} drift={9} duration={15} className="-left-2 top-2 w-[11rem] sm:-left-6">
-        <div className="flex items-center gap-2.5 rounded-full border border-white/10 bg-[#0a0c14]/70 py-2 pl-2 pr-4 backdrop-blur-xl">
+      <Floating z={60} drift={9} duration={15} className="-left-6 -top-4 w-[11rem] sm:-left-14">
+        <div className="flex items-center gap-2.5 rounded-full border border-white/15 bg-[#0a0c14]/90 py-2 pl-2 pr-4 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={thumb(defaultVideos[12]?.youtubeId ?? current.youtubeId)} alt="" className="h-7 w-7 rounded-full object-cover" />
           <span className="min-w-0">
-            <span className="block truncate text-[11px] text-white/75">Camille</span>
+            <span className="block truncate text-[11px] text-white">Camille</span>
             <span className="block font-mono text-[9px] text-[#7fd4c1]">en focus</span>
           </span>
         </div>
@@ -338,15 +340,20 @@ function HeroScene({ px, py }: { px: MotionValue<number>; py: MotionValue<number
    CATALOGUE — carrousel 3D des vraies vidéos, qu'on fait tourner à la main
    ══════════════════════════════════════════════════════════════════════════ */
 
-const CAROUSEL = defaultVideos.filter((v) =>
-  ["abao-01", "abao-11", "abao-15", "swj-01", "hatsu-01", "jplo-01", "driv-01", "cn-01", "driv-05", "kr-01", "tw-01", "ramb-02"].includes(v.id)
-);
+// Dix cartes, dix pays : Hong Kong, Corée, Chine, Taïwan, Vietnam, Japon,
+// Norvège, Suisse, Royaume-Uni, Indonésie.
+const CAROUSEL_IDS = ["hk-02", "driv-05", "cn-01", "tw-02", "vn-01", "abao-11", "no-01", "noma-07", "uk-01", "id-02"];
+const CAROUSEL = CAROUSEL_IDS.map((id) => defaultVideos.find((v) => v.id === id)!).filter(Boolean);
 
 function Carousel3D() {
   const reduce = useReducedMotion();
   const count = CAROUSEL.length;
   const step = 360 / count;
-  const radius = 430;
+  // Rayon calculé pour que deux cartes voisines ne se touchent jamais :
+  // corde = 2·R·sin(180°/N) doit dépasser la largeur de carte + la respiration.
+  // N=10, carte 272 px, marge 56 px  ->  R >= 531. On prend 560.
+  const radius = 560;
+  const cardW = 272;
 
   const angle = useMotionValue(0);
   const smooth = useSpring(angle, { stiffness: 70, damping: 18, mass: 0.7 });
@@ -387,47 +394,52 @@ function Carousel3D() {
 
   return (
     <div
-      className="relative h-[24rem] cursor-grab select-none active:cursor-grabbing sm:h-[27rem]"
-      style={{ perspective: "1500px" }}
+      className="relative h-[22rem] cursor-grab select-none active:cursor-grabbing sm:h-[24rem]"
+      style={{ perspective: "1300px" }}
       onPointerDown={onDown}
       onPointerMove={onMove}
       onPointerUp={onUp}
       onPointerCancel={onUp}
       onPointerLeave={onUp}
     >
+      {/* L'anneau est reculé de son propre rayon : la carte de devant retombe
+          donc sur le plan de l'écran, à sa taille réelle (sans ce recul, la
+          perspective la ferait exploser en taille). */}
       <motion.div
         className="absolute left-1/2 top-1/2 h-0 w-0"
-        style={{ transformStyle: "preserve-3d", rotateY: smooth, rotateX: -6 }}
+        style={{ transformStyle: "preserve-3d", rotateY: smooth, rotateX: -5, z: -radius }}
       >
         {CAROUSEL.map((v, i) => (
           <div
             key={v.id}
-            className="absolute h-[10.5rem] w-[18.5rem] -translate-x-1/2 -translate-y-1/2"
-            style={{ transform: `rotateY(${i * step}deg) translateZ(${radius}px)`, transformStyle: "preserve-3d" }}
+            className="absolute h-[9.5rem] -translate-x-1/2 -translate-y-1/2"
+            style={{
+              width: cardW,
+              transform: `rotateY(${i * step}deg) translateZ(${radius}px)`,
+              transformStyle: "preserve-3d",
+              // Sans ça, les cartes de l'autre côté de l'anneau nous montrent
+              // leur dos (image et texte en miroir), comme sur la capture.
+              backfaceVisibility: "hidden",
+            }}
           >
-            <div className="group h-full w-full overflow-hidden rounded-2xl border border-white/12 bg-[#07080e] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)]">
+            <div className="group relative h-full w-full overflow-hidden rounded-2xl border border-white/15 bg-[#07080e] shadow-[0_18px_50px_-20px_rgba(0,0,0,0.9)]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={thumb(v.youtubeId)}
                 alt=""
                 loading="lazy"
                 draggable={false}
-                className="h-full w-full object-cover opacity-70 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-105 group-hover:opacity-100"
+                className="h-full w-full object-cover opacity-80 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-105 group-hover:opacity-100"
               />
-              <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#05060c] via-[#05060c]/70 to-transparent px-4 pb-3 pt-10">
-                <span className="block truncate text-[13px] font-medium text-white/90">{v.title}</span>
-                <span className="mt-0.5 block truncate font-mono text-[10px] text-white/35">
-                  {v.channel} · {v.country}
-                </span>
+              <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/80 to-transparent px-4 pb-3 pt-12">
+                <span className="block truncate text-[13px] font-medium text-white">{v.title}</span>
+                <span className="mt-1 block truncate font-mono text-[10px] text-white/72">{v.country}</span>
               </span>
             </div>
           </div>
         ))}
       </motion.div>
 
-      {/* Fondus latéraux : le carrousel sort du cadre sans coupure nette */}
-      <span className="pointer-events-none absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-[#05060c] to-transparent" aria-hidden />
-      <span className="pointer-events-none absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-[#05060c] to-transparent" aria-hidden />
     </div>
   );
 }
@@ -502,7 +514,7 @@ function SourceShowcase() {
               </span>
               <span
                 className={cn(
-                  "mt-2 block text-[13px] leading-relaxed text-white/45 transition-all duration-500",
+                  "mt-2 block text-[13px] leading-relaxed text-white/60 transition-all duration-500",
                   on ? "max-h-24 opacity-100" : "max-h-0 overflow-hidden opacity-0"
                 )}
               >
@@ -553,7 +565,7 @@ function QueuePane() {
   const items = defaultVideos.slice(20, 25);
   return (
     <motion.div {...PANE_IN} className="flex h-full flex-col gap-1.5 p-4">
-      <span className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">
+      <span className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/50">
         <YoutubeMark /> File d&apos;attente
       </span>
       {items.map((v, i) => (
@@ -564,7 +576,7 @@ function QueuePane() {
             i === 0 ? "bg-white/[0.07]" : "hover:bg-white/[0.04]"
           )}
         >
-          <span className="w-4 shrink-0 text-center font-mono text-[10px] text-white/30">{i + 1}</span>
+          <span className="w-4 shrink-0 text-center font-mono text-[10px] text-white/50">{i + 1}</span>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={thumb(v.youtubeId)} alt="" loading="lazy" className="h-8 w-12 shrink-0 rounded-md object-cover" />
           <span className="min-w-0 flex-1 truncate text-[12px] text-white/75">{v.title}</span>
@@ -590,18 +602,18 @@ function SpotifyPane() {
   ];
   return (
     <motion.div {...PANE_IN} className="flex h-full flex-col p-5">
-      <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">
+      <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/50">
         <SpotifyMark /> Connecté en Premium
       </span>
       <div className="mt-4 flex flex-1 flex-col justify-center gap-1">
         {rows.map((r, i) => (
           <div key={r.t} className={cn("flex items-center gap-3 rounded-xl px-3 py-2.5", i === 1 && "bg-white/[0.06]")}>
-            <span className="w-3 font-mono text-[10px] text-white/25">{i + 1}</span>
+            <span className="w-3 font-mono text-[10px] text-white/45">{i + 1}</span>
             <span className="min-w-0 flex-1">
               <span className={cn("block truncate text-[13px]", i === 1 ? "text-[#1db954]" : "text-white/80")}>{r.t}</span>
-              <span className="block truncate text-[11px] text-white/35">{r.a}</span>
+              <span className="block truncate text-[11px] text-white/50">{r.a}</span>
             </span>
-            <span className="font-mono text-[10px] tabular-nums text-white/30">{r.d}</span>
+            <span className="font-mono text-[10px] tabular-nums text-white/50">{r.d}</span>
           </div>
         ))}
       </div>
@@ -635,7 +647,7 @@ function TwitchPane() {
       </div>
       <div className="flex flex-col gap-2 overflow-hidden rounded-xl bg-white/[0.03] p-3">
         {chat.map((c) => (
-          <p key={c.u} className="text-[11px] leading-snug text-white/55">
+          <p key={c.u} className="text-[11px] leading-snug text-white/65">
             <span className="text-[#9146ff]">{c.u}</span> {c.m}
           </p>
         ))}
@@ -683,7 +695,7 @@ function TryPomodoro() {
         <h2 className="mt-7 text-[clamp(2rem,4vw,3.1rem)] font-semibold leading-[1.05] tracking-[-0.03em] text-white">
           Le minuteur, pour de vrai.
         </h2>
-        <p className="mt-6 text-[16px] leading-relaxed text-white/50">
+        <p className="mt-6 text-[16px] leading-relaxed text-white/65">
           Celui-ci fonctionne, ici, sans compte. C&apos;est exactement le moteur de la session : trois rythmes, un
           bouton, et le temps qui descend.
         </p>
@@ -696,11 +708,11 @@ function TryPomodoro() {
                 "rounded-full px-5 py-2.5 text-[13px] font-medium transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
                 i === preset
                   ? "border border-white/25 bg-white/[0.08] text-white"
-                  : "border border-white/10 text-white/45 hover:border-white/25 hover:text-white/80"
+                  : "border border-white/10 text-white/60 hover:border-white/25 hover:text-white/80"
               )}
             >
               {p.label}
-              <span className="ml-2 font-mono text-[11px] text-white/35">{p.work}</span>
+              <span className="ml-2 font-mono text-[11px] text-white/50">{p.work}</span>
             </button>
           ))}
         </div>
@@ -736,7 +748,7 @@ function TryPomodoro() {
                 <span className="font-mono text-[42px] leading-none tabular-nums text-white">
                   {mm}:{ss}
                 </span>
-                <span className="mt-2 font-mono text-[9px] uppercase tracking-[0.22em] text-white/35">
+                <span className="mt-2 font-mono text-[9px] uppercase tracking-[0.22em] text-white/50">
                   {left === 0 ? "Terminé" : running ? "En cours" : "En attente"}
                 </span>
               </span>
@@ -764,7 +776,7 @@ function TryPomodoro() {
                   setRunning(false);
                   setLeft(total);
                 }}
-                className="flex h-12 w-12 items-center justify-center rounded-full border border-white/12 text-white/50 transition-colors hover:border-white/30 hover:text-white"
+                className="flex h-12 w-12 items-center justify-center rounded-full border border-white/12 text-white/65 transition-colors hover:border-white/30 hover:text-white"
                 aria-label="Réinitialiser"
               >
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -787,29 +799,60 @@ function TryPomodoro() {
 // doivent produire exactement la même grille).
 const HEAT = Array.from({ length: 91 }, (_, i) => (i * 37) % 11);
 
+const HEAT_STEPS = [
+  "bg-white/[0.09]",
+  "bg-[#ffc38a]/30",
+  "bg-[#ffc38a]/55",
+  "bg-[#ffc38a]/80",
+  "bg-[#ffc38a]",
+];
+const heatStep = (v: number) => (v > 8 ? 4 : v > 6 ? 3 : v > 4 ? 2 : v > 2 ? 1 : 0);
+
+const HEAT_DAYS = ["L", "", "M", "", "V", "", "D"];
+
 function TracePanel() {
   const reduce = useReducedMotion();
   return (
     <div className="grid gap-4 md:grid-cols-3">
-      <div className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-8 md:col-span-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">Treize semaines</span>
-        <div className="mt-6 grid grid-flow-col grid-rows-7 gap-[5px]">
-          {HEAT.map((v, i) => (
-            <motion.span
-              key={i}
-              initial={reduce ? false : { opacity: 0, scale: 0.4 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: (i % 30) * 0.012, ease: EASE }}
-              className={cn(
-                "aspect-square rounded-[3px]",
-                v > 8 ? "bg-[#ffc38a]" : v > 6 ? "bg-[#ffc38a]/65" : v > 4 ? "bg-[#ffc38a]/35" : v > 2 ? "bg-white/12" : "bg-white/[0.05]"
-              )}
-            />
-          ))}
+      <div className="rounded-[2rem] border border-white/10 bg-[#080a12]/70 p-8 md:col-span-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-4">
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/65">Treize semaines</span>
+          <span className="flex items-center gap-2 font-mono text-[10px] text-white/60">
+            moins
+            <span className="flex gap-1" aria-hidden>
+              {HEAT_STEPS.map((c) => (
+                <span key={c} className={cn("h-2.5 w-2.5 rounded-[3px]", c)} />
+              ))}
+            </span>
+            plus
+          </span>
         </div>
-        <p className="mt-6 max-w-md text-[14px] leading-relaxed text-white/45">
-          Chaque carré est une soirée. La série, le score de concentration et le récap du dimanche se construisent tout
+
+        <div className="mt-7 flex gap-2.5">
+          {/* Jours de la semaine, pour que la grille se lise comme un calendrier */}
+          <div className="grid grid-rows-7 gap-[6px] pr-1">
+            {HEAT_DAYS.map((d, i) => (
+              <span key={i} className="flex h-[14px] items-center font-mono text-[9px] leading-none text-white/40">
+                {d}
+              </span>
+            ))}
+          </div>
+          <div className="grid flex-1 grid-flow-col grid-rows-7 gap-[6px]">
+            {HEAT.map((v, i) => (
+              <motion.span
+                key={i}
+                initial={reduce ? false : { opacity: 0, scale: 0.4 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: (i % 30) * 0.012, ease: EASE }}
+                className={cn("h-[14px] rounded-[3px]", HEAT_STEPS[heatStep(v)])}
+              />
+            ))}
+          </div>
+        </div>
+
+        <p className="mt-7 max-w-md text-[14px] leading-relaxed text-white/72">
+          Chaque case est une soirée. La série, le score de concentration et le récap du dimanche se construisent tout
           seuls pendant que tu travailles.
         </p>
       </div>
@@ -820,8 +863,8 @@ function TracePanel() {
           { k: "Cette semaine", v: "9h 20m" },
           { k: "Score de concentration", v: "84" },
         ].map((s) => (
-          <div key={s.k} className="flex-1 rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-7">
-            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">{s.k}</span>
+          <div key={s.k} className="flex-1 rounded-[1.75rem] border border-white/10 bg-[#080a12]/70 p-7">
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/65">{s.k}</span>
             <p className="mt-4 font-mono text-[34px] leading-none tabular-nums text-white">{s.v}</p>
           </div>
         ))}
@@ -838,35 +881,55 @@ export default function LandingPage() {
   const reduce = useReducedMotion();
 
   const heroRef = useRef<HTMLElement>(null);
+
+  // Position du pointeur DANS LE VIEWPORT (0-1) : le halo est une couche fixe,
+  // il ne s'éteint donc plus brutalement quand on quitte le hero.
   const px = useMotionValue(0);
   const py = useMotionValue(0);
   const spotX = useSpring(useTransform(px, (v) => (v + 0.5) * 100), { stiffness: 80, damping: 20 });
   const spotY = useSpring(useTransform(py, (v) => (v + 0.5) * 100), { stiffness: 80, damping: 20 });
-  const spotlight = useMotionTemplate`radial-gradient(42rem circle at ${spotX}% ${spotY}%, rgba(255,183,110,0.14), transparent 60%)`;
+  const spotlight = useMotionTemplate`radial-gradient(40rem circle at ${spotX}% ${spotY}%, rgba(255,183,110,0.13), transparent 62%)`;
+
+  // Voile de lecture : transparent sur le hero (on veut voir la ville), il
+  // monte ensuite pour que TOUT le texte de la page repose sur un fond stable.
+  const { scrollYProgress } = useScroll();
+  const veil = useTransform(scrollYProgress, [0, 0.12], [0, 0.86]);
 
   const { scrollYProgress: heroP } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
   const heroY = useTransform(heroP, [0, 1], [0, 120]);
   const heroFade = useTransform(heroP, [0, 0.75], [1, 0]);
 
-  const marquee = useMemo(
-    () => Array.from(new Set(defaultVideos.map((v) => v.country).filter(Boolean) as string[])),
-    []
-  );
-
   return (
     <MotionConfig reducedMotion="user">
-      <main className="relative w-full max-w-full overflow-x-hidden bg-[#05060c] text-white">
+      <main
+        className="relative w-full max-w-full overflow-x-hidden bg-[#05060c] text-white"
+        onPointerMove={(e) => {
+          if (reduce) return;
+          px.set(e.clientX / window.innerWidth - 0.5);
+          py.set(e.clientY / window.innerHeight - 0.5);
+        }}
+      >
         {/* La ville, et la nuit qui tombe au fil du scroll */}
         <div className="pointer-events-none fixed inset-0 z-0">
           <CityBackdrop />
         </div>
+        {/* Voile de lisibilité, au-dessus de la ville et sous le contenu */}
+        <motion.div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 z-[1] bg-[#05060c]"
+          style={reduce ? { opacity: 0.86 } : { opacity: veil }}
+        />
+        {/* Halo du curseur, sur toute la page */}
+        {!reduce && (
+          <motion.div aria-hidden className="pointer-events-none fixed inset-0 z-[2]" style={{ background: spotlight }} />
+        )}
 
         <div className="relative z-10">
           {/* Nav : île de verre détachée du bord */}
           <header className="fixed inset-x-0 top-6 z-40 flex justify-center px-4">
             <nav className="flex w-max items-center gap-8 rounded-full border border-white/12 bg-[#080a12]/70 py-2 pl-5 pr-2 backdrop-blur-2xl">
               <Wordmark />
-              <div className="hidden items-center gap-6 text-[13px] text-white/45 md:flex">
+              <div className="hidden items-center gap-6 text-[13px] text-white/60 md:flex">
                 <a href="#catalogue" className="transition-colors duration-500 hover:text-white">Catalogue</a>
                 <a href="#sources" className="transition-colors duration-500 hover:text-white">Sources</a>
                 <a href="#minuteur" className="transition-colors duration-500 hover:text-white">Minuteur</a>
@@ -876,18 +939,7 @@ export default function LandingPage() {
           </header>
 
           {/* ── Hero ─────────────────────────────────────────────────────── */}
-          <section
-            ref={heroRef}
-            onPointerMove={(e) => {
-              if (reduce) return;
-              const r = e.currentTarget.getBoundingClientRect();
-              px.set((e.clientX - r.left) / r.width - 0.5);
-              py.set((e.clientY - r.top) / r.height - 0.5);
-            }}
-            className="relative flex min-h-[100dvh] items-center px-4 pb-24 pt-36 sm:px-8"
-          >
-            <motion.span aria-hidden className="pointer-events-none absolute inset-0" style={reduce ? undefined : { background: spotlight }} />
-
+          <section ref={heroRef} className="relative flex min-h-[100dvh] items-center px-4 pb-24 pt-36 sm:px-8">
             <motion.div
               style={reduce ? undefined : { y: heroY, opacity: heroFade }}
               className="relative mx-auto grid w-full max-w-[86rem] items-center gap-20 lg:grid-cols-[minmax(0,1fr)_auto]"
@@ -916,7 +968,7 @@ export default function LandingPage() {
                   initial={reduce ? false : { opacity: 0, y: 26 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.9, delay: 0.2, ease: EASE }}
-                  className="mt-9 max-w-lg text-[17px] leading-relaxed text-white/60 [text-shadow:0_1px_20px_rgba(0,0,0,0.9)]"
+                  className="mt-9 max-w-lg text-[17px] leading-relaxed text-white/72 [text-shadow:0_1px_20px_rgba(0,0,0,0.9)]"
                 >
                   Un minuteur Pomodoro et ta musique dans le même écran, sur un paysage qui tourne en boucle. Le reste
                   du bruit attend dehors.
@@ -944,18 +996,6 @@ export default function LandingPage() {
             </motion.div>
           </section>
 
-          {/* ── Pays du catalogue, en défilement ─────────────────────────── */}
-          <div className="relative overflow-hidden border-y border-white/[0.07] py-6">
-            <div className="anim-marquee flex w-max items-center gap-12 pr-12">
-              {[...marquee, ...marquee].map((p, i) => (
-                <span key={`${p}-${i}`} className="flex items-center gap-12 font-mono text-[12px] uppercase tracking-[0.24em] text-white/25">
-                  {p}
-                  <span className="h-1 w-1 rounded-full bg-white/15" aria-hidden />
-                </span>
-              ))}
-            </div>
-          </div>
-
           {/* ── Catalogue en carrousel 3D ────────────────────────────────── */}
           <section id="catalogue" className="mx-auto w-full max-w-[86rem] px-4 py-28 sm:px-8 md:py-40">
             <Rise className="mb-16 max-w-3xl">
@@ -963,7 +1003,7 @@ export default function LandingPage() {
               <h2 className="mt-7 text-[clamp(2rem,4.4vw,3.4rem)] font-semibold leading-[1.04] tracking-[-0.035em]">
                 Cinquante-six endroits où poser ta soirée.
               </h2>
-              <p className="mt-6 max-w-xl text-[16px] leading-relaxed text-white/50">
+              <p className="mt-6 max-w-xl text-[16px] leading-relaxed text-white/65">
                 Study with me à Osaka, la pluie sur Shinjuku, le Bund à minuit, un train le long de la rivière au Gifu.
                 Attrape le carrousel et fais-le tourner.
               </p>
@@ -1010,7 +1050,7 @@ export default function LandingPage() {
               <h2 className="mx-auto max-w-5xl text-[clamp(2.6rem,6.6vw,5.2rem)] font-semibold leading-[0.98] tracking-[-0.04em]">
                 Il fait nuit. Tu as une heure devant toi.
               </h2>
-              <p className="mx-auto mt-9 max-w-md text-[15px] leading-relaxed text-white/50">
+              <p className="mx-auto mt-9 max-w-md text-[15px] leading-relaxed text-white/65">
                 Utilisable sans compte. Google sert seulement à retrouver ta progression d&apos;un appareil à
                 l&apos;autre.
               </p>
@@ -1023,7 +1063,7 @@ export default function LandingPage() {
           <footer className="border-t border-white/[0.07]">
             <div className="mx-auto flex w-full max-w-[86rem] flex-col items-center justify-between gap-5 px-4 py-10 sm:flex-row sm:px-8">
               <Wordmark />
-              <p className="font-mono text-[11px] tracking-wider text-white/25">
+              <p className="font-mono text-[11px] tracking-wider text-white/45">
                 Pomodoro · Lofi · Focus. © {new Date().getFullYear()}
               </p>
             </div>
