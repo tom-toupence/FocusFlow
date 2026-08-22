@@ -324,8 +324,9 @@ function HeroScene({ px, py }: { px: MotionValue<number>; py: MotionValue<number
       {/* Satellite lointain : la présence d'un ami */}
       <Floating z={60} drift={9} duration={15} className="-left-6 -top-4 w-[11rem] sm:-left-14">
         <div className="flex items-center gap-2.5 rounded-full border border-white/15 bg-[#0a0c14]/90 py-2 pl-2 pr-4 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={thumb(defaultVideos[12]?.youtubeId ?? current.youtubeId)} alt="" className="h-7 w-7 rounded-full object-cover" />
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/12 text-[11px] font-semibold text-white" aria-hidden>
+            C
+          </span>
           <span className="min-w-0">
             <span className="block truncate text-[11px] text-white">Camille</span>
             <span className="block font-mono text-[9px] text-[#7fd4c1]">en focus</span>
@@ -539,8 +540,10 @@ function SourceShowcase() {
 
 const PANE_IN = { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.6, ease: EASE } };
 
+const PANE_IDS = ["hk-01", "vn-01", "no-01", "tw-01", "th-01", "abao-03"];
+
 function CataloguePane() {
-  const items = defaultVideos.slice(0, 6);
+  const items = PANE_IDS.map((id) => defaultVideos.find((v) => v.id === id)!).filter(Boolean);
   return (
     <motion.div {...PANE_IN} className="grid h-full grid-cols-3 gap-2 p-3">
       {items.map((v) => (
@@ -561,8 +564,10 @@ function CataloguePane() {
   );
 }
 
+const QUEUE_IDS = ["driv-05", "cn-03", "id-02", "np-01", "uk-01"];
+
 function QueuePane() {
-  const items = defaultVideos.slice(20, 25);
+  const items = QUEUE_IDS.map((id) => defaultVideos.find((v) => v.id === id)!).filter(Boolean);
   return (
     <motion.div {...PANE_IN} className="flex h-full flex-col gap-1.5 p-4">
       <span className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/50">
@@ -635,7 +640,12 @@ function TwitchPane() {
     <motion.div {...PANE_IN} className="grid h-full grid-cols-[1fr_minmax(0,11rem)] gap-3 p-4">
       <div className="relative overflow-hidden rounded-xl bg-black/50">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={thumb(defaultVideos[0].youtubeId)} alt="" loading="lazy" className="h-full w-full object-cover opacity-40" />
+        <img
+          src={thumb(defaultVideos.find((v) => v.id === "uk-01")?.youtubeId ?? defaultVideos[0].youtubeId)}
+          alt=""
+          loading="lazy"
+          className="h-full w-full object-cover opacity-45"
+        />
         <span className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-[#9146ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white">
           <span className="h-1.5 w-1.5 rounded-full bg-white" aria-hidden />
           Live

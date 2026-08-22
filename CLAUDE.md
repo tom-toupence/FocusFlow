@@ -751,3 +751,29 @@ effet site de voyage, un phare pour illustrer Twitch), et le dashboard restait t
 (auth/twitch/callback, summary, StatsSection, TodoStatusDropdown), aucune nouvelle.
 **Vérification navigateur toujours pas faite** (pas d'extension Chrome dans la session) : rendu à
 valider à l'œil.
+
+
+### Correctifs landing (retours utilisateur sur capture, même jour)
+
+- **Diversité du catalogue** : le hero, le carrousel, la grille « Catalogue », la file d'attente et le
+  fond Twitch ne piochaient que dans les 30 premières entrées (= Japon). Ils tirent désormais sur des
+  **listes d'ids explicites, un pays par carte** (Hong Kong, Corée, Chine, Taïwan, Vietnam, Japon,
+  Norvège, Suisse, Royaume-Uni, Indonésie, Thaïlande, Népal). ⚠️ Ne pas revenir à un `slice()` sur
+  `defaultVideos` : le tableau est trié par pays, un slice donne toujours le même.
+- **Carrousel 3D** : les cartes se chevauchaient et montraient leur **dos en miroir**. Corrigé par
+  (1) un rayon calculé — corde `2·R·sin(180°/N)` > largeur de carte + marge, soit R=560 pour 10 cartes
+  de 272 px ; (2) `backfaceVisibility: "hidden"` sur chaque carte ; (3) l'anneau **reculé de son propre
+  rayon** (`z: -radius`) pour que la carte de devant retombe à taille réelle au lieu d'exploser sous la
+  perspective. Les **caches latéraux en dégradé sont supprimés** (ils se lisaient comme deux rectangles
+  noirs sur la photo).
+- **Défilement des pays retiré** (il coupait mal et se lisait à peine).
+- **Halo du curseur rendu GLOBAL** : c'était une couche interne au hero, il s'éteignait donc net au
+  premier scroll. Il est maintenant une couche `fixed` alimentée par la position dans le viewport.
+- **Hero** : le timer **recule d'un plan** (`z:-90`) et les trois satellites passent devant
+  (`z: 60/95/130`), avec fonds plus opaques et ombre portée — ils étaient masqués derrière l'écran.
+  L'avatar d'ami n'est plus une vignette de vidéo (ça ne voulait rien dire) mais un monogramme.
+- **Lisibilité** : nouveau **voile de lecture** `fixed` sous le contenu, dont l'opacité monte au scroll
+  (0 → 0.86 sur les 12 premiers pourcents) — la ville reste visible dans le hero, tout le texte qui suit
+  repose sur un fond stable. Toutes les opacités de texte remontées d'un cran (plus aucun `text-white/25`
+  ni `/35`). **Heatmap refaite** : cases de 14 px, échelle à 5 paliers plus francs, initiales des jours
+  et légende « moins / plus ».
