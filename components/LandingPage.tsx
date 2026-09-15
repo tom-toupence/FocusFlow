@@ -3,12 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { ScrollSmoother } from "gsap/ScrollSmoother";
 import { ScrambleTextPlugin } from "gsap/ScrambleTextPlugin";
 import { useGSAP } from "@gsap/react";
 import { signInWithGoogle } from "@/lib/supabase";
 import dynamic from "next/dynamic";
-import CityBackdrop from "@/components/CityBackdrop";
 import { defaultVideos } from "@/data/videos";
 import { cn } from "@/lib/utils";
 
@@ -75,7 +73,7 @@ const PRIO = {
   below: 0, // tout ce qui vient après les épinglages (révélations, trace)
 } as const;
 
-if (typeof window !== "undefined") gsap.registerPlugin(useGSAP, ScrollTrigger, ScrollSmoother, ScrambleTextPlugin);
+if (typeof window !== "undefined") gsap.registerPlugin(useGSAP, ScrollTrigger, ScrambleTextPlugin);
 
 const thumb = (id: string) => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 const byId = (id: string) => defaultVideos.find((v) => v.id === id);
@@ -467,35 +465,37 @@ function HeroWindow() {
     </div>
   );
 }
-
 /* ══════════════════════════════════════════════════════════════════════════
-   LA BALADE — on descend l'avenue, dans une ville modélisée
+   LE MONDE — la ville derrière toute la page
    ══════════════════════════════════════════════════════════════════════════
 
-   Le grand plan de la page, et sa bascule entre la moitié « ville » et la
-   moitié « produit ». Section épinglée : le scroll ne fait plus défiler du
-   contenu, il FAIT MARCHER une caméra dans une scène 3D (`CityScene`).
+   La scène 3D (`CityScene`) n'est plus une SECTION, c'est le DÉCOR DE LA PAGE.
+   Le scroll fait marcher la caméra du haut du document jusqu'en bas, et tout
+   le contenu se lit par-dessus.
 
-   Deux versions ont échoué avant celle-ci, et pour la même raison de fond :
-     1. une grille de blocs qui se refermait en volet. Techniquement correcte,
+   Trois tentatives ont précédé celle-ci, et les deux premières ont échoué pour
+   la même raison de fond :
+     1. une grille de blocs qui se refermait en volet. Correcte techniquement,
         mais une grille de carrés colorés se lit comme un calendrier.
-     2. une photo qui grossissait pendant que des vignettes passaient en CSS 3D.
-        Bancale (à z=640 sous une perspective de 1000, une carte est agrandie
-        2,78 fois et sort du cadre), et surtout : une image plate qui grossit
-        donne un ZOOM, jamais un DÉPLACEMENT. Sans géométrie, il n'y a ni point
-        de fuite qui bouge, ni façade qu'on dépasse, donc pas de balade.
+     2. une photo qui grossissait pendant que des vignettes passaient en CSS
+        3D : une image plate qui grossit donne un ZOOM, jamais un DÉPLACEMENT.
+     3. la même scène 3D, mais enfermée dans une section épinglée au milieu
+        d'une page photographique : un bloc noir rapporté, impossible à
+        raccorder puisque le décor changeait de nature en cours de route.
 
-   D'où une vraie scène. Le détail de la modélisation et des choix de perf est
-   dans `CityScene.tsx`.
+   D'où ce parti : une seule et même ville, du premier au dernier pixel de la
+   page. Il n'y a plus de raccord à faire, donc plus de raccord à rater.
 
-   Ici on ne fait que trois choses : épingler, convertir le scroll en avancée,
-   et fournir un repli honnête quand la 3D n'est pas souhaitable (mouvement
-   réduit) ou pas disponible (pas de WebGL). */
+   La photo de Séoul et son composant `CityBackdrop` ont été retirés : ils
+   faisaient doublon avec la scène, et leur couche `mix-blend-screen` en plein
+   écran obligeait le navigateur à recomposer tout le viewport à chaque frame
+   de scroll, ce qui était l'une des deux causes des saccades. (Le fichier
+   reste récupérable dans l'historique Git.) */
 
-const WALK_SCREENS = pick(["cn-01", "tw-02", "hk-02", "no-01", "vn-01", "abao-11", "id-02", "uk-01"]);
+const WORLD_SCREENS = pick(["cn-01", "tw-02", "hk-02", "no-01", "vn-01", "abao-11", "id-02", "uk-01", "th-01", "np-01"]);
+const WORLD_THUMBS = WORLD_SCREENS.map((v) => thumb(v.youtubeId));
 
-// La scène est chargée à part : `three` ne doit pas peser sur le premier rendu
-// de la landing, qui doit afficher le hero tout de suite.
+// `three` est chargé à part : il ne doit pas retarder l'affichage du hero.
 const CityScene = dynamic(() => import("@/components/CityScene"), { ssr: false });
 
 /** Sonde de capacité. La disponibilité de WebGL est un état du navigateur, pas
@@ -517,75 +517,46 @@ function useWebGL() {
   return ok;
 }
 
-function CityWalk() {
-  const section = useRef<HTMLElement>(null);
+function World() {
   const reduced = useReducedMotionPref();
   const webgl = useWebGL();
-
-  // L'avancée de la marche. Un ref, lu à la frame par la scène : la position
-  // de la caméra ne passe jamais par un state React.
-  const progress = useRef({ v: 0 });
   const live = webgl === true && !reduced;
 
-  useGSAP(
-    () => {
-      if (!live) return;
-      const st = ScrollTrigger.create({
-        trigger: section.current,
-        start: "top top",
-        end: "+=320%",
-        pin: true,
-        scrub: 0.6,
-        anticipatePin: 1,
-        refreshPriority: PRIO.walk,
-        onUpdate: (self) => {
-          progress.current.v = self.progress;
-        },
-      });
-      return () => st.kill();
-    },
-    { scope: section, dependencies: [live], revertOnUpdate: true }
-  );
+  // L'avancée de la marche, écrite par le scroll et lue à la frame par la
+  // scène : la position de la caméra ne passe jamais par un state React.
+  const walk = useRef({ v: 0 });
 
-  // Repli : mouvement réduit, ou pas de WebGL. Une caméra qui avance n'a
-  // aucun sens dans le premier cas et n'existe pas dans le second : on donne
-  // ce que la scène raconte, la liste des lieux qu'on longe.
-  if (webgl === null || !live) {
-    return (
-      <section className="mx-auto w-full max-w-[86rem] px-4 py-24 sm:px-8">
-        <ul className="flex flex-wrap gap-x-7 gap-y-3 font-mono text-[11px] uppercase tracking-[0.18em] text-white/55">
-          {WALK_SCREENS.map((v) => (
-            <li key={v.id}>{v.country}</li>
-          ))}
-        </ul>
-      </section>
-    );
-  }
+  useGSAP(() => {
+    if (!live) return;
+    const st = ScrollTrigger.create({
+      start: 0,
+      end: "max",
+      refreshPriority: PRIO.backdrop,
+      onUpdate: (self) => {
+        walk.current.v = self.progress;
+      },
+    });
+    return () => st.kill();
+  }, { dependencies: [live], revertOnUpdate: true });
 
   return (
-    <section ref={section} className="relative h-[100dvh] overflow-hidden bg-[#05060c]">
-      <CityScene progress={progress} thumbnails={WALK_SCREENS.map((v) => thumb(v.youtubeId))} />
-
-      {/* La scène est décorative pour une synthèse vocale : on écrit ce qu'elle
-          montre, sinon ce chapitre est un trou de trois écrans de scroll. */}
-      <p className="sr-only">
-        Descente d&apos;une avenue la nuit. Les paysages du catalogue sont affichés en grand sur les façades :{" "}
-        {WALK_SCREENS.map((v) => v.country).join(", ")}.
-      </p>
-
-      {/* Dégradés de raccord : la scène ne doit pas s'arrêter sur une ligne
-          nette en haut et en bas de l'écran. */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#05060c] to-transparent"
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#05060c] to-transparent"
-      />
-    </section>
+    <div className="pointer-events-none fixed inset-0 z-0 bg-[#05060c]">
+      {live && <CityScene progress={walk} thumbnails={WORLD_THUMBS} />}
+      {/* Sans WebGL, ou en mouvement réduit : un ciel de nuit fixe. Le contenu
+          de la page reste entièrement lisible, c'est tout ce qui compte. */}
+      {!live && (
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(to bottom, #060a1c 0%, #0a1026 42%, #171432 72%, #2a1a20 100%)",
+          }}
+        />
+      )}
+    </div>
   );
 }
+
 
 /* ══════════════════════════════════════════════════════════════════════════
    LE MANIFESTE — les mots s'allument un par un, comme les fenêtres
@@ -692,11 +663,10 @@ function ChapterRail() {
       const anchor = (id: string) => document.querySelector<HTMLElement>(`[data-anchor="${id}"]`);
 
       // Position dans le document par la chaîne des `offsetTop`, et NON par
-      // `getBoundingClientRect`. Le défilement inertiel (`ScrollSmoother`)
-      // translate en permanence le conteneur de contenu : un rectangle mesuré
-      // à l'écran refléterait l'amortissement en cours, pas la mise en page.
-      // `offsetTop` ignore les transformations, tout en tenant compte de
-      // l'espace réservé par les épinglages, qui lui est bien du layout.
+      // `getBoundingClientRect`, qui est une position À L'ÉCRAN : pendant un
+      // épinglage elle ne bouge plus, et toute transformation d'un ancêtre la
+      // fausse. `offsetTop` ignore les transformations, tout en tenant compte
+      // de l'espace réservé par les épinglages, qui lui est bien du layout.
       const docTop = (el: HTMLElement) => {
         let y = 0;
         let n: HTMLElement | null = el;
@@ -1572,42 +1542,6 @@ function Trace() {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   LE DÉFILEMENT AMORTI
-   ══════════════════════════════════════════════════════════════════════════
-
-   `ScrollSmoother` (gratuit depuis GSAP 3.13) : le scroll natif reste la
-   source de vérité, seul le contenu rattrape sa position avec un peu
-   d'inertie. C'est ce qui donne aux pages GSAP soignées leur glisse, et ça
-   n'empêche ni l'épinglage ni le `scrub`, qui passent par le même moteur.
-
-   Contrainte à tenir : tout ce qui est `position: fixed` doit rester HORS de
-   `#smooth-wrapper`, sinon le conteneur transformé devient son référentiel et
-   l'élément dérive avec la page.
-
-   Sous `prefers-reduced-motion`, on ne crée rien : le scroll natif, immédiat,
-   est exactement ce que ce réglage demande. */
-
-function SmoothScroll() {
-  useGSAP(() => {
-    const mm = gsap.matchMedia();
-    mm.add("(prefers-reduced-motion: no-preference)", () => {
-      const smoother = ScrollSmoother.create({
-        wrapper: "#smooth-wrapper",
-        content: "#smooth-content",
-        smooth: 1.05,
-        // Pas d'amortissement au doigt : sur mobile, désynchroniser le contenu
-        // du geste donne une impression de latence, pas de fluidité.
-        smoothTouch: false,
-        effects: false,
-      });
-      return () => smoother.kill();
-    });
-    return () => mm.revert();
-  });
-  return null;
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
    PAGE
    ══════════════════════════════════════════════════════════════════════════ */
 
@@ -1677,9 +1611,32 @@ export default function LandingPage() {
             scrollTrigger: { start: 0, end: () => window.innerHeight * 1.15, scrub: 0.5, refreshPriority: PRIO.hero, invalidateOnRefresh: true },
           }
         );
+
+        // Le voile SE RETIRE le temps de la rue seule, puis revient. Sans ça,
+        // le seul moment où le décor passe au premier plan se jouerait derrière
+        // un aplat à 86 % d'opacité. Les trois plages de scroll ne se
+        // chevauchent pas, les tweens ne se disputent donc jamais la propriété.
+        const sky = root.current?.querySelector("[data-open-sky]");
+        const open = sky
+          ? gsap.to("[data-veil]", {
+              opacity: 0.1,
+              ease: "none",
+              scrollTrigger: { trigger: sky, start: "top 90%", end: "top 25%", scrub: 0.5, refreshPriority: PRIO.below },
+            })
+          : null;
+        const close = sky
+          ? gsap.to("[data-veil]", {
+              opacity: 0.86,
+              ease: "none",
+              scrollTrigger: { trigger: sky, start: "bottom 85%", end: "bottom 25%", scrub: 0.5, refreshPriority: PRIO.below },
+            })
+          : null;
+
         return () => {
-          tween.scrollTrigger?.kill();
-          tween.kill();
+          [tween, open, close].forEach((t) => {
+            t?.scrollTrigger?.kill();
+            t?.kill();
+          });
         };
       });
 
@@ -1777,27 +1734,16 @@ export default function LandingPage() {
   );
 
   return (
-    // Le fond de page est porté par la RACINE, jamais par `#smooth-content` :
-    // ce conteneur est peint AU-DESSUS des couches fixes, et un fond opaque
-    // dessus masquait complètement la photo de la ville.
-    <div ref={root} className="relative bg-[#05060c] text-white">
-      {/* Le défilement amorti. Monté en PREMIER : les effets React s'exécutent
-          dans l'ordre du document pour des frères, donc le lisseur existe
-          avant que les sections plus bas ne créent leurs épinglages. */}
-      <SmoothScroll />
+    <main ref={root} className="relative w-full max-w-full overflow-x-clip bg-[#05060c] text-white">
+      {/* ── LE DÉCOR ─────────────────────────────────────────────────────
+          Une seule ville, derrière toute la page. Le scroll y fait marcher la
+          caméra du premier au dernier écran. */}
+      <World />
 
-      {/* ── COUCHES FIXES ────────────────────────────────────────────────
-          Elles vivent VOLONTAIREMENT hors de `#smooth-wrapper`. Le défilement
-          inertiel translate en continu `#smooth-content` ; or un élément
-          `position: fixed` placé dans un ancêtre transformé se positionne par
-          rapport à cet ancêtre et non au viewport. Le fond, le voile, le halo,
-          la barre du haut et l'index dériveraient donc avec la page. */}
-
-      {/* La ville, et la nuit qui tombe au fil du scroll */}
-      <div className="pointer-events-none fixed inset-0 z-0">
-        <CityBackdrop />
-      </div>
-      {/* Voile de lisibilité, au-dessus de la ville et sous le contenu */}
+      {/* Voile de lisibilité, au-dessus de la ville et sous le contenu.
+          Une simple opacité sur un aplat : surtout PAS de mode de fusion, qui
+          obligerait le navigateur à recomposer tout le viewport à chaque
+          frame de scroll (c'était l'une des deux causes des saccades). */}
       <div data-veil aria-hidden className="pointer-events-none fixed inset-0 z-[1] bg-[#05060c] opacity-0" />
       {/* Halo du curseur, sur toute la page */}
       <div
@@ -1808,11 +1754,14 @@ export default function LandingPage() {
       />
 
       {/* Nav : île de verre détachée du bord. Hors du conteneur de contenu,
-          pour passer au-dessus de la section épinglée par ScrollTrigger.
+          pour passer au-dessus des sections épinglées par ScrollTrigger.
           Les liens de section ont été retirés : ils n'indiquaient pas où on se
-          trouvait. C'est l'index de chapitres qui tient ce rôle, en le disant. */}
+          trouvait. C'est l'index de chapitres qui tient ce rôle, en le disant.
+          Le flou d'arrière-plan est volontairement MODESTE : un
+          `backdrop-blur-2xl` fixe re-floute sa zone à chaque frame de scroll,
+          par-dessus une scène 3D qui change en permanence. */}
       <header className="fixed inset-x-0 top-6 z-40 flex justify-center px-4">
-        <nav className="flex w-max items-center gap-5 rounded-full border border-white/12 bg-[#080a12]/75 py-2 pl-5 pr-2 backdrop-blur-2xl">
+        <nav className="flex w-max items-center gap-5 rounded-full border border-white/12 bg-[#080a12]/88 py-2 pl-5 pr-2 backdrop-blur-sm">
           <Wordmark />
           <span className="hidden h-8 w-px bg-white/10 sm:block" aria-hidden />
           <div className="hidden sm:block">
@@ -1822,18 +1771,12 @@ export default function LandingPage() {
         </nav>
       </header>
 
-      {/* L'index de chapitres. `fixed` lui aussi, donc hors du conteneur
-          amorti. Monté avant le contenu sans conséquence : il ne mesure rien
-          au montage, il lit les ancres à chaque `refresh`. */}
+      {/* L'index de chapitres. `fixed`, donc sa place dans le DOM ne change
+          rien à sa position : il ne mesure rien au montage, il lit les ancres
+          à chaque `refresh`. */}
       <ChapterRail />
 
-      {/* ── CONTENU AMORTI ─────────────────────────────────────────────── */}
-      <div id="smooth-wrapper" className="z-10">
-        {/* Pas d'`overflow` ici : `ScrollSmoother` transforme ce conteneur et
-            y épingle des sections. C'est le wrapper qui coupe (il est mis en
-            `overflow: hidden` par le plugin), et le travelling du catalogue
-            se contient déjà lui-même. */}
-        <main id="smooth-content" className="relative w-full max-w-full">
+      <div className="relative z-10">
         {/* ── Hero ───────────────────────────────────────────────────────── */}
         <section data-hero-section className="relative flex min-h-[100dvh] items-center px-4 pb-24 pt-24 sm:px-8">
           <div
@@ -1879,8 +1822,17 @@ export default function LandingPage() {
         {/* ── Le manifeste : les mots s'allument un par un ───────────────── */}
         <Manifesto />
 
-        {/* ── La balade : on descend la rue jusqu'au catalogue ──────────── */}
-        <CityWalk />
+        {/* ── La rue seule ───────────────────────────────────────────────
+            Deux écrans sans aucun contenu : la ville a le cadre pour elle, on
+            marche, on croise des enseignes, la nuit finit de tomber. C'est le
+            seul endroit de la page où le décor passe au premier plan, et il
+            n'a besoin de rien d'autre que d'espace. Le voile de lecture, lui,
+            se retire le temps de la traversée. */}
+        <section data-open-sky aria-hidden className="h-[190vh]" />
+        <p className="sr-only">
+          Descente d&apos;une avenue la nuit. Les paysages du catalogue sont affichés en grand sur les façades :{" "}
+          {WORLD_SCREENS.map((v) => v.country).join(", ")}.
+        </p>
 
         {/* ── Le boulevard (catalogue) ───────────────────────────────────── */}
         <span data-anchor="catalogue" aria-hidden className="block h-0" />
@@ -1959,8 +1911,7 @@ export default function LandingPage() {
             </p>
           </div>
         </footer>
-        </main>
       </div>
-    </div>
+    </main>
   );
 }

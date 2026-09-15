@@ -11,17 +11,21 @@ générique**. Le produit s'illustre avec ses propres contenus.
 
 | Asset | Source | Utilisé par |
 |---|---|---|
-| `public/pexels-ethan-brooke-1123775-3142005.jpg` | Séoul à l'heure bleue, Pexels (licence gratuite) | fond de page (`CityBackdrop`) |
-| Vignettes du catalogue | `https://i.ytimg.com/vi/<id>/hqdefault.jpg`, via `data/videos.ts` | hero, balade, boulevard, sources |
+| **La ville** | **générée par le code** (`CityScene.tsx`) | décor de toute la page |
+| Vignettes du catalogue | `https://i.ytimg.com/vi/<id>/hqdefault.jpg`, via `data/videos.ts` | hero, écrans sur les façades, boulevard, sources |
 | Marques YouTube / Spotify / Twitch | SVG inline dans `LandingPage.tsx` | section Sources |
-| **La ville de la balade** | **générée par le code** (`CityScene.tsx`) | section `CityWalk` |
 
-La balade n'a besoin d'**aucun asset**. Immeubles, façades, fenêtres allumées,
-lampadaires, chaussée, couchant et ligne de crête sont tous dessinés à
-l'exécution : les textures sont peintes dans des `<canvas>` au montage, et la
-géométrie est procédurale avec un générateur pseudo-aléatoire à graine (donc
-identique à chaque visite). Le poids ajouté est celui de `three` seul,
-lui-même chargé à part pour ne pas retarder le hero.
+Le décor n'a besoin d'**aucun asset**. Immeubles, façades, fenêtres allumées,
+lampadaires, chaussée et ciel sont tous dessinés à l'exécution : les textures
+sont peintes dans des `<canvas>` au montage, et la géométrie est procédurale
+avec un générateur pseudo-aléatoire à graine (donc identique à chaque visite).
+Le poids ajouté est celui de `three` seul, lui-même chargé à part pour ne pas
+retarder le hero.
+
+> ⚠️ `public/pexels-ethan-brooke-1123775-3142005.jpg` (Séoul à l'heure bleue)
+> **n'est plus utilisé** par la landing : la ville 3D l'a remplacé, et son
+> composant `CityBackdrop.tsx` a été supprimé. Le fichier reste dans `public/`
+> et le composant est récupérable dans l'historique Git.
 
 Les seules images de la scène sont les **vignettes du catalogue**, montées en
 écrans géants sur les façades. `i.ytimg.com` renvoie

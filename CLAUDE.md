@@ -931,3 +931,53 @@ three.js** (MIT, donc gratuit, conforme à la règle du projet), pilotée par le
 
 `docs/ASSETS_LANDING.md` est à jour : **la balade ne demande aucun asset**, tout
 est généré. Ce qui reste demandé y est marqué facultatif.
+
+### Suite même jour — la ville devient le décor de TOUTE la page
+
+Retours utilisateur : « le site n'est pas du tout fluide », « la partie balade
+n'est pas bien incrustée », « la ville est moche ». Les trois étaient fondés.
+
+**Fluidité.** Mesuré d'abord : le coût JavaScript par frame était dérisoire
+(0,25 à 1,24 ms, rendu WebGL inclus). Ce n'était donc pas la 3D mais la
+**composition**. Deux causes, toutes deux introduites par moi :
+1. une couche **`mix-blend-screen` en plein écran** dans le fond photo (le
+   navigateur recompose tout le viewport à chaque frame de scroll) ;
+2. **`ScrollSmoother`**, qui déporte le scroll sur le fil principal là où le
+   scroll natif se fait sur le compositeur. Sur une page déjà chargée en
+   couches, il amplifiait la saccade au lieu de l'adoucir.
+Les deux sont **supprimés**. `backdrop-blur-2xl` de la nav passe en
+`backdrop-blur-sm` (un flou d'arrière-plan fixe se recalcule à chaque frame).
+
+**Incrustation.** Le problème était structurel, pas cosmétique : une scène 3D
+enfermée dans une section, au milieu d'une page photographique, ne partage ni
+la lumière ni les couleurs du reste. **La scène est donc devenue le décor de la
+page entière** (`World` dans `LandingPage.tsx`) : le scroll fait marcher la
+caméra du premier au dernier écran, et tout le contenu se lit par-dessus. Il
+n'y a plus de raccord à faire. Une section vide de deux écrans
+(`[data-open-sky]`) donne le cadre à la ville seule, et le voile de lecture
+**se retire puis revient** sur cette plage.
+
+⚠️ **`components/CityBackdrop.tsx` est supprimé** (photo de Séoul + couche de
+fusion). Récupérable dans l'historique Git. `public/pexels-*.jpg` n'est plus
+utilisé par la landing.
+
+**Beauté.** La ville procédurale est refaite en quatre principes, tous
+commentés dans `CityScene.tsx` : **silhouettes** (immeubles quasi noirs, seules
+les fenêtres existent), **brouillard exponentiel dense** (la profondeur se lit
+seule, le fond se dissout dans le ciel), **bloom** (`UnrealBloomPass` à demi-
+résolution : c'est lui qui fait qu'une ville de nuit en temps réel cesse d'avoir
+l'air d'un jeu de 2005), et **une seule couleur chaude** sur un indigo froid.
+S'ajoutent des retraits en gradins au sommet des tours (sinon la skyline est une
+rangée de boîtes) et un ciel en dégradé accroché à la caméra.
+
+**La nuit tombe en marchant** : brouillard, ciel et **couleur du matériau des
+façades** sont interpolés au fil de la descente, donc les fenêtres s'allument
+pendant que le ciel s'éteint. Une ligne de code, et c'est tout le propos du
+produit.
+
+**Rendu à la demande** : si la position de scroll n'a pas changé, pas une frame
+n'est dessinée. À l'arrêt, le coût GPU de la page est nul.
+
+Dépendance ajoutée : `three` 0.186 (MIT), chargée en `dynamic(ssr:false)` pour
+ne pas retarder le hero. Repli (ciel dégradé fixe) sans WebGL et sous
+`prefers-reduced-motion`.
