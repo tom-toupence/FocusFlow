@@ -1079,3 +1079,48 @@ Piège rencontré : une couche photographique en `-z-10` passe DERRIÈRE le fond
 section est obligatoire. Et des voiles `from-black ... to-black` pleins, doublés
 d'un vignettage à 0,9, recouvraient la photo en entier : les voiles doivent
 asseoir le texte, pas effacer l'image.
+
+### Suite même jour — analyse technique de la référence, et les effets qui bougent
+
+Retour utilisateur : « je préférais l'ancienne font », et « j'aimerais un truc
+plus dynamique, genre comme ce site où tu bouges ». J'ai donc analysé
+forgeautomotive.co.uk **dans son DOM**, et non à l'allure des captures.
+
+**Ce que la référence utilise réellement (relevé) :**
+
+| Indice trouvé | Conclusion |
+|---|---|
+| `window.Lenis` présent, pas de GSAP global | défilement amorti par **Lenis**, pas ScrollSmoother |
+| **22 noeuds `data-trail`** : un conteneur plein écran + 20 vignettes 259x324 à opacité 0 | **traînée d'images au curseur** |
+| `data-car` portant des `matrix()` pilotées en JS | **parallaxe de pointeur** sur la composition du hero |
+| `data-cinematic-words`, titre découpé en 13 enfants | révélation mot par mot |
+| polices `geistsans` + `editorial` | **ils utilisent Geist** pour le corps de texte |
+
+**Les quatre sont repris dans `LandingPage.tsx` :**
+
+1. **`SmoothScroll` (Lenis, MIT, ~2 ko)**. ⚠️ Ne PAS revenir à `ScrollSmoother` :
+   il enveloppe la page dans un conteneur transformé de douze mille pixels de
+   haut, ce qui casse `position: fixed`, complique les épinglages et déporte
+   tout sur le fil principal. Lenis interpole la position de scroll native,
+   donc rien ne casse. Il pousse ses mises à jour dans `ScrollTrigger.update`
+   et c'est `gsap.ticker` qui bat la mesure pour les deux, avec
+   `lagSmoothing(0)` (sans quoi l'amortissement fait un bond après chaque
+   hoquet).
+2. **`ImageTrail`** : bouger la souris sur le premier écran laisse une traînée
+   de paysages **du catalogue**. Douze éléments recyclés en anneau (aucune
+   allocation pendant le mouvement), émission cadencée par la DISTANCE
+   parcourue et non par le temps, et armement uniquement sur pointeur fin.
+3. **Parallaxe de pointeur** sur les trois cadres du hero, à des amplitudes
+   différentes, via `gsap.quickTo` (jamais un state React : l'arbre se
+   re-rendrait à chaque pixel).
+4. **Boutons magnétiques**, titres découpés en mots, parallaxe de scroll sur
+   chaque photographie plein cadre.
+
+**La police revient à Geist partout** (la serif Cormorant a été retirée, ainsi
+que son chargement dans `layout.tsx` et son token dans `globals.css`). Le
+titrage tient par la taille, la graisse légère et la chasse resserrée, pas par
+un changement de famille. La référence fait d'ailleurs pareil.
+
+> ⚠️ **« Commencer » n'apparaît qu'à TROIS endroits** : bandeau, hero, action
+> finale. Il y en avait six, ce qui banalisait l'action et hachait la lecture.
+> Ne pas en rajouter à chaque section.

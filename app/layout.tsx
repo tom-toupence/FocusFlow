@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Cormorant_Garamond } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SupabaseProvider from "@/components/SupabaseProvider";
 import AuthGate from "@/components/AuthGate";
@@ -21,16 +21,6 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Serif d'affichage, RÉSERVÉE À LA LANDING (utilitaire `font-display`). Le site
-// connecté reste intégralement en Geist : une serif dans une interface de
-// productivité serait hors sujet.
-const cormorant = Cormorant_Garamond({
-  variable: "--font-display",
-  subsets: ["latin"],
-  weight: ["300", "400", "500"],
-  style: ["normal", "italic"],
-});
-
 // `viewport-fit=cover` active env(safe-area-inset-*) sur iPhone à encoche —
 // AppNav/CreateMenu/AddToMenu s'en servent déjà pour leurs bottom-bars.
 export const viewport: Viewport = {
@@ -50,7 +40,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className={`${geist.variable} ${geistMono.variable} ${cormorant.variable} h-full dark`}>
+    <html lang="fr" className={`${geist.variable} ${geistMono.variable} h-full dark`}>
       <head>
         {/* Apply saved theme before first paint to avoid flash */}
         <script dangerouslySetInnerHTML={{ __html: `try{var t=JSON.parse(localStorage.getItem('focusflow-theme')||'{}').state?.theme;if(t==='light')document.documentElement.classList.remove('dark');else document.documentElement.classList.add('dark');}catch(e){}` }} />

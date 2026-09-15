@@ -5,6 +5,7 @@ import Image from "next/image";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
+import type LenisInstance from "lenis";
 import { signInWithGoogle } from "@/lib/supabase";
 import { defaultVideos } from "@/data/videos";
 import { cn } from "@/lib/utils";
@@ -17,8 +18,8 @@ import { cn } from "@/lib/utils";
 // (forgeautomotive.co.uk) : « c'est exactement le type de design que je veux ».
 // Le vocabulaire est donc repris, pas copié :
 //   . un noir profond, texturé d'un grain fin, et RIEN d'autre comme fond ;
-//   . une SERIF D'AFFICHAGE en très grand, centrée, pour tout ce qui parle ;
-//   . la même serif en MOT FANTÔME derrière les paragraphes, très basse
+//   . un TITRAGE très grand et centré, en Geist léger à chasse resserrée ;
+//   . le même titrage en MOT FANTÔME derrière les paragraphes, très basse
 //     opacité, comme un filigrane de chapitre ;
 //   . des boutons RECTANGULAIRES à filet, en capitales très espacées. Pas de
 //     pilules : la pilule est un signe d'application, pas d'atelier ;
@@ -26,11 +27,34 @@ import { cn } from "@/lib/utils";
 //   . une barre de progression de lecture, fine, en bas de l'écran ;
 //   . un chrome minuscule : logo au centre, et c'est à peu près tout.
 //
+// ── Ce qui BOUGE, et c'est l'essentiel ────────────────────────────────────
+// Analyse du DOM de la référence, pas de son allure : elle tourne sur **Lenis**
+// (pas ScrollSmoother), porte 22 noeuds `data-trail` (une traînée d'images au
+// curseur), transforme ses trois véhicules en JS (parallaxe de pointeur) et
+// découpe ses titres en mots. Les quatre sont repris ici :
+//   1. `SmoothScroll` : Lenis, branché sur `gsap.ticker` et `ScrollTrigger` ;
+//   2. `ImageTrail` : bouger la souris sur le premier écran laisse une traînée
+//      de paysages DU CATALOGUE. Bouger, c'est feuilleter le produit ;
+//   3. parallaxe de pointeur sur les trois cadres du hero (`HeroStage`) ;
+//   4. boutons magnétiques (`Cta`), titres découpés en mots (`MaskedLine`),
+//      et parallaxe de scroll sur chaque photographie plein cadre.
+//
+// ── La police ─────────────────────────────────────────────────────────────
+// **Geist**, partout, à la demande de l'utilisateur (une serif d'affichage
+// avait été essayée puis écartée). La référence fait d'ailleurs pareil pour
+// son corps de texte. Le titrage tient par la TAILLE, la graisse légère et la
+// chasse resserrée, pas par un changement de famille.
+//
 // ── Ce qui a été retiré, et pourquoi ──────────────────────────────────────
 // La ville 3D procédurale (`CityScene`, three.js) a été SUPPRIMÉE. Ce langage
 // est photographique et typographique ; une ville de synthèse le contredisait,
 // et elle a été rejetée deux fois. L'imagerie revient donc à ce que le produit
-// possède réellement : la photo de Séoul et les vignettes du catalogue.
+// possède réellement : les photos de Séoul et les vignettes du catalogue.
+//
+// ── Les appels à l'action ─────────────────────────────────────────────────
+// « Commencer » n'apparaît qu'à TROIS endroits : le bandeau, le hero, l'action
+// finale. Répéter la même action à chaque section la banalise et hache la
+// lecture. Ne pas en rajouter.
 //
 // ── L'imagerie ────────────────────────────────────────────────────────────
 // Zéro photo générique. Les cadres montrent les VRAIES vignettes YouTube du
@@ -114,6 +138,151 @@ function useReducedMotionPref() {
 const PRIO = { top: 30, pan: 20, deck: 10, below: 0 } as const;
 
 /* ══════════════════════════════════════════════════════════════════════════
+   LE DÉFILEMENT AMORTI
+   ══════════════════════════════════════════════════════════════════════════
+
+   **Lenis**, et non `ScrollSmoother`. C'est ce que fait la référence, et pour
+   une bonne raison : Lenis n'enveloppe pas la page dans un conteneur
+   transformé, il interpole la position de scroll native. Rien ne casse
+   (`position: fixed`, épinglages, mesures), et le coût est de l'ordre de deux
+   kilo-octets.
+   `ScrollSmoother`, lui, translate en continu un conteneur de douze mille
+   pixels de haut : sur une page aussi chargée en photographies, il déporte tout
+   sur le fil principal et produit exactement la saccade qu'il prétend corriger.
+   C'était l'une des deux causes des ralentissements signalés.
+
+   Intégration : Lenis pousse ses mises à jour dans `ScrollTrigger.update`, et
+   c'est `gsap.ticker` qui bat la mesure pour les deux. Un seul cœur, donc
+   aucune désynchronisation entre le scroll et les animations.
+   `lagSmoothing(0)` est nécessaire : sans lui, GSAP « rattrape » les frames
+   perdues et l'amortissement fait un bond après chaque hoquet. */
+
+function SmoothScroll() {
+  useGSAP(() => {
+    const mm = gsap.matchMedia();
+    mm.add("(prefers-reduced-motion: no-preference)", () => {
+      let lenis: LenisInstance | null = null;
+      let raf: ((t: number) => void) | null = null;
+      let cancelled = false;
+
+      // Chargé à la demande : deux kilo-octets, mais inutiles tant que la page
+      // n'est pas montée, et totalement inutiles sous mouvement réduit.
+      void import("lenis").then(({ default: Lenis }) => {
+        if (cancelled) return;
+        const instance = new Lenis({ duration: 1.05, smoothWheel: true });
+        instance.on("scroll", ScrollTrigger.update);
+        lenis = instance;
+        raf = (time: number) => instance.raf(time * 1000);
+        gsap.ticker.add(raf);
+        gsap.ticker.lagSmoothing(0);
+      });
+
+      return () => {
+        cancelled = true;
+        if (raf) gsap.ticker.remove(raf);
+        gsap.ticker.lagSmoothing(500, 33);
+        lenis?.destroy();
+      };
+    });
+    return () => mm.revert();
+  });
+  return null;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LA TRAÎNÉE D'IMAGES — l'effet qu'on déclenche en bougeant
+   ══════════════════════════════════════════════════════════════════════════
+
+   Le geste signature de la référence : en déplaçant la souris sur le premier
+   écran, on laisse derrière soi une traînée de vignettes qui apparaissent puis
+   s'effacent. Ici ce sont les VRAIS paysages du catalogue : bouger la souris,
+   c'est feuilleter le produit.
+
+   Trois points de méthode :
+     . les vignettes sont recyclées dans un anneau fixe (douze éléments montés
+       une fois), jamais créées à la volée. Aucune allocation pendant le
+       mouvement ;
+     . l'émission est cadencée par la DISTANCE parcourue, pas par le temps :
+       un mouvement lent ne crache pas cinquante images au même endroit ;
+     . tout passe par `transform` et `opacity`, et l'effet ne s'arme que sur un
+       pointeur fin (au doigt, il n'existe pas de survol) et hors mouvement
+       réduit. */
+
+const TRAIL = pick(["hk-02", "driv-05", "cn-01", "tw-02", "vn-01", "abao-11", "no-01", "id-02", "th-01", "uk-01", "np-01", "noma-07"]);
+/** Distance en pixels entre deux vignettes de la traînée. */
+const TRAIL_STEP = 145;
+
+function ImageTrail() {
+  const root = useRef<HTMLDivElement>(null);
+
+  useGSAP(
+    () => {
+      const items = gsap.utils.toArray<HTMLElement>("[data-trail-item]", root.current);
+      if (items.length === 0) return;
+
+      const mm = gsap.matchMedia();
+      mm.add("(prefers-reduced-motion: no-preference) and (pointer: fine)", () => {
+        gsap.set(items, { xPercent: -50, yPercent: -50, autoAlpha: 0, scale: 0.7 });
+
+        let next = 0;
+        let lastX = 0;
+        let lastY = 0;
+        let primed = false;
+
+        const onMove = (e: PointerEvent) => {
+          const box = root.current?.getBoundingClientRect();
+          if (!box) return;
+          // On reste dans le premier écran : la traînée est un geste d'accueil,
+          // pas un curseur personnalisé qui suivrait toute la page.
+          if (e.clientY > box.bottom || e.clientY < box.top) return;
+
+          if (!primed) {
+            lastX = e.clientX;
+            lastY = e.clientY;
+            primed = true;
+            return;
+          }
+          if (Math.hypot(e.clientX - lastX, e.clientY - lastY) < TRAIL_STEP) return;
+          lastX = e.clientX;
+          lastY = e.clientY;
+
+          const el = items[next % items.length];
+          next += 1;
+          gsap.killTweensOf(el);
+          gsap.set(el, {
+            x: e.clientX - box.left,
+            y: e.clientY - box.top,
+            zIndex: next,
+            rotate: gsap.utils.random(-8, 8),
+          });
+          gsap
+            .timeline()
+            .fromTo(el, { autoAlpha: 0, scale: 0.72 }, { autoAlpha: 1, scale: 1, duration: 0.4, ease: "power3.out" })
+            .to(el, { autoAlpha: 0, scale: 1.08, duration: 0.75, ease: "power2.in" }, 0.45);
+        };
+
+        window.addEventListener("pointermove", onMove, { passive: true });
+        return () => window.removeEventListener("pointermove", onMove);
+      });
+
+      return () => mm.revert();
+    },
+    { scope: root }
+  );
+
+  return (
+    <div ref={root} aria-hidden className="pointer-events-none absolute inset-0 z-[-5] overflow-hidden">
+      {TRAIL.map((v) => (
+        <span key={v.id} data-trail-item className="absolute left-0 top-0 block w-[13rem] border border-white/15">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={thumb(v.youtubeId)} alt="" loading="lazy" className="block aspect-[16/10] w-full object-cover" />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    PRIMITIVES
    ══════════════════════════════════════════════════════════════════════════ */
 
@@ -140,8 +309,47 @@ function Cta({
   className?: string;
   tone?: "line" | "solid";
 }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const move = useRef<{ x: (v: number) => void; y: (v: number) => void } | null>(null);
+
+  // Magnétisme : le bouton vient à la rencontre du curseur. `gsap.quickTo`
+  // réutilise un seul tween au lieu d'en créer un par mouvement de souris,
+  // c'est la seule façon correcte d'animer une valeur mise à jour en continu.
+  useGSAP(
+    () => {
+      const el = ref.current;
+      if (!el) return;
+      const mm = gsap.matchMedia();
+      // Au doigt, le magnétisme déplacerait la cible au moment du tap.
+      mm.add("(prefers-reduced-motion: no-preference) and (pointer: fine)", () => {
+        move.current = {
+          x: gsap.quickTo(el, "x", { duration: 0.55, ease: "power3" }),
+          y: gsap.quickTo(el, "y", { duration: 0.55, ease: "power3" }),
+        };
+        return () => {
+          move.current = null;
+          gsap.set(el, { x: 0, y: 0 });
+        };
+      });
+      return () => mm.revert();
+    },
+    { scope: ref }
+  );
+
   return (
     <button
+      ref={ref}
+      onPointerMove={(e) => {
+        const el = ref.current;
+        if (!move.current || !el) return;
+        const r = el.getBoundingClientRect();
+        move.current.x(((e.clientX - r.left) / r.width - 0.5) * 26);
+        move.current.y(((e.clientY - r.top) / r.height - 0.5) * 14);
+      }}
+      onPointerLeave={() => {
+        move.current?.x(0);
+        move.current?.y(0);
+      }}
       onClick={onClick}
       className={cn(
         "group relative isolate inline-flex items-center justify-center overflow-hidden px-9 py-4",
@@ -203,7 +411,7 @@ function Ghost({ children, className }: { children: React.ReactNode; className?:
       aria-hidden
       data-ghost
       className={cn(
-        "pointer-events-none absolute -z-10 select-none font-display text-[clamp(5rem,13vw,11rem)] font-light leading-[0.8] text-white/[0.07]",
+        "pointer-events-none absolute -z-10 select-none tracking-[-0.035em] text-[clamp(5rem,13vw,11rem)] font-light leading-[0.8] text-white/[0.07]",
         className
       )}
     >
@@ -347,8 +555,50 @@ function SessionClock({ clock, onDoneChange }: { clock: React.RefObject<Clock>; 
 const HERO_TRACK = byId("driv-05") ?? defaultVideos[0];
 
 function HeroStage() {
+  const root = useRef<HTMLDivElement>(null);
+
+  // Parallaxe de pointeur : les trois cadres répondent au curseur à des
+  // amplitudes différentes, donc la composition a une ÉPAISSEUR. C'est ce que
+  // fait la référence sur ses trois véhicules. La position du pointeur ne passe
+  // évidemment pas par un state React : `quickTo` interpole hors du cycle de
+  // rendu, sinon l'arbre entier se re-rendrait à chaque pixel parcouru.
+  useGSAP(
+    () => {
+      const plates = gsap.utils.toArray<HTMLElement>("[data-stage]", root.current);
+      if (plates.length === 0) return;
+
+      const mm = gsap.matchMedia();
+      mm.add("(prefers-reduced-motion: no-preference) and (pointer: fine)", () => {
+        const DEPTH = [26, 10, 26];
+        const setters = plates.map((el, i) => ({
+          x: gsap.quickTo(el, "x", { duration: 0.9, ease: "power3" }),
+          y: gsap.quickTo(el, "y", { duration: 0.9, ease: "power3" }),
+          d: DEPTH[i] ?? 16,
+        }));
+
+        const onMove = (e: PointerEvent) => {
+          const px = e.clientX / window.innerWidth - 0.5;
+          const py = e.clientY / window.innerHeight - 0.5;
+          setters.forEach((s) => {
+            s.x(-px * s.d);
+            s.y(-py * s.d * 0.55);
+          });
+        };
+
+        window.addEventListener("pointermove", onMove, { passive: true });
+        return () => {
+          window.removeEventListener("pointermove", onMove);
+          gsap.set(plates, { x: 0, y: 0 });
+        };
+      });
+
+      return () => mm.revert();
+    },
+    { scope: root }
+  );
+
   return (
-    <div className="relative mx-auto mt-12 grid w-full max-w-[78rem] grid-cols-1 items-end gap-5 md:mt-14 md:grid-cols-[1fr_1.35fr_1fr] md:gap-8">
+    <div ref={root} className="relative mx-auto mt-12 grid w-full max-w-[78rem] grid-cols-1 items-end gap-5 md:mt-14 md:grid-cols-[1fr_1.35fr_1fr] md:gap-8">
       {/* Deux photographies de Séoul en portrait, hautes, qui cadrent le
           produit. Elles DÉBORDENT sous le bord de l'écran : c'est ce qui fait
           que le hero se lit comme une image et non comme un bloc de texte
@@ -451,7 +701,7 @@ function Statement() {
         <Image src={SEOUL.skyline} alt="" fill sizes="100vw" className="object-cover opacity-45" />
       </span>
       <span aria-hidden className="absolute inset-0 bg-black/60" />
-      <p className="relative max-w-5xl text-center font-display text-[clamp(2.2rem,6.4vw,5.2rem)] font-light leading-[1.08]">
+      <p className="relative max-w-5xl text-center tracking-[-0.035em] text-[clamp(2.2rem,6.4vw,5.2rem)] font-light leading-[1.08]">
         <span className="block text-white">{CLAIM_1}</span>
         <span className="mt-2 block">
           {CLAIM_2.split(" ").map((w, i) => (
@@ -528,7 +778,7 @@ function Catalogue() {
         <div className="relative w-[min(80vw,30rem)] shrink-0">
           <Ghost className="-left-4 -top-16">Catalogue</Ghost>
           <Label>Le catalogue</Label>
-          <h2 className="mt-7 font-display text-[clamp(2.2rem,5vw,4rem)] font-light leading-[1.02]">
+          <h2 className="mt-7 tracking-[-0.035em] text-[clamp(2.2rem,5vw,4rem)] font-light leading-[1.02]">
             Cinquante-six endroits où poser ta soirée.
           </h2>
           <p className="mt-7 max-w-sm text-[14.5px] leading-relaxed text-white/60">
@@ -585,7 +835,7 @@ const DECK = [
   },
 ];
 
-function Deck({ signIn }: { signIn: () => void }) {
+function Deck() {
   const section = useRef<HTMLElement>(null);
   const reduced = useReducedMotionPref();
 
@@ -640,7 +890,7 @@ function Deck({ signIn }: { signIn: () => void }) {
               <Frame src={d.img} alt="" local ratio="4/5" />
               <div>
                 <Label>{d.label} / 03</Label>
-                <h3 className="mt-6 font-display text-[clamp(2rem,4vw,3.2rem)] font-light leading-[1.05]">{d.title}</h3>
+                <h3 className="mt-6 tracking-[-0.035em] text-[clamp(2rem,4vw,3.2rem)] font-light leading-[1.05]">{d.title}</h3>
                 <p className="mt-6 max-w-md text-[14.5px] leading-relaxed text-white/60">{d.body}</p>
               </div>
             </div>
@@ -680,11 +930,14 @@ function Deck({ signIn }: { signIn: () => void }) {
                 <Label>
                   {d.label} <span className="text-white/25">/ 03</span>
                 </Label>
-                <h3 className="mt-6 font-display text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]">
+                <h3 className="mt-6 tracking-[-0.035em] text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]">
                   {d.title}
                 </h3>
+                {/* Pas de bouton ici : « Commencer » ne vit qu'à TROIS endroits
+                    sur toute la page (le bandeau, le hero, l'action finale).
+                    Répéter la même action à chaque volet la banalise et hache
+                    la lecture. */}
                 <p className="mt-6 max-w-md text-[14.5px] leading-relaxed text-white/60">{d.body}</p>
-                <Cta label="Commencer" onClick={signIn} className="mt-10" />
               </div>
             </div>
           );
@@ -816,7 +1069,7 @@ function TryPomodoro({ publish }: { publish: (live: boolean, total: number, left
       <div data-reveal className="relative">
         <Ghost className="-top-12 left-0">Essaie</Ghost>
         <Label>La démonstration</Label>
-        <h2 className="mt-6 font-display text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]">
+        <h2 className="mt-6 tracking-[-0.035em] text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]">
           Le vrai minuteur, ici même.
         </h2>
         <p className="mt-6 max-w-md text-[14.5px] leading-relaxed text-white/60">
@@ -1198,6 +1451,9 @@ export default function LandingPage() {
 
   return (
     <main ref={root} className="relative w-full max-w-full overflow-x-clip bg-[#050505] text-white">
+      {/* Le défilement amorti, monté en premier. */}
+      <SmoothScroll />
+
       {/* Grain : couche fixe, jamais attachée à un conteneur qui défile. */}
       <div
         aria-hidden
@@ -1231,6 +1487,9 @@ export default function LandingPage() {
         data-hero-section
         className="relative isolate flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden px-5 pb-0 pt-28 text-center sm:px-10"
       >
+        {/* La traînée : elle vit DANS le premier écran, derrière le texte. */}
+        <ImageTrail />
+
         <span data-hero-img aria-hidden className="absolute inset-0 -z-10">
           <Image src={SEOUL.aerien} alt="" fill priority sizes="100vw" className="object-cover opacity-70" />
           {/* Les voiles doivent ASSEOIR le texte, pas effacer la photo : un
@@ -1248,7 +1507,7 @@ export default function LandingPage() {
           <Label>Gratuit, sans compte obligatoire</Label>
         </span>
 
-        <h1 className="mt-8 max-w-5xl font-display text-[clamp(2.6rem,7.2vw,6rem)] font-light leading-[0.98]">
+        <h1 className="mt-8 max-w-5xl tracking-[-0.035em] text-[clamp(2.6rem,7.2vw,6rem)] font-light leading-[0.98]">
           <MaskedLine text="Il fait presque nuit." />
           <MaskedLine text="Allume ta fenêtre." />
         </h1>
@@ -1271,13 +1530,13 @@ export default function LandingPage() {
       <Catalogue />
 
       {/* ── Les trois piliers ────────────────────────────────────────────── */}
-      <Deck signIn={signIn} />
+      <Deck />
 
       {/* ── Les sources ──────────────────────────────────────────────────── */}
       <section id="sources" className="mx-auto w-full max-w-[86rem] px-5 py-32 sm:px-10">
         <h2
           data-reveal
-          className="mb-16 max-w-3xl font-display text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]"
+          className="mb-16 max-w-3xl tracking-[-0.035em] text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]"
         >
           Quatre façons de remplir le silence.
         </h2>
@@ -1293,7 +1552,7 @@ export default function LandingPage() {
       <section className="mx-auto w-full max-w-[86rem] px-5 pb-32 sm:px-10">
         <h2
           data-reveal
-          className="mb-16 max-w-3xl font-display text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]"
+          className="mb-16 max-w-3xl tracking-[-0.035em] text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]"
         >
           Le lendemain, tu sais ce que tu as fait.
         </h2>
@@ -1309,7 +1568,7 @@ export default function LandingPage() {
         <div className="relative">
           <h2
             data-reveal
-            className="mx-auto max-w-4xl font-display text-[clamp(2.4rem,7vw,5.6rem)] font-light leading-[1.02]"
+            className="mx-auto max-w-4xl tracking-[-0.035em] text-[clamp(2.4rem,7vw,5.6rem)] font-light leading-[1.02]"
           >
             Il fait nuit. Tu as une heure devant toi.
           </h2>
