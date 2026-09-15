@@ -284,108 +284,6 @@ function SmoothScroll() {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   LA TRAÎNÉE D'IMAGES — l'effet qu'on déclenche en bougeant
-   ══════════════════════════════════════════════════════════════════════════
-
-   Le geste signature de la référence : en déplaçant la souris sur le premier
-   écran, on laisse derrière soi une traînée de vignettes qui apparaissent puis
-   s'effacent. Ici ce sont les VRAIS paysages du catalogue : bouger la souris,
-   c'est feuilleter le produit.
-
-   Trois points de méthode :
-     . les vignettes sont recyclées dans un anneau fixe (douze éléments montés
-       une fois), jamais créées à la volée. Aucune allocation pendant le
-       mouvement ;
-     . l'émission est cadencée par la DISTANCE parcourue, pas par le temps :
-       un mouvement lent ne crache pas cinquante images au même endroit ;
-     . tout passe par `transform` et `opacity`, et l'effet ne s'arme que sur un
-       pointeur fin (au doigt, il n'existe pas de survol) et hors mouvement
-       réduit. */
-
-const TRAIL = pick(["hk-02", "driv-05", "cn-01", "tw-02", "vn-01", "abao-11", "no-01", "id-02", "th-01", "uk-01", "np-01", "noma-07"]);
-/** Distance en pixels entre deux vignettes. Plus elle est courte, plus la
- *  traînée est DENSE : à 145 px on obtenait trois images éparses, c'est-à-dire
- *  rien du tout. À 78 px le geste laisse un vrai ruban derrière le curseur. */
-const TRAIL_STEP = 78;
-
-function ImageTrail() {
-  const root = useRef<HTMLDivElement>(null);
-
-  useGSAP(
-    () => {
-      const items = gsap.utils.toArray<HTMLElement>("[data-trail-item]", root.current);
-      if (items.length === 0) return;
-
-      const mm = gsap.matchMedia();
-      mm.add("(prefers-reduced-motion: no-preference) and (pointer: fine)", () => {
-        gsap.set(items, { xPercent: -50, yPercent: -50, autoAlpha: 0, scale: 0.7 });
-
-        let next = 0;
-        let lastX = 0;
-        let lastY = 0;
-        let primed = false;
-
-        const onMove = (e: PointerEvent) => {
-          const box = root.current?.getBoundingClientRect();
-          if (!box) return;
-          // On reste dans le premier écran : la traînée est un geste d'accueil,
-          // pas un curseur personnalisé qui suivrait toute la page.
-          if (e.clientY > box.bottom || e.clientY < box.top) return;
-
-          if (!primed) {
-            lastX = e.clientX;
-            lastY = e.clientY;
-            primed = true;
-            return;
-          }
-          if (Math.hypot(e.clientX - lastX, e.clientY - lastY) < TRAIL_STEP) return;
-          lastX = e.clientX;
-          lastY = e.clientY;
-
-          const el = items[next % items.length];
-          next += 1;
-          gsap.killTweensOf(el);
-          gsap.set(el, {
-            x: e.clientX - box.left,
-            y: e.clientY - box.top,
-            zIndex: next,
-            rotate: gsap.utils.random(-8, 8),
-          });
-          // Entrée nette, sortie longue : c'est l'écart entre les deux qui
-          // crée le ruban. Une entrée et une sortie de même durée donnent un
-          // clignotement, pas une traînée.
-          gsap
-            .timeline()
-            .fromTo(
-              el,
-              { autoAlpha: 0, scale: 0.6, filter: "blur(6px)" },
-              { autoAlpha: 1, scale: 1, filter: "blur(0px)", duration: 0.55, ease: "power4.out" }
-            )
-            .to(el, { autoAlpha: 0, scale: 1.14, duration: 1.1, ease: "power2.in" }, 0.75);
-        };
-
-        window.addEventListener("pointermove", onMove, { passive: true });
-        return () => window.removeEventListener("pointermove", onMove);
-      });
-
-      return () => mm.revert();
-    },
-    { scope: root }
-  );
-
-  return (
-    <div ref={root} aria-hidden className="pointer-events-none absolute inset-0 z-[-5] overflow-hidden">
-      {TRAIL.map((v) => (
-        <span key={v.id} data-trail-item className="absolute left-0 top-0 block w-[17rem] border border-white/20">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={thumb(v.youtubeId)} alt="" loading="lazy" className="block aspect-[16/10] w-full object-cover" />
-        </span>
-      ))}
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
    PRIMITIVES
    ══════════════════════════════════════════════════════════════════════════ */
 
@@ -540,58 +438,85 @@ function Frame({
     </span>
   );
 }
-
 /* ══════════════════════════════════════════════════════════════════════════
-   L'HORLOGE DE LA PAGE — la landing EST un pomodoro
+   LA NUIT — l'idée directrice de la page
    ══════════════════════════════════════════════════════════════════════════
 
-   Le compteur du bandeau part de 25:00 en haut de page et atteint 00:00 en
-   bas : parcourir la page, c'est dérouler une session. Et si le visiteur lance
-   le vrai minuteur de la section démo, CELUI-CI PREND LE RELAIS.
+   La page EST une nuit à Séoul, de 21:00 à 01:00, et le scroll fait avancer
+   l'heure. Elle est découpée au rythme du pomodoro : des cycles de travail
+   séparés par de vraies pauses, où la page respire au lieu d'enchaîner.
 
-   Un unique `gsap.ticker` lit l'état partagé et écrit directement dans le DOM,
-   avec une garde par valeur pour ne toucher au DOM que si l'affichage change.
-   Aucun re-render React. */
+   Ce n'est pas une métaphore posée après coup : c'est la structure du document.
+   Les sections SONT les cycles, l'horloge du bandeau SUIT le scroll, et les
+   quatre marques de pomodoro se remplissent à mesure qu'on descend. Un
+   visiteur qui parcourt la page a vécu une nuit de travail. */
 
-const CLOCK_R = 11;
-const CLOCK_C = 2 * Math.PI * CLOCK_R;
+/** Bornes de la nuit, en minutes depuis minuit. 21:00 → 01:00. */
+const NIGHT_FROM = 21 * 60;
+const NIGHT_TO = 25 * 60;
 
-function SessionClock({ clock, onDoneChange }: { clock: React.RefObject<Clock>; onDoneChange: (done: boolean) => void }) {
+/** Les quatre cycles, et la part du scroll à laquelle chacun est acquis. */
+const CYCLES = [0.2, 0.44, 0.68, 0.9];
+
+const hhmm = (minutes: number) => {
+  const m = Math.round(minutes) % (24 * 60);
+  return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+};
+
+/** L'horloge de la nuit : l'heure avance avec le scroll, et les quatre
+ *  pomodoros se remplissent au passage.
+ *
+ *  Un unique `gsap.ticker` lit l'état partagé et écrit directement dans le
+ *  DOM, avec une garde par valeur pour ne toucher au DOM que si l'affichage
+ *  change réellement. Aucun re-render React, même à la minute. */
+function NightClock({ clock, onDoneChange }: { clock: React.RefObject<Clock>; onDoneChange: (done: boolean) => void }) {
   const root = useRef<HTMLSpanElement>(null);
   const timeRef = useRef<HTMLSpanElement>(null);
   const labelRef = useRef<HTMLSpanElement>(null);
-  const ringRef = useRef<SVGCircleElement>(null);
 
   useGSAP(
     () => {
+      const marks = gsap.utils.toArray<HTMLElement>("[data-pomo]", root.current);
       let lastText = "";
       let lastLabel = "";
-      let lastRatio = -1;
+      let lastFilled = -1;
       let wasDone: boolean | null = null;
 
       const tick = () => {
         const c = clock.current;
         if (!c) return;
-        const scroll = gsap.utils.clamp(0, 1, c.scroll);
-        const seconds = c.live ? Math.max(0, c.left) : POMODORO_SECONDS * (1 - scroll);
-        const ratio = c.live ? (c.total > 0 ? 1 - Math.max(0, c.left) / c.total : 0) : scroll;
-        const done = c.live ? c.left <= 0 : scroll > 0.985;
+        const p = gsap.utils.clamp(0, 1, c.scroll);
 
-        const text = done ? "00:00" : `${pad(seconds / 60)}:${pad(seconds % 60)}`;
+        // Quand le visiteur lance le minuteur de la démonstration, l'horloge
+        // cesse de suivre la page pour suivre SA session : c'est le seul
+        // moment où la nuit fictive cède la place au temps réel.
+        const text = c.live
+          ? `${pad(Math.max(0, c.left) / 60)}:${pad(Math.max(0, c.left) % 60)}`
+          : hhmm(NIGHT_FROM + (NIGHT_TO - NIGHT_FROM) * p);
         if (text !== lastText && timeRef.current) {
           lastText = text;
           timeRef.current.textContent = text;
         }
-        const label = done ? "pause méritée" : c.live ? "ta session" : "cette page";
+
+        const done = c.live ? c.left <= 0 : p > 0.985;
+        const label = done ? "pause méritée" : c.live ? "ta session" : "cette nuit";
         if (label !== lastLabel && labelRef.current) {
           lastLabel = label;
           labelRef.current.textContent = label;
         }
-        const rounded = Math.round(ratio * 400) / 400;
-        if (rounded !== lastRatio && ringRef.current) {
-          lastRatio = rounded;
-          ringRef.current.style.strokeDashoffset = String(CLOCK_C * (1 - rounded));
+
+        const filled = c.live ? lastFilled : CYCLES.filter((c2) => p >= c2).length;
+        if (filled !== lastFilled) {
+          lastFilled = filled;
+          marks.forEach((m, i) => {
+            gsap.to(m, {
+              backgroundColor: i < filled ? "#ffc38a" : "rgba(255,255,255,0.14)",
+              duration: 0.45,
+              ease: "power2.out",
+            });
+          });
         }
+
         if (done !== wasDone) {
           wasDone = done;
           onDoneChange(done);
@@ -605,178 +530,142 @@ function SessionClock({ clock, onDoneChange }: { clock: React.RefObject<Clock>; 
   );
 
   return (
-    <span ref={root} className="flex items-center gap-2.5" title="La page se déroule comme une session de 25 minutes.">
-      <svg viewBox="0 0 26 26" className="h-[26px] w-[26px] -rotate-90">
-        <circle cx="13" cy="13" r={CLOCK_R} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="1" />
-        <circle
-          ref={ringRef}
-          cx="13"
-          cy="13"
-          r={CLOCK_R}
-          fill="none"
-          stroke="#ffffff"
-          strokeWidth="1"
-          strokeDasharray={CLOCK_C}
-          strokeDashoffset={CLOCK_C}
-        />
-      </svg>
-      <span className="hidden flex-col leading-none sm:flex">
-        <span ref={timeRef} className="font-mono text-[11px] tabular-nums tracking-wider text-white">
-          25:00
+    <span ref={root} className="flex items-center gap-4" title="La page est une nuit de 21:00 à 01:00, en quatre pomodoros.">
+      <span className="flex flex-col leading-none">
+        <span ref={timeRef} className="font-mono text-[13px] tabular-nums tracking-wider text-white">
+          21:00
         </span>
         <span ref={labelRef} className="mt-1 font-mono text-[8px] uppercase tracking-[0.2em] text-white/40">
-          cette page
+          cette nuit
         </span>
+      </span>
+      {/* Les quatre pomodoros de la nuit */}
+      <span className="hidden items-center gap-1.5 sm:flex" aria-hidden>
+        {CYCLES.map((c) => (
+          <span key={c} data-pomo className="block h-[3px] w-5 bg-white/[0.14]" />
+        ))}
       </span>
     </span>
   );
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   HERO — le produit au centre, encadré par deux paysages
+   L'ENSEIGNE — le titre s'allume comme un néon
    ══════════════════════════════════════════════════════════════════════════
 
-   Composition reprise de la référence, où trois véhicules détourés cadrent le
-   titre, celui du milieu étant le seul en couleur. Ici : deux paysages du
-   catalogue en retrait, assombris, et AU CENTRE l'écran de session, seul
-   élément à porter de la lumière. Le sujet du site est donc littéralement au
-   centre du cadre. */
+   La signature visuelle de la page, et elle vient du sujet : une rue de Séoul
+   la nuit, c'est d'abord des enseignes qui s'allument. Le texte ne monte pas
+   et ne se fond pas, il S'AMORCE : quelques ratés, puis la lueur s'installe.
 
-const HERO_TRACK = byId("driv-05") ?? defaultVideos[0];
+   Le halo passe par une VARIABLE CSS animée (`--glow`) et non par une
+   interpolation de `text-shadow` : GSAP ne sait interpoler une ombre que si
+   les deux états ont exactement la même structure, ce qui est fragile. Une
+   variable est un simple nombre, et le `calc()` fait le reste. */
 
-function HeroStage() {
-  const root = useRef<HTMLDivElement>(null);
+function Neon({
+  children,
+  className,
+  delay = 0,
+  glow = 22,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+  glow?: number;
+}) {
+  const ref = useRef<HTMLSpanElement>(null);
 
-  // Parallaxe de pointeur : les trois cadres répondent au curseur à des
-  // amplitudes différentes, donc la composition a une ÉPAISSEUR. C'est ce que
-  // fait la référence sur ses trois véhicules. La position du pointeur ne passe
-  // évidemment pas par un state React : `quickTo` interpole hors du cycle de
-  // rendu, sinon l'arbre entier se re-rendrait à chaque pixel parcouru.
   useGSAP(
     () => {
-      const plates = gsap.utils.toArray<HTMLElement>("[data-stage]", root.current);
-      if (plates.length === 0) return;
-
+      const el = ref.current;
+      if (!el) return;
       const mm = gsap.matchMedia();
-      mm.add("(prefers-reduced-motion: no-preference) and (pointer: fine)", () => {
-        const DEPTH = [26, 10, 26];
-        const setters = plates.map((el, i) => ({
-          x: gsap.quickTo(el, "x", { duration: 0.9, ease: "power3" }),
-          y: gsap.quickTo(el, "y", { duration: 0.9, ease: "power3" }),
-          d: DEPTH[i] ?? 16,
-        }));
 
-        const onMove = (e: PointerEvent) => {
-          const px = e.clientX / window.innerWidth - 0.5;
-          const py = e.clientY / window.innerHeight - 0.5;
-          setters.forEach((s) => {
-            s.x(-px * s.d);
-            s.y(-py * s.d * 0.55);
-          });
-        };
+      mm.add("(prefers-reduced-motion: reduce)", () => {
+        gsap.set(el, { autoAlpha: 1, "--glow": glow });
+      });
 
-        window.addEventListener("pointermove", onMove, { passive: true });
-        return () => {
-          window.removeEventListener("pointermove", onMove);
-          gsap.set(plates, { x: 0, y: 0 });
-        };
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        gsap.set(el, { autoAlpha: 0, "--glow": 0 });
+        const tl = gsap.timeline({ delay });
+        // Les ratés d'amorçage. Les durées sont volontairement irrégulières :
+        // un clignotement régulier se lit comme une animation, pas comme un
+        // tube qui peine à s'allumer.
+        tl.to(el, { autoAlpha: 1, duration: 0.06 })
+          .to(el, { autoAlpha: 0.15, duration: 0.09 })
+          .to(el, { autoAlpha: 1, duration: 0.05 })
+          .to(el, { autoAlpha: 0.35, duration: 0.13 })
+          .to(el, { autoAlpha: 1, duration: 0.07 })
+          .to(el, { autoAlpha: 0.6, duration: 0.05 })
+          // ...puis la lueur s'installe, elle.
+          .to(el, { autoAlpha: 1, "--glow": glow, duration: 1.6, ease: "power2.out" });
+        return () => tl.kill();
       });
 
       return () => mm.revert();
     },
-    { scope: root }
+    { scope: ref }
   );
 
   return (
-    <div ref={root} className="relative mx-auto mt-12 grid w-full max-w-[78rem] grid-cols-1 items-end gap-5 md:mt-14 md:grid-cols-[1fr_1.35fr_1fr] md:gap-8">
-      {/* Deux photographies de Séoul en portrait, hautes, qui cadrent le
-          produit. Elles DÉBORDENT sous le bord de l'écran : c'est ce qui fait
-          que le hero se lit comme une image et non comme un bloc de texte
-          suivi de vignettes. */}
-      <span data-stage className="hidden md:block">
-        <Frame src={SEOUL.lotte} alt="" local ratio="3/4" className="opacity-80" />
-      </span>
-
-      {/* L'écran de session : le seul élément lumineux de la composition, et le
-          seul à porter de la couleur. C'est le sujet du site, il est donc
-          littéralement au centre du cadre. */}
-      <div data-stage className="relative border border-white/20 bg-black shadow-[0_40px_120px_-40px_rgba(0,0,0,1)]">
-        <div className="relative aspect-[4/3] w-full md:aspect-[5/4]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={thumb(HERO_TRACK.youtubeId)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />
-          <span className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/20" aria-hidden />
-          <span className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="relative h-24 w-24">
-              <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" />
-                <circle
-                  data-hero-ring
-                  cx="50"
-                  cy="50"
-                  r="45"
-                  fill="none"
-                  stroke="#ffc38a"
-                  strokeWidth="1.5"
-                  strokeDasharray={2 * Math.PI * 45}
-                  strokeDashoffset={2 * Math.PI * 45}
-                />
-              </svg>
-              <span className="absolute inset-0 flex items-center justify-center font-mono text-[22px] tabular-nums text-white">
-                16:02
-              </span>
-            </span>
-            <span className="mt-6 max-w-[80%] truncate text-center text-[12px] text-white/70">{HERO_TRACK.title}</span>
-            <Label className="mt-2">{HERO_TRACK.country}</Label>
-          </span>
-        </div>
-      </div>
-
-      <span data-stage className="hidden md:block">
-        <Frame src={SEOUL.rue} alt="" local ratio="3/4" className="opacity-80" />
-      </span>
-    </div>
+    <span
+      ref={ref}
+      className={cn("inline-block", className)}
+      style={{
+        textShadow:
+          "0 0 calc(var(--glow, 0) * 1px) rgba(255,198,140,0.55), 0 0 calc(var(--glow, 0) * 2.6px) rgba(255,140,60,0.28)",
+      }}
+    >
+      {children}
+    </span>
   );
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   LE MANIFESTE — plein cadre, la seconde ligne s'allume mot par mot
-   ══════════════════════════════════════════════════════════════════════════ */
+   LA PAUSE — la page respire
+   ══════════════════════════════════════════════════════════════════════════
 
-const CLAIM_1 = "On ne t'ajoute pas des outils.";
-const CLAIM_2 = "On t'enlève le bruit.";
+   Le moment le plus inhabituel de la page, et le plus fidèle au sujet. Entre
+   deux cycles, on ne enchaîne pas : la section INSPIRE puis EXPIRE. La photo
+   s'ouvre lentement, le texte s'écarte, puis tout se resserre.
 
-function Statement() {
+   Une pause de pomodoro n'est pas un vide, c'est un temps qui a une forme.
+   Une page qui enchaîne ses sections ne peut pas parler de pauses de façon
+   crédible ; celle-ci en impose une au lecteur, dans son corps même.
+
+   Techniquement : une timeline scrubée en deux temps (0 → 1 → 0) sur la
+   traversée de la section. Tout est en `scale` et `opacity`, plus un
+   `letter-spacing` sur une seule ligne courte, dont le coût de mise en page
+   est négligeable et qui rend l'expansion lisible. */
+
+function Breath({ time, line, img, minutes }: { time: string; line: string; img: string; minutes: string }) {
   const root = useRef<HTMLElement>(null);
 
   useGSAP(
     () => {
-      const words = gsap.utils.toArray<HTMLElement>("[data-claim-word]", root.current);
+      const photo = root.current?.querySelector("[data-breath-photo]");
+      const copy = root.current?.querySelector("[data-breath-copy]");
+      if (!photo || !copy) return;
+
       const mm = gsap.matchMedia();
-
-      mm.add("(prefers-reduced-motion: reduce)", () => {
-        gsap.set(words, { opacity: 1 });
-      });
-
       mm.add("(prefers-reduced-motion: no-preference)", () => {
-        const tween = gsap.fromTo(
-          words,
-          { opacity: 0.12 },
-          {
-            opacity: 1,
-            ease: "none",
-            stagger: { amount: 0.9, from: "start" },
-            scrollTrigger: {
-              trigger: root.current,
-              start: "top 72%",
-              end: "bottom 72%",
-              scrub: 0.5,
-              refreshPriority: PRIO.top,
-            },
-          }
-        );
+        const tl = gsap.timeline({
+          defaults: { ease: "sine.inOut" },
+          scrollTrigger: {
+            trigger: root.current,
+            start: "top bottom",
+            end: "bottom top",
+            scrub: 0.8,
+            refreshPriority: PRIO.below,
+          },
+        });
+        // Inspiration
+        tl.to(photo, { scale: 1.16, duration: 1 }, 0).to(copy, { letterSpacing: "0.34em", opacity: 1, duration: 1 }, 0);
+        // Expiration
+        tl.to(photo, { scale: 1, duration: 1 }, 1).to(copy, { letterSpacing: "0.18em", opacity: 0.55, duration: 1 }, 1);
         return () => {
-          tween.scrollTrigger?.kill();
-          tween.kill();
+          tl.scrollTrigger?.kill();
+          tl.kill();
         };
       });
 
@@ -786,36 +675,237 @@ function Statement() {
   );
 
   return (
-    <section ref={root} className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden px-5">
-      <span data-parallax aria-hidden className="absolute inset-0">
-        <Image src={SEOUL.skyline} alt="" fill sizes="100vw" className="object-cover opacity-45" />
+    <section ref={root} className="relative flex h-[85vh] items-center justify-center overflow-hidden">
+      <span data-breath-photo aria-hidden className="absolute inset-0">
+        <Image src={img} alt="" fill sizes="100vw" className="object-cover opacity-30" />
       </span>
-      <span aria-hidden className="absolute inset-0 bg-black/60" />
-      <p data-recede className="relative max-w-5xl text-center tracking-[-0.035em] text-[clamp(2.2rem,6.4vw,5.2rem)] font-light leading-[1.08]">
-        <span className="block text-white">{CLAIM_1}</span>
-        <span className="mt-2 block">
-          {CLAIM_2.split(" ").map((w, i) => (
-            <span key={i} data-claim-word className="text-white">
-              {w}{" "}
-            </span>
-          ))}
-        </span>
-      </p>
+      <span aria-hidden className="absolute inset-0 bg-black/55" />
+      <div className="relative text-center">
+        <Label>
+          {time} · pause de {minutes}
+        </Label>
+        <p
+          data-breath-copy
+          className="mt-8 font-mono text-[11px] uppercase text-white/55"
+          style={{ letterSpacing: "0.18em" }}
+        >
+          {line}
+        </p>
+      </div>
     </section>
   );
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   LE CATALOGUE — panneau épinglé, travelling horizontal
+   L'EN-TÊTE DE CYCLE — l'heure, le numéro, le titre
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function CycleHead({
+  n,
+  time,
+  title,
+  body,
+  className,
+}: {
+  n: string;
+  time: string;
+  title: string;
+  body?: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("max-w-3xl", className)}>
+      <Label>
+        Pomodoro {n} <span className="text-white/25">· {time}</span>
+      </Label>
+      <Lines as="h2" className="mt-7 tracking-[-0.035em] text-[clamp(2rem,4.6vw,3.6rem)] font-light leading-[1.03]">
+        {title}
+      </Lines>
+      {body && (
+        <Lines as="p" delay={0.1} className="mt-7 max-w-md text-[14.5px] leading-relaxed text-white/60">
+          {body}
+        </Lines>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MOMENT 1 — L'EFFONDREMENT : toute la ville se referme sur une fenêtre
    ══════════════════════════════════════════════════════════════════════════
 
-   Le scroll vertical devient un déplacement latéral : un mot fantôme géant
-   traverse le cadre, suivi des paysages, puis du propos et de l'action.
-   `ease: "none"` est obligatoire, c'est ce qui garde le rapport 1:1 entre la
-   position de scroll et la position horizontale.
+   La pièce maîtresse de la page, et son idée directrice.
 
-   Sur mobile et sous mouvement réduit, aucun détournement du scroll : la
-   rangée redevient un défilement horizontal natif, au doigt. */
+   On ouvre sur Séoul en plein écran. Au scroll, la photographie ne défile pas
+   et ne s'efface pas : elle SE REFERME, par les quatre côtés, jusqu'à ne plus
+   être qu'une fenêtre éclairée au milieu du noir. La promesse du titre
+   (« Allume ta fenêtre ») est donc démontrée avant d'être lue, et le sujet du
+   produit est littéralement ce qui reste quand tout le reste s'éteint.
+
+   Comment c'est fait, et pourquoi comme ça :
+     . un `clip-path: inset()` animé, PAS une animation de largeur ou de
+       position. Le découpage est composé par le GPU, là où `width`/`top`
+       déclencheraient une mise en page à chaque frame ;
+     . le filet de la fenêtre est un élément SÉPARÉ, positionné aux MÊMES
+       pourcentages que le découpage final. Un `border` posé sur la photo
+       serait coupé par le `clip-path` en même temps qu'elle ;
+     . la section est épinglée sur deux hauteurs d'écran et scrubée : c'est le
+       scroll qui referme la fenêtre, à la vitesse du lecteur.
+
+   Repli mouvement réduit : la fenêtre est déjà fermée, sans épinglage. */
+
+/** Les pourcentages de la fenêtre finale. Partagés entre le découpage de la
+ *  photo et le filet, sans quoi les deux ne coïncideraient pas. */
+const WIN = { top: 44, right: 30, bottom: 9, left: 30 };
+const WIN_INSET = `inset(${WIN.top}% ${WIN.right}% ${WIN.bottom}% ${WIN.left}%)`;
+
+const HERO_TRACK = byId("driv-05") ?? defaultVideos[0];
+
+function Collapse({ signIn }: { signIn: () => void }) {
+  const section = useRef<HTMLElement>(null);
+  const reduced = useReducedMotionPref();
+
+  useGSAP(
+    () => {
+      if (reduced) return;
+      const root = section.current;
+      const photo = root?.querySelector("[data-collapse-photo]");
+      const frame = root?.querySelector("[data-collapse-frame]");
+      const caption = root?.querySelector("[data-collapse-caption]");
+      const veil = root?.querySelector("[data-collapse-veil]");
+      if (!photo || !frame || !caption || !veil) return;
+
+      const tl = gsap.timeline({
+        defaults: { ease: "none" },
+        scrollTrigger: {
+          trigger: section.current,
+          start: "top top",
+          end: "+=200%",
+          pin: true,
+          scrub: 0.65,
+          anticipatePin: 1,
+          refreshPriority: PRIO.top,
+        },
+      });
+
+      // La ville se referme.
+      tl.fromTo(
+        photo,
+        { clipPath: "inset(0% 0% 0% 0%)", scale: 1.12 },
+        { clipPath: WIN_INSET, scale: 1, duration: 1 },
+        0
+      )
+        // ⚠️ Le voile s'efface, il ne s'épaissit PAS. Premier réflexe erroné :
+        // le faire monter vers le noir « puisque la nuit tombe ». Mais il
+        // couvre TOUT, fenêtre comprise, et éteignait donc exactement ce qui
+        // devait rester allumé. Son seul rôle est d'asseoir le titre sur la
+        // photo plein écran du départ ; une fois la fenêtre refermée, le noir
+        // vient du découpage lui-même et le voile n'a plus rien à faire là.
+        .fromTo(veil, { opacity: 0.62 }, { opacity: 0, duration: 1 }, 0)
+        // Le filet n'arrive qu'à la toute fin : une fenêtre n'a de cadre que
+        // lorsqu'elle est une fenêtre.
+        .fromTo(frame, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.18 }, 0.78)
+        .fromTo(caption, { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.18 }, 0.85);
+
+      return () => {
+        tl.scrollTrigger?.kill();
+        tl.kill();
+      };
+    },
+    { scope: section, dependencies: [reduced], revertOnUpdate: true }
+  );
+
+  return (
+    <section
+      ref={section}
+      data-hero-section
+      className="relative isolate flex h-[100dvh] flex-col items-center overflow-hidden px-5 pt-28 sm:px-10"
+    >
+      {/* La photographie, qui se referme */}
+      <span
+        data-collapse-photo
+        aria-hidden
+        className="absolute inset-0 -z-20"
+        style={{ clipPath: reduced ? WIN_INSET : undefined }}
+      >
+        <Image src={SEOUL.aerien} alt="" fill priority sizes="100vw" className="object-cover" />
+      </span>
+      <span
+        data-collapse-veil
+        aria-hidden
+        className="absolute inset-0 -z-10 bg-[#050505]"
+        style={{ opacity: reduced ? 0 : 0.62 }}
+      />
+
+      {/* Le filet de la fenêtre, aux mêmes pourcentages que le découpage */}
+      <span
+        data-collapse-frame
+        aria-hidden
+        className="absolute border border-white/25"
+        style={{
+          top: `${WIN.top}%`,
+          right: `${WIN.right}%`,
+          bottom: `${WIN.bottom}%`,
+          left: `${WIN.left}%`,
+          opacity: reduced ? 1 : 0,
+        }}
+      />
+
+      <div className="relative z-10 flex w-full flex-col items-center text-center">
+        <span data-hero="eyebrow" className="block">
+          <Label>21:00 · Séoul · gratuit, sans compte</Label>
+        </span>
+
+        {/* Le titre ne monte pas, il S'ALLUME : c'est une enseigne dans une rue
+            de Séoul. La seconde ligne s'amorce après la première, comme deux
+            tubes qui ne partent jamais ensemble. */}
+        <h1 className="mt-8 max-w-4xl tracking-[-0.035em] text-[clamp(2.6rem,7vw,5.6rem)] font-light leading-[0.98]">
+          <Neon delay={0.35} glow={20}>
+            La ville ne dort pas.
+          </Neon>
+          <br />
+          <Neon delay={1.25} glow={26}>
+            Travaille avec elle.
+          </Neon>
+        </h1>
+
+        <p data-hero="sub" className="mt-8 max-w-md text-[14.5px] leading-relaxed text-white/60">
+          Quatre pomodoros, une nuit. Un minuteur et ta musique dans le même écran, sur un paysage qui tourne
+          en boucle. La supérette en bas ne ferme pas non plus.
+        </p>
+
+        <div data-hero="cta" className="mt-9">
+          <Cta label="Commencer" onClick={signIn} tone="solid" />
+        </div>
+      </div>
+
+      {/* La légende de la fenêtre, une fois qu'elle en est une */}
+      <span
+        data-collapse-caption
+        className="absolute inset-x-0 z-10 text-center"
+        style={{ top: `calc(${100 - WIN.bottom}% + 1.25rem)`, opacity: reduced ? 1 : 0 }}
+      >
+        <Label>{HERO_TRACK.country} · en lecture · pomodoro 01</Label>
+      </span>
+    </section>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MOMENT 2 — LE CATALOGUE : travelling horizontal, le pays en très grand
+   ══════════════════════════════════════════════════════════════════════════
+
+   Le scroll vertical devient un déplacement latéral le long des paysages. Ce
+   qui en fait un MOMENT et non une simple bande : derrière les cartes, le nom
+   du pays s'écrit en très grand et CHANGE quand la carte suivante passe au
+   centre. On ne fait pas défiler des vignettes, on traverse des lieux.
+
+   `ease: "none"` est obligatoire sur le travelling, c'est ce qui garde le
+   rapport 1:1 entre scroll et position horizontale. Et les déclencheurs par
+   carte passent par `containerAnimation` : ils réagissent à la progression
+   HORIZONTALE, pas au scroll vertical. Leurs bornes sont en MOTS-CLÉS
+   (`"left center"`), les pourcentages y étant mesurés dans l'espace de la
+   piste et non du viewport. */
 
 const BELT = pick(["hk-02", "driv-05", "cn-01", "tw-02", "vn-01", "abao-11", "no-01", "noma-07", "uk-01", "id-02"]);
 
@@ -829,12 +919,13 @@ function Catalogue() {
       if (reduced) return;
       const t = track.current;
       const w = wrap.current;
+      const label = w?.querySelector<HTMLElement>("[data-belt-label]");
       if (!t || !w) return;
 
       const mm = gsap.matchMedia();
       mm.add("(min-width: 768px)", () => {
         const distance = () => Math.max(1, t.scrollWidth - window.innerWidth + 80);
-        const tween = gsap.to(t, {
+        const pan = gsap.to(t, {
           x: () => -distance(),
           ease: "none",
           scrollTrigger: {
@@ -847,9 +938,55 @@ function Catalogue() {
             refreshPriority: PRIO.pan,
           },
         });
+
+        // Deux listes distinctes plutôt qu'une liste mixte : `instanceof` ne
+        // restreint pas correctement le type d'une union `ScrollTrigger | Tween`
+        // (ScrollTrigger est une interface, pas une classe, côté typage).
+        const triggers: ScrollTrigger[] = [];
+        const tweens: gsap.core.Tween[] = [];
+
+        const cards = gsap.utils.toArray<HTMLElement>("[data-belt-card]", t);
+        cards.forEach((card) => {
+          const country = card.dataset.country ?? "";
+          // Le pays derrière : il change quand la carte prend le centre.
+          const swap = ScrollTrigger.create({
+            trigger: card,
+            containerAnimation: pan,
+            start: "left center",
+            end: "right center",
+            onToggle: (self) => {
+              if (!self.isActive || !label) return;
+              gsap.fromTo(
+                label,
+                { autoAlpha: 0, y: 26 },
+                { autoAlpha: 1, y: 0, duration: 0.5, ease: EASE, onStart: () => (label.textContent = country) }
+              );
+            },
+          });
+          // La carte se lève et s'agrandit en prenant le centre du cadre.
+          const lift = gsap.fromTo(
+            card,
+            { yPercent: 7, scale: 0.9, autoAlpha: 0.45 },
+            {
+              yPercent: 0,
+              scale: 1,
+              autoAlpha: 1,
+              ease: "none",
+              scrollTrigger: { trigger: card, containerAnimation: pan, start: "left right", end: "left center", scrub: true },
+            }
+          );
+          triggers.push(swap);
+          tweens.push(lift);
+        });
+
         return () => {
-          tween.scrollTrigger?.kill();
-          tween.kill();
+          triggers.forEach((s) => s.kill());
+          tweens.forEach((t2) => {
+            t2.scrollTrigger?.kill();
+            t2.kill();
+          });
+          pan.scrollTrigger?.kill();
+          pan.kill();
         };
       });
 
@@ -862,23 +999,40 @@ function Catalogue() {
     <section
       id="catalogue"
       ref={wrap}
-      className={cn("relative bg-black", reduced ? "overflow-x-auto" : "overflow-x-auto md:overflow-x-clip")}
+      className={cn("relative bg-[#050505]", reduced ? "overflow-x-auto" : "overflow-x-auto md:overflow-x-clip")}
     >
-      <div ref={track} className="flex h-[70vh] w-max items-center gap-10 px-5 sm:px-10 md:h-[100dvh] md:gap-14">
-        <div className="relative w-[min(80vw,30rem)] shrink-0">
-          <Ghost className="-left-4 -top-16">Catalogue</Ghost>
-          <Label>Le catalogue</Label>
-          <Lines as="h2" start="top bottom" className="mt-7 tracking-[-0.035em] text-[clamp(2.2rem,5vw,4rem)] font-light leading-[1.02]">
-            Cinquante-six endroits où poser ta soirée.
+      {/* Le pays, en très grand, derrière tout */}
+      <span
+        data-belt-label
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-1/2 z-0 hidden -translate-y-1/2 select-none text-center tracking-[-0.05em] text-[clamp(5rem,17vw,15rem)] font-light leading-none text-white/[0.06] md:block"
+      >
+        {BELT[0]?.country}
+      </span>
+
+      <div ref={track} className="relative z-10 flex h-[70vh] w-max items-center gap-10 px-5 sm:px-10 md:h-[100dvh] md:gap-16">
+        <div className="w-[min(80vw,28rem)] shrink-0">
+          <Label>Pomodoro 01 <span className="text-white/25">· 21:00</span></Label>
+          <Lines
+            as="h2"
+            start="top bottom"
+            className="mt-7 tracking-[-0.035em] text-[clamp(2.2rem,5vw,3.8rem)] font-light leading-[1.02]"
+          >
+            Cinquante-six endroits où poser ta nuit.
           </Lines>
-          <Lines as="p" start="top bottom" delay={0.12} className="mt-7 max-w-sm text-[14.5px] leading-relaxed text-white/60">
-            Study with me à Osaka, la pluie sur Shinjuku, le Bund à minuit, un drive lofi au pied du Fuji. Tenus à la
-            main, un par un.
+          <Lines
+            as="p"
+            start="top bottom"
+            delay={0.12}
+            className="mt-7 max-w-sm text-[14.5px] leading-relaxed text-white/60"
+          >
+            Study with me à Osaka, la pluie sur Shinjuku, le Bund à minuit. Choisis ta fenêtre, le minuteur
+            part tout seul.
           </Lines>
         </div>
 
         {BELT.map((v) => (
-          <article key={v.id} className="w-[19rem] shrink-0 md:w-[23rem]">
+          <article key={v.id} data-belt-card data-country={v.country} className="w-[19rem] shrink-0 md:w-[24rem]">
             <Frame src={thumb(v.youtubeId)} alt="" />
             <p className="mt-4 truncate text-[13px] text-white/80">{v.title}</p>
             <Label className="mt-2">{v.country}</Label>
@@ -888,155 +1042,6 @@ function Catalogue() {
     </section>
   );
 }
-
-/* ══════════════════════════════════════════════════════════════════════════
-   LES TROIS PILIERS — diaporama épinglé, numéroté
-   ══════════════════════════════════════════════════════════════════════════
-
-   Une section épinglée, trois volets qui se succèdent au scroll. Chaque volet :
-   l'image nette dans son cadre à gauche, LA MÊME IMAGE floutée en plein cadre
-   derrière (c'est ce doublon flou qui donne le fond sans jamais jurer avec le
-   sujet), le mot fantôme, le propos, et un compteur.
-
-   Les volets sont empilés au même endroit : on ne fait varier que l'opacité et
-   un léger décalage, jamais la mise en page. */
-
-const DECK = [
-  {
-    ghost: "Minuteur",
-    label: "01",
-    title: "Le minuteur",
-    body: "Vingt-cinq minutes, cinquante, ou un chrono libre qui s'arrête quand tu décroches. Les pauses se prennent toutes seules.",
-    img: SEOUL.rue,
-  },
-  {
-    ghost: "Musique",
-    label: "02",
-    title: "La musique",
-    body: "Le catalogue, tes playlists YouTube dans TON ordre, Spotify Premium, un live Twitch. Dans le même écran que le minuteur.",
-    img: SEOUL.skyline,
-  },
-  {
-    ghost: "Trace",
-    label: "03",
-    title: "La trace",
-    body: "Série, score de concentration, récap du dimanche. Construits tout seuls pendant que tu travaillais.",
-    img: SEOUL.pont,
-  },
-];
-
-function Deck() {
-  const section = useRef<HTMLElement>(null);
-  const reduced = useReducedMotionPref();
-
-  useGSAP(
-    () => {
-      if (reduced) return;
-      const panels = gsap.utils.toArray<HTMLElement>("[data-panel]", section.current);
-      const backs = gsap.utils.toArray<HTMLElement>("[data-panel-back]", section.current);
-      if (panels.length === 0) return;
-
-      gsap.set(panels.slice(1), { autoAlpha: 0, y: 40 });
-      gsap.set(backs.slice(1), { autoAlpha: 0 });
-
-      const tl = gsap.timeline({
-        defaults: { ease: "power2.inOut" },
-        scrollTrigger: {
-          trigger: section.current,
-          start: "top top",
-          end: "+=" + panels.length * 100 + "%",
-          pin: true,
-          scrub: 0.6,
-          anticipatePin: 1,
-          refreshPriority: PRIO.deck,
-        },
-      });
-
-      panels.forEach((p, i) => {
-        if (i === 0) return;
-        const at = i - 1;
-        tl.to(panels[i - 1], { autoAlpha: 0, y: -40, duration: 0.45 }, at)
-          .to(backs[i - 1], { autoAlpha: 0, duration: 0.45 }, at)
-          .to(p, { autoAlpha: 1, y: 0, duration: 0.45 }, at + 0.25)
-          .to(backs[i], { autoAlpha: 1, duration: 0.45 }, at + 0.25);
-      });
-
-      return () => {
-        tl.scrollTrigger?.kill();
-        tl.kill();
-      };
-    },
-    { scope: section, dependencies: [reduced], revertOnUpdate: true }
-  );
-
-  // Sous mouvement réduit, l'empilement n'a pas de sens : les trois volets se
-  // lisent à la suite, comme une liste.
-  if (reduced) {
-    return (
-      <section className="mx-auto w-full max-w-[86rem] space-y-24 px-5 py-28 sm:px-10">
-        {DECK.map((d) => {
-          return (
-            <div key={d.label} className="grid items-center gap-10 md:grid-cols-2 md:gap-16">
-              <Frame src={d.img} alt="" local ratio="4/5" />
-              <div>
-                <Label>{d.label} / 03</Label>
-                <h3 className="mt-6 tracking-[-0.035em] text-[clamp(2rem,4vw,3.2rem)] font-light leading-[1.05]">{d.title}</h3>
-                <p className="mt-6 max-w-md text-[14.5px] leading-relaxed text-white/60">{d.body}</p>
-              </div>
-            </div>
-          );
-        })}
-      </section>
-    );
-  }
-
-  return (
-    <section ref={section} className="relative h-[100dvh] overflow-hidden bg-black">
-      {/* Les fonds : LA MÊME IMAGE que le volet, floutée et assombrie. C'est ce
-          doublon flou qui donne un fond à chaque volet sans jamais jurer avec
-          son sujet, et c'est l'un des gestes les plus efficaces de la
-          référence. */}
-      {DECK.map((d) => (
-        <span key={`b-${d.label}`} data-panel-back aria-hidden className="absolute inset-0">
-          <Image src={d.img} alt="" fill sizes="100vw" className="scale-110 object-cover opacity-30 blur-2xl" />
-          <span className="absolute inset-0 bg-black/60" />
-        </span>
-      ))}
-
-      <div className="relative mx-auto flex h-full w-full max-w-[86rem] items-center px-5 sm:px-10">
-        {DECK.map((d) => {
-          return (
-            <div
-              key={d.label}
-              data-panel
-              className="absolute inset-x-5 grid items-center gap-10 sm:inset-x-10 md:grid-cols-2 md:gap-16"
-            >
-              <Frame src={d.img} alt="" local ratio="4/5" className="mx-auto w-full max-w-[26rem] bg-black" />
-              <div className="relative">
-                {/* Assez haut pour ne pas retomber sur le compteur : le mot
-                    fantôme est un filigrane, il ne doit jamais gêner la
-                    lecture de ce qu'il accompagne. */}
-                <Ghost className="-top-28 left-0">{d.ghost}</Ghost>
-                <Label>
-                  {d.label} <span className="text-white/25">/ 03</span>
-                </Label>
-                <h3 className="mt-6 tracking-[-0.035em] text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]">
-                  {d.title}
-                </h3>
-                {/* Pas de bouton ici : « Commencer » ne vit qu'à TROIS endroits
-                    sur toute la page (le bandeau, le hero, l'action finale).
-                    Répéter la même action à chaque volet la banalise et hache
-                    la lecture. */}
-                <p className="mt-6 max-w-md text-[14.5px] leading-relaxed text-white/60">{d.body}</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 /* ══════════════════════════════════════════════════════════════════════════
    LES SOURCES — quatre marques réelles, quatre panneaux cadrés
    ══════════════════════════════════════════════════════════════════════════ */
@@ -1604,107 +1609,81 @@ export default function LandingPage() {
           droite. Aucun lien de section : sur une page qui se lit d'un trait,
           ils n'indiquent rien. */}
       <header className="fixed inset-x-0 top-0 z-40 flex items-center justify-between px-5 py-5 sm:px-10">
-        <SessionClock clock={clock} onDoneChange={onDoneChange} />
+        <NightClock clock={clock} onDoneChange={onDoneChange} />
         <Wordmark className="absolute left-1/2 hidden -translate-x-1/2 sm:flex" />
         <Cta label="Commencer" onClick={signIn} className="px-6 py-3 text-[10px]" />
       </header>
 
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      {/* Le hero est UNE IMAGE, pas un bloc de texte suivi de vignettes : une
-          photographie de Séoul occupe tout le cadre, le titre se pose dessus,
-          et la composition déborde sous le bord de l'écran. */}
-      {/* `isolate` est OBLIGATOIRE : sans contexte d'empilement propre, la
-          couche photographique en `-z-10` passe DERRIÈRE le fond de `main` et
-          disparaît complètement. */}
-      <section
-        data-hero-section
-        className="relative isolate flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden px-5 pb-0 pt-28 text-center sm:px-10"
-      >
-        {/* La traînée : elle vit DANS le premier écran, derrière le texte. */}
-        <ImageTrail />
+      {/* ══ 21:00 ─ La ville s'allume, et se referme sur une fenêtre ══════ */}
+      <Collapse signIn={signIn} />
 
-        <span data-hero-img aria-hidden className="absolute inset-0 -z-10">
-          <Image src={SEOUL.aerien} alt="" fill priority sizes="100vw" className="object-cover opacity-70" />
-          {/* Les voiles doivent ASSEOIR le texte, pas effacer la photo : un
-              `from-black ... to-black` plein, doublé d'un vignettage à 0,9,
-              recouvrait l'image en entier. On garde du noir franc derrière le
-              bandeau et sous le pied de page, et on laisse le milieu respirer. */}
-          <span className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/35 to-black/85" />
-          <span
-            className="absolute inset-0"
-            style={{ background: "radial-gradient(ellipse 80% 65% at 50% 45%, transparent 40%, rgba(5,5,5,0.7) 100%)" }}
-          />
-        </span>
-
-        <span data-hero="eyebrow" className="block">
-          <Label>Gratuit, sans compte obligatoire</Label>
-        </span>
-
-        {/* L'arrivée du titre est pilotée par la timeline du hero, pas par le
-            scroll : `start` est calé très haut pour que le ScrollTrigger soit
-            déjà franchi au chargement. */}
-        <Lines
-          as="h1"
-          start="top bottom"
-          delay={0.25}
-          className="mt-8 max-w-5xl tracking-[-0.035em] text-[clamp(2.6rem,7.2vw,6rem)] font-light leading-[0.98]"
-        >
-          Il fait presque nuit.
-          <br />
-          Allume ta fenêtre.
-        </Lines>
-
-        <p data-hero="sub" className="mt-7 max-w-md text-[14.5px] leading-relaxed text-white/55">
-          Un minuteur Pomodoro et ta musique dans le même écran, posés sur un paysage qui tourne en boucle.
-        </p>
-
-        <div data-hero="cta" className="mt-9">
-          <Cta label="Commencer" onClick={signIn} tone="solid" />
-        </div>
-
-        <HeroStage />
-      </section>
-
-      {/* ── Le manifeste ─────────────────────────────────────────────────── */}
-      <Statement />
-
-      {/* ── Le catalogue ─────────────────────────────────────────────────── */}
+      {/* ══ POMODORO 01 ─ 21:00 ══════════════════════════════════════════ */}
       <Catalogue />
 
-      {/* ── Les trois piliers ────────────────────────────────────────────── */}
-      <Deck />
+      {/* ══ PAUSE ─ 21:25 ════════════════════════════════════════════════ */}
+      <Breath
+        time="21:25"
+        minutes="cinq minutes"
+        line="Lève les yeux. La rue est toujours là."
+        img={SEOUL.rue}
+      />
 
-      {/* ── Les sources ──────────────────────────────────────────────────── */}
+      {/* ══ POMODORO 02 ─ 21:30 ══════════════════════════════════════════ */}
       <section id="sources" className="mx-auto w-full max-w-[86rem] px-5 py-32 sm:px-10">
-        <Lines as="h2" className="mb-16 max-w-3xl tracking-[-0.035em] text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]">
-          Quatre façons de remplir le silence.
-        </Lines>
+        <CycleHead
+          n="02"
+          time="21:30"
+          title="Mets le son, pas la playlist des autres."
+          body="Quatre sources, un seul écran. Le minuteur ne s'arrête jamais pour aller chercher la musique."
+          className="mb-16"
+        />
         <Sources />
       </section>
 
-      {/* ── Le minuteur jouable ──────────────────────────────────────────── */}
-      <section id="minuteur" className="mx-auto w-full max-w-[86rem] px-5 pb-32 sm:px-10">
+      {/* ══ PAUSE ─ 22:00 ════════════════════════════════════════════════ */}
+      <Breath
+        time="22:00"
+        minutes="cinq minutes"
+        line="La supérette en bas est ouverte. Elle le sera encore à trois heures."
+        img={SEOUL.pontLarge}
+      />
+
+      {/* ══ POMODORO 03 ─ 22:05 ══════════════════════════════════════════ */}
+      <section id="minuteur" className="mx-auto w-full max-w-[86rem] px-5 py-32 sm:px-10">
+        <CycleHead n="03" time="22:05" title="Le vrai minuteur, ici même." className="mb-16" />
         <TryPomodoro publish={publish} />
       </section>
 
-      {/* ── La trace ─────────────────────────────────────────────────────── */}
+      {/* ══ PAUSE LONGUE ─ 23:00 ═════════════════════════════════════════ */}
+      <Breath
+        time="23:00"
+        minutes="quinze minutes"
+        line="Quatre cycles. La longue pause se mérite."
+        img={SEOUL.lotte}
+      />
+
+      {/* ══ 01:00 ─ Ce que la nuit a laissé ══════════════════════════════ */}
       <section className="mx-auto w-full max-w-[86rem] px-5 pb-32 sm:px-10">
-        <Lines as="h2" className="mb-16 max-w-3xl tracking-[-0.035em] text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]">
-          Le lendemain, tu sais ce que tu as fait.
-        </Lines>
+        <CycleHead
+          n="04"
+          time="01:00"
+          title="Au matin, la nuit a laissé quelque chose."
+          body="Série, score de concentration, récap du dimanche. Construits tout seuls pendant que tu travaillais."
+          className="mb-16"
+        />
         <Trace />
       </section>
 
-      {/* ── Action ───────────────────────────────────────────────────────── */}
+      {/* ══ FIN DE NUIT ══════════════════════════════════════════════════ */}
       <section className="relative flex min-h-[80vh] items-center justify-center overflow-hidden px-5 text-center">
         <span data-parallax aria-hidden className="absolute inset-0">
-          <Image src={SEOUL.pontLarge} alt="" fill sizes="100vw" className="object-cover opacity-35" />
+          <Image src={SEOUL.pont} alt="" fill sizes="100vw" className="object-cover opacity-35" />
         </span>
         <span aria-hidden className="absolute inset-0 bg-black/65" />
         <div data-recede className="relative">
-          <Lines as="h2" className="mx-auto max-w-4xl tracking-[-0.035em] text-[clamp(2.4rem,7vw,5.6rem)] font-light leading-[1.02]">
-            Il fait nuit. Tu as une heure devant toi.
-          </Lines>
+          <h2 className="mx-auto max-w-4xl tracking-[-0.035em] text-[clamp(2.4rem,7vw,5.6rem)] font-light leading-[1.02]">
+            <Neon delay={0.15}>Il est 21:00 quelque part.</Neon>
+          </h2>
           <Lines as="p" className="mx-auto mt-10 max-w-md text-[14.5px] leading-relaxed text-white/55">
             Utilisable sans compte. Google sert seulement à retrouver ta progression d&apos;un appareil à l&apos;autre.
           </Lines>

@@ -185,8 +185,9 @@ Flux type d'une feature : `product-lead` (spec) → `state-architect`/`backend-e
 ### Langage visuel (refonte 2026-08-22)
 
 - **Deux surfaces, deux langages assumés.** La **landing** (`LandingPage.tsx`) est sombre et
-  cinématique (night city, blancs/noirs écrits en dur) : elle n'utilise **jamais** les tokens
-  `foreground`/`background`. Le **site connecté** vit entièrement sur les tokens et suit le thème.
+  cinématique (Séoul la nuit, blancs/noirs écrits en dur) : elle n'utilise **jamais** les tokens
+  `foreground`/`background`, et a son propre système de formes. Le **site connecté** vit
+  entièrement sur les tokens et suit le thème. Voir « La landing » en fin de fichier.
 - **Un seul accent dans l'app** : token `--focus` (utilitaires `text-focus` / `bg-focus` /
   `border-focus`), défini clair et sombre dans `globals.css`. Tout le reste s'exprime en niveaux de
   `foreground`. Restent légitimes car **sémantiques** : couleurs de marque (Spotify/Twitch), couleur
@@ -201,10 +202,12 @@ Flux type d'une feature : `product-lead` (spec) → `state-architect`/`backend-e
   chiffre devient forme), pression tactile au clic. Toujours dégradé via `useReducedMotion()` ou
   `motion-safe:`. Pas d'animation en boucle décorative dans l'app (la landing, elle, est
   volontairement très animée).
-- **Moteur d'animation unique : `motion/react`.** Ne pas ajouter GSAP : `CityBackdrop` et la landing
-  pilotent déjà le scroll avec `useScroll`, deux moteurs se disputeraient les frames.
-- **Position du pointeur = MotionValue, jamais un `useState`** (sinon re-render de l'arbre à chaque
-  pixel parcouru).
+- **Un seul moteur d'animation PAR SURFACE.** Le **site connecté** est en `motion/react` :
+  ne pas y introduire GSAP. La **landing** est en **GSAP + ScrollTrigger** et n'importe
+  jamais `motion/react`. La règle « un seul moteur de scroll par page » est donc
+  respectée des deux côtés ; c'est juste que ce n'est pas le même moteur.
+- **Position du pointeur : MotionValue dans l'app, `gsap.quickTo` sur la landing. Jamais un
+  `useState`** (sinon re-render de l'arbre à chaque pixel parcouru).
 - **Densité du dashboard : basse (3/10)** — voir l'en-tête de `TodayDashboard.tsx`. Avant d'ajouter
   une tuile, se demander laquelle retirer.
 - **Zéro em-dash (`—`) dans les textes visibles** (et toujours zéro emoji) : virgule, point, ou
@@ -662,30 +665,11 @@ Retours utilisateur « UX moins générée par IA » :
 StatsSection.tsx:53, insights.tsx:102).
 
 
-## Journal de session — 2026-08-22 (refonte UI globale : landing minimaliste + app dynamique)
+## Journal de session — 2026-08-22 (refonte UI du site connecté)
 
-Deux directions distinctes et assumées (cf. « Langage visuel » dans les conventions).
+Refonte de l.interface du SITE CONNECTÉ. (La partie landing de cette session a été
+entièrement remplacée depuis : voir la section « La landing » en fin de fichier.)
 
-1. **Landing entièrement refaite** (`components/LandingPage.tsx`), direction **night city, très
-   interactive** (dials : variance 8-9 / motion 8 / densité 3). Le fond reste `CityBackdrop`
-   (photo de ville en `fixed`, la **nuit tombe au scroll** : la photo descend, le couchant s'efface,
-   les fenêtres s'allument, un rail d'heure avance) — fichier **restauré** après une première
-   tentative claire/éditoriale abandonnée.
-   Chorégraphie, entièrement en **`motion/react`** (pas de GSAP : deux moteurs de scroll sur la même
-   page se disputeraient les frames) :
-   - **halo qui suit le curseur** dans le hero et **carte de session inclinée en 3D** vers le
-     pointeur — via `useMotionValue`/`useSpring`, **jamais** de `useState` pour la position ;
-   - **boutons magnétiques** (`Magnetic`) ; nav en **pilule flottante** ;
-   - **manifeste scrubé** : les mots s'allument un par un au fil du scroll (`ScrubbedText`/`Word`) ;
-   - **pile d'étapes** : chaque carte se colle en haut (`sticky`) et la précédente recule
-     (`StepStack`/`StepCard`) ;
-   - **accordéon horizontal** des 4 sources (replié en vertical sous `md`) ;
-   - **marquee** des lieux du catalogue (`.anim-marquee`, une seule de la page) ;
-   - bento `grid-flow-dense` 4×2 (une tuile 2×2 + quatre 1×1, zéro cellule vide).
-   Hero : H1 en `clamp()` sur `max-w-5xl`, 2 lignes, avec une **image en pilule DANS le titre**.
-   ⚠️ La landing n'utilise PAS les tokens de thème (blancs/noirs écrits en dur, elle est sombre par
-   nature). La police serif (Instrument Serif) de la tentative précédente a été retirée ;
-   il reste **Geist + Geist Mono**.
 2. **Accent unique du site connecté** : token `--focus` (`globals.css`, clair + sombre) exposé en
    `--color-focus`. Migrés dessus : `GoalRing`, heatmap + barres 7 jours + succès de `StatsSection`,
    XP/jardin/défis de `ProgressionPanel`, dashboard. Fin de l'arc-en-ciel emerald/violet/sky/orange
@@ -713,452 +697,73 @@ pré-existantes : summary, StatsSection, insights, TodoStatusDropdown).
 visuel reste à valider à l'œil.
 
 
-## Journal de session — 2026-08-22 (2e passe : landing 3D « night city » + dashboard réorganisé)
 
-Retour utilisateur sur la 1re passe : la landing « n'était pas raccord » (photos picsum aléatoires →
-effet site de voyage, un phare pour illustrer Twitch), et le dashboard restait trop dense.
-
-1. **Landing refaite de zéro** (`components/LandingPage.tsx`), archétypes « Ethereal Glass » +
-   « Z-Axis Cascade », dials imposés variance 9 / motion 8 / densité 3.
-   - **RÈGLE D'IMAGERIE, à tenir** : plus AUCUNE photo générique (picsum banni de la page). Toutes les
-     images viennent des **vraies vignettes YouTube du catalogue** (`data/videos.ts` →
-     `https://i.ytimg.com/vi/<id>/hqdefault.jpg`, IDs vérifiés 200). Le produit s'illustre lui-même.
-     Les sources externes (YouTube/Spotify/Twitch) ne sont PAS illustrées par des photos mais par
-     **leur marque en SVG inline + un fragment de leur interface** (file d'attente, lignes de
-     playlist, badge Live + chat).
-   - **Scène 3D** dans le hero (`HeroScene`) : vraie perspective `preserve-3d`, satellites en
-     profondeur via la prop `z` de motion (⚠️ **jamais** `transform: translateZ()` en CSS brut :
-     motion recompose `transform` et l'écraserait), dérive en boucle, orientation vers le curseur.
-   - **Carrousel 3D du catalogue** (`Carousel3D`) : 12 vidéos réelles disposées en cylindre
-     (`rotateY(i·step) translateZ(430px)`), **tirable à la souris/au doigt** (Pointer Events +
-     `requestAnimationFrame` pour la dérive, `useMotionValue` → aucun state par frame).
-   - **Minuteur jouable** (`TryPomodoro`) : un vrai Pomodoro fonctionnel sur la landing (3 presets,
-     lecture/pause/reset) — la démo la plus honnête possible.
-   - Aussi : nav en île de verre, CTA « island » (icône nichée + magnétisme), double-bezel sur toutes
-     les cartes, heatmap déterministe (⚠️ pas de `Math.random` au rendu, sinon mismatch SSR),
-     marquee des pays du catalogue, entrées au scroll en montée + flou.
-2. **Dashboard réorganisé** (`components/TodayDashboard.tsx`) autour d'**UNE décision**. Le défaut
-   corrigé : cinq façons concurrentes de lancer une session, toutes de poids visuel égal, au milieu
-   d'une dizaine de tuiles pairs. Nouvelle structure : **1. la décision** (carte unique, une seule
-   action primaire choisie par priorité sprint > reprise > choisir une ambiance, la prochaine tâche
-   affichée dedans, les autres chemins en liens discrets) → **2. l'état** (objectif + série + focus
-   du jour, en bande typographique sans cartes) → **3. le contexte** (semaine en barres, rail horaire)
-   → **4. le reste** (projet, routines, réflexion, récap, poids visuel réduit sous un filet).
-   Ajout d'anneaux de focus clavier (`FOCUS_RING`) et d'un état vide pédagogique pour le planning.
-3. Police serif retirée (plus utilisée) ; il reste **Geist + Geist Mono**.
-
-`npx tsc --noEmit` et `npm run build` verts ; `npm run lint` = les 4 mêmes erreurs pré-existantes
-(auth/twitch/callback, summary, StatsSection, TodoStatusDropdown), aucune nouvelle.
-**Vérification navigateur toujours pas faite** (pas d'extension Chrome dans la session) : rendu à
-valider à l'œil.
-
-
-### Correctifs landing (retours utilisateur sur capture, même jour)
-
-- **Diversité du catalogue** : le hero, le carrousel, la grille « Catalogue », la file d'attente et le
-  fond Twitch ne piochaient que dans les 30 premières entrées (= Japon). Ils tirent désormais sur des
-  **listes d'ids explicites, un pays par carte** (Hong Kong, Corée, Chine, Taïwan, Vietnam, Japon,
-  Norvège, Suisse, Royaume-Uni, Indonésie, Thaïlande, Népal). ⚠️ Ne pas revenir à un `slice()` sur
-  `defaultVideos` : le tableau est trié par pays, un slice donne toujours le même.
-- **Carrousel 3D** : les cartes se chevauchaient et montraient leur **dos en miroir**. Corrigé par
-  (1) un rayon calculé — corde `2·R·sin(180°/N)` > largeur de carte + marge, soit R=560 pour 10 cartes
-  de 272 px ; (2) `backfaceVisibility: "hidden"` sur chaque carte ; (3) l'anneau **reculé de son propre
-  rayon** (`z: -radius`) pour que la carte de devant retombe à taille réelle au lieu d'exploser sous la
-  perspective. Les **caches latéraux en dégradé sont supprimés** (ils se lisaient comme deux rectangles
-  noirs sur la photo).
-- **Défilement des pays retiré** (il coupait mal et se lisait à peine).
-- **Halo du curseur rendu GLOBAL** : c'était une couche interne au hero, il s'éteignait donc net au
-  premier scroll. Il est maintenant une couche `fixed` alimentée par la position dans le viewport.
-- **Hero** : le timer **recule d'un plan** (`z:-90`) et les trois satellites passent devant
-  (`z: 60/95/130`), avec fonds plus opaques et ombre portée — ils étaient masqués derrière l'écran.
-  L'avatar d'ami n'est plus une vignette de vidéo (ça ne voulait rien dire) mais un monogramme.
-- **Lisibilité** : nouveau **voile de lecture** `fixed` sous le contenu, dont l'opacité monte au scroll
-  (0 → 0.86 sur les 12 premiers pourcents) — la ville reste visible dans le hero, tout le texte qui suit
-  repose sur un fond stable. Toutes les opacités de texte remontées d'un cran (plus aucun `text-white/25`
-  ni `/35`). **Heatmap refaite** : cases de 14 px, échelle à 5 paliers plus francs, initiales des jours
-  et légende « moins / plus ».
-
-
-### Landing : bande infinie + « la page est un pomodoro » (même jour)
-
-- **Carrousel remplacé par une BANDE INFINIE** (`CatalogueBelt` / `BeltCard`). L'anneau fermé était
-  une impasse : dès qu'on masquait les dos de cartes, la moitié arrière disparaissait et le cadre se
-  vidait. Désormais les cartes défilent sur un axe horizontal, se replient modulo la longueur de la
-  bande (`((i·SLOT - offset) mod SPAN) - SPAN/2`), s'inclinent d'autant plus qu'elles s'éloignent du
-  centre (`rotateY` borné ±46°, `z` négatif) et s'effacent avant le raccord. **Le cadre est toujours
-  plein**, le pas `SLOT = largeur + 52` garantit l'absence de chevauchement. Chaque carte calcule sa
-  place via `useTransform` sur une MotionValue partagée : zéro re-render par frame, même en glissant.
-- **Idée maîtresse : la landing EST un pomodoro** (`SessionClock`, dans la nav). Le compteur part de
-  25:00 en haut de page et atteint 00:00 en bas : parcourir la page, c'est dérouler une session.
-  **Si le visiteur lance le minuteur jouable de la section démo, celui-ci prend le relais** et la nav
-  bascule sur son temps à lui (libellé « cette page » → « ta session »). Arrivé à zéro, le libellé
-  passe à « pause méritée » et le CTA final **sonne** (deux ondes qui s'échappent du bouton).
-  ⚠️ Deux règles tenues ici : (1) le minuteur alimente la nav par une **MotionValue**, jamais par un
-  state remonté — sinon toute la page se re-rendrait à chaque seconde ; (2) `SessionClock` ne fait pas
-  commuter `useTransform` d'une source à l'autre entre deux rendus, il **s'abonne explicitement** à la
-  bonne source dans un effet.
-- Micro-motion perpétuelle réservée à un usage sémantique : le point qui bat dans l'horloge ne bat que
-  lorsqu'une vraie session tourne.
-
-## Journal de session — 2026-09-15 (refonte landing : passage à GSAP)
-
-**Décision d'architecture, à connaître avant de toucher à la landing.** La règle
-« moteur d'animation unique : `motion/react`, ne pas ajouter GSAP » (section
-« Langage visuel ») vaut toujours pour **le site connecté**. La **landing fait
-désormais exception** et tourne à 100 % sur **GSAP + ScrollTrigger**, à la
-demande de l'utilisateur. `LandingPage.tsx` et `CityBackdrop.tsx` n'importent
-plus `motion/react` du tout : la règle « un seul moteur de scroll par page » est
-donc respectée, c'est juste que ce moteur n'est pas le même sur les deux
-surfaces. Ne pas réintroduire `motion/react` dans ces deux fichiers.
-
-Dépendances ajoutées : `gsap` (3.15) + `@gsap/react` (2.1). Depuis GSAP 3.13
-tous les plugins sont gratuits, y compris ceux utilisés ici : **ScrollTrigger**,
-**ScrollSmoother**, **ScrambleTextPlugin**.
-
-### ⚠️ Le piège qui a coûté le plus cher : `refreshPriority`
-
-**Dans GSAP, un `refreshPriority` PLUS ÉLEVÉ se rafraîchit EN PREMIER.** Avec
-l'échelle inverse (épinglages en négatif), les deux sections épinglées étaient
-mesurées en dernier, donc après tout ce qui se trouve plus bas dans la page :
-**chaque déclencheur situé sous le catalogue démarrait 2128 px trop tôt**, très
-exactement la distance d'épinglage. Symptômes : le catalogue se superposait à la
-section précédente, l'index de chapitres éclairait le mauvais titre, les
-révélations se jouaient hors écran. Ni `ScrollTrigger.refresh()`, ni deux
-appels de suite n'y changeaient quoi que ce soit. L'échelle `PRIO` en tête de
-`LandingPage.tsx` est donc **décroissante**, du haut de la page vers le bas, et
-`below` vaut 0 parce que `ScrollTrigger.batch()` n'expose pas `refreshPriority`.
-
-Autres pièges rencontrés, tous commentés dans le code :
-- Les effets React s'exécutent **enfant d'abord** : les épinglages existent
-  avant l'effet du parent, d'où un `ScrollTrigger.refresh()` explicite en fin de
-  `useGSAP` de `LandingPage` (+ un second sur `document.fonts.ready`).
-- **Ne jamais mesurer une section épinglée** : une fois figée, son rectangle ne
-  bouge plus. L'index de chapitres lit des **ancres de flux** (`[data-anchor]`,
-  hauteur nulle) via la chaîne des `offsetTop` (et non `getBoundingClientRect`,
-  faussé par la transformation de ScrollSmoother).
-- Avec `containerAnimation`, les bornes en **pourcentage** se mesurent dans
-  l'espace de la piste et non du viewport : utiliser les **mots-clés**
-  (`"left right"`, `"left center"`).
-- `ScrollSmoother` transforme `#smooth-content` : tout ce qui est
-  `position: fixed` doit rester **hors** de `#smooth-wrapper`, et le fond de
-  page est porté par la **racine** (un fond opaque sur `#smooth-content`
-  masquait entièrement la photo de la ville).
-- Un `stagger` prolonge un tween bien après sa `duration` : en positionner un
-  autre au milieu les fait se chevaucher.
-
-### Chorégraphie (neuf blocs, neuf techniques distinctes)
-
-Direction tirée de la photo de fond (Séoul à l'heure bleue, vue de Namsan) et
-des références envoyées par l'utilisateur (davidecattaneo.it, jesperlandberg.com).
-
-1. **Hero** : titre découpé en mots, chacun dans son masque, timeline d'entrée.
-2. **Manifeste** : les mots s'allument un par un au scrub (`opacity` étagée).
-3. **La balade** (`CityWalk`, épinglée) : la rue se rapproche pendant que six
-   écrans du catalogue surgissent du fond et s'écartent vers les bords.
-4. **Le boulevard** (`Boulevard`, épinglée) : travelling horizontal
-   (`containerAnimation`), sol en perspective en CSS pur, chaque carte pivote
-   en traversant le cadre.
-5. **Les sources** : révélation en volet découpé (`clip-path`), via `batch`.
-6. **Le parcours** : un trait qui se dessine et dépose ses étapes au passage.
-7. **La trace** : heatmap en `stagger` de grille + chiffres qui se comptent.
-8. **L'index de chapitres** : repère qui suit le scroll, libellé recomposé au
-   `ScrambleTextPlugin` au changement de chapitre.
-9. **L'horloge de la nav** : la page EST un pomodoro (25:00 en haut, 00:00 en
-   bas) ; le minuteur jouable prend le relais dès qu'on le lance. Un seul
-   `gsap.ticker`, écriture directe dans le DOM, zéro re-render.
-
-**Abandonné sur retour utilisateur** : une transition en grille de blocs qui se
-refermait en volet. Techniquement correcte, mais « ça ressemble à un
-calendrier ». Ne pas la reproposer.
-
-### Reste à faire
-
-- **Vérification visuelle fine non faite** : l'onglet d'inspection automatisée
-  est en arrière-plan, donc `requestAnimationFrame` y est bridé et GSAP avance
-  au ralenti. La géométrie a été validée numériquement (positions
-  d'épinglage, bornes de déclencheurs, opacités), pas le rendu à l'oeil.
-- **Assets manquants** pour atteindre le niveau des références : voir
-  **`docs/ASSETS_LANDING.md`**. Le plus gros écart est la balade, qui fait
-  aujourd'hui grossir une photo fixe (donc un zoom) là où il faudrait une
-  séquence d'images scrubée (donc un déplacement).
-
-### Suite même jour — la balade devient une vraie ville modélisée (`three`)
-
-Retour utilisateur : « la balade dans la ville est nulle, y'a pas de
-modélisation, c'est juste bugué ». Les deux reproches étaient fondés.
-
-**Le bug.** La balade faisait grossir une photo pendant que des vignettes
-passaient en CSS 3D. À `z: 640` sous une `perspective: 1000px`, le facteur
-d'échelle est `1000 / (1000 - 640)` = **2,78** : une carte de 368 px devenait
-1430 px de large et partait à 4164 px hors de l'écran. Les vignettes étaient
-donc soit minuscules au loin, soit géantes et hors cadre.
-
-**Le fond du problème.** Même corrigée, l'approche ne pouvait pas marcher :
-une image plate qui grossit donne un **zoom**, jamais un **déplacement**. Le
-point de fuite ne bouge pas, aucune façade n'est dépassée. Sans géométrie, il
-n'y a pas de balade.
-
-**La réponse :** `components/CityScene.tsx`, une avenue nocturne **modélisée en
-three.js** (MIT, donc gratuit, conforme à la règle du projet), pilotée par le
-`ScrollTrigger` épinglé de `CityWalk` :
-- deux rangées d'immeubles sur trois profondeurs, en trois `InstancedMesh`
-  (un appel de dessin chacun), hauteurs et largeurs procédurales à graine fixe ;
-- façades, halos de lampadaires, marquage au sol et couchant **peints dans des
-  `<canvas>`** au montage : la scène n'a besoin d'aucun fichier ;
-- les **vignettes du catalogue montées en écrans géants sur les façades**
-  (contenu réel du produit ; `i.ytimg.com` renvoie bien le CORS nécessaire aux
-  textures WebGL, vérifié) ;
-- `MeshBasicMaterial` partout : une ville de nuit n'est que de l'émissif, donc
-  aucune lumière à calculer. Brouillard pour masquer le fond, pixel ratio
-  plafonné, boucle de rendu sur `gsap.ticker` ;
-- la caméra **tangue** (indexé sur la distance parcourue, pas sur le temps,
-  pour rester calé au scrub) : c'est ce tangage qui distingue une balade d'un
-  travelling sur rail ;
-- repli honnête (liste des lieux) sous `prefers-reduced-motion` **et** sans
-  WebGL ; `three` est chargé en `dynamic(ssr:false)` pour ne pas retarder le hero.
-
-**Pièges de scène corrigés, tous commentés dans le fichier :**
-- les immeubles étaient placés par leur AXE, donc une façade large de 13 sur un
-  axe à 14 avançait jusqu'à x=7,5, à l'intérieur d'une chaussée large de 22 :
-  les immeubles se tenaient dans la rue et avalaient les écrans. Ils sont
-  désormais placés par leur **face intérieure** ;
-- les UV d'une boîte s'étirent avec ses dimensions : sans `repeat` sur **les
-  deux axes**, les fenêtres devenaient des tirets horizontaux ;
-- en fusion additive, un halo unique partagé entre lampadaires et écrans
-  transformait la rue en taches orange : deux matériaux distincts ;
-- le plan de couchant, trop clair et trop grand, se lisait comme un mur de
-  brume grise bouchant la perspective.
-
-`docs/ASSETS_LANDING.md` est à jour : **la balade ne demande aucun asset**, tout
-est généré. Ce qui reste demandé y est marqué facultatif.
-
-### Suite même jour — la ville devient le décor de TOUTE la page
-
-Retours utilisateur : « le site n'est pas du tout fluide », « la partie balade
-n'est pas bien incrustée », « la ville est moche ». Les trois étaient fondés.
-
-**Fluidité.** Mesuré d'abord : le coût JavaScript par frame était dérisoire
-(0,25 à 1,24 ms, rendu WebGL inclus). Ce n'était donc pas la 3D mais la
-**composition**. Deux causes, toutes deux introduites par moi :
-1. une couche **`mix-blend-screen` en plein écran** dans le fond photo (le
-   navigateur recompose tout le viewport à chaque frame de scroll) ;
-2. **`ScrollSmoother`**, qui déporte le scroll sur le fil principal là où le
-   scroll natif se fait sur le compositeur. Sur une page déjà chargée en
-   couches, il amplifiait la saccade au lieu de l'adoucir.
-Les deux sont **supprimés**. `backdrop-blur-2xl` de la nav passe en
-`backdrop-blur-sm` (un flou d'arrière-plan fixe se recalcule à chaque frame).
-
-**Incrustation.** Le problème était structurel, pas cosmétique : une scène 3D
-enfermée dans une section, au milieu d'une page photographique, ne partage ni
-la lumière ni les couleurs du reste. **La scène est donc devenue le décor de la
-page entière** (`World` dans `LandingPage.tsx`) : le scroll fait marcher la
-caméra du premier au dernier écran, et tout le contenu se lit par-dessus. Il
-n'y a plus de raccord à faire. Une section vide de deux écrans
-(`[data-open-sky]`) donne le cadre à la ville seule, et le voile de lecture
-**se retire puis revient** sur cette plage.
-
-⚠️ **`components/CityBackdrop.tsx` est supprimé** (photo de Séoul + couche de
-fusion). Récupérable dans l'historique Git. `public/pexels-*.jpg` n'est plus
-utilisé par la landing.
-
-**Beauté.** La ville procédurale est refaite en quatre principes, tous
-commentés dans `CityScene.tsx` : **silhouettes** (immeubles quasi noirs, seules
-les fenêtres existent), **brouillard exponentiel dense** (la profondeur se lit
-seule, le fond se dissout dans le ciel), **bloom** (`UnrealBloomPass` à demi-
-résolution : c'est lui qui fait qu'une ville de nuit en temps réel cesse d'avoir
-l'air d'un jeu de 2005), et **une seule couleur chaude** sur un indigo froid.
-S'ajoutent des retraits en gradins au sommet des tours (sinon la skyline est une
-rangée de boîtes) et un ciel en dégradé accroché à la caméra.
-
-**La nuit tombe en marchant** : brouillard, ciel et **couleur du matériau des
-façades** sont interpolés au fil de la descente, donc les fenêtres s'allument
-pendant que le ciel s'éteint. Une ligne de code, et c'est tout le propos du
-produit.
-
-**Rendu à la demande** : si la position de scroll n'a pas changé, pas une frame
-n'est dessinée. À l'arrêt, le coût GPU de la page est nul.
-
-Dépendance ajoutée : `three` 0.186 (MIT), chargée en `dynamic(ssr:false)` pour
-ne pas retarder le hero. Repli (ciel dégradé fixe) sans WebGL et sous
-`prefers-reduced-motion`.
-
-### Suite même jour — la ville remodelée D'APRÈS LA PHOTO
-
-Retour utilisateur : « l'idée de la ville est giga mal modélisée, regarde
-l'ancienne photo ». Fondé, et l'écart était grossier : la photo du projet est
-une **vue plongeante sur une vallée de tours depuis Namsan**, avec trois plans
-de montagnes et un couchant derrière la crête. J'avais modélisé un **canyon
-symétrique vu du trottoir**. Ce n'était pas le même plan, pas le même point de
-vue, pas le même sujet.
-
-La scène est donc refaite **plan par plan d'après la photo** (relevé détaillé en
-tête de `CityScene.tsx`) : ciel d'heure bleue avec nuages, bande orange, trois
-crêtes en perspective atmosphérique, vallée dense d'immeubles sur une trame de
-rues avec carte de hauteurs, deux tours de premier plan qui cadrent, boulevard
-avec filés de phares blancs et rouges, tissu bas dont **on voit les toits**.
-
-**Le scroll est devenu une DESCENTE** : on démarre sur le cadrage de la photo,
-très au-dessus du boulevard, et on descend en avançant jusqu'au niveau de la
-rue. Le pas (tangage, roulis) n'apparaît que dans le dernier tiers, quand on est
-assez bas pour marcher.
-
-Pièges de rendu procédural rencontrés, tous commentés dans le fichier, et tous
-trouvés à l'écran et non au raisonnement :
-- **les toits** : en vue plongeante, une boîte dont la face supérieure porte la
-  texture de façade trahit immédiatement le pavé. Deux matériaux par immeuble,
-  dans l'ordre des groupes de `BoxGeometry` ;
-- **le dégradé du ciel** : le plan de fond dépasse largement le champ de la
-  caméra, on n'en voit que la portion v ∈ [0,34 ; 1]. Des arrêts répartis sur
-  toute la hauteur donnaient un ciel presque entièrement orange ;
-- **les crêtes invisibles** : dessinées trop bas dans la texture, elles se
-  projetaient sous le niveau du sol. Il n'en restait qu'une sur trois ;
-- **les fréquences du profil de crête** se lisent par rapport à la largeur de la
-  texture : à `x * 0,003`, la sinusoïde ne parcourt pas une demi-période sur
-  1024 px et la montagne devient une ligne droite ;
-- **la forme des montagnes** : un bruit aléatoire par point donne des dents de
-  scie, une somme de sinus donne des dunes. La bonne réponse est le bruit
-  « ridged » (`1 - |sin|`), dont les maxima sont anguleux et les minima
-  arrondis, soit la signature d'une ligne de crête ;
-- **les nuages** : une ellipse nette se lit comme un dessin animé. Elles sont
-  floutées au `ctx.filter` et très aplaties.
-
-Ajouté par-dessus le rendu (skill `high-end-visual-design`) : **grain argentique
-et vignettage** en couches fixes `pointer-events-none`. C'est ce qui fait
-basculer une image de synthèse du côté de la photo plutôt que du jeu vidéo, pour
-zéro coût de calcul.
-
-### Suite même jour — refonte complète sur référence validée (forgeautomotive.co.uk)
-
-L'utilisateur a fourni une référence et l'a validée sans ambiguïté : « c'est
-exactement le type de design que je veux en GSAP ». La landing est donc
-**entièrement refaite dans ce vocabulaire**, relevé section par section :
-
-- noir profond et grain fin, rien d'autre comme fond ;
-- **serif d'affichage en très grand, centrée** (Cormorant Garamond, gratuite,
-  chargée par `next/font`), pour tout ce qui parle ;
-- la même serif en **MOT FANTÔME** derrière les paragraphes, très basse
-  opacité, comme un filigrane de chapitre ;
-- **boutons RECTANGULAIRES à filet**, capitales très espacées, remplissage qui
-  arrive par la gauche en `scaleX`. Plus aucune pilule ;
-- photographie plein cadre, alternée avec des panneaux cadrés ;
-- **barre de progression de lecture** en bas de l'écran ;
-- chrome minuscule : horloge à gauche, nom au centre, action à droite.
-
-> ⚠️ **SYSTÈME DE FORMES : tout est à angle droit sur la landing.** Aucun
-> `rounded-*`, hormis les points et anneaux, ronds par nature. C'est le choix le
-> plus lourd de conséquences de la direction, et il se tient de bout en bout. Ne
-> pas y réintroduire de coins arrondis. Le site connecté, lui, garde son échelle
-> de rayons (`rounded-2xl` / `xl` / `lg`).
-
-**Structure** : hero photographique dominé par l'image (titre serif par-dessus,
-composition à trois cadres qui déborde sous le bord) → manifeste plein cadre
-dont la seconde ligne s'allume mot par mot → catalogue en travelling horizontal
-épinglé → **diaporama épinglé numéroté 01/03** (cadre net à gauche, LA MÊME
-IMAGE floutée en fond, mot fantôme, compteur) → sources en quatre panneaux →
-minuteur jouable → trace → action finale.
-
-**Le sentiment de balade** ne vient plus d'une scène 3D mais de la **parallaxe
-continue** : chaque photographie plein cadre dérive plus lentement que la page
-(`yPercent` scrubé, sur-cadrage `scale: 1.18` obligatoire sans quoi la dérive
-découvrirait le bord). C'est ce décalage, et lui seul, qui donne l'impression
-d'avancer DANS quelque chose. S'y ajoute une vraie séquence d'arrivée : la photo
-se détend depuis un sur-cadrage, les mots montent derrière leur masque, la
-composition se lève.
-
-⚠️ **`components/CityScene.tsx` et la dépendance `three` ont été SUPPRIMÉS.**
-La ville 3D procédurale contredisait ce langage photographique et typographique,
-et elle avait été rejetée deux fois. Récupérable dans l'historique Git.
-
-**Photographies** : six vraies photos de Séoul la nuit (Pexels, licence libre)
-dans `public/seoul/`, détaillées dans `docs/ASSETS_LANDING.md`. Deux registres à
-ne pas mélanger : **Séoul porte l'atmosphère**, **les vignettes du catalogue
-portent le produit**.
-
-Piège rencontré : une couche photographique en `-z-10` passe DERRIÈRE le fond de
-`main` si sa section ne crée pas de contexte d'empilement. `isolate` sur la
-section est obligatoire. Et des voiles `from-black ... to-black` pleins, doublés
-d'un vignettage à 0,9, recouvraient la photo en entier : les voiles doivent
-asseoir le texte, pas effacer l'image.
-
-### Suite même jour — analyse technique de la référence, et les effets qui bougent
-
-Retour utilisateur : « je préférais l'ancienne font », et « j'aimerais un truc
-plus dynamique, genre comme ce site où tu bouges ». J'ai donc analysé
-forgeautomotive.co.uk **dans son DOM**, et non à l'allure des captures.
-
-**Ce que la référence utilise réellement (relevé) :**
-
-| Indice trouvé | Conclusion |
-|---|---|
-| `window.Lenis` présent, pas de GSAP global | défilement amorti par **Lenis**, pas ScrollSmoother |
-| **22 noeuds `data-trail`** : un conteneur plein écran + 20 vignettes 259x324 à opacité 0 | **traînée d'images au curseur** |
-| `data-car` portant des `matrix()` pilotées en JS | **parallaxe de pointeur** sur la composition du hero |
-| `data-cinematic-words`, titre découpé en 13 enfants | révélation mot par mot |
-| polices `geistsans` + `editorial` | **ils utilisent Geist** pour le corps de texte |
-
-**Les quatre sont repris dans `LandingPage.tsx` :**
-
-1. **`SmoothScroll` (Lenis, MIT, ~2 ko)**. ⚠️ Ne PAS revenir à `ScrollSmoother` :
-   il enveloppe la page dans un conteneur transformé de douze mille pixels de
-   haut, ce qui casse `position: fixed`, complique les épinglages et déporte
-   tout sur le fil principal. Lenis interpole la position de scroll native,
-   donc rien ne casse. Il pousse ses mises à jour dans `ScrollTrigger.update`
-   et c'est `gsap.ticker` qui bat la mesure pour les deux, avec
-   `lagSmoothing(0)` (sans quoi l'amortissement fait un bond après chaque
-   hoquet).
-2. **`ImageTrail`** : bouger la souris sur le premier écran laisse une traînée
-   de paysages **du catalogue**. Douze éléments recyclés en anneau (aucune
-   allocation pendant le mouvement), émission cadencée par la DISTANCE
-   parcourue et non par le temps, et armement uniquement sur pointeur fin.
-3. **Parallaxe de pointeur** sur les trois cadres du hero, à des amplitudes
-   différentes, via `gsap.quickTo` (jamais un state React : l'arbre se
-   re-rendrait à chaque pixel).
-4. **Boutons magnétiques**, titres découpés en mots, parallaxe de scroll sur
-   chaque photographie plein cadre.
-
-**La police revient à Geist partout** (la serif Cormorant a été retirée, ainsi
-que son chargement dans `layout.tsx` et son token dans `globals.css`). Le
-titrage tient par la taille, la graisse légère et la chasse resserrée, pas par
-un changement de famille. La référence fait d'ailleurs pareil.
-
-> ⚠️ **« Commencer » n'apparaît qu'à TROIS endroits** : bandeau, hero, action
-> finale. Il y en avait six, ce qui banalisait l'action et hachait la lecture.
-> Ne pas en rajouter à chaque section.
-
-### Suite même jour — refonte de la COUCHE DE MOUVEMENT (SplitText)
-
-Retour utilisateur : « la traînée n'est pas dingue, on ne voit pas du GSAP comme
-je t'ai envoyé, refacto tout ». Fondé. Le diagnostic, à garder en tête :
-
-> **C'était de l'animation POSÉE SUR une page, pas une page CONSTRUITE par son
-> animation.** Concrètement : des fondus vers le haut de 0,95 s sur 36 px. Ça se
-> lit comme « une page correcte », jamais comme une pièce animée.
-
-Trois principes désormais tenus partout dans `LandingPage.tsx` :
-
-1. **RIEN N'APPARAÎT, TOUT ARRIVE.** Chaque texte passe par le composant
-   **`Lines`** : découpage en LIGNES par **SplitText** (gratuit depuis GSAP
-   3.13), chaque ligne montant derrière un masque (`mask: "lines"`). C'est la
-   signature visuelle du GSAP soigné, et c'est ce qui manquait le plus.
-   `autoSplit: true` est indispensable : sans lui les lignes sont calculées sur
-   la police de repli et les masques tombent au mauvais endroit. L'animation est
-   créée DANS `onSplit` et **retournée**, ce qui laisse SplitText la nettoyer et
-   la resynchroniser à chaque redécoupage.
-2. **DU POIDS.** `EASE = "power4.out"`, `DUR = 1.2`, `STAGGER = 0.085`, et de
-   grandes distances (une ligne monte de 118 % de sa hauteur). Les BLOCS
-   (panneaux, cadres, grilles) se dévoilent en `clip-path` par le bas plutôt
-   qu'en opacité, et le découpage est figé à la fin (`clipPath: "none"`) pour ne
-   laisser aucun coût de composition résiduel.
-3. **LES SECTIONS SE PASSENT LE RELAIS** (`[data-recede]`) : les plein-cadres
-   reculent et s'effacent pendant que la suivante arrive par-dessus. On traverse
-   des plans, on ne fait pas défiler une liste.
-
-**Traînée d'images densifiée** : pas ramené de 145 à **78 px** (à 145 px on
-obtenait trois vignettes éparses, c'est-à-dire rien), vignettes agrandies à
-17rem, et surtout une **entrée nette (0,55 s) contre une sortie longue (1,1 s)**.
-C'est cet écart qui fait un ruban ; deux durées égales ne donnent qu'un
-clignotement.
-
-⚠️ **Piège React 19** : `createElement(tag, { ref })` déclenche
-`react-hooks` « Cannot access refs during render ». `Lines` utilise donc du JSX
-avec un **ref de rappel**, jamais `createElement` avec un ref.
+## La landing
+
+> Section unique et à jour. Les journaux de refonte successifs ont été retirés :
+> ils se contredisaient et décrivaient des versions mortes. Ce qui suit décrit
+> `components/LandingPage.tsx` tel qu'il est.
+
+### L'idée : « Une nuit, quatre pomodoros »
+
+La page EST une nuit à Séoul, de **21:00 à 01:00**, et le scroll fait avancer
+l'heure. Elle est découpée au rythme du pomodoro : des cycles de travail
+séparés par de **vraies pauses**, où la page respire au lieu d'enchaîner.
+
+Ce n'est pas une métaphore posée après coup, c'est la structure du document :
+les sections SONT les cycles, l'horloge du bandeau SUIT le scroll, et les quatre
+marques de pomodoro se remplissent à mesure qu'on descend.
+
+Le propos, qui est la raison d'être d'une app de focus nocturne : **la nuit,
+tout le monde travaille.** La supérette, le taxi, la cuisine. Tu n'es pas seul.
+
+### Les trois gestes
+
+1. **`Neon`** — le titre ne monte pas et ne se fond pas, il **s'allume** :
+   quelques ratés d'amorçage aux durées irrégulières (un clignotement régulier
+   se lit comme une animation, pas comme un tube qui peine), puis la lueur
+   s'installe. ⚠️ Le halo passe par une **variable CSS animée** (`--glow`) et un
+   `calc()`, jamais par une interpolation de `text-shadow` : GSAP ne sait
+   interpoler une ombre que si les deux états ont exactement la même structure.
+2. **`Collapse`** — on ouvre sur Séoul en plein écran ; au scroll la photo **se
+   referme par les quatre côtés** jusqu'à n'être qu'une fenêtre éclairée.
+   `clip-path: inset()` animé, jamais `width`/`top`. Le filet est un élément
+   SÉPARÉ aux mêmes pourcentages (un `border` sur la photo serait coupé avec
+   elle). ⚠️ **Le voile s'efface, il ne s'épaissit pas** : il couvre tout,
+   fenêtre comprise, et l'épaissir éteignait ce qui devait rester allumé.
+3. **`Breath`** — entre deux cycles, la section **inspire puis expire** (une
+   timeline scrubée en deux temps). Une page qui enchaîne ses sections ne peut
+   pas parler de pauses de façon crédible ; celle-ci en impose une au lecteur.
+
+Plus : le **travelling horizontal** du catalogue, où le nom du pays s'écrit en
+très grand derrière et change quand la carte suivante prend le centre
+(`containerAnimation`, bornes en MOTS-CLÉS car les pourcentages y sont mesurés
+dans l'espace de la piste).
+
+### Le système
+
+- **Moteur : GSAP + ScrollTrigger + SplitText**, jamais `motion/react` ici.
+  **Lenis** pour le défilement amorti (et non `ScrollSmoother`, qui enveloppe la
+  page dans un conteneur transformé et déporte tout sur le fil principal).
+- **Tout le texte arrive par `Lines`** : découpage en lignes (SplitText,
+  `mask: "lines"`, `autoSplit`), chaque ligne montant derrière un masque.
+  `EASE = "power4.out"`, `DUR = 1.2`. Les blocs, eux, se dévoilent en `clip-path`.
+- **Formes : tout est à angle droit.** Aucun `rounded-*` sur la landing, hormis
+  points et anneaux. Boutons rectangulaires à filet, jamais de pilules.
+- **Police : Geist partout** (une serif a été essayée puis écartée).
+- **Imagerie, deux registres à ne pas mélanger** : les six photos de Séoul
+  (`public/seoul/`, Pexels, licence libre) portent l'atmosphère ; les vignettes
+  du catalogue portent le produit. Détail dans `docs/ASSETS_LANDING.md`.
+- **« Commencer » n'apparaît qu'à TROIS endroits** : bandeau, hero, fin de nuit.
+- ⚠️ **`refreshPriority` : une valeur PLUS ÉLEVÉE se rafraîchit EN PREMIER.**
+  Les sections épinglées allongent le document et doivent donc être mesurées
+  avant tout ce qui est plus bas. Échelle `PRIO` décroissante, `below: 0`
+  (défaut) parce que `ScrollTrigger.batch()` n'expose pas la propriété.
+
+### Outillage : ce qu'on ne peut PAS vérifier ici
+
+L'onglet piloté par l'extension Chrome est en arrière-plan : `requestAnimationFrame`
+y est bridé **et les captures d'écran sont en retard sur le DOM** (un `clip-path`
+appliqué et confirmé en style calculé s'affichait encore non découpé à la capture
+suivante). **Les mesures JS sont fiables, les captures ne le sont pas** pour du
+contenu animé ou photographique. Valider le rendu avec `npm run dev`.
