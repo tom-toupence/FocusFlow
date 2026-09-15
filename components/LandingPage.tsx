@@ -495,6 +495,10 @@ function HeroWindow() {
 const WORLD_SCREENS = pick(["cn-01", "tw-02", "hk-02", "no-01", "vn-01", "abao-11", "id-02", "uk-01", "th-01", "np-01"]);
 const WORLD_THUMBS = WORLD_SCREENS.map((v) => thumb(v.youtubeId));
 
+/** Grain argentique : bruit SVG en data-URI, zéro requête réseau. */
+const GRAIN =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
+
 // `three` est chargé à part : il ne doit pas retarder l'affichage du hero.
 const CityScene = dynamic(() => import("@/components/CityScene"), { ssr: false });
 
@@ -542,6 +546,22 @@ function World() {
   return (
     <div className="pointer-events-none fixed inset-0 z-0 bg-[#05060c]">
       {live && <CityScene progress={walk} thumbnails={WORLD_THUMBS} />}
+
+      {/* Finition photographique : grain argentique et vignettage, posés SUR le
+          rendu. C'est ce qui fait basculer une image de synthèse du côté de la
+          photo plutôt que du jeu vidéo, pour deux couches statiques et zéro
+          coût de calcul. Elles sont `fixed` et `pointer-events-none`, jamais
+          attachées à un conteneur qui défile. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-[0.055] mix-blend-overlay"
+        style={{ backgroundImage: GRAIN }}
+      />
+      <div
+        aria-hidden
+        className="absolute inset-0"
+        style={{ background: "radial-gradient(ellipse 110% 95% at 50% 45%, transparent 52%, rgba(2,3,8,0.55) 100%)" }}
+      />
       {/* Sans WebGL, ou en mouvement réduit : un ciel de nuit fixe. Le contenu
           de la page reste entièrement lisible, c'est tout ce qui compte. */}
       {!live && (

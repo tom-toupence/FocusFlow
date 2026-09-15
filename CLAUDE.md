@@ -981,3 +981,48 @@ n'est dessinée. À l'arrêt, le coût GPU de la page est nul.
 Dépendance ajoutée : `three` 0.186 (MIT), chargée en `dynamic(ssr:false)` pour
 ne pas retarder le hero. Repli (ciel dégradé fixe) sans WebGL et sous
 `prefers-reduced-motion`.
+
+### Suite même jour — la ville remodelée D'APRÈS LA PHOTO
+
+Retour utilisateur : « l'idée de la ville est giga mal modélisée, regarde
+l'ancienne photo ». Fondé, et l'écart était grossier : la photo du projet est
+une **vue plongeante sur une vallée de tours depuis Namsan**, avec trois plans
+de montagnes et un couchant derrière la crête. J'avais modélisé un **canyon
+symétrique vu du trottoir**. Ce n'était pas le même plan, pas le même point de
+vue, pas le même sujet.
+
+La scène est donc refaite **plan par plan d'après la photo** (relevé détaillé en
+tête de `CityScene.tsx`) : ciel d'heure bleue avec nuages, bande orange, trois
+crêtes en perspective atmosphérique, vallée dense d'immeubles sur une trame de
+rues avec carte de hauteurs, deux tours de premier plan qui cadrent, boulevard
+avec filés de phares blancs et rouges, tissu bas dont **on voit les toits**.
+
+**Le scroll est devenu une DESCENTE** : on démarre sur le cadrage de la photo,
+très au-dessus du boulevard, et on descend en avançant jusqu'au niveau de la
+rue. Le pas (tangage, roulis) n'apparaît que dans le dernier tiers, quand on est
+assez bas pour marcher.
+
+Pièges de rendu procédural rencontrés, tous commentés dans le fichier, et tous
+trouvés à l'écran et non au raisonnement :
+- **les toits** : en vue plongeante, une boîte dont la face supérieure porte la
+  texture de façade trahit immédiatement le pavé. Deux matériaux par immeuble,
+  dans l'ordre des groupes de `BoxGeometry` ;
+- **le dégradé du ciel** : le plan de fond dépasse largement le champ de la
+  caméra, on n'en voit que la portion v ∈ [0,34 ; 1]. Des arrêts répartis sur
+  toute la hauteur donnaient un ciel presque entièrement orange ;
+- **les crêtes invisibles** : dessinées trop bas dans la texture, elles se
+  projetaient sous le niveau du sol. Il n'en restait qu'une sur trois ;
+- **les fréquences du profil de crête** se lisent par rapport à la largeur de la
+  texture : à `x * 0,003`, la sinusoïde ne parcourt pas une demi-période sur
+  1024 px et la montagne devient une ligne droite ;
+- **la forme des montagnes** : un bruit aléatoire par point donne des dents de
+  scie, une somme de sinus donne des dunes. La bonne réponse est le bruit
+  « ridged » (`1 - |sin|`), dont les maxima sont anguleux et les minima
+  arrondis, soit la signature d'une ligne de crête ;
+- **les nuages** : une ellipse nette se lit comme un dessin animé. Elles sont
+  floutées au `ctx.filter` et très aplaties.
+
+Ajouté par-dessus le rendu (skill `high-end-visual-design`) : **grain argentique
+et vignettage** en couches fixes `pointer-events-none`. C'est ce qui fait
+basculer une image de synthèse du côté de la photo plutôt que du jeu vidéo, pour
+zéro coût de calcul.
