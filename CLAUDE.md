@@ -881,3 +881,53 @@ calendrier ». Ne pas la reproposer.
   **`docs/ASSETS_LANDING.md`**. Le plus gros écart est la balade, qui fait
   aujourd'hui grossir une photo fixe (donc un zoom) là où il faudrait une
   séquence d'images scrubée (donc un déplacement).
+
+### Suite même jour — la balade devient une vraie ville modélisée (`three`)
+
+Retour utilisateur : « la balade dans la ville est nulle, y'a pas de
+modélisation, c'est juste bugué ». Les deux reproches étaient fondés.
+
+**Le bug.** La balade faisait grossir une photo pendant que des vignettes
+passaient en CSS 3D. À `z: 640` sous une `perspective: 1000px`, le facteur
+d'échelle est `1000 / (1000 - 640)` = **2,78** : une carte de 368 px devenait
+1430 px de large et partait à 4164 px hors de l'écran. Les vignettes étaient
+donc soit minuscules au loin, soit géantes et hors cadre.
+
+**Le fond du problème.** Même corrigée, l'approche ne pouvait pas marcher :
+une image plate qui grossit donne un **zoom**, jamais un **déplacement**. Le
+point de fuite ne bouge pas, aucune façade n'est dépassée. Sans géométrie, il
+n'y a pas de balade.
+
+**La réponse :** `components/CityScene.tsx`, une avenue nocturne **modélisée en
+three.js** (MIT, donc gratuit, conforme à la règle du projet), pilotée par le
+`ScrollTrigger` épinglé de `CityWalk` :
+- deux rangées d'immeubles sur trois profondeurs, en trois `InstancedMesh`
+  (un appel de dessin chacun), hauteurs et largeurs procédurales à graine fixe ;
+- façades, halos de lampadaires, marquage au sol et couchant **peints dans des
+  `<canvas>`** au montage : la scène n'a besoin d'aucun fichier ;
+- les **vignettes du catalogue montées en écrans géants sur les façades**
+  (contenu réel du produit ; `i.ytimg.com` renvoie bien le CORS nécessaire aux
+  textures WebGL, vérifié) ;
+- `MeshBasicMaterial` partout : une ville de nuit n'est que de l'émissif, donc
+  aucune lumière à calculer. Brouillard pour masquer le fond, pixel ratio
+  plafonné, boucle de rendu sur `gsap.ticker` ;
+- la caméra **tangue** (indexé sur la distance parcourue, pas sur le temps,
+  pour rester calé au scrub) : c'est ce tangage qui distingue une balade d'un
+  travelling sur rail ;
+- repli honnête (liste des lieux) sous `prefers-reduced-motion` **et** sans
+  WebGL ; `three` est chargé en `dynamic(ssr:false)` pour ne pas retarder le hero.
+
+**Pièges de scène corrigés, tous commentés dans le fichier :**
+- les immeubles étaient placés par leur AXE, donc une façade large de 13 sur un
+  axe à 14 avançait jusqu'à x=7,5, à l'intérieur d'une chaussée large de 22 :
+  les immeubles se tenaient dans la rue et avalaient les écrans. Ils sont
+  désormais placés par leur **face intérieure** ;
+- les UV d'une boîte s'étirent avec ses dimensions : sans `repeat` sur **les
+  deux axes**, les fenêtres devenaient des tirets horizontaux ;
+- en fusion additive, un halo unique partagé entre lampadaires et écrans
+  transformait la rue en taches orange : deux matériaux distincts ;
+- le plan de couchant, trop clair et trop grand, se lisait comme un mur de
+  brume grise bouchant la perspective.
+
+`docs/ASSETS_LANDING.md` est à jour : **la balade ne demande aucun asset**, tout
+est généré. Ce qui reste demandé y est marqué facultatif.

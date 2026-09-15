@@ -7,8 +7,8 @@ import { ScrollSmoother } from "gsap/ScrollSmoother";
 import { ScrambleTextPlugin } from "gsap/ScrambleTextPlugin";
 import { useGSAP } from "@gsap/react";
 import { signInWithGoogle } from "@/lib/supabase";
-import Image from "next/image";
-import CityBackdrop, { CITY_PHOTO } from "@/components/CityBackdrop";
+import dynamic from "next/dynamic";
+import CityBackdrop from "@/components/CityBackdrop";
 import { defaultVideos } from "@/data/videos";
 import { cn } from "@/lib/utils";
 
@@ -469,119 +469,88 @@ function HeroWindow() {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   LA BALADE — on descend l'avenue à pied, les écrans défilent
+   LA BALADE — on descend l'avenue, dans une ville modélisée
    ══════════════════════════════════════════════════════════════════════════
 
    Le grand plan de la page, et sa bascule entre la moitié « ville » et la
-   moitié « produit ». Le scroll devient une CAMÉRA : elle avance dans la
-   photo (travelling avant), pendant que les paysages du catalogue passent de
-   part et d'autre comme des vitrines allumées qu'on longe. On n'arrive pas
-   sur le catalogue, on y marche.
+   moitié « produit ». Section épinglée : le scroll ne fait plus défiler du
+   contenu, il FAIT MARCHER une caméra dans une scène 3D (`CityScene`).
 
-   Trois couches, une seule timeline scrubée :
-     1. la photo, qui grossit lentement (la marche)
-     2. le voile, qui s'épaissit (on s'enfonce dans la rue)
-     3. six écrans, qui surgissent du fond, grossissent et s'écartent vers les
-        bords (la parallaxe de ce qu'on dépasse)
+   Deux versions ont échoué avant celle-ci, et pour la même raison de fond :
+     1. une grille de blocs qui se refermait en volet. Techniquement correcte,
+        mais une grille de carrés colorés se lit comme un calendrier.
+     2. une photo qui grossissait pendant que des vignettes passaient en CSS 3D.
+        Bancale (à z=640 sous une perspective de 1000, une carte est agrandie
+        2,78 fois et sort du cadre), et surtout : une image plate qui grossit
+        donne un ZOOM, jamais un DÉPLACEMENT. Sans géométrie, il n'y a ni point
+        de fuite qui bouge, ni façade qu'on dépasse, donc pas de balade.
 
-   (Version précédente, abandonnée sur retour utilisateur : une grille de blocs
-   qui se refermait en volet. Techniquement juste, mais une grille de carrés
-   colorés se lit comme un calendrier, pas comme un plan de cinéma.)
+   D'où une vraie scène. Le détail de la modélisation et des choix de perf est
+   dans `CityScene.tsx`.
 
-   ⚠️ POUR ALLER PLUS LOIN, IL FAUT UN ASSET. Une vraie balade filmée se fait
-   en SÉQUENCE D'IMAGES scrubée sur un canvas (la technique Apple/Locomotive) :
-   une photo unique qui grossit ne donne qu'un zoom, jamais un déplacement. Le
-   jour où les frames existent, seule la couche 1 change : voir
-   `docs/ASSETS_LANDING.md`. Le reste de la chorégraphie est déjà en place. */
+   Ici on ne fait que trois choses : épingler, convertir le scroll en avancée,
+   et fournir un repli honnête quand la 3D n'est pas souhaitable (mouvement
+   réduit) ou pas disponible (pas de WebGL). */
 
-const WALK_SCREENS = pick(["cn-01", "tw-02", "hk-02", "no-01", "vn-01", "abao-11"]);
+const WALK_SCREENS = pick(["cn-01", "tw-02", "hk-02", "no-01", "vn-01", "abao-11", "id-02", "uk-01"]);
 
-// Côté de la rue, hauteur dans le cadre, inclinaison. Déterministe, pour que
-// la scène soit la même à chaque visite.
-const WALK_LANES = [
-  { side: -1, y: -9, rot: 15 },
-  { side: 1, y: 7, rot: -15 },
-  { side: -1, y: 13, rot: 12 },
-  { side: 1, y: -13, rot: -18 },
-  { side: -1, y: 4, rot: 17 },
-  { side: 1, y: -5, rot: -12 },
-];
+// La scène est chargée à part : `three` ne doit pas peser sur le premier rendu
+// de la landing, qui doit afficher le hero tout de suite.
+const CityScene = dynamic(() => import("@/components/CityScene"), { ssr: false });
+
+/** Sonde de capacité. La disponibilité de WebGL est un état du navigateur, pas
+ *  de React : elle se lit dans un effet, jamais pendant le rendu, qui doit
+ *  rester pur. `null` tant qu'on ne sait pas. */
+function useWebGL() {
+  const [ok, setOk] = useState<boolean | null>(null);
+  useEffect(() => {
+    const probe = () => {
+      try {
+        const c = document.createElement("canvas");
+        setOk(Boolean(c.getContext("webgl2") || c.getContext("webgl")));
+      } catch {
+        setOk(false);
+      }
+    };
+    probe();
+  }, []);
+  return ok;
+}
 
 function CityWalk() {
   const section = useRef<HTMLElement>(null);
   const reduced = useReducedMotionPref();
+  const webgl = useWebGL();
+
+  // L'avancée de la marche. Un ref, lu à la frame par la scène : la position
+  // de la caméra ne passe jamais par un state React.
+  const progress = useRef({ v: 0 });
+  const live = webgl === true && !reduced;
 
   useGSAP(
     () => {
-      if (reduced) return;
-      const screens = gsap.utils.toArray<HTMLElement>("[data-walk]", section.current);
-      const photo = section.current?.querySelector<HTMLElement>("[data-walk-photo]");
-      const veil = section.current?.querySelector<HTMLElement>("[data-walk-veil]");
-      if (screens.length === 0 || !photo || !veil) return;
-
-      gsap.set(screens, { xPercent: -50, yPercent: -50, autoAlpha: 0 });
-
-      const tl = gsap.timeline({
-        defaults: { ease: "none" },
-        scrollTrigger: {
-          trigger: section.current,
-          start: "top top",
-          end: "+=260%",
-          pin: true,
-          scrub: 0.7,
-          anticipatePin: 1,
-          // Les distances latérales sont exprimées en largeur de fenêtre :
-          // il faut les recalculer à chaque redimensionnement.
-          invalidateOnRefresh: true,
-          refreshPriority: PRIO.walk,
+      if (!live) return;
+      const st = ScrollTrigger.create({
+        trigger: section.current,
+        start: "top top",
+        end: "+=320%",
+        pin: true,
+        scrub: 0.6,
+        anticipatePin: 1,
+        refreshPriority: PRIO.walk,
+        onUpdate: (self) => {
+          progress.current.v = self.progress;
         },
       });
-
-      // 1. la marche : la rue se rapproche
-      tl.fromTo(photo, { scale: 1.04 }, { scale: 1.46, duration: 4 }, 0)
-        // 2. on s'enfonce : la lumière du ciel se retire
-        .fromTo(veil, { opacity: 0.15 }, { opacity: 0.74, duration: 4 }, 0);
-
-      // 3. les vitrines qu'on dépasse
-      screens.forEach((el, i) => {
-        const lane = WALK_LANES[i % WALK_LANES.length];
-        const at = i * 0.42;
-        tl.fromTo(
-          el,
-          {
-            z: -2600,
-            x: () => lane.side * window.innerWidth * 0.1,
-            rotateY: lane.rot,
-            autoAlpha: 0,
-          },
-          {
-            z: 640,
-            // Elles s'écartent vers les bords à mesure qu'elles approchent :
-            // c'est ce glissement latéral, et non le grossissement seul, qui
-            // fait qu'on LONGE la rue au lieu de foncer dedans.
-            x: () => lane.side * window.innerWidth * 0.82,
-            rotateY: lane.rot * 0.35,
-            autoAlpha: 1,
-            duration: 1.7,
-          },
-          at
-        )
-          // Elle s'efface juste avant de sortir du cadre : au-delà, une image
-          // plein écran qui explose est du bruit, pas de la vitesse.
-          .to(el, { autoAlpha: 0, duration: 0.4 }, at + 1.35);
-      });
-
-      return () => {
-        tl.scrollTrigger?.kill();
-        tl.kill();
-      };
+      return () => st.kill();
     },
-    { scope: section, dependencies: [reduced], revertOnUpdate: true }
+    { scope: section, dependencies: [live], revertOnUpdate: true }
   );
 
-  // Sous reduced-motion, une caméra qui avance n'a aucun sens : on la remplace
-  // par ce qu'elle dit, la liste des lieux qu'on longe.
-  if (reduced) {
+  // Repli : mouvement réduit, ou pas de WebGL. Une caméra qui avance n'a
+  // aucun sens dans le premier cas et n'existe pas dans le second : on donne
+  // ce que la scène raconte, la liste des lieux qu'on longe.
+  if (webgl === null || !live) {
     return (
       <section className="mx-auto w-full max-w-[86rem] px-4 py-24 sm:px-8">
         <ul className="flex flex-wrap gap-x-7 gap-y-3 font-mono text-[11px] uppercase tracking-[0.18em] text-white/55">
@@ -594,42 +563,30 @@ function CityWalk() {
   }
 
   return (
-    <section
-      ref={section}
-      className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden"
-      style={{ perspective: "1000px" }}
-    >
-      {/* La rue. Même fichier que le fond de page : le navigateur l'a déjà en
-          cache, cette couche ne coûte donc aucun téléchargement. */}
-      <div data-walk-photo aria-hidden className="absolute inset-0 will-change-transform">
-        <Image src={CITY_PHOTO} alt="" fill sizes="100vw" className="object-cover object-center" />
-      </div>
-      <div data-walk-veil aria-hidden className="absolute inset-0 bg-[#05060c]" />
+    <section ref={section} className="relative h-[100dvh] overflow-hidden bg-[#05060c]">
+      <CityScene progress={progress} thumbnails={WALK_SCREENS.map((v) => thumb(v.youtubeId))} />
 
-      <div className="absolute inset-0" style={{ transformStyle: "preserve-3d" }}>
-        {WALK_SCREENS.map((v, i) => {
-          const lane = WALK_LANES[i % WALK_LANES.length];
-          return (
-            <figure
-              key={v.id}
-              data-walk
-              className="absolute w-[17rem] sm:w-[23rem]"
-              style={{ left: "50%", top: `${50 + lane.y}%` }}
-            >
-              <div className="overflow-hidden rounded-2xl border border-white/15 shadow-[0_40px_90px_-30px_rgba(0,0,0,0.95)]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={thumb(v.youtubeId)} alt="" loading="lazy" className="aspect-[16/10] w-full object-cover" />
-              </div>
-              <figcaption className="mt-3 font-mono text-[11px] uppercase tracking-[0.18em] text-white/60">
-                {v.country}
-              </figcaption>
-            </figure>
-          );
-        })}
-      </div>
+      {/* La scène est décorative pour une synthèse vocale : on écrit ce qu'elle
+          montre, sinon ce chapitre est un trou de trois écrans de scroll. */}
+      <p className="sr-only">
+        Descente d&apos;une avenue la nuit. Les paysages du catalogue sont affichés en grand sur les façades :{" "}
+        {WALK_SCREENS.map((v) => v.country).join(", ")}.
+      </p>
+
+      {/* Dégradés de raccord : la scène ne doit pas s'arrêter sur une ligne
+          nette en haut et en bas de l'écran. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#05060c] to-transparent"
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#05060c] to-transparent"
+      />
     </section>
   );
 }
+
 /* ══════════════════════════════════════════════════════════════════════════
    LE MANIFESTE — les mots s'allument un par un, comme les fenêtres
    ══════════════════════════════════════════════════════════════════════════
