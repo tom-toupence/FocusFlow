@@ -799,3 +799,85 @@ valider à l'œil.
   bonne source dans un effet.
 - Micro-motion perpétuelle réservée à un usage sémantique : le point qui bat dans l'horloge ne bat que
   lorsqu'une vraie session tourne.
+
+## Journal de session — 2026-09-15 (refonte landing : passage à GSAP)
+
+**Décision d'architecture, à connaître avant de toucher à la landing.** La règle
+« moteur d'animation unique : `motion/react`, ne pas ajouter GSAP » (section
+« Langage visuel ») vaut toujours pour **le site connecté**. La **landing fait
+désormais exception** et tourne à 100 % sur **GSAP + ScrollTrigger**, à la
+demande de l'utilisateur. `LandingPage.tsx` et `CityBackdrop.tsx` n'importent
+plus `motion/react` du tout : la règle « un seul moteur de scroll par page » est
+donc respectée, c'est juste que ce moteur n'est pas le même sur les deux
+surfaces. Ne pas réintroduire `motion/react` dans ces deux fichiers.
+
+Dépendances ajoutées : `gsap` (3.15) + `@gsap/react` (2.1). Depuis GSAP 3.13
+tous les plugins sont gratuits, y compris ceux utilisés ici : **ScrollTrigger**,
+**ScrollSmoother**, **ScrambleTextPlugin**.
+
+### ⚠️ Le piège qui a coûté le plus cher : `refreshPriority`
+
+**Dans GSAP, un `refreshPriority` PLUS ÉLEVÉ se rafraîchit EN PREMIER.** Avec
+l'échelle inverse (épinglages en négatif), les deux sections épinglées étaient
+mesurées en dernier, donc après tout ce qui se trouve plus bas dans la page :
+**chaque déclencheur situé sous le catalogue démarrait 2128 px trop tôt**, très
+exactement la distance d'épinglage. Symptômes : le catalogue se superposait à la
+section précédente, l'index de chapitres éclairait le mauvais titre, les
+révélations se jouaient hors écran. Ni `ScrollTrigger.refresh()`, ni deux
+appels de suite n'y changeaient quoi que ce soit. L'échelle `PRIO` en tête de
+`LandingPage.tsx` est donc **décroissante**, du haut de la page vers le bas, et
+`below` vaut 0 parce que `ScrollTrigger.batch()` n'expose pas `refreshPriority`.
+
+Autres pièges rencontrés, tous commentés dans le code :
+- Les effets React s'exécutent **enfant d'abord** : les épinglages existent
+  avant l'effet du parent, d'où un `ScrollTrigger.refresh()` explicite en fin de
+  `useGSAP` de `LandingPage` (+ un second sur `document.fonts.ready`).
+- **Ne jamais mesurer une section épinglée** : une fois figée, son rectangle ne
+  bouge plus. L'index de chapitres lit des **ancres de flux** (`[data-anchor]`,
+  hauteur nulle) via la chaîne des `offsetTop` (et non `getBoundingClientRect`,
+  faussé par la transformation de ScrollSmoother).
+- Avec `containerAnimation`, les bornes en **pourcentage** se mesurent dans
+  l'espace de la piste et non du viewport : utiliser les **mots-clés**
+  (`"left right"`, `"left center"`).
+- `ScrollSmoother` transforme `#smooth-content` : tout ce qui est
+  `position: fixed` doit rester **hors** de `#smooth-wrapper`, et le fond de
+  page est porté par la **racine** (un fond opaque sur `#smooth-content`
+  masquait entièrement la photo de la ville).
+- Un `stagger` prolonge un tween bien après sa `duration` : en positionner un
+  autre au milieu les fait se chevaucher.
+
+### Chorégraphie (neuf blocs, neuf techniques distinctes)
+
+Direction tirée de la photo de fond (Séoul à l'heure bleue, vue de Namsan) et
+des références envoyées par l'utilisateur (davidecattaneo.it, jesperlandberg.com).
+
+1. **Hero** : titre découpé en mots, chacun dans son masque, timeline d'entrée.
+2. **Manifeste** : les mots s'allument un par un au scrub (`opacity` étagée).
+3. **La balade** (`CityWalk`, épinglée) : la rue se rapproche pendant que six
+   écrans du catalogue surgissent du fond et s'écartent vers les bords.
+4. **Le boulevard** (`Boulevard`, épinglée) : travelling horizontal
+   (`containerAnimation`), sol en perspective en CSS pur, chaque carte pivote
+   en traversant le cadre.
+5. **Les sources** : révélation en volet découpé (`clip-path`), via `batch`.
+6. **Le parcours** : un trait qui se dessine et dépose ses étapes au passage.
+7. **La trace** : heatmap en `stagger` de grille + chiffres qui se comptent.
+8. **L'index de chapitres** : repère qui suit le scroll, libellé recomposé au
+   `ScrambleTextPlugin` au changement de chapitre.
+9. **L'horloge de la nav** : la page EST un pomodoro (25:00 en haut, 00:00 en
+   bas) ; le minuteur jouable prend le relais dès qu'on le lance. Un seul
+   `gsap.ticker`, écriture directe dans le DOM, zéro re-render.
+
+**Abandonné sur retour utilisateur** : une transition en grille de blocs qui se
+refermait en volet. Techniquement correcte, mais « ça ressemble à un
+calendrier ». Ne pas la reproposer.
+
+### Reste à faire
+
+- **Vérification visuelle fine non faite** : l'onglet d'inspection automatisée
+  est en arrière-plan, donc `requestAnimationFrame` y est bridé et GSAP avance
+  au ralenti. La géométrie a été validée numériquement (positions
+  d'épinglage, bornes de déclencheurs, opacités), pas le rendu à l'oeil.
+- **Assets manquants** pour atteindre le niveau des références : voir
+  **`docs/ASSETS_LANDING.md`**. Le plus gros écart est la balade, qui fait
+  aujourd'hui grossir une photo fixe (donc un zoom) là où il faudrait une
+  séquence d'images scrubée (donc un déplacement).

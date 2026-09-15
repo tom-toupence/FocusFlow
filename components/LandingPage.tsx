@@ -1,90 +1,125 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  motion,
-  useMotionValue,
-  useMotionTemplate,
-  useReducedMotion,
-  useScroll,
-  useSpring,
-  useTransform,
-  MotionConfig,
-  type MotionValue,
-} from "motion/react";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { ScrollSmoother } from "gsap/ScrollSmoother";
+import { ScrambleTextPlugin } from "gsap/ScrambleTextPlugin";
+import { useGSAP } from "@gsap/react";
 import { signInWithGoogle } from "@/lib/supabase";
-import CityBackdrop from "@/components/CityBackdrop";
+import Image from "next/image";
+import CityBackdrop, { CITY_PHOTO } from "@/components/CityBackdrop";
 import { defaultVideos } from "@/data/videos";
 import { cn } from "@/lib/utils";
 
 // ═══════════════════════════════════════════════════════════════════════════
-// LANDING — « Ethereal Glass » posée sur la ville la nuit, en cascade Z.
+// LANDING — « LE MUR DE FENÊTRES »
 //
-// PARTI PRIS SUR L'IMAGERIE : zéro photo générique. Toutes les images de cette
-// page sont les VRAIES vignettes YouTube du catalogue (`data/videos.ts`) :
-// Shibuya sous la pluie, la baie de Yokohama, le Bund la nuit. C'est le produit
-// qui s'illustre lui-même, et chaque image est raccord avec son propos.
-// Les trois sources externes (YouTube, Spotify, Twitch) ne sont PAS illustrées
-// par des photos mais par leur marque et un morceau de leur interface.
+// L'IDÉE, tirée de la photo du fond (Séoul, heure bleue, vue de Namsan) :
+// une tour à la tombée de la nuit, c'est une grille stricte de petits
+// rectangles qui s'allument un par un. Or une grille de rectangles qui
+// s'allument, c'est AUSSI la heatmap de ta concentration, ta grille de
+// pomodoros, et ton catalogue en vignettes. La page adopte donc ce module
+// unique, la fenêtre, et GSAP l'allume au scroll exactement comme la nuit
+// allume la ville. Une session = une fenêtre allumée.
+// L'avenue rectiligne du bas de la photo, elle, devient le travelling
+// horizontal du catalogue.
 //
-// AMBIANCE : `CityBackdrop` tient le fond en `fixed` et fait tomber la nuit au
-// fil du scroll (la photo descend, le couchant s'efface, les fenêtres
-// s'allument, un rail d'heure avance).
+// MOTEUR : GSAP + ScrollTrigger, et rien d'autre. Cette page n'importe PAS
+// `motion/react` : deux moteurs de scroll sur la même page se disputent les
+// frames. Le site connecté, lui, reste intégralement sur `motion/react`.
 //
-// 3D : une vraie scène `preserve-3d` dans le hero. Les éléments flottent à des
-// profondeurs différentes (`translateZ`) et la scène s'oriente vers le curseur,
-// donc la parallaxe est réelle et non simulée.
+// IMAGERIE : zéro photo générique. Toutes les images sont les VRAIES vignettes
+// YouTube du catalogue (`data/videos.ts`). Les sources externes (YouTube,
+// Spotify, Twitch) ne sont pas illustrées par des photos mais par leur marque
+// et un fragment de leur interface.
 //
-// PERF : uniquement `transform` / `opacity`. La position du pointeur vit dans
-// des MotionValue, jamais dans un state. `backdrop-blur` réservé aux éléments
-// fixes et aux cartes de taille modeste. Tout se replie sous reduced-motion.
+// SYSTÈME DE FORMES, une seule échelle tenue partout :
+//   fenêtre (module de base, tuiles) ....... rounded-[3px]
+//   panneau / carte ........................ rounded-2xl
+//   contrôle (bouton, pilule) .............. rounded-full
+//
+// ACCENT UNIQUE : #ffc38a, la couleur exacte des fenêtres allumées sur la
+// photo. Les seules autres couleurs de la page sont les marques (YouTube,
+// Spotify, Twitch), qui sont sémantiques.
+//
+// PERF : uniquement `transform` et `opacity`. La position du pointeur passe par
+// `gsap.quickTo`, jamais par un state React. Tout se replie sous
+// `prefers-reduced-motion`, via `gsap.matchMedia()` pour l'animation et via
+// `useReducedMotionPref()` quand c'est la MISE EN PAGE qui doit changer.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const SPRING = { stiffness: 110, damping: 20, mass: 0.6 };
-const EASE = [0.32, 0.72, 0, 1] as const;
+// ORDRE DE RAFRAÎCHISSEMENT (`refreshPriority`) : les effets React s'exécutent
+// ENFANT D'ABORD, les ScrollTriggers ne naissent donc PAS dans l'ordre de la
+// page. Or deux sections sont épinglées, et un épinglage ALLONGE le document :
+// tout déclencheur situé plus bas doit être mesuré APRÈS elles, sinon ses
+// bornes sont calculées sur une page trop courte. D'où cette échelle, qui
+// rejoue l'ordre de lecture.
+//
+// ⚠️ LE SENS EST CONTRE-INTUITIF, et me l'être trompé a coûté cher : dans
+// GSAP, un `refreshPriority` PLUS ÉLEVÉ se rafraîchit EN PREMIER. Avec une
+// échelle croissante (les épinglages au-dessus de 0), ils étaient mesurés en
+// DERNIER, donc après tout ce qui se trouve plus bas dans la page : chaque
+// déclencheur situé sous le catalogue démarrait exactement 2128 px trop tôt,
+// soit très précisément la distance d'épinglage. D'où l'échelle DÉCROISSANTE
+// ci-dessous, du haut de la page vers le bas.
+//
+// `below` vaut 0, qui est aussi la valeur par défaut : c'est indispensable,
+// parce que `ScrollTrigger.batch()` n'expose pas `refreshPriority` et que ses
+// révélations doivent donc se rafraîchir en dernier, après les épinglages.
+const PRIO = {
+  backdrop: 40, // le fond, qui couvre toute la page
+  hero: 30, // voile de lecture, sortie du hero, manifeste, progression
+  walk: 20, // 1re section épinglée : la balade dans la rue
+  boulevard: 10, // 2e section épinglée : le travelling du catalogue
+  below: 0, // tout ce qui vient après les épinglages (révélations, trace)
+} as const;
+
+if (typeof window !== "undefined") gsap.registerPlugin(useGSAP, ScrollTrigger, ScrollSmoother, ScrambleTextPlugin);
 
 const thumb = (id: string) => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+const byId = (id: string) => defaultVideos.find((v) => v.id === id);
+const pick = (ids: string[]) => ids.map(byId).filter((v): v is NonNullable<typeof v> => Boolean(v));
+
+const POMODORO_SECONDS = 25 * 60;
+const pad = (n: number) => String(Math.floor(n)).padStart(2, "0");
+
+/** État partagé de « l'horloge de la page ». Lu à la frame par `SessionClock`,
+ *  écrit par le scroll et par le minuteur jouable. Un ref, donc zéro re-render
+ *  de l'arbre React à la seconde. */
+type Clock = { scroll: number; live: boolean; total: number; left: number };
+
+/** `prefers-reduced-motion`, pour les cas où c'est la MISE EN PAGE qui change
+ *  (et pas seulement l'animation, que `gsap.matchMedia()` gère très bien). */
+function useReducedMotionPref() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const q = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = () => setReduced(q.matches);
+    apply();
+    q.addEventListener("change", apply);
+    return () => q.removeEventListener("change", apply);
+  }, []);
+  return reduced;
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    Primitives
    ══════════════════════════════════════════════════════════════════════════ */
 
-/** Double-bezel : coque extérieure + noyau, rayons concentriques. */
-function Bezel({
-  children,
-  className,
-  inner,
-  radius = 2,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  inner?: string;
-  radius?: number;
-}) {
+/** Panneau : coque extérieure + noyau, rayons concentriques. */
+function Panel({ children, className, inner }: { children: React.ReactNode; className?: string; inner?: string }) {
   return (
-    <div
-      className={cn("border border-white/10 bg-white/[0.04] p-1.5", className)}
-      style={{ borderRadius: `${radius}rem` }}
-    >
-      <div
-        className={cn("relative overflow-hidden bg-[#07080e] shadow-[inset_0_1px_1px_rgba(255,255,255,0.14)]", inner)}
-        style={{ borderRadius: `${radius - 0.375}rem` }}
-      >
+    <div className={cn("rounded-2xl border border-white/10 bg-white/[0.04] p-1.5", className)}>
+      <div className={cn("relative overflow-hidden rounded-xl bg-[#07080e] shadow-[inset_0_1px_1px_rgba(255,255,255,0.14)]", inner)}>
         {children}
       </div>
     </div>
   );
 }
 
-function Eyebrow({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.04] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-white/65">
-      {children}
-    </span>
-  );
-}
-
-/** CTA « island » : pilule + icône nichée dans son propre cercle. */
+/** CTA magnétique. La position du curseur passe par `gsap.quickTo` : la valeur
+ *  est interpolée hors du cycle de rendu React, aucune frame n'est perdue. */
 function Cta({
   label,
   onClick,
@@ -97,45 +132,67 @@ function Cta({
   className?: string;
 }) {
   const ref = useRef<HTMLButtonElement>(null);
-  const reduce = useReducedMotion();
-  const x = useSpring(useMotionValue(0), { stiffness: 250, damping: 17 });
-  const y = useSpring(useMotionValue(0), { stiffness: 250, damping: 17 });
+  const move = useRef<{ x: (v: number) => void; y: (v: number) => void } | null>(null);
+
+  useGSAP(
+    () => {
+      const el = ref.current;
+      if (!el) return;
+      const mm = gsap.matchMedia();
+      // Le magnétisme n'a de sens qu'avec un vrai pointeur : au doigt, il
+      // déplacerait la cible sous l'utilisateur au moment du tap.
+      mm.add("(prefers-reduced-motion: no-preference) and (pointer: fine)", () => {
+        move.current = {
+          x: gsap.quickTo(el, "x", { duration: 0.5, ease: "power3" }),
+          y: gsap.quickTo(el, "y", { duration: 0.5, ease: "power3" }),
+        };
+        return () => {
+          move.current = null;
+          gsap.set(el, { x: 0, y: 0 });
+        };
+      });
+      return () => mm.revert();
+    },
+    { scope: ref }
+  );
 
   return (
-    <motion.button
+    <button
       ref={ref}
       onClick={onClick}
-      style={reduce ? undefined : { x, y }}
       onPointerMove={(e) => {
-        if (reduce || !ref.current) return;
-        const r = ref.current.getBoundingClientRect();
-        x.set(((e.clientX - r.left) / r.width - 0.5) * 22);
-        y.set(((e.clientY - r.top) / r.height - 0.5) * 12);
+        const el = ref.current;
+        if (!move.current || !el) return;
+        const r = el.getBoundingClientRect();
+        move.current.x(((e.clientX - r.left) / r.width - 0.5) * 22);
+        move.current.y(((e.clientY - r.top) / r.height - 0.5) * 12);
       }}
       onPointerLeave={() => {
-        x.set(0);
-        y.set(0);
+        move.current?.x(0);
+        move.current?.y(0);
       }}
       className={cn(
-        "group inline-flex items-center gap-4 rounded-full py-2 pl-7 pr-2 text-sm font-semibold tracking-tight transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.98]",
+        "group inline-flex items-center gap-4 rounded-full py-2 pl-7 pr-2 text-sm font-semibold tracking-tight",
+        "transition-colors duration-500 active:scale-[0.98]",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc38a] focus-visible:ring-offset-2 focus-visible:ring-offset-[#05060c]",
         tone === "light"
-          ? "bg-white text-[#08090f] hover:bg-white/92"
-          : "border border-white/15 bg-white/[0.05] text-white hover:border-white/35 hover:bg-white/[0.09]",
+          ? "bg-white text-[#08090f] hover:bg-white/90"
+          : "border border-white/20 bg-white/[0.06] text-white hover:border-white/40 hover:bg-white/[0.11]",
         className
       )}
     >
       {label}
       <span
         className={cn(
-          "flex h-9 w-9 items-center justify-center rounded-full transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:-translate-y-[1px] group-hover:translate-x-1 group-hover:scale-105",
-          tone === "light" ? "bg-black/[0.07]" : "bg-white/10"
+          "flex h-9 w-9 items-center justify-center rounded-full transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:-translate-y-px group-hover:translate-x-1",
+          tone === "light" ? "bg-black/[0.08]" : "bg-white/12"
         )}
       >
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
           <path d="M4.5 11.5L11.5 4.5M6 4.5h5.5V10" />
         </svg>
       </span>
-    </motion.button>
+    </button>
   );
 }
 
@@ -143,7 +200,7 @@ function Wordmark() {
   return (
     <span className="flex items-center gap-2.5">
       <span className="relative flex h-7 w-7 items-center justify-center rounded-full border border-white/15">
-        <span className="absolute inset-0 rounded-full bg-[#ffb570]/25 blur-[7px]" aria-hidden />
+        <span className="absolute inset-0 rounded-full bg-[#ffc38a]/25 blur-[7px]" aria-hidden />
         <svg className="relative h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" aria-hidden>
           <circle cx="12" cy="12" r="8.5" />
           <path d="M12 7.5V12l3 2.2" />
@@ -154,27 +211,20 @@ function Wordmark() {
   );
 }
 
-/** Entrée au scroll : montée lourde, flou qui se dissipe. */
-function Rise({
-  children,
-  delay = 0,
-  className,
-}: {
-  children: React.ReactNode;
-  delay?: number;
-  className?: string;
-}) {
-  const reduce = useReducedMotion();
+/** Titre découpé en mots, chacun dans son propre masque : à l'entrée, les mots
+ *  montent derrière une ligne nette, comme un volet qui se lève. */
+function MaskedLine({ text, className }: { text: string; className?: string }) {
   return (
-    <motion.div
-      initial={reduce ? false : { opacity: 0, y: 64, filter: "blur(10px)" }}
-      whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-      viewport={{ once: true, margin: "-90px" }}
-      transition={{ duration: 0.95, delay, ease: EASE }}
-      className={className}
-    >
-      {children}
-    </motion.div>
+    <span className={cn("block", className)}>
+      {text.split(" ").map((w, i) => (
+        <span key={`${w}-${i}`} className="inline-block overflow-hidden pb-[0.12em] align-bottom">
+          <span data-word className="inline-block">
+            {w}
+            {i < text.split(" ").length - 1 ? " " : ""}
+          </span>
+        </span>
+      ))}
+    </span>
   );
 }
 
@@ -182,96 +232,121 @@ function Rise({
    L'HORLOGE DE LA PAGE — la landing EST un pomodoro
    ══════════════════════════════════════════════════════════════════════════
 
-   Idée directrice : sur un site de Pomodoro, le temps ne doit pas être un
-   argument, il doit être l'expérience. Le compteur logé dans la nav part de
-   25:00 en haut de page et atteint 00:00 en bas : parcourir la page, c'est
-   dérouler une session. Et si le visiteur lance le vrai minuteur de la section
-   démo, CELUI-CI PREND LE RELAIS — la page cesse de mimer le temps pour
-   afficher le sien.
+   Sur un site de Pomodoro, le temps ne doit pas être un argument, il doit être
+   l'expérience. Le compteur logé dans la nav part de 25:00 en haut de page et
+   atteint 00:00 en bas : parcourir la page, c'est dérouler une session. Et si
+   le visiteur lance le vrai minuteur de la section démo, CELUI-CI PREND LE
+   RELAIS : la page cesse de mimer le temps pour afficher le sien.
 
-   Tout est piloté par MotionValue : le texte se met à jour sans jamais
-   re-rendre l'arbre React, même à la seconde. */
+   Implémentation : un unique `gsap.ticker`, qui lit l'état partagé et écrit
+   directement dans le DOM, avec une garde par valeur pour ne toucher au DOM
+   que lorsque l'affichage change réellement. Aucun re-render React. */
 
-const POMODORO_SECONDS = 25 * 60;
 const CLOCK_R = 13;
 const CLOCK_C = 2 * Math.PI * CLOCK_R;
 
-function SessionClock({
-  scrollProgress,
-  liveLeft,
-  liveTotal,
-  live,
-  done,
-}: {
-  scrollProgress: MotionValue<number>;
-  liveLeft: MotionValue<number>;
-  liveTotal: number;
-  live: boolean;
-  done: boolean;
-}) {
-  // UNE seule valeur affichée, alimentée par l'une ou l'autre source. On ne
-  // fait pas commuter `useTransform` d'une MotionValue à l'autre entre deux
-  // rendus : on s'abonne explicitement à la bonne source.
-  const seconds = useMotionValue(POMODORO_SECONDS);
-  const ratio = useMotionValue(0); // part écoulée, 0 → 1
+function SessionClock({ clock, onDoneChange }: { clock: React.RefObject<Clock>; onDoneChange: (done: boolean) => void }) {
+  const root = useRef<HTMLSpanElement>(null);
+  const timeRef = useRef<HTMLSpanElement>(null);
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const ringRef = useRef<SVGCircleElement>(null);
+  const dotRef = useRef<HTMLSpanElement>(null);
 
-  useEffect(() => {
-    if (live) {
-      const apply = (v: number) => {
-        seconds.set(v);
-        ratio.set(liveTotal > 0 ? 1 - v / liveTotal : 0);
+  useGSAP(
+    () => {
+      // Micro-boucle perpétuelle : le point ne bat QUE quand une vraie session
+      // tourne. Le mouvement dit un état, il ne décore pas.
+      const pulse = gsap
+        .to(dotRef.current, { scale: 1.45, opacity: 1, duration: 1, repeat: -1, yoyo: true, ease: "sine.inOut" })
+        .pause();
+
+      let lastText = "";
+      let lastLabel = "";
+      let lastRatio = -1;
+      let wasLive: boolean | null = null;
+      let wasDone: boolean | null = null;
+
+      const tick = () => {
+        const c = clock.current;
+        if (!c) return;
+        const scroll = gsap.utils.clamp(0, 1, c.scroll);
+        const seconds = c.live ? Math.max(0, c.left) : POMODORO_SECONDS * (1 - scroll);
+        const ratio = c.live ? (c.total > 0 ? 1 - Math.max(0, c.left) / c.total : 0) : scroll;
+        const done = c.live ? c.left <= 0 : scroll > 0.985;
+
+        const text = done ? "00:00" : `${pad(seconds / 60)}:${pad(seconds % 60)}`;
+        if (text !== lastText && timeRef.current) {
+          lastText = text;
+          timeRef.current.textContent = text;
+        }
+
+        const label = done ? "pause méritée" : c.live ? "ta session" : "cette page";
+        if (label !== lastLabel && labelRef.current) {
+          lastLabel = label;
+          labelRef.current.textContent = label;
+        }
+
+        const rounded = Math.round(ratio * 400) / 400;
+        if (rounded !== lastRatio && ringRef.current) {
+          lastRatio = rounded;
+          ringRef.current.style.strokeDashoffset = String(CLOCK_C * (1 - rounded));
+        }
+
+        if (c.live !== wasLive) {
+          wasLive = c.live;
+          if (c.live) pulse.play();
+          else {
+            pulse.pause();
+            gsap.set(dotRef.current, { scale: 1, opacity: 0 });
+          }
+        }
+
+        if (done !== wasDone) {
+          wasDone = done;
+          onDoneChange(done);
+          gsap.to(ringRef.current, { stroke: done ? "#ffffff" : "#ffc38a", duration: 0.4 });
+        }
       };
-      apply(liveLeft.get());
-      return liveLeft.on("change", apply);
-    }
-    const apply = (p: number) => {
-      const clamped = Math.max(0, Math.min(1, p));
-      seconds.set(POMODORO_SECONDS * (1 - clamped));
-      ratio.set(clamped);
-    };
-    apply(scrollProgress.get());
-    return scrollProgress.on("change", apply);
-  }, [live, liveTotal, liveLeft, scrollProgress, seconds, ratio]);
 
-  const mm = useTransform(seconds, (v) => String(Math.floor(Math.max(v, 0) / 60)).padStart(2, "0"));
-  const ss = useTransform(seconds, (v) => String(Math.floor(Math.max(v, 0) % 60)).padStart(2, "0"));
-  const label = useMotionTemplate`${mm}:${ss}`;
-  const dashOffset = useTransform(ratio, (v) => CLOCK_C * (1 - v));
+      gsap.ticker.add(tick);
+      return () => {
+        gsap.ticker.remove(tick);
+        pulse.kill();
+      };
+    },
+    { scope: root }
+  );
 
   return (
     <span
+      ref={root}
       className="flex items-center gap-2.5"
-      title={live ? "Ta session est en cours" : "La page se déroule comme une session de 25 minutes"}
+      title="La page se déroule comme une session de 25 minutes. Lance le minuteur plus bas et il prend le relais."
     >
       <span className="relative flex h-8 w-8 items-center justify-center">
         <svg viewBox="0 0 32 32" className="absolute inset-0 h-full w-full -rotate-90">
-          <circle cx="16" cy="16" r={CLOCK_R} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="2" />
-          <motion.circle
+          <circle cx="16" cy="16" r={CLOCK_R} fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth="2" />
+          <circle
+            ref={ringRef}
             cx="16"
             cy="16"
             r={CLOCK_R}
             fill="none"
-            stroke={done ? "#7fd4c1" : "#ffc38a"}
+            stroke="#ffc38a"
             strokeWidth="2"
             strokeLinecap="round"
             strokeDasharray={CLOCK_C}
-            style={{ strokeDashoffset: dashOffset }}
+            strokeDashoffset={CLOCK_C}
           />
         </svg>
-        {/* Micro-boucle perpétuelle : le point ne bat QUE quand une vraie
-            session tourne. Le mouvement dit un état, il ne décore pas. */}
-        {live && (
-          <motion.span
-            className="h-1.5 w-1.5 rounded-full bg-[#ffc38a]"
-            animate={{ scale: [1, 1.5, 1], opacity: [0.6, 1, 0.6] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          />
-        )}
+        <span ref={dotRef} className="h-1.5 w-1.5 rounded-full bg-[#ffc38a] opacity-0" aria-hidden />
       </span>
       <span className="flex flex-col leading-none">
-        <motion.span className="font-mono text-[13px] tabular-nums text-white">{done ? "00:00" : label}</motion.span>
-        <span className="mt-1 font-mono text-[8px] uppercase tracking-[0.16em] text-white/45">
-          {done ? "pause méritée" : live ? "ta session" : "cette page"}
+        <span ref={timeRef} className="font-mono text-[13px] tabular-nums text-white">
+          25:00
+        </span>
+        <span ref={labelRef} className="mt-1 font-mono text-[8px] uppercase tracking-[0.16em] text-white/50">
+          cette page
         </span>
       </span>
     </span>
@@ -279,291 +354,666 @@ function SessionClock({
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   HERO — scène 3D : la session au centre, ses satellites en profondeur
+   HERO — une fenêtre allumée, posée sur la ville
    ══════════════════════════════════════════════════════════════════════════ */
 
 // Un pays différent à chaque rotation : le catalogue ne se résume pas au Japon.
-const HERO_TRACKS = defaultVideos.filter((v) => ["hk-02", "driv-05", "cn-01", "np-01", "abao-11"].includes(v.id));
+const HERO_TRACKS = pick(["hk-02", "driv-05", "cn-01", "np-01", "abao-11"]);
 
-/** Élément flottant à une profondeur donnée : il dérive en boucle et suit la scène. */
-function Floating({
-  z,
-  drift = 14,
-  duration = 9,
-  className,
-  children,
-}: {
-  z: number;
-  drift?: number;
-  duration?: number;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  const reduce = useReducedMotion();
-  return (
-    <motion.div
-      className={cn("absolute", className)}
-      style={{ z, transformStyle: "preserve-3d" }}
-      animate={reduce ? undefined : { y: [0, -drift, 0] }}
-      transition={{ duration, repeat: Infinity, ease: "easeInOut" }}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-function HeroScene({ px, py }: { px: MotionValue<number>; py: MotionValue<number> }) {
-  const reduce = useReducedMotion();
-  const rotY = useSpring(useTransform(px, [-0.5, 0.5], [14, -14]), SPRING);
-  const rotX = useSpring(useTransform(py, [-0.5, 0.5], [-11, 11]), SPRING);
-
-  const TOTAL = 1500; // 25 min
-  const [remaining, setRemaining] = useState(TOTAL);
-  const [track, setTrack] = useState(0);
-
-  useEffect(() => {
-    if (reduce) return;
-    const t = setInterval(() => setRemaining((r) => (r <= 1 ? TOTAL : r - 1)), 1000);
-    const k = setInterval(() => setTrack((i) => (i + 1) % HERO_TRACKS.length), 5600);
-    return () => {
-      clearInterval(t);
-      clearInterval(k);
-    };
-  }, [reduce]);
-
-  const current = HERO_TRACKS[track] ?? defaultVideos[0];
-  const progress = 1 - remaining / TOTAL;
-  const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
-  const ss = String(remaining % 60).padStart(2, "0");
+/** La fenêtre du hero. Les vignettes s'enchaînent par une timeline GSAP qui
+ *  fait un fondu entre des couches empilées : aucun state React, donc aucun
+ *  re-render toutes les cinq secondes. */
+function HeroWindow() {
+  const root = useRef<HTMLDivElement>(null);
+  const ring = useRef<SVGCircleElement>(null);
   const dash = 2 * Math.PI * 44;
 
+  useGSAP(
+    () => {
+      const slides = gsap.utils.toArray<HTMLElement>("[data-slide]", root.current);
+      const mm = gsap.matchMedia();
+
+      mm.add("(prefers-reduced-motion: reduce)", () => {
+        gsap.set(slides, { autoAlpha: 0 });
+        gsap.set(slides[0], { autoAlpha: 1 });
+        gsap.set(ring.current, { strokeDashoffset: dash * 0.36 });
+      });
+
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        gsap.set(slides, { autoAlpha: 0 });
+        gsap.set(slides[0], { autoAlpha: 1 });
+
+        // L'anneau se dessine une fois à l'arrivée : il dit « une session est
+        // en cours », puis se tait.
+        const draw = gsap.fromTo(
+          ring.current,
+          { strokeDashoffset: dash },
+          { strokeDashoffset: dash * 0.36, duration: 2.2, delay: 0.5, ease: "power2.inOut" }
+        );
+
+        const tl = gsap.timeline({ repeat: -1 });
+        slides.forEach((slide, i) => {
+          const next = slides[(i + 1) % slides.length];
+          tl.to(slide, { autoAlpha: 0, duration: 1.1, ease: "power2.inOut" }, "+=4.4").to(
+            next,
+            { autoAlpha: 1, duration: 1.1, ease: "power2.inOut" },
+            "<"
+          );
+        });
+
+        return () => {
+          tl.kill();
+          draw.kill();
+        };
+      });
+
+      return () => mm.revert();
+    },
+    { scope: root }
+  );
+
   return (
-    <motion.div
-      style={reduce ? undefined : { rotateX: rotX, rotateY: rotY, transformPerspective: 1400, transformStyle: "preserve-3d" }}
-      className="relative h-[28rem] w-[22rem] sm:h-[30rem] sm:w-[26rem]"
-    >
-      {/* Noyau : l'écran de session. Reculé d'un plan (z négatif) pour que les
-          satellites vivent DEVANT lui et restent lisibles. */}
-      <Floating z={-90} drift={10} duration={11} className="inset-x-0 top-10">
-        <Bezel radius={2}>
-          <div className="relative aspect-[4/3]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              key={current.youtubeId}
-              src={thumb(current.youtubeId)}
-              alt=""
-              className="anim-ambient-in absolute inset-0 h-full w-full object-cover opacity-45"
-            />
-            <span className="absolute inset-0 bg-gradient-to-t from-[#05060c] via-[#05060c]/55 to-[#05060c]/25" aria-hidden />
-
-            <div className="relative flex h-full flex-col items-center justify-center gap-5">
-              <div className="relative h-28 w-28">
-                <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="2.5" />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="44"
-                    fill="none"
-                    stroke="#ffc38a"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeDasharray={dash}
-                    strokeDashoffset={dash * (1 - progress)}
-                    style={{ transition: "stroke-dashoffset 1s linear" }}
-                  />
-                </svg>
-                <span className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="font-mono text-[26px] tabular-nums text-white">
-                    {mm}:{ss}
-                  </span>
-                  <span className="mt-1 font-mono text-[9px] uppercase tracking-[0.22em] text-white/50">Focus</span>
+    <div ref={root} className="w-[20rem] sm:w-[24rem]">
+      <Panel>
+        <div className="relative aspect-[4/3]">
+          {HERO_TRACKS.map((v) => (
+            <div key={v.id} data-slide className="absolute inset-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={thumb(v.youtubeId)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45" />
+              <span className="absolute inset-0 bg-gradient-to-t from-[#05060c] via-[#05060c]/60 to-[#05060c]/25" aria-hidden />
+              <span className="absolute inset-x-4 bottom-4 flex items-center gap-2.5 rounded-full border border-white/12 bg-[#0a0c14]/85 py-2 pl-2.5 pr-4">
+                <span className="flex h-3 items-end gap-[2px]" aria-hidden>
+                  {[1.2, 1.5, 1.35].map((d, k) => (
+                    <span
+                      key={k}
+                      className="anim-eq w-[2px] rounded-full bg-[#ffc38a]"
+                      style={{ height: "100%", animationDuration: `${d}s`, animationDelay: `${-k * 0.4}s` }}
+                    />
+                  ))}
                 </span>
-              </div>
-            </div>
-          </div>
-        </Bezel>
-      </Floating>
-
-      {/* Satellite avant-plan : le titre en cours */}
-      <Floating z={130} drift={16} duration={8} className="-left-10 bottom-6 w-[17rem] sm:-left-20">
-        <div className="flex items-center gap-3 rounded-2xl border border-white/15 bg-[#0a0c14]/92 p-2.5 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={thumb(current.youtubeId)} alt="" className="h-11 w-11 shrink-0 rounded-xl object-cover" />
-          <span className="min-w-0">
-            <span className="block truncate text-[12px] font-medium text-white">{current.title}</span>
-            <span className="mt-0.5 flex items-center gap-1.5">
-              <span className="flex h-2.5 items-end gap-[2px]" aria-hidden>
-                {[1.2, 1.5, 1.35].map((d, i) => (
-                  <span
-                    key={i}
-                    className="anim-eq w-[2px] rounded-full bg-[#ffc38a]"
-                    style={{ height: "100%", animationDuration: `${d}s`, animationDelay: `${-i * 0.4}s` }}
-                  />
-                ))}
+                <span className="min-w-0">
+                  <span className="block truncate text-[11.5px] text-white">{v.title}</span>
+                  <span className="block truncate font-mono text-[9.5px] text-white/55">{v.country}</span>
+                </span>
               </span>
-              <span className="truncate font-mono text-[10px] text-white/65">{current.channel}</span>
+            </div>
+          ))}
+
+          <span className="absolute inset-0 flex items-start justify-center pt-12">
+            <span className="relative h-28 w-28">
+              <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="2.5" />
+                <circle
+                  ref={ring}
+                  cx="50"
+                  cy="50"
+                  r="44"
+                  fill="none"
+                  stroke="#ffc38a"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeDasharray={dash}
+                  strokeDashoffset={dash}
+                />
+              </svg>
+              <span className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="font-mono text-[26px] tabular-nums text-white">16:02</span>
+                <span className="mt-1 font-mono text-[9px] uppercase tracking-[0.2em] text-white/50">Focus</span>
+              </span>
             </span>
           </span>
         </div>
-      </Floating>
-
-      {/* Satellite arrière-plan : la tâche en cours */}
-      <Floating z={95} drift={12} duration={13} className="-right-8 top-4 w-[13rem] sm:-right-16">
-        <div className="rounded-2xl border border-white/15 bg-[#0a0c14]/90 p-4 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl">
-          <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/65">En cours</span>
-          <p className="mt-2 text-[13px] leading-snug text-white">Relire le chapitre 4</p>
-          <span className="mt-3 flex gap-1" aria-hidden>
-            {[1, 1, 1, 0].map((full, i) => (
-              <span key={i} className={cn("h-1 flex-1 rounded-full", full ? "bg-[#ffc38a]/70" : "bg-white/12")} />
-            ))}
-          </span>
-        </div>
-      </Floating>
-
-      {/* Satellite lointain : la présence d'un ami */}
-      <Floating z={60} drift={9} duration={15} className="-left-6 -top-4 w-[11rem] sm:-left-14">
-        <div className="flex items-center gap-2.5 rounded-full border border-white/15 bg-[#0a0c14]/90 py-2 pl-2 pr-4 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/12 text-[11px] font-semibold text-white" aria-hidden>
-            C
-          </span>
-          <span className="min-w-0">
-            <span className="block truncate text-[11px] text-white">Camille</span>
-            <span className="block font-mono text-[9px] text-[#7fd4c1]">en focus</span>
-          </span>
-        </div>
-      </Floating>
-    </motion.div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   CATALOGUE — bande sans fin, en perspective, qu'on fait défiler à la main
-   ══════════════════════════════════════════════════════════════════════════ */
-
-// Dix cartes, dix pays : Hong Kong, Corée, Chine, Taïwan, Vietnam, Japon,
-// Norvège, Suisse, Royaume-Uni, Indonésie.
-const CAROUSEL_IDS = ["hk-02", "driv-05", "cn-01", "tw-02", "vn-01", "abao-11", "no-01", "noma-07", "uk-01", "id-02"];
-const CAROUSEL = CAROUSEL_IDS.map((id) => defaultVideos.find((v) => v.id === id)!).filter(Boolean);
-
-// L'anneau fermé laissait forcément un trou : dès qu'on masquait les dos de
-// cartes, la moitié arrière disparaissait et le cadre se vidait. On passe donc
-// à une BANDE INFINIE : les cartes défilent en boucle sur un axe horizontal et
-// s'inclinent d'autant plus qu'elles s'éloignent du centre. Le cadre est
-// toujours plein, quel que soit l'angle.
-const CARD_W = 272; // px
-const GAP = 52;
-const SLOT = CARD_W + GAP; // pas entre deux cartes, garantit l'absence de chevauchement
-const SPAN = CAROUSEL.length * SLOT;
-const FADE = 820; // distance au centre où la carte s'efface (avant le raccord)
-
-/** Une carte de la bande : elle calcule sa propre place à partir du défilement. */
-function BeltCard({ video, index, offset }: { video: (typeof CAROUSEL)[number]; index: number; offset: MotionValue<number> }) {
-  // Position signée par rapport au centre, repliée sur la longueur de la bande :
-  // la carte qui sort à droite réapparaît à gauche, sans couture.
-  const dx = useTransform(offset, (o) => {
-    const raw = (((index * SLOT - o) % SPAN) + SPAN) % SPAN;
-    return raw - SPAN / 2;
-  });
-  const rotateY = useTransform(dx, (v) => Math.max(-46, Math.min(46, -v * 0.045)));
-  const z = useTransform(dx, (v) => -Math.abs(v) * 0.5);
-  const opacity = useTransform(dx, (v) => {
-    const a = Math.abs(v);
-    return a > FADE ? 0 : a > FADE - 220 ? (FADE - a) / 220 : 1;
-  });
-
-  return (
-    <motion.div
-      className="absolute left-1/2 top-1/2"
-      style={{
-        width: CARD_W,
-        height: 152,
-        marginLeft: -CARD_W / 2,
-        marginTop: -76,
-        x: dx,
-        rotateY,
-        z,
-        opacity,
-        transformStyle: "preserve-3d",
-      }}
-    >
-      <div className="group relative h-full w-full overflow-hidden rounded-2xl border border-white/15 bg-[#07080e] shadow-[0_18px_50px_-20px_rgba(0,0,0,0.9)]">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={thumb(video.youtubeId)}
-          alt=""
-          loading="lazy"
-          draggable={false}
-          className="h-full w-full object-cover opacity-80 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-105 group-hover:opacity-100"
-        />
-        <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/80 to-transparent px-4 pb-3 pt-12">
-          <span className="block truncate text-[13px] font-medium text-white">{video.title}</span>
-          <span className="mt-1 block truncate font-mono text-[10px] text-white/60">{video.country}</span>
-        </span>
-      </div>
-    </motion.div>
-  );
-}
-
-function CatalogueBelt() {
-  const reduce = useReducedMotion();
-  const offset = useMotionValue(0);
-  const dragging = useRef(false);
-  const lastX = useRef(0);
-
-  // Dérive continue, suspendue tant qu'on tient la bande.
-  useEffect(() => {
-    if (reduce) return;
-    let raf = 0;
-    let prev = performance.now();
-    const loop = (now: number) => {
-      const dt = now - prev;
-      prev = now;
-      if (!dragging.current) offset.set(offset.get() + dt * 0.028);
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [offset, reduce]);
-
-  const onDown = useCallback((e: React.PointerEvent) => {
-    dragging.current = true;
-    lastX.current = e.clientX;
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-  }, []);
-  const onMove = useCallback(
-    (e: React.PointerEvent) => {
-      if (!dragging.current) return;
-      offset.set(offset.get() - (e.clientX - lastX.current));
-      lastX.current = e.clientX;
-    },
-    [offset]
-  );
-  const onUp = useCallback(() => {
-    dragging.current = false;
-  }, []);
-
-  return (
-    <div
-      className="relative h-[15rem] cursor-grab select-none touch-pan-y active:cursor-grabbing sm:h-[17rem]"
-      style={{ perspective: "1200px" }}
-      onPointerDown={onDown}
-      onPointerMove={onMove}
-      onPointerUp={onUp}
-      onPointerCancel={onUp}
-      onPointerLeave={onUp}
-    >
-      <div className="absolute inset-0" style={{ transformStyle: "preserve-3d" }}>
-        {CAROUSEL.map((v, i) => (
-          <BeltCard key={v.id} video={v} index={i} offset={offset} />
-        ))}
-      </div>
+      </Panel>
     </div>
   );
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   SOURCES — marques réelles + un morceau de leur interface (aucune photo)
+   LA BALADE — on descend l'avenue à pied, les écrans défilent
+   ══════════════════════════════════════════════════════════════════════════
+
+   Le grand plan de la page, et sa bascule entre la moitié « ville » et la
+   moitié « produit ». Le scroll devient une CAMÉRA : elle avance dans la
+   photo (travelling avant), pendant que les paysages du catalogue passent de
+   part et d'autre comme des vitrines allumées qu'on longe. On n'arrive pas
+   sur le catalogue, on y marche.
+
+   Trois couches, une seule timeline scrubée :
+     1. la photo, qui grossit lentement (la marche)
+     2. le voile, qui s'épaissit (on s'enfonce dans la rue)
+     3. six écrans, qui surgissent du fond, grossissent et s'écartent vers les
+        bords (la parallaxe de ce qu'on dépasse)
+
+   (Version précédente, abandonnée sur retour utilisateur : une grille de blocs
+   qui se refermait en volet. Techniquement juste, mais une grille de carrés
+   colorés se lit comme un calendrier, pas comme un plan de cinéma.)
+
+   ⚠️ POUR ALLER PLUS LOIN, IL FAUT UN ASSET. Une vraie balade filmée se fait
+   en SÉQUENCE D'IMAGES scrubée sur un canvas (la technique Apple/Locomotive) :
+   une photo unique qui grossit ne donne qu'un zoom, jamais un déplacement. Le
+   jour où les frames existent, seule la couche 1 change : voir
+   `docs/ASSETS_LANDING.md`. Le reste de la chorégraphie est déjà en place. */
+
+const WALK_SCREENS = pick(["cn-01", "tw-02", "hk-02", "no-01", "vn-01", "abao-11"]);
+
+// Côté de la rue, hauteur dans le cadre, inclinaison. Déterministe, pour que
+// la scène soit la même à chaque visite.
+const WALK_LANES = [
+  { side: -1, y: -9, rot: 15 },
+  { side: 1, y: 7, rot: -15 },
+  { side: -1, y: 13, rot: 12 },
+  { side: 1, y: -13, rot: -18 },
+  { side: -1, y: 4, rot: 17 },
+  { side: 1, y: -5, rot: -12 },
+];
+
+function CityWalk() {
+  const section = useRef<HTMLElement>(null);
+  const reduced = useReducedMotionPref();
+
+  useGSAP(
+    () => {
+      if (reduced) return;
+      const screens = gsap.utils.toArray<HTMLElement>("[data-walk]", section.current);
+      const photo = section.current?.querySelector<HTMLElement>("[data-walk-photo]");
+      const veil = section.current?.querySelector<HTMLElement>("[data-walk-veil]");
+      if (screens.length === 0 || !photo || !veil) return;
+
+      gsap.set(screens, { xPercent: -50, yPercent: -50, autoAlpha: 0 });
+
+      const tl = gsap.timeline({
+        defaults: { ease: "none" },
+        scrollTrigger: {
+          trigger: section.current,
+          start: "top top",
+          end: "+=260%",
+          pin: true,
+          scrub: 0.7,
+          anticipatePin: 1,
+          // Les distances latérales sont exprimées en largeur de fenêtre :
+          // il faut les recalculer à chaque redimensionnement.
+          invalidateOnRefresh: true,
+          refreshPriority: PRIO.walk,
+        },
+      });
+
+      // 1. la marche : la rue se rapproche
+      tl.fromTo(photo, { scale: 1.04 }, { scale: 1.46, duration: 4 }, 0)
+        // 2. on s'enfonce : la lumière du ciel se retire
+        .fromTo(veil, { opacity: 0.15 }, { opacity: 0.74, duration: 4 }, 0);
+
+      // 3. les vitrines qu'on dépasse
+      screens.forEach((el, i) => {
+        const lane = WALK_LANES[i % WALK_LANES.length];
+        const at = i * 0.42;
+        tl.fromTo(
+          el,
+          {
+            z: -2600,
+            x: () => lane.side * window.innerWidth * 0.1,
+            rotateY: lane.rot,
+            autoAlpha: 0,
+          },
+          {
+            z: 640,
+            // Elles s'écartent vers les bords à mesure qu'elles approchent :
+            // c'est ce glissement latéral, et non le grossissement seul, qui
+            // fait qu'on LONGE la rue au lieu de foncer dedans.
+            x: () => lane.side * window.innerWidth * 0.82,
+            rotateY: lane.rot * 0.35,
+            autoAlpha: 1,
+            duration: 1.7,
+          },
+          at
+        )
+          // Elle s'efface juste avant de sortir du cadre : au-delà, une image
+          // plein écran qui explose est du bruit, pas de la vitesse.
+          .to(el, { autoAlpha: 0, duration: 0.4 }, at + 1.35);
+      });
+
+      return () => {
+        tl.scrollTrigger?.kill();
+        tl.kill();
+      };
+    },
+    { scope: section, dependencies: [reduced], revertOnUpdate: true }
+  );
+
+  // Sous reduced-motion, une caméra qui avance n'a aucun sens : on la remplace
+  // par ce qu'elle dit, la liste des lieux qu'on longe.
+  if (reduced) {
+    return (
+      <section className="mx-auto w-full max-w-[86rem] px-4 py-24 sm:px-8">
+        <ul className="flex flex-wrap gap-x-7 gap-y-3 font-mono text-[11px] uppercase tracking-[0.18em] text-white/55">
+          {WALK_SCREENS.map((v) => (
+            <li key={v.id}>{v.country}</li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      ref={section}
+      className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden"
+      style={{ perspective: "1000px" }}
+    >
+      {/* La rue. Même fichier que le fond de page : le navigateur l'a déjà en
+          cache, cette couche ne coûte donc aucun téléchargement. */}
+      <div data-walk-photo aria-hidden className="absolute inset-0 will-change-transform">
+        <Image src={CITY_PHOTO} alt="" fill sizes="100vw" className="object-cover object-center" />
+      </div>
+      <div data-walk-veil aria-hidden className="absolute inset-0 bg-[#05060c]" />
+
+      <div className="absolute inset-0" style={{ transformStyle: "preserve-3d" }}>
+        {WALK_SCREENS.map((v, i) => {
+          const lane = WALK_LANES[i % WALK_LANES.length];
+          return (
+            <figure
+              key={v.id}
+              data-walk
+              className="absolute w-[17rem] sm:w-[23rem]"
+              style={{ left: "50%", top: `${50 + lane.y}%` }}
+            >
+              <div className="overflow-hidden rounded-2xl border border-white/15 shadow-[0_40px_90px_-30px_rgba(0,0,0,0.95)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={thumb(v.youtubeId)} alt="" loading="lazy" className="aspect-[16/10] w-full object-cover" />
+              </div>
+              <figcaption className="mt-3 font-mono text-[11px] uppercase tracking-[0.18em] text-white/60">
+                {v.country}
+              </figcaption>
+            </figure>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+/* ══════════════════════════════════════════════════════════════════════════
+   LE MANIFESTE — les mots s'allument un par un, comme les fenêtres
+   ══════════════════════════════════════════════════════════════════════════
+
+   Le geste de la page appliqué à la typographie : au fil du scroll, chaque
+   mot passe de l'ombre à la pleine lumière. Ce n'est pas un effet de style,
+   c'est le propos du produit rendu littéral, et c'est ce qui donne à ce
+   paragraphe le droit d'occuper un écran entier. */
+
+const MANIFESTO = "Les fenêtres s'allument une par une. Derrière chacune, quelqu'un vient de s'y mettre. Tu en allumes une par session de vingt-cinq minutes.";
+
+function Manifesto() {
+  const root = useRef<HTMLElement>(null);
+
+  useGSAP(
+    () => {
+      const words = gsap.utils.toArray<HTMLElement>("[data-lw]", root.current);
+      const mm = gsap.matchMedia();
+
+      mm.add("(prefers-reduced-motion: reduce)", () => {
+        gsap.set(words, { opacity: 1 });
+      });
+
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        const tween = gsap.fromTo(
+          words,
+          { opacity: 0.13 },
+          {
+            opacity: 1,
+            ease: "none",
+            stagger: { amount: 1, from: "start" },
+            scrollTrigger: {
+              trigger: root.current,
+              start: "top 80%",
+              end: "bottom 65%",
+              scrub: 0.45,
+              refreshPriority: PRIO.hero,
+            },
+          }
+        );
+        return () => {
+          tween.scrollTrigger?.kill();
+          tween.kill();
+        };
+      });
+
+      return () => mm.revert();
+    },
+    { scope: root }
+  );
+
+  return (
+    <section ref={root} className="mx-auto w-full max-w-[86rem] px-4 py-32 sm:px-8 md:py-48">
+      <p className="max-w-4xl text-[clamp(1.7rem,4.4vw,3.5rem)] font-semibold leading-[1.14] tracking-[-0.035em]">
+        {MANIFESTO.split(" ").map((w, i) => (
+          <span key={i} data-lw>
+            {w}{" "}
+          </span>
+        ))}
+      </p>
+    </section>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   L'INDEX DE CHAPITRES — où tu en es dans la page
+   ══════════════════════════════════════════════════════════════════════════
+
+   Rail fixe en bas à gauche : la liste des chapitres, et un repère qui se
+   remplit sur celui qu'on est en train de lire. Il remplace les liens de la
+   barre du haut (qui n'indiquaient rien) et donne à la page une structure
+   lisible d'un coup d'oeil, sans jamais masquer le contenu.
+
+   L'état actif est écrit directement par GSAP sur le DOM (`onToggle`) : aucun
+   state React, donc aucun rendu de l'arbre pendant le scroll. */
+
+const CHAPTERS = [
+  { id: "catalogue", label: "Catalogue" },
+  { id: "sources", label: "Sources" },
+  { id: "parcours", label: "Parcours" },
+  { id: "minuteur", label: "Minuteur" },
+  { id: "trace", label: "Trace" },
+] as const;
+
+function ChapterRail() {
+  const root = useRef<HTMLDivElement>(null);
+  const reduce = useReducedMotionPref();
+
+  useGSAP(
+    () => {
+      // ── Pourquoi PAS un ScrollTrigger par chapitre ────────────────────
+      // Un index de chapitres doit être juste, toujours, y compris pendant les
+      // deux épinglages de la page. Or un épinglage allonge le document, et
+      // tout déclencheur mesuré avant lui démarre trop tôt (c'est le piège de
+      // `refreshPriority`, documenté en tête de fichier). Plutôt que de faire
+      // dépendre le repère de l'ordre de rafraîchissement, on lit la position
+      // RÉELLE des ancres dans le document : c'est vrai par construction.
+      //
+      // Les positions sont mises en cache et recalculées seulement au
+      // `refresh` de ScrollTrigger (redimensionnement, polices, images), jamais
+      // pendant le scroll : la boucle ne fait que cinq comparaisons de nombres
+      // par mise à jour, et aucune lecture de mise en page.
+      const anchor = (id: string) => document.querySelector<HTMLElement>(`[data-anchor="${id}"]`);
+
+      // Position dans le document par la chaîne des `offsetTop`, et NON par
+      // `getBoundingClientRect`. Le défilement inertiel (`ScrollSmoother`)
+      // translate en permanence le conteneur de contenu : un rectangle mesuré
+      // à l'écran refléterait l'amortissement en cours, pas la mise en page.
+      // `offsetTop` ignore les transformations, tout en tenant compte de
+      // l'espace réservé par les épinglages, qui lui est bien du layout.
+      const docTop = (el: HTMLElement) => {
+        let y = 0;
+        let n: HTMLElement | null = el;
+        while (n) {
+          y += n.offsetTop;
+          n = n.offsetParent as HTMLElement | null;
+        }
+        return y;
+      };
+
+      const rows = CHAPTERS.map((c) => {
+        const row = root.current?.querySelector<HTMLElement>(`[data-chapter="${c.id}"]`);
+        return {
+          id: c.id,
+          label: c.label,
+          mark: row?.querySelector<HTMLElement>("[data-mark]") ?? null,
+          text: row?.querySelector<HTMLElement>("[data-text]") ?? null,
+        };
+      });
+
+      rows.forEach((r) => r.mark && gsap.set(r.mark, { scaleX: 0, transformOrigin: "left center" }));
+
+      let tops: number[] = [];
+      let endTop = Infinity;
+      const measure = () => {
+        tops = CHAPTERS.map((c) => {
+          const el = anchor(c.id);
+          return el ? docTop(el) : Infinity;
+        });
+        const fin = anchor("fin");
+        endTop = fin ? docTop(fin) : Infinity;
+      };
+      measure();
+      ScrollTrigger.addEventListener("refresh", measure);
+
+      const light = (i: number, on: boolean) => {
+        const r = rows[i];
+        if (!r || !r.mark || !r.text) return;
+        gsap.to(r.mark, { scaleX: on ? 1 : 0, duration: 0.45, ease: "power3.out" });
+        gsap.to(r.text, { color: on ? "rgb(255,255,255)" : "rgba(255,255,255,0.45)", duration: 0.35 });
+        // Le libellé se recompose lettre par lettre en devenant actif. C'est
+        // un accusé de réception, pas un décor : il ne se joue qu'au
+        // changement d'état, jamais en boucle.
+        if (on && !reduce) {
+          gsap.to(r.text, { duration: 0.55, scrambleText: { text: r.label, chars: "upperCase", speed: 0.7 } });
+        }
+      };
+
+      let current = -1;
+      const st = ScrollTrigger.create({
+        start: 0,
+        end: "max",
+        onUpdate: () => {
+          const probe = window.scrollY + window.innerHeight * 0.55;
+          let next = -1;
+          if (probe < endTop) for (let i = 0; i < tops.length; i++) if (probe >= tops[i]) next = i;
+          if (next === current) return;
+          light(current, false);
+          light(next, true);
+          current = next;
+        },
+      });
+
+      return () => {
+        ScrollTrigger.removeEventListener("refresh", measure);
+        st.kill();
+      };
+    },
+    { scope: root, dependencies: [reduce], revertOnUpdate: true }
+  );
+
+  return (
+    <div className="pointer-events-none fixed bottom-8 left-8 z-40 hidden flex-col gap-2.5 lg:flex" ref={root}>
+      {CHAPTERS.map((c) => (
+        <a
+          key={c.id}
+          href={`#${c.id}`}
+          data-chapter={c.id}
+          className="pointer-events-auto flex items-center gap-3 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc38a]"
+        >
+          <span className="relative block h-[2px] w-5 overflow-hidden bg-white/15">
+            <span data-mark className="absolute inset-0 block bg-[#ffc38a]" />
+          </span>
+          <span data-text className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">
+            {c.label}
+          </span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LE BOULEVARD — le catalogue en travelling horizontal
+   ══════════════════════════════════════════════════════════════════════════
+
+   L'avenue rectiligne de la photo, reprise comme geste : le scroll vertical
+   devient un travelling latéral le long d'une rangée de paysages, décalés en
+   hauteur comme une ligne d'immeubles.
+
+   Sur mobile ET sous reduced-motion, aucun détournement du scroll : la rangée
+   redevient un simple défilement horizontal natif, au doigt. */
+
+const BOULEVARD = pick(["hk-02", "driv-05", "cn-01", "tw-02", "vn-01", "abao-11", "no-01", "noma-07", "uk-01", "id-02"]);
+
+function Boulevard() {
+  const wrap = useRef<HTMLElement>(null);
+  const track = useRef<HTMLDivElement>(null);
+  const reduced = useReducedMotionPref();
+
+  useGSAP(
+    () => {
+      if (reduced) return;
+      const t = track.current;
+      const w = wrap.current;
+      if (!t || !w) return;
+
+      const mm = gsap.matchMedia();
+      mm.add("(min-width: 768px)", () => {
+        // `ease: "none"` est obligatoire : c'est ce qui garde le rapport 1:1
+        // entre la position de scroll et la position horizontale.
+        const distance = () => Math.max(1, t.scrollWidth - window.innerWidth + 64);
+        const tween = gsap.to(t, {
+          x: () => -distance(),
+          ease: "none",
+          scrollTrigger: {
+            trigger: w,
+            start: "top top",
+            end: () => `+=${distance()}`,
+            pin: true,
+            scrub: 0.6,
+            invalidateOnRefresh: true,
+            refreshPriority: PRIO.boulevard,
+          },
+        });
+
+        // Deuxième couche, propre au travelling : chaque carte se lève et se
+        // révèle en ENTRANT DANS LE CADRE, pas en entrant dans le viewport.
+        // C'est exactement ce que `containerAnimation` permet : déclencher sur
+        // la progression HORIZONTALE plutôt que sur le scroll vertical. Sans
+        // lui, toutes les cartes seraient déjà « entrées » dès l'épinglage.
+        const cards = gsap.utils.toArray<HTMLElement>("[data-belt]", t);
+        const inner: gsap.core.Tween[] = [];
+
+        cards.forEach((card) => {
+          const rest = Number(card.dataset.off || 0);
+
+          // (a) l'arrivée : la carte monte à sa hauteur de repos
+          inner.push(
+            gsap.fromTo(
+              card,
+              { y: rest + 90, autoAlpha: 0.25 },
+              {
+                y: rest,
+                autoAlpha: 1,
+                ease: "power2.out",
+                // Bornes en MOTS-CLÉS, pas en pourcentages : avec
+                // `containerAnimation`, un « left 58% » se mesure dans
+                // l'espace de la piste et non du viewport, et la carte
+                // atteignait le centre de l'écran encore à demi effacée.
+                scrollTrigger: { trigger: card, containerAnimation: tween, start: "left right", end: "left center", scrub: true },
+              }
+            )
+          );
+
+          // (b) l'orientation : la carte pivote face à nous en passant au
+          // centre, puis se referme. C'est ce qui fait qu'on longe une rangée
+          // de façades au lieu de faire défiler une bande d'images plates.
+          inner.push(
+            gsap.fromTo(
+              card,
+              { rotateY: 26 },
+              {
+                rotateY: -26,
+                ease: "none",
+                scrollTrigger: { trigger: card, containerAnimation: tween, start: "left right", end: "right left", scrub: true },
+              }
+            )
+          );
+        });
+
+        return () => {
+          inner.forEach((i) => {
+            i.scrollTrigger?.kill();
+            i.kill();
+          });
+          tween.scrollTrigger?.kill();
+          tween.kill();
+        };
+      });
+
+      return () => mm.revert();
+    },
+    { scope: wrap, dependencies: [reduced], revertOnUpdate: true }
+  );
+
+  return (
+    <section
+      id="catalogue"
+      ref={wrap}
+      className={cn("relative", reduced ? "overflow-x-auto" : "overflow-x-auto md:overflow-x-clip")}
+      style={{ perspective: "1600px" }}
+    >
+      {/* Le sol qui fuit. Une seule grille en dégradés répétés, basculée en
+          perspective : l'avenue de la photo du fond, rendue en CSS pur. Aucun
+          canvas, aucune 3D calculée, et rien à repeindre pendant le
+          travelling puisque c'est le contenu qui bouge, pas elle. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[42%] opacity-45"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, rgba(255,195,138,0.16) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,195,138,0.16) 1px, transparent 1px)",
+          backgroundSize: "90px 90px",
+          transform: "perspective(680px) rotateX(71deg)",
+          transformOrigin: "center top",
+          maskImage: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, #000 34%, #000 100%)",
+          WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, #000 34%, #000 100%)",
+        }}
+      />
+
+      <div
+        ref={track}
+        className="relative flex h-[70vh] w-max items-center gap-7 px-4 sm:px-8 md:h-[100dvh] md:gap-10"
+        // `perspective` est posée sur la SECTION (fixe, de la taille du
+        // viewport) et non ici : le point de fuite doit rester au centre de
+        // l'écran. Sur la piste, qui se translate sur plusieurs milliers de
+        // pixels, il voyagerait avec elle et déformerait les cartes des
+        // extrémités.
+        style={{ transformStyle: "preserve-3d" }}
+      >
+        {/* Le titre voyage avec la rangée : la section n'a pas besoin d'un
+            en-tête séparé. */}
+        <div className="w-[min(78vw,30rem)] shrink-0">
+          <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-semibold leading-[1.05] tracking-[-0.04em]">
+            Cinquante-six endroits où poser ta soirée.
+          </h2>
+          <p className="mt-6 max-w-sm text-[15px] leading-relaxed text-white/70">
+            Study with me à Osaka, la pluie sur Shinjuku, le Bund à minuit, un drive lofi au pied du Fuji. Tu choisis la
+            fenêtre, le minuteur s&apos;occupe du reste.
+          </p>
+        </div>
+
+        {BOULEVARD.map((v, i) => (
+          <article
+            key={v.id}
+            data-belt
+            // Décalage vertical de repos, en DONNÉE et non en classe : GSAP
+            // réécrit `transform` en entier, une translation Tailwind sur la
+            // même carte serait écrasée au premier tween.
+            data-off={i % 3 === 0 ? -56 : i % 3 === 1 ? 40 : -8}
+            className="w-[17rem] shrink-0 md:w-[19rem]"
+          >
+            <div className="overflow-hidden rounded-2xl border border-white/12 bg-[#07080e] shadow-[0_24px_60px_-28px_rgba(0,0,0,0.95)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={thumb(v.youtubeId)}
+                alt=""
+                loading="lazy"
+                draggable={false}
+                className="aspect-[16/10] w-full object-cover opacity-85 transition-opacity duration-700 hover:opacity-100"
+              />
+            </div>
+            <p className="mt-4 truncate text-[14px] font-medium text-white">{v.title}</p>
+            <p className="mt-1 font-mono text-[11px] text-white/55">{v.country}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LES SOURCES — quatre marques réelles, un fragment de leur interface
    ══════════════════════════════════════════════════════════════════════════ */
 
 function YoutubeMark() {
@@ -589,296 +1039,374 @@ function TwitchMark() {
   );
 }
 
-const SOURCE_TABS = [
-  {
-    key: "catalogue",
-    name: "Catalogue",
-    line: "Une cinquantaine de paysages tenus à la main, classés par ambiance. Rien à chercher, tu cliques et ça tourne.",
-  },
-  { key: "youtube", name: "YouTube", line: "Tes playlists et ta file d'attente, jouées dans TON ordre. YouTube ne reprend jamais la main." },
-  { key: "spotify", name: "Spotify", line: "Ta bibliothèque Premium se lit dans la session, sans changer d'onglet ni couper le timer." },
-  { key: "twitch", name: "Twitch", line: "Un live ou une rediffusion en fond, pour travailler à côté de quelqu'un." },
-] as const;
-
-function SourceShowcase() {
-  const [tab, setTab] = useState<(typeof SOURCE_TABS)[number]["key"]>("catalogue");
-
+function SourceCell({
+  mark,
+  name,
+  line,
+  className,
+  children,
+}: {
+  mark: React.ReactNode;
+  name: string;
+  line: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="grid gap-10 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-16">
-      <div className="flex flex-col gap-2">
-        {SOURCE_TABS.map((t) => {
-          const on = t.key === tab;
-          return (
-            <button
-              key={t.key}
-              onMouseEnter={() => setTab(t.key)}
-              onFocus={() => setTab(t.key)}
-              onClick={() => setTab(t.key)}
-              className={cn(
-                "group relative overflow-hidden rounded-2xl px-5 py-4 text-left transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)]",
-                on ? "border border-white/12 bg-white/[0.05]" : "border border-transparent hover:bg-white/[0.03]"
-              )}
-              aria-pressed={on}
-            >
-              <span className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-black/40">
-                  {t.key === "youtube" ? <YoutubeMark /> : t.key === "spotify" ? <SpotifyMark /> : t.key === "twitch" ? <TwitchMark /> : (
-                    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="#ffc38a" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <path d="M3 17.5V7a1 1 0 0 1 1-1h5l2 2.5h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
-                    </svg>
-                  )}
-                </span>
-                <span className="text-[15px] font-medium text-white">{t.name}</span>
-              </span>
-              <span
-                className={cn(
-                  "mt-2 block text-[13px] leading-relaxed text-white/60 transition-all duration-500",
-                  on ? "max-h-24 opacity-100" : "max-h-0 overflow-hidden opacity-0"
-                )}
-              >
-                {t.line}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <Bezel radius={2.25} className="self-start">
-        <div className="relative aspect-[16/10] w-full">
-          {tab === "catalogue" && <CataloguePane />}
-          {tab === "youtube" && <QueuePane />}
-          {tab === "spotify" && <SpotifyPane />}
-          {tab === "twitch" && <TwitchPane />}
-        </div>
-      </Bezel>
+    <div
+      data-wipe
+      className={cn("flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#080a12]/75 p-7", className)}
+    >
+      <span className="flex items-center gap-3">
+        <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/40">{mark}</span>
+        <span className="text-[15px] font-medium text-white">{name}</span>
+      </span>
+      <p className="mt-4 max-w-md text-[13.5px] leading-relaxed text-white/70">{line}</p>
+      <div className="mt-7 flex-1">{children}</div>
     </div>
   );
 }
 
-const PANE_IN = { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.6, ease: EASE } };
+const CATALOGUE_TILES = pick(["hk-01", "vn-01", "no-01", "tw-01", "th-01", "abao-03"]);
+const QUEUE_ROWS = pick(["driv-05", "cn-03", "id-02", "np-01"]);
 
-const PANE_IDS = ["hk-01", "vn-01", "no-01", "tw-01", "th-01", "abao-03"];
+function Sources() {
+  const root = useRef<HTMLDivElement>(null);
 
-function CataloguePane() {
-  const items = PANE_IDS.map((id) => defaultVideos.find((v) => v.id === id)!).filter(Boolean);
+  // Révélation en VOLET DÉCOUPÉ, et non en fondu : la tuile se dévoile du haut
+  // vers le bas comme un store qu'on lève. C'est le seul endroit de la page qui
+  // utilise `clip-path`, et c'est ce qui distingue ce bloc des révélations
+  // ordinaires du reste de la page. Le découpage est figé une fois joué, donc
+  // aucun coût de composition résiduel.
+  useGSAP(
+    () => {
+      const tiles = gsap.utils.toArray<HTMLElement>("[data-wipe]", root.current);
+      const mm = gsap.matchMedia();
+
+      mm.add("(prefers-reduced-motion: reduce)", () => {
+        gsap.set(tiles, { clipPath: "none", autoAlpha: 1 });
+      });
+
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        gsap.set(tiles, { clipPath: "inset(0% 0% 100% 0%)" });
+        const batched = ScrollTrigger.batch(tiles, {
+          start: "top 86%",
+          once: true,
+          onEnter: (batch) =>
+            gsap.to(batch, {
+              clipPath: "inset(0% 0% 0% 0%)",
+              duration: 1.05,
+              stagger: 0.13,
+              ease: "power3.inOut",
+              overwrite: true,
+              onComplete: () => gsap.set(batch, { clipPath: "none" }),
+            }),
+        });
+        return () => batched.forEach((t) => t.kill());
+      });
+
+      return () => mm.revert();
+    },
+    { scope: root }
+  );
+
   return (
-    <motion.div {...PANE_IN} className="grid h-full grid-cols-3 gap-2 p-3">
-      {items.map((v) => (
-        <div key={v.id} className="group relative overflow-hidden rounded-xl">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={thumb(v.youtubeId)}
-            alt=""
-            loading="lazy"
-            className="h-full w-full object-cover opacity-65 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-105 group-hover:opacity-100"
-          />
-          <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/85 to-transparent px-2.5 pb-2 pt-6 text-[10px] text-white/80">
-            {v.country}
+    <div ref={root} className="grid gap-5 md:grid-cols-3">
+      <SourceCell
+        className="md:col-span-2"
+        name="Catalogue"
+        line="Une cinquantaine de paysages tenus à la main, classés par ambiance. Rien à chercher, tu cliques et ça tourne."
+        mark={
+          <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="#ffc38a" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M3 17.5V7a1 1 0 0 1 1-1h5l2 2.5h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
+          </svg>
+        }
+      >
+        <div className="grid grid-cols-3 gap-2">
+          {CATALOGUE_TILES.map((v) => (
+            <span key={v.id} className="group relative overflow-hidden rounded-[3px]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={thumb(v.youtubeId)}
+                alt=""
+                loading="lazy"
+                className="aspect-[16/10] w-full object-cover opacity-70 transition-opacity duration-500 group-hover:opacity-100"
+              />
+              <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/85 to-transparent px-2 pb-1.5 pt-6 text-[10px] text-white/80">
+                {v.country}
+              </span>
+            </span>
+          ))}
+        </div>
+      </SourceCell>
+
+      <SourceCell
+        name="YouTube"
+        line="Tes playlists et ta file d'attente, jouées dans TON ordre. YouTube ne reprend jamais la main."
+        mark={<YoutubeMark />}
+      >
+        <div className="flex flex-col gap-1.5">
+          {QUEUE_ROWS.map((v, i) => (
+            <span
+              key={v.id}
+              className={cn("flex items-center gap-3 rounded-full px-2.5 py-1.5", i === 0 && "bg-white/[0.07]")}
+            >
+              <span className="w-3 shrink-0 text-center font-mono text-[10px] text-white/50">{i + 1}</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={thumb(v.youtubeId)} alt="" loading="lazy" className="h-7 w-11 shrink-0 rounded-[3px] object-cover" />
+              <span className="min-w-0 flex-1 truncate text-[12px] text-white/75">{v.title}</span>
+            </span>
+          ))}
+        </div>
+      </SourceCell>
+
+      <SourceCell
+        name="Spotify"
+        line="Ta bibliothèque Premium se lit dans la session, sans changer d'onglet ni couper le minuteur."
+        mark={<SpotifyMark />}
+      >
+        <div className="flex flex-col gap-1">
+          {[
+            { t: "Weightless", a: "Marconi Union", d: "8:08" },
+            { t: "Nuvole Bianche", a: "Ludovico Einaudi", d: "5:57" },
+            { t: "An Ending (Ascent)", a: "Brian Eno", d: "4:24" },
+          ].map((r, i) => (
+            <span key={r.t} className={cn("flex items-center gap-3 rounded-full px-3 py-2", i === 1 && "bg-white/[0.06]")}>
+              <span className="min-w-0 flex-1">
+                <span className={cn("block truncate text-[12.5px]", i === 1 ? "text-[#1db954]" : "text-white/80")}>{r.t}</span>
+                <span className="block truncate text-[11px] text-white/55">{r.a}</span>
+              </span>
+              <span className="font-mono text-[10px] tabular-nums text-white/55">{r.d}</span>
+            </span>
+          ))}
+          <span className="mt-3 block h-[3px] w-full overflow-hidden rounded-full bg-white/10">
+            <span className="block h-full w-[38%] rounded-full bg-[#1db954]" />
           </span>
         </div>
-      ))}
-    </motion.div>
-  );
-}
+      </SourceCell>
 
-const QUEUE_IDS = ["driv-05", "cn-03", "id-02", "np-01", "uk-01"];
-
-function QueuePane() {
-  const items = QUEUE_IDS.map((id) => defaultVideos.find((v) => v.id === id)!).filter(Boolean);
-  return (
-    <motion.div {...PANE_IN} className="flex h-full flex-col gap-1.5 p-4">
-      <span className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/50">
-        <YoutubeMark /> File d&apos;attente
-      </span>
-      {items.map((v, i) => (
-        <div
-          key={v.id}
-          className={cn(
-            "flex items-center gap-3 rounded-xl px-2.5 py-2 transition-colors",
-            i === 0 ? "bg-white/[0.07]" : "hover:bg-white/[0.04]"
-          )}
-        >
-          <span className="w-4 shrink-0 text-center font-mono text-[10px] text-white/50">{i + 1}</span>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={thumb(v.youtubeId)} alt="" loading="lazy" className="h-8 w-12 shrink-0 rounded-md object-cover" />
-          <span className="min-w-0 flex-1 truncate text-[12px] text-white/75">{v.title}</span>
-          {i === 0 && (
-            <span className="flex h-3 items-end gap-[2px]" aria-hidden>
-              {[1.2, 1.45, 1.3].map((d, k) => (
-                <span key={k} className="anim-eq w-[2px] rounded-full bg-[#ffc38a]" style={{ height: "100%", animationDuration: `${d}s`, animationDelay: `${-k * 0.4}s` }} />
-              ))}
+      <SourceCell
+        className="md:col-span-2"
+        name="Twitch"
+        line="Un live ou une rediffusion en fond, pour travailler à côté de quelqu'un."
+        mark={<TwitchMark />}
+      >
+        <div className="grid gap-3 sm:grid-cols-[1fr_minmax(0,13rem)]">
+          <span className="relative block overflow-hidden rounded-[3px] bg-black/50">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={thumb(byId("uk-01")?.youtubeId ?? defaultVideos[0].youtubeId)}
+              alt=""
+              loading="lazy"
+              className="aspect-[16/9] w-full object-cover opacity-50"
+            />
+            <span className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-[#9146ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white">
+              Live
             </span>
-          )}
+            <span className="absolute bottom-3 left-3 font-mono text-[11px] text-white/75">studywithme_fr</span>
+          </span>
+          <span className="flex flex-col gap-2 rounded-[3px] bg-white/[0.03] p-3">
+            {[
+              { u: "lenaCodes", m: "quelqu'un révise la bio ce soir ?" },
+              { u: "marco_dev", m: "3e pomodoro, ça pique" },
+              { u: "sora", m: "la pluie sur le stream est parfaite" },
+              { u: "juliette", m: "on repart pour 25 min" },
+            ].map((c) => (
+              <span key={c.u} className="block text-[11px] leading-snug text-white/70">
+                <span className="text-[#9146ff]">{c.u}</span> {c.m}
+              </span>
+            ))}
+          </span>
         </div>
-      ))}
-    </motion.div>
-  );
-}
-
-function SpotifyPane() {
-  const rows = [
-    { t: "Weightless", a: "Marconi Union", d: "8:08" },
-    { t: "Nuvole Bianche", a: "Ludovico Einaudi", d: "5:57" },
-    { t: "Intro", a: "The xx", d: "2:07" },
-    { t: "An Ending (Ascent)", a: "Brian Eno", d: "4:24" },
-  ];
-  return (
-    <motion.div {...PANE_IN} className="flex h-full flex-col p-5">
-      <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/50">
-        <SpotifyMark /> Connecté en Premium
-      </span>
-      <div className="mt-4 flex flex-1 flex-col justify-center gap-1">
-        {rows.map((r, i) => (
-          <div key={r.t} className={cn("flex items-center gap-3 rounded-xl px-3 py-2.5", i === 1 && "bg-white/[0.06]")}>
-            <span className="w-3 font-mono text-[10px] text-white/45">{i + 1}</span>
-            <span className="min-w-0 flex-1">
-              <span className={cn("block truncate text-[13px]", i === 1 ? "text-[#1db954]" : "text-white/80")}>{r.t}</span>
-              <span className="block truncate text-[11px] text-white/50">{r.a}</span>
-            </span>
-            <span className="font-mono text-[10px] tabular-nums text-white/50">{r.d}</span>
-          </div>
-        ))}
-      </div>
-      <div className="mt-3 h-[3px] w-full overflow-hidden rounded-full bg-white/10">
-        <span className="block h-full w-[38%] rounded-full bg-[#1db954]" />
-      </div>
-    </motion.div>
-  );
-}
-
-function TwitchPane() {
-  const chat = [
-    { u: "lenaCodes", m: "quelqu'un révise la bio ce soir ?" },
-    { u: "marco_dev", m: "3e pomodoro, ça pique" },
-    { u: "sora", m: "la pluie sur le stream est parfaite" },
-    { u: "juliette", m: "on repart pour 25 min" },
-  ];
-  return (
-    <motion.div {...PANE_IN} className="grid h-full grid-cols-[1fr_minmax(0,11rem)] gap-3 p-4">
-      <div className="relative overflow-hidden rounded-xl bg-black/50">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={thumb(defaultVideos.find((v) => v.id === "uk-01")?.youtubeId ?? defaultVideos[0].youtubeId)}
-          alt=""
-          loading="lazy"
-          className="h-full w-full object-cover opacity-45"
-        />
-        <span className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-[#9146ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white">
-          <span className="h-1.5 w-1.5 rounded-full bg-white" aria-hidden />
-          Live
-        </span>
-        <span className="absolute bottom-3 left-3 flex items-center gap-2">
-          <TwitchMark />
-          <span className="font-mono text-[11px] text-white/70">studywithme_fr</span>
-        </span>
-      </div>
-      <div className="flex flex-col gap-2 overflow-hidden rounded-xl bg-white/[0.03] p-3">
-        {chat.map((c) => (
-          <p key={c.u} className="text-[11px] leading-snug text-white/65">
-            <span className="text-[#9146ff]">{c.u}</span> {c.m}
-          </p>
-        ))}
-      </div>
-    </motion.div>
+      </SourceCell>
+    </div>
   );
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   POMODORO JOUABLE — la démo la plus honnête possible : le vrai geste
+   LE PARCOURS — un tracé qui se dessine, et dépose ses étapes au passage
+   ══════════════════════════════════════════════════════════════════════════
+
+   L'avenue rectiligne qui traverse la photo du fond, reprise en repère de
+   lecture. Une seule timeline scrubée coordonne trois choses : le trait qui
+   descend, le point qui s'allume quand le trait l'atteint, et le texte qui
+   se pose juste après. Le mouvement RACONTE ici un ordre (on fait ça, puis
+   ça), ce qui est la seule bonne raison d'animer une liste.
+
+   Le trait est un `div` en `scaleY`, pas un tracé SVG : sur une ligne droite
+   le rendu est identique et c'est composé par le GPU, sans recalcul de
+   `getTotalLength` à chaque redimensionnement. */
+
+const STEPS = [
+  { t: "Choisis une fenêtre", d: "Un paysage du catalogue, ta playlist, un live. La musique démarre avec la session." },
+  { t: "Règle ton rythme", d: "Vingt-cinq minutes, cinquante, ou un chrono libre qui s'arrête quand tu décroches." },
+  { t: "Travaille", d: "Minuteur, tâches et lecteur dans le même écran. Rien d'autre à l'image." },
+  { t: "Relis ta semaine", d: "Série, score de concentration, récap du dimanche. Construits pendant que tu bossais." },
+];
+
+function Parcours() {
+  const root = useRef<HTMLDivElement>(null);
+
+  useGSAP(
+    () => {
+      const line = root.current?.querySelector<HTMLElement>("[data-line]");
+      const dots = gsap.utils.toArray<HTMLElement>("[data-dot]", root.current);
+      const bodies = gsap.utils.toArray<HTMLElement>("[data-step]", root.current);
+      if (!line || dots.length === 0) return;
+      const mm = gsap.matchMedia();
+
+      mm.add("(prefers-reduced-motion: reduce)", () => {
+        gsap.set(line, { scaleY: 1 });
+        gsap.set(dots, { scale: 1, backgroundColor: "#ffc38a" });
+        gsap.set(bodies, { autoAlpha: 1, x: 0 });
+      });
+
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        gsap.set(line, { scaleY: 0, transformOrigin: "center top" });
+        gsap.set(dots, { scale: 0.4, backgroundColor: "rgba(255,195,138,0)" });
+        gsap.set(bodies, { autoAlpha: 0.22, x: -20 });
+
+        const tl = gsap.timeline({
+          defaults: { ease: "none" },
+          scrollTrigger: {
+            trigger: root.current,
+            start: "top 76%",
+            end: "bottom 82%",
+            scrub: 0.5,
+            refreshPriority: PRIO.below,
+          },
+        });
+
+        tl.to(line, { scaleY: 1, duration: 1 }, 0);
+        dots.forEach((dot, i) => {
+          const at = (i / dots.length) * 0.9;
+          tl.to(dot, { scale: 1, backgroundColor: "#ffc38a", duration: 0.05, ease: "power2.out" }, at);
+          tl.to(bodies[i], { autoAlpha: 1, x: 0, duration: 0.13, ease: "power2.out" }, at);
+        });
+
+        return () => {
+          tl.scrollTrigger?.kill();
+          tl.kill();
+        };
+      });
+
+      return () => mm.revert();
+    },
+    { scope: root }
+  );
+
+  return (
+    <div ref={root} className="relative pl-10 sm:pl-14">
+      {/* Le trait, et sa gaine éteinte */}
+      <span aria-hidden className="absolute left-[5px] top-2 bottom-2 w-px bg-white/12 sm:left-[13px]" />
+      <span
+        data-line
+        aria-hidden
+        className="absolute left-[4px] top-2 bottom-2 w-[3px] rounded-full bg-[#ffc38a] sm:left-3"
+      />
+
+      <ol className="grid gap-12 sm:gap-16">
+        {STEPS.map((s) => (
+          <li key={s.t} className="relative">
+            <span
+              data-dot
+              aria-hidden
+              className="absolute left-[-2.15rem] top-[0.45rem] block h-[11px] w-[11px] rounded-full ring-2 ring-[#ffc38a]/45 sm:left-[-3rem]"
+            />
+            <div data-step>
+              <h3 className="text-[clamp(1.25rem,2.2vw,1.7rem)] font-semibold tracking-[-0.025em] text-white">{s.t}</h3>
+              <p className="mt-3 max-w-md text-[14.5px] leading-relaxed text-white/65">{s.d}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LE MINUTEUR JOUABLE — la démo la plus honnête possible : le vrai geste
    ══════════════════════════════════════════════════════════════════════════ */
 
-function TryPomodoro({
-  liveLeft,
-  onLiveChange,
-}: {
-  liveLeft: MotionValue<number>;
-  onLiveChange: (live: boolean, total: number) => void;
-}) {
-  const PRESETS = [
-    { label: "Classique", work: 25 },
-    { label: "Profond", work: 50 },
-    { label: "Court", work: 15 },
-  ];
-  const [preset, setPreset] = useState(0);
-  const [running, setRunning] = useState(false);
-  const total = PRESETS[preset].work * 60;
+const PRESETS = [
+  { key: "classic", label: "Classique", work: "25 / 5", total: 25 * 60 },
+  { key: "deep", label: "Concentration longue", work: "50 / 10", total: 50 * 60 },
+  { key: "court", label: "Court", work: "15 / 3", total: 15 * 60 },
+] as const;
+
+function TryPomodoro({ publish }: { publish: (live: boolean, total: number, left: number) => void }) {
+  const [preset, setPreset] = useState<(typeof PRESETS)[number]["key"]>("classic");
+  const total = PRESETS.find((p) => p.key === preset)!.total;
   const [left, setLeft] = useState(total);
+  const [running, setRunning] = useState(false);
+  // « touched » = le visiteur a lancé SA session au moins une fois. C'est ce
+  // qui fait basculer l'horloge de la nav du temps de la page au sien.
+  const [touched, setTouched] = useState(false);
+
+  // « En cours » est DÉRIVÉ, jamais stocké : arrivé à zéro, `active` retombe
+  // seul et l'effet nettoie son intervalle. Pas de `setState` dans un effet,
+  // donc pas de rendu en cascade.
+  const active = running && left > 0;
 
   useEffect(() => {
-    setLeft(PRESETS[preset].work * 60);
-    setRunning(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preset]);
+    if (!active) return;
+    const t = setInterval(() => setLeft((v) => Math.max(0, v - 1)), 1000);
+    return () => clearInterval(t);
+  }, [active]);
 
+  // Publication vers l'horloge de la nav. Le parent écrit dans SON ref (on ne
+  // mute pas un ref reçu en prop), donc aucun re-render ne remonte l'arbre.
   useEffect(() => {
-    if (!running) return;
-    const id = setInterval(() => setLeft((l) => (l <= 1 ? 0 : l - 1)), 1000);
-    return () => clearInterval(id);
-  }, [running]);
+    publish(touched, total, left);
+  }, [publish, touched, total, left]);
 
-  // Le minuteur alimente l'horloge de la nav SANS re-rendre la page : la valeur
-  // transite par une MotionValue, pas par un state remonté.
-  useEffect(() => {
-    liveLeft.set(left);
-  }, [left, liveLeft]);
-
-  useEffect(() => {
-    onLiveChange(running, total);
-  }, [running, total, onLiveChange]);
-
-  const progress = 1 - left / total;
+  const progress = total > 0 ? 1 - left / total : 0;
   const dash = 2 * Math.PI * 52;
-  const mm = String(Math.floor(left / 60)).padStart(2, "0");
-  const ss = String(left % 60).padStart(2, "0");
 
   return (
     <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-20">
-      <div className="max-w-lg">
-        <Eyebrow>Essaye tout de suite</Eyebrow>
-        <h2 className="mt-7 text-[clamp(2rem,4vw,3.1rem)] font-semibold leading-[1.05] tracking-[-0.03em] text-white">
-          Le minuteur, pour de vrai.
+      <div data-reveal>
+        <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-semibold leading-[1.05] tracking-[-0.04em]">
+          Essaie-le tout de suite.
         </h2>
-        <p className="mt-6 text-[16px] leading-relaxed text-white/65">
-          Celui-ci fonctionne, ici, sans compte. C&apos;est exactement le moteur de la session : trois rythmes, un
-          bouton, et le temps qui descend.
+        <p className="mt-6 max-w-md text-[15px] leading-relaxed text-white/70">
+          C&apos;est le minuteur de l&apos;application, pas une capture. Lance-le et le compteur en haut de page arrête
+          de suivre ton scroll pour suivre ta session.
         </p>
-        <p className="mt-4 text-[13px] leading-relaxed text-white/50">
-          {running
-            ? "Regarde la barre en haut : ta session a pris le relais du compteur de la page."
-            : "Lance-le, et le compteur en haut de page passera sur ton temps à toi."}
-        </p>
+
         <div className="mt-9 flex flex-wrap gap-2">
-          {PRESETS.map((p, i) => (
-            <button
-              key={p.label}
-              onClick={() => setPreset(i)}
-              className={cn(
-                "rounded-full px-5 py-2.5 text-[13px] font-medium transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
-                i === preset
-                  ? "border border-white/25 bg-white/[0.08] text-white"
-                  : "border border-white/10 text-white/60 hover:border-white/25 hover:text-white/80"
-              )}
-            >
-              {p.label}
-              <span className="ml-2 font-mono text-[11px] text-white/50">{p.work}</span>
-            </button>
-          ))}
+          {PRESETS.map((p) => {
+            const on = p.key === preset;
+            return (
+              <button
+                key={p.key}
+                onClick={() => {
+                  setPreset(p.key);
+                  setLeft(p.total);
+                  setRunning(false);
+                  setTouched(false);
+                }}
+                aria-pressed={on}
+                className={cn(
+                  "rounded-full border px-5 py-2.5 text-[13px] transition-colors duration-500",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc38a] focus-visible:ring-offset-2 focus-visible:ring-offset-[#05060c]",
+                  on ? "border-white/45 bg-white/10 text-white" : "border-white/12 text-white/60 hover:border-white/28 hover:text-white"
+                )}
+              >
+                {p.label}
+                <span className="ml-2 font-mono text-[11px] text-white/50">{p.work}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="justify-self-center">
-        <Bezel radius={3} className="w-[19rem]">
+      <div data-reveal className="justify-self-center">
+        <Panel className="w-[19rem]">
           <div className="flex flex-col items-center gap-7 px-8 py-10">
             <div className="relative h-[13.5rem] w-[13.5rem]">
-              <motion.span
-                aria-hidden
-                className="absolute inset-4 rounded-full"
-                style={{ background: "radial-gradient(circle, rgba(255,180,110,0.18), transparent 70%)" }}
-                animate={running ? { scale: [1, 1.08, 1], opacity: [0.6, 1, 0.6] } : { opacity: 0.4 }}
-                transition={{ duration: 4, repeat: running ? Infinity : 0, ease: "easeInOut" }}
-              />
               <svg className="h-full w-full -rotate-90" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
+                <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="3" />
                 <circle
                   cx="60"
                   cy="60"
@@ -894,21 +1422,27 @@ function TryPomodoro({
               </svg>
               <span className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className="font-mono text-[42px] leading-none tabular-nums text-white">
-                  {mm}:{ss}
+                  {pad(left / 60)}:{pad(left % 60)}
                 </span>
                 <span className="mt-2 font-mono text-[9px] uppercase tracking-[0.22em] text-white/50">
-                  {left === 0 ? "Terminé" : running ? "En cours" : "En attente"}
+                  {left === 0 ? "Terminé" : active ? "En cours" : "En attente"}
                 </span>
               </span>
             </div>
 
             <div className="flex items-center gap-3">
               <button
-                onClick={() => (left === 0 ? (setLeft(total), setRunning(true)) : setRunning((r) => !r))}
-                className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#08090f] transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:scale-105 active:scale-95"
-                aria-label={running ? "Mettre en pause" : "Démarrer"}
+                onClick={() => {
+                  setTouched(true);
+                  if (left === 0) {
+                    setLeft(total);
+                    setRunning(true);
+                  } else setRunning((r) => !r);
+                }}
+                className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#08090f] transition-transform duration-500 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc38a] focus-visible:ring-offset-2 focus-visible:ring-offset-[#07080e]"
+                aria-label={active ? "Mettre en pause le minuteur" : "Démarrer le minuteur"}
               >
-                {running ? (
+                {active ? (
                   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
                     <rect x="6" y="5" width="4" height="14" rx="1" />
                     <rect x="14" y="5" width="4" height="14" rx="1" />
@@ -922,10 +1456,11 @@ function TryPomodoro({
               <button
                 onClick={() => {
                   setRunning(false);
+                  setTouched(false);
                   setLeft(total);
                 }}
-                className="flex h-12 w-12 items-center justify-center rounded-full border border-white/12 text-white/65 transition-colors hover:border-white/30 hover:text-white"
-                aria-label="Réinitialiser"
+                className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 text-white/70 transition-colors hover:border-white/35 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc38a] focus-visible:ring-offset-2 focus-visible:ring-offset-[#07080e]"
+                aria-label="Réinitialiser le minuteur"
               >
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d="M3 12a9 9 0 1 0 2.6-6.4M3 4.5V10h5.5" />
@@ -933,38 +1468,109 @@ function TryPomodoro({
               </button>
             </div>
           </div>
-        </Bezel>
+        </Panel>
       </div>
     </div>
   );
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   TRACE — ce que l'app garde de tes soirées
-   ══════════════════════════════════════════════════════════════════════════ */
+   LA TRACE — la même grille, mais devenue tes données
+   ══════════════════════════════════════════════════════════════════════════
 
-// Trame déterministe (pas de Math.random au rendu : le SSR et le client
-// doivent produire exactement la même grille).
+   Le paiement de la métaphore : la façade de la section « mur » revient ici
+   sous forme de heatmap. Une case, une soirée, une fenêtre allumée.
+
+   Trame déterministe (aucun Math.random au rendu : le composant doit produire
+   deux fois la même grille). */
+
 const HEAT = Array.from({ length: 91 }, (_, i) => (i * 37) % 11);
-
-const HEAT_STEPS = [
-  "bg-white/[0.09]",
-  "bg-[#ffc38a]/30",
-  "bg-[#ffc38a]/55",
-  "bg-[#ffc38a]/80",
-  "bg-[#ffc38a]",
-];
+const HEAT_STEPS = ["bg-white/[0.07]", "bg-[#ffc38a]/30", "bg-[#ffc38a]/55", "bg-[#ffc38a]/80", "bg-[#ffc38a]"];
 const heatStep = (v: number) => (v > 8 ? 4 : v > 6 ? 3 : v > 4 ? 2 : v > 2 ? 1 : 0);
-
 const HEAT_DAYS = ["L", "", "M", "", "V", "", "D"];
 
-function TracePanel() {
-  const reduce = useReducedMotion();
+// Les chiffres se COMPTENT à l'arrivée : un total qui monte dit « ça s'est
+// accumulé pendant que tu travaillais », ce qu'un chiffre déjà posé ne dit pas.
+// Le rendu initial contient déjà la valeur finale : sans JavaScript, la section
+// reste juste.
+const TRACE_STATS = [
+  { k: "Série en cours", to: 17, kind: "days" as const },
+  { k: "Cette semaine", to: 560, kind: "hm" as const },
+  { k: "Score de concentration", to: 84, kind: "plain" as const },
+];
+
+const fmtStat = (v: number, kind: "days" | "hm" | "plain") => {
+  if (kind === "days") return `${Math.round(v)} j`;
+  if (kind === "hm") return `${Math.floor(v / 60)}h ${pad(v % 60)}m`;
+  return String(Math.round(v));
+};
+
+function Trace() {
+  const root = useRef<HTMLDivElement>(null);
+
+  useGSAP(
+    () => {
+      const cells = gsap.utils.toArray<HTMLElement>("[data-heat]", root.current);
+      const mm = gsap.matchMedia();
+
+      mm.add("(prefers-reduced-motion: reduce)", () => {
+        gsap.set(cells, { autoAlpha: 1, scale: 1 });
+      });
+
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        // Même geste que la façade, en plus court : la grille se remplit
+        // colonne par colonne, de la plus ancienne à aujourd'hui.
+        const tween = gsap.fromTo(
+          cells,
+          { autoAlpha: 0, scale: 0.4 },
+          {
+            autoAlpha: 1,
+            scale: 1,
+            duration: 0.5,
+            ease: "power2.out",
+            stagger: { amount: 0.9, grid: "auto", from: "start", axis: "x" },
+            scrollTrigger: { trigger: root.current, start: "top 78%", once: true, refreshPriority: PRIO.below },
+          }
+        );
+        // Les totaux montent jusqu'à leur valeur. On anime un objet, pas le
+        // DOM : une seule écriture de texte par frame, et le formatage reste
+        // au même endroit que le rendu initial.
+        const counters = gsap.utils.toArray<HTMLElement>("[data-count]", root.current).map((el) => {
+          const target = Number(el.dataset.count);
+          const kind = (el.dataset.kind ?? "plain") as "days" | "hm" | "plain";
+          const box = { v: 0 };
+          el.textContent = fmtStat(0, kind);
+          return gsap.to(box, {
+            v: target,
+            duration: 1.5,
+            ease: "power2.out",
+            onUpdate: () => {
+              el.textContent = fmtStat(box.v, kind);
+            },
+            scrollTrigger: { trigger: el, start: "top 90%", once: true },
+          });
+        });
+
+        return () => {
+          tween.scrollTrigger?.kill();
+          tween.kill();
+          counters.forEach((c) => {
+            c.scrollTrigger?.kill();
+            c.kill();
+          });
+        };
+      });
+
+      return () => mm.revert();
+    },
+    { scope: root }
+  );
+
   return (
-    <div className="grid gap-4 md:grid-cols-3">
-      <div className="rounded-[2rem] border border-white/10 bg-[#080a12]/70 p-8 md:col-span-2">
+    <div ref={root}>
+      <div data-reveal className="rounded-2xl border border-white/10 bg-[#080a12]/70 p-7 sm:p-9">
         <div className="flex flex-wrap items-baseline justify-between gap-4">
-          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/65">Treize semaines</span>
+          <p className="text-[15px] text-white/75">Treize semaines. Une case par soirée.</p>
           <span className="flex items-center gap-2 font-mono text-[10px] text-white/60">
             moins
             <span className="flex gap-1" aria-hidden>
@@ -977,43 +1583,30 @@ function TracePanel() {
         </div>
 
         <div className="mt-7 flex gap-2.5">
-          {/* Jours de la semaine, pour que la grille se lise comme un calendrier */}
           <div className="grid grid-rows-7 gap-[6px] pr-1">
             {HEAT_DAYS.map((d, i) => (
-              <span key={i} className="flex h-[14px] items-center font-mono text-[9px] leading-none text-white/40">
+              <span key={i} className="flex h-[14px] items-center font-mono text-[9px] leading-none text-white/45">
                 {d}
               </span>
             ))}
           </div>
           <div className="grid flex-1 grid-flow-col grid-rows-7 gap-[6px]">
             {HEAT.map((v, i) => (
-              <motion.span
-                key={i}
-                initial={reduce ? false : { opacity: 0, scale: 0.4 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: (i % 30) * 0.012, ease: EASE }}
-                className={cn("h-[14px] rounded-[3px]", HEAT_STEPS[heatStep(v)])}
-              />
+              <span key={i} data-heat className={cn("h-[14px] rounded-[3px]", HEAT_STEPS[heatStep(v)])} />
             ))}
           </div>
         </div>
-
-        <p className="mt-7 max-w-md text-[14px] leading-relaxed text-white/72">
-          Chaque case est une soirée. La série, le score de concentration et le récap du dimanche se construisent tout
-          seuls pendant que tu travailles.
-        </p>
       </div>
 
-      <div className="flex flex-col gap-4">
-        {[
-          { k: "Série en cours", v: "17 j" },
-          { k: "Cette semaine", v: "9h 20m" },
-          { k: "Score de concentration", v: "84" },
-        ].map((s) => (
-          <div key={s.k} className="flex-1 rounded-[1.75rem] border border-white/10 bg-[#080a12]/70 p-7">
-            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/65">{s.k}</span>
-            <p className="mt-4 font-mono text-[34px] leading-none tabular-nums text-white">{s.v}</p>
+      {/* Les chiffres, nus, sous un filet. Pas de cartes : ils n'ont pas besoin
+          d'élévation, ils ont besoin d'espace. */}
+      <div data-reveal className="mt-10 grid gap-8 border-t border-white/[0.09] pt-9 sm:grid-cols-3">
+        {TRACE_STATS.map((s) => (
+          <div key={s.k}>
+            <p data-count={s.to} data-kind={s.kind} className="font-mono text-[34px] leading-none tabular-nums text-white">
+              {fmtStat(s.to, s.kind)}
+            </p>
+            <p className="mt-3 text-[13px] text-white/60">{s.k}</p>
           </div>
         ))}
       </div>
@@ -1022,253 +1615,395 @@ function TracePanel() {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   LE DÉFILEMENT AMORTI
+   ══════════════════════════════════════════════════════════════════════════
+
+   `ScrollSmoother` (gratuit depuis GSAP 3.13) : le scroll natif reste la
+   source de vérité, seul le contenu rattrape sa position avec un peu
+   d'inertie. C'est ce qui donne aux pages GSAP soignées leur glisse, et ça
+   n'empêche ni l'épinglage ni le `scrub`, qui passent par le même moteur.
+
+   Contrainte à tenir : tout ce qui est `position: fixed` doit rester HORS de
+   `#smooth-wrapper`, sinon le conteneur transformé devient son référentiel et
+   l'élément dérive avec la page.
+
+   Sous `prefers-reduced-motion`, on ne crée rien : le scroll natif, immédiat,
+   est exactement ce que ce réglage demande. */
+
+function SmoothScroll() {
+  useGSAP(() => {
+    const mm = gsap.matchMedia();
+    mm.add("(prefers-reduced-motion: no-preference)", () => {
+      const smoother = ScrollSmoother.create({
+        wrapper: "#smooth-wrapper",
+        content: "#smooth-content",
+        smooth: 1.05,
+        // Pas d'amortissement au doigt : sur mobile, désynchroniser le contenu
+        // du geste donne une impression de latence, pas de fluidité.
+        smoothTouch: false,
+        effects: false,
+      });
+      return () => smoother.kill();
+    });
+    return () => mm.revert();
+  });
+  return null;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    PAGE
    ══════════════════════════════════════════════════════════════════════════ */
 
 export default function LandingPage() {
-  const reduce = useReducedMotion();
+  const root = useRef<HTMLDivElement>(null);
+  const halo = useRef<HTMLDivElement>(null);
+  const bell = useRef<HTMLSpanElement>(null);
 
-  const heroRef = useRef<HTMLElement>(null);
+  const clock = useRef<Clock>({ scroll: 0, live: false, total: POMODORO_SECONDS, left: POMODORO_SECONDS });
+  const [done, setDone] = useState(false);
+  const onDoneChange = useCallback((d: boolean) => setDone(d), []);
 
-  // Position du pointeur DANS LE VIEWPORT (0-1) : le halo est une couche fixe,
-  // il ne s'éteint donc plus brutalement quand on quitte le hero.
-  const px = useMotionValue(0);
-  const py = useMotionValue(0);
-  const spotX = useSpring(useTransform(px, (v) => (v + 0.5) * 100), { stiffness: 80, damping: 20 });
-  const spotY = useSpring(useTransform(py, (v) => (v + 0.5) * 100), { stiffness: 80, damping: 20 });
-  const spotlight = useMotionTemplate`radial-gradient(40rem circle at ${spotX}% ${spotY}%, rgba(255,183,110,0.13), transparent 62%)`;
-
-  // Voile de lecture : transparent sur le hero (on veut voir la ville), il
-  // monte ensuite pour que TOUT le texte de la page repose sur un fond stable.
-  const { scrollYProgress } = useScroll();
-  const veil = useTransform(scrollYProgress, [0, 0.12], [0, 0.86]);
-
-  // L'horloge de la page. `liveLeft` est une MotionValue : le minuteur de la
-  // section démo l'alimente à la seconde sans provoquer un seul re-render ici.
-  const liveLeft = useMotionValue(POMODORO_SECONDS);
-  const [live, setLive] = useState(false);
-  const [liveTotal, setLiveTotal] = useState(POMODORO_SECONDS);
-  const onLiveChange = useCallback((on: boolean, total: number) => {
-    setLive(on);
-    setLiveTotal(total);
+  /** Le minuteur de la démo publie son état ici : c'est lui qui fait basculer
+   *  l'horloge de la nav du temps de la page au temps de la session. */
+  const publish = useCallback((live: boolean, total: number, left: number) => {
+    clock.current.live = live;
+    clock.current.total = total;
+    clock.current.left = left;
   }, []);
 
-  // Fin de la « session de la page » : atteinte du bas, ou minuteur à zéro.
-  const [done, setDone] = useState(false);
-  useEffect(() => {
-    const unScroll = scrollYProgress.on("change", (v) => {
-      if (!live) setDone(v > 0.985);
-    });
-    const unLive = liveLeft.on("change", (v) => {
-      if (live) setDone(v <= 0);
-    });
-    return () => {
-      unScroll();
-      unLive();
-    };
-  }, [scrollYProgress, liveLeft, live]);
+  const signIn = useCallback(() => {
+    void signInWithGoogle();
+  }, []);
 
-  const { scrollYProgress: heroP } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
-  const heroY = useTransform(heroP, [0, 1], [0, 120]);
-  const heroFade = useTransform(heroP, [0, 0.75], [1, 0]);
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
+
+      /* ── Progression de la page, source de l'horloge de la nav ─────────── */
+      const progress = ScrollTrigger.create({
+        start: 0,
+        end: "max",
+        refreshPriority: PRIO.hero,
+        onUpdate: (self) => {
+          if (clock.current) clock.current.scroll = self.progress;
+        },
+      });
+
+      /* ── Halo du curseur ──────────────────────────────────────────────── */
+      mm.add("(prefers-reduced-motion: no-preference) and (pointer: fine)", () => {
+        const el = halo.current;
+        if (!el) return;
+        gsap.set(el, { xPercent: -50, yPercent: -50, x: window.innerWidth / 2, y: window.innerHeight / 2 });
+        const xTo = gsap.quickTo(el, "x", { duration: 0.85, ease: "power3" });
+        const yTo = gsap.quickTo(el, "y", { duration: 0.85, ease: "power3" });
+        const onMove = (e: PointerEvent) => {
+          xTo(e.clientX);
+          yTo(e.clientY);
+        };
+        window.addEventListener("pointermove", onMove, { passive: true });
+        return () => window.removeEventListener("pointermove", onMove);
+      });
+
+      /* ── Voile de lecture ─────────────────────────────────────────────── */
+      // Transparent sur le hero (on veut voir la ville), il monte ensuite pour
+      // que TOUT le texte de la page repose sur un fond stable.
+      mm.add("(prefers-reduced-motion: reduce)", () => {
+        gsap.set("[data-veil]", { opacity: 0.86 });
+      });
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        const tween = gsap.fromTo(
+          "[data-veil]",
+          { opacity: 0 },
+          {
+            opacity: 0.86,
+            ease: "none",
+            scrollTrigger: { start: 0, end: () => window.innerHeight * 1.15, scrub: 0.5, refreshPriority: PRIO.hero, invalidateOnRefresh: true },
+          }
+        );
+        return () => {
+          tween.scrollTrigger?.kill();
+          tween.kill();
+        };
+      });
+
+      /* ── Entrée du hero ───────────────────────────────────────────────── */
+      mm.add("(prefers-reduced-motion: reduce)", () => {
+        gsap.set("[data-hero]", { autoAlpha: 1, y: 0 });
+        gsap.set("[data-word]", { yPercent: 0 });
+      });
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+        tl.from("[data-hero='eyebrow']", { autoAlpha: 0, y: 18, duration: 0.7 })
+          .from("[data-word]", { yPercent: 115, duration: 0.95, stagger: 0.055 }, 0.12)
+          .from("[data-hero='sub']", { autoAlpha: 0, y: 22, duration: 0.8 }, 0.55)
+          .from("[data-hero='cta']", { autoAlpha: 0, y: 20, duration: 0.8 }, 0.68)
+          .from("[data-hero='window']", { autoAlpha: 0, y: 56, duration: 1.2 }, 0.3);
+        return () => tl.kill();
+      });
+
+      /* ── Parallaxe de sortie du hero ──────────────────────────────────── */
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        const tween = gsap.to("[data-hero-inner]", {
+          y: 110,
+          autoAlpha: 0,
+          ease: "none",
+          scrollTrigger: { trigger: "[data-hero-section]", start: "top top", end: "bottom 30%", scrub: 0.6, refreshPriority: PRIO.hero },
+        });
+        return () => {
+          tween.scrollTrigger?.kill();
+          tween.kill();
+        };
+      });
+
+      /* ── Révélations au scroll, pour toutes les sections en flux ──────── */
+      const items = gsap.utils.toArray<HTMLElement>("[data-reveal]", root.current);
+      mm.add("(prefers-reduced-motion: reduce)", () => {
+        gsap.set(items, { autoAlpha: 1, y: 0 });
+      });
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        gsap.set(items, { autoAlpha: 0, y: 44 });
+        const batched = ScrollTrigger.batch(items, {
+          start: "top 88%",
+          once: true,
+          onEnter: (batch) =>
+            gsap.to(batch, { autoAlpha: 1, y: 0, duration: 0.9, stagger: 0.09, ease: "power3.out", overwrite: true }),
+        });
+        return () => batched.forEach((t) => t.kill());
+      });
+
+      /* ── Recalcul obligatoire ─────────────────────────────────────────── */
+      // Les effets React s'exécutent ENFANT D'ABORD : quand ce composant monte
+      // ses propres déclencheurs, les deux sections épinglées ont déjà inséré
+      // leur `pin-spacer` et allongé le document. Mais les déclencheurs créés
+      // AVANT ces insertions gardent des bornes calculées sur une page plus
+      // courte. Sans ce recalcul, le catalogue s'épinglait plusieurs centaines
+      // de pixels trop tôt et se superposait au mur de fenêtres.
+      // Un `requestAnimationFrame` laisse le navigateur poser la mise en page
+      // avant la mesure.
+      const raf = requestAnimationFrame(() => ScrollTrigger.refresh());
+
+      // Les polices modifient la hauteur des titres, donc les bornes.
+      let cancelled = false;
+      void document.fonts?.ready.then(() => {
+        if (!cancelled) ScrollTrigger.refresh();
+      });
+
+      return () => {
+        cancelled = true;
+        cancelAnimationFrame(raf);
+        progress.kill();
+        mm.revert();
+      };
+    },
+    { scope: root }
+  );
+
+  /* La sonnerie de fin : deux ondes qui partent du bouton quand les
+     vingt-cinq minutes de la page (ou de ta session) sont écoulées. Elle ne
+     tourne pas en boucle décorative, elle marque un instant précis. */
+  useGSAP(
+    () => {
+      if (!done || !bell.current) return;
+      const mm = gsap.matchMedia();
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        const rings = gsap.utils.toArray<HTMLElement>("[data-ring]", bell.current);
+        const tween = gsap.fromTo(
+          rings,
+          { scale: 0.85, autoAlpha: 0.7 },
+          { scale: 1.9, autoAlpha: 0, duration: 2.6, ease: "power2.out", repeat: -1, stagger: 0.9 }
+        );
+        return () => tween.kill();
+      });
+      return () => mm.revert();
+    },
+    { dependencies: [done], revertOnUpdate: true }
+  );
 
   return (
-    <MotionConfig reducedMotion="user">
-      <main
-        className="relative w-full max-w-full overflow-x-hidden bg-[#05060c] text-white"
-        onPointerMove={(e) => {
-          if (reduce) return;
-          px.set(e.clientX / window.innerWidth - 0.5);
-          py.set(e.clientY / window.innerHeight - 0.5);
-        }}
-      >
-        {/* La ville, et la nuit qui tombe au fil du scroll */}
-        <div className="pointer-events-none fixed inset-0 z-0">
-          <CityBackdrop />
-        </div>
-        {/* Voile de lisibilité, au-dessus de la ville et sous le contenu */}
-        <motion.div
-          aria-hidden
-          className="pointer-events-none fixed inset-0 z-[1] bg-[#05060c]"
-          style={reduce ? { opacity: 0.86 } : { opacity: veil }}
-        />
-        {/* Halo du curseur, sur toute la page */}
-        {!reduce && (
-          <motion.div aria-hidden className="pointer-events-none fixed inset-0 z-[2]" style={{ background: spotlight }} />
-        )}
+    // Le fond de page est porté par la RACINE, jamais par `#smooth-content` :
+    // ce conteneur est peint AU-DESSUS des couches fixes, et un fond opaque
+    // dessus masquait complètement la photo de la ville.
+    <div ref={root} className="relative bg-[#05060c] text-white">
+      {/* Le défilement amorti. Monté en PREMIER : les effets React s'exécutent
+          dans l'ordre du document pour des frères, donc le lisseur existe
+          avant que les sections plus bas ne créent leurs épinglages. */}
+      <SmoothScroll />
 
-        <div className="relative z-10">
-          {/* Nav : île de verre détachée du bord */}
-          <header className="fixed inset-x-0 top-6 z-40 flex justify-center px-4">
-            <nav className="flex w-max items-center gap-8 rounded-full border border-white/12 bg-[#080a12]/70 py-2 pl-5 pr-2 backdrop-blur-2xl">
-              <Wordmark />
-              <div className="hidden items-center gap-6 text-[13px] text-white/60 md:flex">
-                <a href="#catalogue" className="transition-colors duration-500 hover:text-white">Catalogue</a>
-                <a href="#sources" className="transition-colors duration-500 hover:text-white">Sources</a>
-                <a href="#minuteur" className="transition-colors duration-500 hover:text-white">Minuteur</a>
-              </div>
-              <span className="hidden h-8 w-px bg-white/10 sm:block" aria-hidden />
-              <div className="hidden sm:block">
-                <SessionClock
-                  scrollProgress={scrollYProgress}
-                  liveLeft={liveLeft}
-                  liveTotal={liveTotal}
-                  live={live}
-                  done={done}
+      {/* ── COUCHES FIXES ────────────────────────────────────────────────
+          Elles vivent VOLONTAIREMENT hors de `#smooth-wrapper`. Le défilement
+          inertiel translate en continu `#smooth-content` ; or un élément
+          `position: fixed` placé dans un ancêtre transformé se positionne par
+          rapport à cet ancêtre et non au viewport. Le fond, le voile, le halo,
+          la barre du haut et l'index dériveraient donc avec la page. */}
+
+      {/* La ville, et la nuit qui tombe au fil du scroll */}
+      <div className="pointer-events-none fixed inset-0 z-0">
+        <CityBackdrop />
+      </div>
+      {/* Voile de lisibilité, au-dessus de la ville et sous le contenu */}
+      <div data-veil aria-hidden className="pointer-events-none fixed inset-0 z-[1] bg-[#05060c] opacity-0" />
+      {/* Halo du curseur, sur toute la page */}
+      <div
+        ref={halo}
+        aria-hidden
+        className="pointer-events-none fixed left-0 top-0 z-[2] h-[46rem] w-[46rem] rounded-full"
+        style={{ background: "radial-gradient(circle, rgba(255,183,110,0.11), transparent 62%)" }}
+      />
+
+      {/* Nav : île de verre détachée du bord. Hors du conteneur de contenu,
+          pour passer au-dessus de la section épinglée par ScrollTrigger.
+          Les liens de section ont été retirés : ils n'indiquaient pas où on se
+          trouvait. C'est l'index de chapitres qui tient ce rôle, en le disant. */}
+      <header className="fixed inset-x-0 top-6 z-40 flex justify-center px-4">
+        <nav className="flex w-max items-center gap-5 rounded-full border border-white/12 bg-[#080a12]/75 py-2 pl-5 pr-2 backdrop-blur-2xl">
+          <Wordmark />
+          <span className="hidden h-8 w-px bg-white/10 sm:block" aria-hidden />
+          <div className="hidden sm:block">
+            <SessionClock clock={clock} onDoneChange={onDoneChange} />
+          </div>
+          <Cta label="Commencer" onClick={signIn} className="py-1.5 pl-5 pr-1.5 text-[13px]" />
+        </nav>
+      </header>
+
+      {/* L'index de chapitres. `fixed` lui aussi, donc hors du conteneur
+          amorti. Monté avant le contenu sans conséquence : il ne mesure rien
+          au montage, il lit les ancres à chaque `refresh`. */}
+      <ChapterRail />
+
+      {/* ── CONTENU AMORTI ─────────────────────────────────────────────── */}
+      <div id="smooth-wrapper" className="z-10">
+        {/* Pas d'`overflow` ici : `ScrollSmoother` transforme ce conteneur et
+            y épingle des sections. C'est le wrapper qui coupe (il est mis en
+            `overflow: hidden` par le plugin), et le travelling du catalogue
+            se contient déjà lui-même. */}
+        <main id="smooth-content" className="relative w-full max-w-full">
+        {/* ── Hero ───────────────────────────────────────────────────────── */}
+        <section data-hero-section className="relative flex min-h-[100dvh] items-center px-4 pb-24 pt-24 sm:px-8">
+          <div
+            data-hero-inner
+            className="relative mx-auto grid w-full max-w-[86rem] items-center gap-16 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-20"
+          >
+            <div className="max-w-3xl">
+              <span
+                data-hero="eyebrow"
+                className="inline-flex items-center rounded-full border border-white/15 bg-white/[0.05] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-white/70"
+              >
+                Gratuit, sans compte obligatoire
+              </span>
+
+              <h1 className="mt-8 text-[clamp(2.7rem,6.4vw,5.4rem)] font-semibold leading-[1.02] tracking-[-0.04em] [text-shadow:0_4px_44px_rgba(0,0,0,0.85)]">
+                <MaskedLine text="Il fait presque nuit." />
+                <MaskedLine text="Allume ta fenêtre." />
+              </h1>
+
+              <p
+                data-hero="sub"
+                className="mt-8 max-w-lg text-[17px] leading-relaxed text-white/75 [text-shadow:0_1px_20px_rgba(0,0,0,0.9)]"
+              >
+                Un minuteur Pomodoro et ta musique dans le même écran, posés sur un paysage qui tourne en boucle.
+              </p>
+
+              <div data-hero="cta" className="mt-11 flex flex-wrap items-center gap-4">
+                <Cta label="Commencer" onClick={signIn} />
+                <Cta
+                  label="Voir le catalogue"
+                  tone="glass"
+                  onClick={() => document.getElementById("catalogue")?.scrollIntoView({ behavior: "smooth" })}
                 />
               </div>
-              <Cta label="Se connecter" onClick={() => signInWithGoogle()} className="py-1.5 pl-5 pr-1.5 text-[13px]" />
-            </nav>
-          </header>
-
-          {/* ── Hero ─────────────────────────────────────────────────────── */}
-          <section ref={heroRef} className="relative flex min-h-[100dvh] items-center px-4 pb-24 pt-36 sm:px-8">
-            <motion.div
-              style={reduce ? undefined : { y: heroY, opacity: heroFade }}
-              className="relative mx-auto grid w-full max-w-[86rem] items-center gap-20 lg:grid-cols-[minmax(0,1fr)_auto]"
-            >
-              <div className="max-w-4xl">
-                <motion.div
-                  initial={reduce ? false : { opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, ease: EASE }}
-                >
-                  <Eyebrow>Gratuit, sans publicité</Eyebrow>
-                </motion.div>
-
-                <motion.h1
-                  initial={reduce ? false : { opacity: 0, y: 40, filter: "blur(12px)" }}
-                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                  transition={{ duration: 1.1, delay: 0.08, ease: EASE }}
-                  className="mt-8 text-[clamp(2.9rem,6.8vw,5.9rem)] font-semibold leading-[0.98] tracking-[-0.04em] [text-shadow:0_4px_44px_rgba(0,0,0,0.8)]"
-                >
-                  La ville s&apos;allume,
-                  <br />
-                  toi tu te poses.
-                </motion.h1>
-
-                <motion.p
-                  initial={reduce ? false : { opacity: 0, y: 26 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.9, delay: 0.2, ease: EASE }}
-                  className="mt-9 max-w-lg text-[17px] leading-relaxed text-white/72 [text-shadow:0_1px_20px_rgba(0,0,0,0.9)]"
-                >
-                  Un minuteur Pomodoro et ta musique dans le même écran, sur un paysage qui tourne en boucle. Le reste
-                  du bruit attend dehors.
-                </motion.p>
-
-                <motion.div
-                  initial={reduce ? false : { opacity: 0, y: 22 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.9, delay: 0.3, ease: EASE }}
-                  className="mt-12 flex flex-wrap items-center gap-4"
-                >
-                  <Cta label="Commencer" onClick={() => signInWithGoogle()} />
-                  <Cta label="Voir le catalogue" tone="glass" onClick={() => document.getElementById("catalogue")?.scrollIntoView({ behavior: "smooth" })} />
-                </motion.div>
-              </div>
-
-              <motion.div
-                initial={reduce ? false : { opacity: 0, y: 60, filter: "blur(14px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                transition={{ duration: 1.3, delay: 0.34, ease: EASE }}
-                className="hidden justify-self-end lg:block"
-              >
-                <HeroScene px={px} py={py} />
-              </motion.div>
-            </motion.div>
-          </section>
-
-          {/* ── Catalogue en carrousel 3D ────────────────────────────────── */}
-          <section id="catalogue" className="mx-auto w-full max-w-[86rem] px-4 py-28 sm:px-8 md:py-40">
-            <Rise className="mb-16 max-w-3xl">
-              <Eyebrow>Le catalogue</Eyebrow>
-              <h2 className="mt-7 text-[clamp(2rem,4.4vw,3.4rem)] font-semibold leading-[1.04] tracking-[-0.035em]">
-                Cinquante-six endroits où poser ta soirée.
-              </h2>
-              <p className="mt-6 max-w-xl text-[16px] leading-relaxed text-white/65">
-                Study with me à Osaka, la pluie sur Shinjuku, le Bund à minuit, un train le long de la rivière au Gifu.
-                Attrape le carrousel et fais-le tourner.
-              </p>
-            </Rise>
-            <Rise delay={0.1}>
-              <CatalogueBelt />
-            </Rise>
-          </section>
-
-          {/* ── Sources ──────────────────────────────────────────────────── */}
-          <section id="sources" className="mx-auto w-full max-w-[86rem] px-4 pb-28 sm:px-8 md:pb-40">
-            <Rise className="mb-16 max-w-3xl">
-              <h2 className="text-[clamp(2rem,4.4vw,3.4rem)] font-semibold leading-[1.04] tracking-[-0.035em]">
-                Quatre façons de remplir le silence.
-              </h2>
-            </Rise>
-            <Rise delay={0.08}>
-              <SourceShowcase />
-            </Rise>
-          </section>
-
-          {/* ── Minuteur jouable ─────────────────────────────────────────── */}
-          <section id="minuteur" className="mx-auto w-full max-w-[86rem] px-4 pb-28 sm:px-8 md:pb-40">
-            <Rise>
-              <TryPomodoro liveLeft={liveLeft} onLiveChange={onLiveChange} />
-            </Rise>
-          </section>
-
-          {/* ── Trace ────────────────────────────────────────────────────── */}
-          <section className="mx-auto w-full max-w-[86rem] px-4 pb-28 sm:px-8 md:pb-40">
-            <Rise className="mb-16 max-w-3xl">
-              <h2 className="text-[clamp(2rem,4.4vw,3.4rem)] font-semibold leading-[1.04] tracking-[-0.035em]">
-                Le lendemain, tu sais ce que tu as fait.
-              </h2>
-            </Rise>
-            <Rise delay={0.08}>
-              <TracePanel />
-            </Rise>
-          </section>
-
-          {/* ── Action ───────────────────────────────────────────────────── */}
-          <section className="mx-auto w-full max-w-[86rem] px-4 pb-32 text-center sm:px-8 md:pb-48">
-            <Rise>
-              <h2 className="mx-auto max-w-5xl text-[clamp(2.6rem,6.6vw,5.2rem)] font-semibold leading-[0.98] tracking-[-0.04em]">
-                Il fait nuit. Tu as une heure devant toi.
-              </h2>
-              <p className="mx-auto mt-9 max-w-md text-[15px] leading-relaxed text-white/65">
-                Utilisable sans compte. Google sert seulement à retrouver ta progression d&apos;un appareil à
-                l&apos;autre.
-              </p>
-              <div className="relative mt-12 flex justify-center">
-                {/* La sonnerie : deux ondes qui partent du bouton quand les
-                    25 minutes de la page sont écoulées. Elle ne tourne pas en
-                    boucle décorative, elle marque un instant précis. */}
-                {done && !reduce && (
-                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
-                    {[0, 0.9].map((d) => (
-                      <motion.span
-                        key={d}
-                        className="absolute h-16 w-56 rounded-full border border-[#ffc38a]/40"
-                        initial={{ scale: 0.85, opacity: 0.65 }}
-                        animate={{ scale: 1.9, opacity: 0 }}
-                        transition={{ duration: 2.6, repeat: Infinity, delay: d, ease: "easeOut" }}
-                      />
-                    ))}
-                  </span>
-                )}
-                <Cta label="Ouvrir une session" onClick={() => signInWithGoogle()} />
-              </div>
-            </Rise>
-          </section>
-
-          <footer className="border-t border-white/[0.07]">
-            <div className="mx-auto flex w-full max-w-[86rem] flex-col items-center justify-between gap-5 px-4 py-10 sm:flex-row sm:px-8">
-              <Wordmark />
-              <p className="font-mono text-[11px] tracking-wider text-white/45">
-                Pomodoro · Lofi · Focus. © {new Date().getFullYear()}
-              </p>
             </div>
-          </footer>
-        </div>
-      </main>
-    </MotionConfig>
+
+            <div data-hero="window" className="hidden justify-self-end lg:block">
+              <HeroWindow />
+            </div>
+          </div>
+        </section>
+
+        {/* ── Le manifeste : les mots s'allument un par un ───────────────── */}
+        <Manifesto />
+
+        {/* ── La balade : on descend la rue jusqu'au catalogue ──────────── */}
+        <CityWalk />
+
+        {/* ── Le boulevard (catalogue) ───────────────────────────────────── */}
+        <span data-anchor="catalogue" aria-hidden className="block h-0" />
+        <Boulevard />
+
+        {/* ── Les sources ────────────────────────────────────────────────── */}
+        <span data-anchor="sources" aria-hidden className="block h-0" />
+        <section id="sources" className="mx-auto w-full max-w-[86rem] px-4 py-28 sm:px-8 md:py-36">
+          <h2
+            data-reveal
+            className="mb-14 max-w-3xl text-[clamp(1.9rem,4.2vw,3.2rem)] font-semibold leading-[1.05] tracking-[-0.04em]"
+          >
+            Quatre façons de remplir le silence.
+          </h2>
+          <Sources />
+        </section>
+
+        {/* ── Le parcours ────────────────────────────────────────────────── */}
+        <span data-anchor="parcours" aria-hidden className="block h-0" />
+        <section id="parcours" className="mx-auto w-full max-w-[86rem] px-4 pb-28 sm:px-8 md:pb-36">
+          <h2
+            data-reveal
+            className="mb-16 max-w-3xl text-[clamp(1.9rem,4.2vw,3.2rem)] font-semibold leading-[1.05] tracking-[-0.04em]"
+          >
+            Une soirée, du début à la fin.
+          </h2>
+          <Parcours />
+        </section>
+
+        {/* ── Le minuteur jouable ────────────────────────────────────────── */}
+        <span data-anchor="minuteur" aria-hidden className="block h-0" />
+        <section id="minuteur" className="mx-auto w-full max-w-[86rem] px-4 pb-28 sm:px-8 md:pb-36">
+          <TryPomodoro publish={publish} />
+        </section>
+
+        {/* ── La trace ───────────────────────────────────────────────────── */}
+        <span data-anchor="trace" aria-hidden className="block h-0" />
+        <section id="trace" className="mx-auto w-full max-w-[86rem] px-4 pb-28 sm:px-8 md:pb-36">
+          <h2
+            data-reveal
+            className="mb-14 max-w-3xl text-[clamp(1.9rem,4.2vw,3.2rem)] font-semibold leading-[1.05] tracking-[-0.04em]"
+          >
+            Le lendemain, tu sais ce que tu as fait.
+          </h2>
+          <Trace />
+        </section>
+
+        {/* ── Action ─────────────────────────────────────────────────────── */}
+        <section className="mx-auto w-full max-w-[86rem] px-4 pb-32 text-center sm:px-8 md:pb-44">
+          <h2
+            data-reveal
+            className="mx-auto max-w-4xl text-[clamp(2.4rem,6vw,4.8rem)] font-semibold leading-[1.02] tracking-[-0.04em]"
+          >
+            Il fait nuit. Tu as une heure devant toi.
+          </h2>
+          <p data-reveal className="mx-auto mt-8 max-w-md text-[15px] leading-relaxed text-white/70">
+            Utilisable sans compte. Google sert seulement à retrouver ta progression d&apos;un appareil à l&apos;autre.
+          </p>
+          <div data-reveal className="relative mt-12 flex justify-center">
+            {done && (
+              <span ref={bell} className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
+                <span data-ring className="absolute h-16 w-56 rounded-full border border-[#ffc38a]/45" />
+                <span data-ring className="absolute h-16 w-56 rounded-full border border-[#ffc38a]/45" />
+              </span>
+            )}
+            <Cta label="Commencer" onClick={signIn} />
+          </div>
+        </section>
+
+        <span data-anchor="fin" aria-hidden className="block h-0" />
+        <footer className="border-t border-white/[0.07]">
+          <div className="mx-auto flex w-full max-w-[86rem] flex-col items-center justify-between gap-5 px-4 py-10 sm:flex-row sm:px-8">
+            <Wordmark />
+            <p className="font-mono text-[11px] tracking-wider text-white/50">
+              Pomodoro, lofi, focus. {new Date().getFullYear()}
+            </p>
+          </div>
+        </footer>
+        </main>
+      </div>
+    </div>
   );
 }
