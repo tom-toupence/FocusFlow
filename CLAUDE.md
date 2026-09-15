@@ -1026,3 +1026,56 @@ Ajouté par-dessus le rendu (skill `high-end-visual-design`) : **grain argentiqu
 et vignettage** en couches fixes `pointer-events-none`. C'est ce qui fait
 basculer une image de synthèse du côté de la photo plutôt que du jeu vidéo, pour
 zéro coût de calcul.
+
+### Suite même jour — refonte complète sur référence validée (forgeautomotive.co.uk)
+
+L'utilisateur a fourni une référence et l'a validée sans ambiguïté : « c'est
+exactement le type de design que je veux en GSAP ». La landing est donc
+**entièrement refaite dans ce vocabulaire**, relevé section par section :
+
+- noir profond et grain fin, rien d'autre comme fond ;
+- **serif d'affichage en très grand, centrée** (Cormorant Garamond, gratuite,
+  chargée par `next/font`), pour tout ce qui parle ;
+- la même serif en **MOT FANTÔME** derrière les paragraphes, très basse
+  opacité, comme un filigrane de chapitre ;
+- **boutons RECTANGULAIRES à filet**, capitales très espacées, remplissage qui
+  arrive par la gauche en `scaleX`. Plus aucune pilule ;
+- photographie plein cadre, alternée avec des panneaux cadrés ;
+- **barre de progression de lecture** en bas de l'écran ;
+- chrome minuscule : horloge à gauche, nom au centre, action à droite.
+
+> ⚠️ **SYSTÈME DE FORMES : tout est à angle droit sur la landing.** Aucun
+> `rounded-*`, hormis les points et anneaux, ronds par nature. C'est le choix le
+> plus lourd de conséquences de la direction, et il se tient de bout en bout. Ne
+> pas y réintroduire de coins arrondis. Le site connecté, lui, garde son échelle
+> de rayons (`rounded-2xl` / `xl` / `lg`).
+
+**Structure** : hero photographique dominé par l'image (titre serif par-dessus,
+composition à trois cadres qui déborde sous le bord) → manifeste plein cadre
+dont la seconde ligne s'allume mot par mot → catalogue en travelling horizontal
+épinglé → **diaporama épinglé numéroté 01/03** (cadre net à gauche, LA MÊME
+IMAGE floutée en fond, mot fantôme, compteur) → sources en quatre panneaux →
+minuteur jouable → trace → action finale.
+
+**Le sentiment de balade** ne vient plus d'une scène 3D mais de la **parallaxe
+continue** : chaque photographie plein cadre dérive plus lentement que la page
+(`yPercent` scrubé, sur-cadrage `scale: 1.18` obligatoire sans quoi la dérive
+découvrirait le bord). C'est ce décalage, et lui seul, qui donne l'impression
+d'avancer DANS quelque chose. S'y ajoute une vraie séquence d'arrivée : la photo
+se détend depuis un sur-cadrage, les mots montent derrière leur masque, la
+composition se lève.
+
+⚠️ **`components/CityScene.tsx` et la dépendance `three` ont été SUPPRIMÉS.**
+La ville 3D procédurale contredisait ce langage photographique et typographique,
+et elle avait été rejetée deux fois. Récupérable dans l'historique Git.
+
+**Photographies** : six vraies photos de Séoul la nuit (Pexels, licence libre)
+dans `public/seoul/`, détaillées dans `docs/ASSETS_LANDING.md`. Deux registres à
+ne pas mélanger : **Séoul porte l'atmosphère**, **les vignettes du catalogue
+portent le produit**.
+
+Piège rencontré : une couche photographique en `-z-10` passe DERRIÈRE le fond de
+`main` si sa section ne crée pas de contexte d'empilement. `isolate` sur la
+section est obligatoire. Et des voiles `from-black ... to-black` pleins, doublés
+d'un vignettage à 0,9, recouvraient la photo en entier : les voiles doivent
+asseoir le texte, pas effacer l'image.

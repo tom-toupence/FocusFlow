@@ -1,90 +1,93 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { ScrambleTextPlugin } from "gsap/ScrambleTextPlugin";
 import { useGSAP } from "@gsap/react";
 import { signInWithGoogle } from "@/lib/supabase";
-import dynamic from "next/dynamic";
 import { defaultVideos } from "@/data/videos";
 import { cn } from "@/lib/utils";
 
 // ═══════════════════════════════════════════════════════════════════════════
-// LANDING — « LE MUR DE FENÊTRES »
+// LANDING — atelier, pas tableau de bord
 //
-// L'IDÉE, tirée de la photo du fond (Séoul, heure bleue, vue de Namsan) :
-// une tour à la tombée de la nuit, c'est une grille stricte de petits
-// rectangles qui s'allument un par un. Or une grille de rectangles qui
-// s'allument, c'est AUSSI la heatmap de ta concentration, ta grille de
-// pomodoros, et ton catalogue en vignettes. La page adopte donc ce module
-// unique, la fenêtre, et GSAP l'allume au scroll exactement comme la nuit
-// allume la ville. Une session = une fenêtre allumée.
-// L'avenue rectiligne du bas de la photo, elle, devient le travelling
-// horizontal du catalogue.
+// ── La direction, et d'où elle vient ──────────────────────────────────────
+// Direction validée par l'utilisateur sur une référence précise
+// (forgeautomotive.co.uk) : « c'est exactement le type de design que je veux ».
+// Le vocabulaire est donc repris, pas copié :
+//   . un noir profond, texturé d'un grain fin, et RIEN d'autre comme fond ;
+//   . une SERIF D'AFFICHAGE en très grand, centrée, pour tout ce qui parle ;
+//   . la même serif en MOT FANTÔME derrière les paragraphes, très basse
+//     opacité, comme un filigrane de chapitre ;
+//   . des boutons RECTANGULAIRES à filet, en capitales très espacées. Pas de
+//     pilules : la pilule est un signe d'application, pas d'atelier ;
+//   . de la photographie plein cadre, alternée avec des panneaux cadrés ;
+//   . une barre de progression de lecture, fine, en bas de l'écran ;
+//   . un chrome minuscule : logo au centre, et c'est à peu près tout.
 //
-// MOTEUR : GSAP + ScrollTrigger, et rien d'autre. Cette page n'importe PAS
-// `motion/react` : deux moteurs de scroll sur la même page se disputent les
-// frames. Le site connecté, lui, reste intégralement sur `motion/react`.
+// ── Ce qui a été retiré, et pourquoi ──────────────────────────────────────
+// La ville 3D procédurale (`CityScene`, three.js) a été SUPPRIMÉE. Ce langage
+// est photographique et typographique ; une ville de synthèse le contredisait,
+// et elle a été rejetée deux fois. L'imagerie revient donc à ce que le produit
+// possède réellement : la photo de Séoul et les vignettes du catalogue.
 //
-// IMAGERIE : zéro photo générique. Toutes les images sont les VRAIES vignettes
-// YouTube du catalogue (`data/videos.ts`). Les sources externes (YouTube,
-// Spotify, Twitch) ne sont pas illustrées par des photos mais par leur marque
-// et un fragment de leur interface.
+// ── L'imagerie ────────────────────────────────────────────────────────────
+// Zéro photo générique. Les cadres montrent les VRAIES vignettes YouTube du
+// catalogue (`data/videos.ts`), et les plein-cadres la photo du projet. Les
+// sources externes sont représentées par leur marque en SVG, jamais par une
+// photo d'illustration.
 //
-// SYSTÈME DE FORMES, une seule échelle tenue partout :
-//   fenêtre (module de base, tuiles) ....... rounded-[3px]
-//   panneau / carte ........................ rounded-2xl
-//   contrôle (bouton, pilule) .............. rounded-full
+// ── Le moteur ─────────────────────────────────────────────────────────────
+// GSAP + ScrollTrigger, et rien d'autre sur cette page (le site connecté reste
+// sur `motion/react`). Pas de `ScrollSmoother` : sur une page aussi chargée en
+// images, il déporte le scroll sur le fil principal et produit exactement la
+// saccade qu'il prétend corriger.
 //
-// ACCENT UNIQUE : #ffc38a, la couleur exacte des fenêtres allumées sur la
-// photo. Les seules autres couleurs de la page sont les marques (YouTube,
-// Spotify, Twitch), qui sont sémantiques.
-//
-// PERF : uniquement `transform` et `opacity`. La position du pointeur passe par
-// `gsap.quickTo`, jamais par un state React. Tout se replie sous
-// `prefers-reduced-motion`, via `gsap.matchMedia()` pour l'animation et via
-// `useReducedMotionPref()` quand c'est la MISE EN PAGE qui doit changer.
+// ── Système de formes ─────────────────────────────────────────────────────
+// TOUT est à angle droit. Aucun `rounded-*` sur cette page, hormis les points
+// et les anneaux, qui sont ronds par nature. C'est le choix le plus lourd de
+// conséquences de la direction, et il se tient de bout en bout.
 // ═══════════════════════════════════════════════════════════════════════════
 
-// ORDRE DE RAFRAÎCHISSEMENT (`refreshPriority`) : les effets React s'exécutent
-// ENFANT D'ABORD, les ScrollTriggers ne naissent donc PAS dans l'ordre de la
-// page. Or deux sections sont épinglées, et un épinglage ALLONGE le document :
-// tout déclencheur situé plus bas doit être mesuré APRÈS elles, sinon ses
-// bornes sont calculées sur une page trop courte. D'où cette échelle, qui
-// rejoue l'ordre de lecture.
-//
-// ⚠️ LE SENS EST CONTRE-INTUITIF, et me l'être trompé a coûté cher : dans
-// GSAP, un `refreshPriority` PLUS ÉLEVÉ se rafraîchit EN PREMIER. Avec une
-// échelle croissante (les épinglages au-dessus de 0), ils étaient mesurés en
-// DERNIER, donc après tout ce qui se trouve plus bas dans la page : chaque
-// déclencheur situé sous le catalogue démarrait exactement 2128 px trop tôt,
-// soit très précisément la distance d'épinglage. D'où l'échelle DÉCROISSANTE
-// ci-dessous, du haut de la page vers le bas.
-//
-// `below` vaut 0, qui est aussi la valeur par défaut : c'est indispensable,
-// parce que `ScrollTrigger.batch()` n'expose pas `refreshPriority` et que ses
-// révélations doivent donc se rafraîchir en dernier, après les épinglages.
-const PRIO = {
-  backdrop: 40, // le fond, qui couvre toute la page
-  hero: 30, // voile de lecture, sortie du hero, manifeste, progression
-  walk: 20, // 1re section épinglée : la balade dans la rue
-  boulevard: 10, // 2e section épinglée : le travelling du catalogue
-  below: 0, // tout ce qui vient après les épinglages (révélations, trace)
-} as const;
-
-if (typeof window !== "undefined") gsap.registerPlugin(useGSAP, ScrollTrigger, ScrambleTextPlugin);
+if (typeof window !== "undefined") gsap.registerPlugin(useGSAP, ScrollTrigger);
 
 const thumb = (id: string) => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 const byId = (id: string) => defaultVideos.find((v) => v.id === id);
 const pick = (ids: string[]) => ids.map(byId).filter((v): v is NonNullable<typeof v> => Boolean(v));
 
+/* ── La photographie ────────────────────────────────────────────────────────
+   De vraies photos de Séoul la nuit, téléchargées depuis Pexels (licence
+   libre, usage commercial, sans attribution obligatoire, donc conforme à la
+   règle « tout reste gratuit » du projet). Elles sont servies par `next/image`,
+   qui les convertit en AVIF/WebP et les met en cache sur l'edge Vercel.
+
+   Deux registres, et ils ne se mélangent pas :
+     . SÉOUL porte l'atmosphère (plein-cadres et volets du diaporama) ;
+     . les VIGNETTES DU CATALOGUE portent le produit (bande du catalogue,
+       panneaux de sources), parce que ce sont littéralement les paysages que
+       l'application propose.
+   `01-skyline-aerien` vient de la même série que la photo historique du projet
+   (Ethan Brooke, Séoul), ce qui garde la continuité visuelle.              */
+const SEOUL = {
+  aerien: "/seoul/01-skyline-aerien.jpg",
+  skyline: "/seoul/02-skyline-nuit.jpg",
+  lotte: "/seoul/03-lotte-han.jpg",
+  pont: "/seoul/04-pont-illumine.jpg",
+  rue: "/seoul/05-rue-enseignes.jpg",
+  pontLarge: "/seoul/06-pont-skyline.jpg",
+} as const;
+
+/** Grain argentique : bruit SVG en data-URI, zéro requête. Posé en couche fixe
+ *  `pointer-events-none`, jamais sur un conteneur qui défile. */
+const GRAIN =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
+
 const POMODORO_SECONDS = 25 * 60;
 const pad = (n: number) => String(Math.floor(n)).padStart(2, "0");
 
-/** État partagé de « l'horloge de la page ». Lu à la frame par `SessionClock`,
- *  écrit par le scroll et par le minuteur jouable. Un ref, donc zéro re-render
- *  de l'arbre React à la seconde. */
+/** État partagé de l'horloge de la page : lu à la frame, écrit par le scroll et
+ *  par le minuteur de démonstration. Un ref, donc zéro re-render à la seconde. */
 type Clock = { scroll: number; live: boolean; total: number; left: number };
 
 /** `prefers-reduced-motion`, pour les cas où c'est la MISE EN PAGE qui change
@@ -101,127 +104,141 @@ function useReducedMotionPref() {
   return reduced;
 }
 
+// ORDRE DE RAFRAÎCHISSEMENT. ⚠️ Dans GSAP, un `refreshPriority` PLUS ÉLEVÉ se
+// rafraîchit EN PREMIER. Les sections épinglées allongent le document : elles
+// doivent donc être mesurées AVANT tout ce qui se trouve plus bas, sinon chaque
+// déclencheur en dessous démarre trop tôt, exactement de la distance
+// d'épinglage. L'échelle est décroissante, du haut de la page vers le bas, et
+// `below` vaut 0 (la valeur par défaut) parce que `ScrollTrigger.batch()`
+// n'expose pas `refreshPriority`.
+const PRIO = { top: 30, pan: 20, deck: 10, below: 0 } as const;
+
 /* ══════════════════════════════════════════════════════════════════════════
-   Primitives
+   PRIMITIVES
    ══════════════════════════════════════════════════════════════════════════ */
 
-/** Panneau : coque extérieure + noyau, rayons concentriques. */
-function Panel({ children, className, inner }: { children: React.ReactNode; className?: string; inner?: string }) {
+/** Micro-label : capitales minuscules, très espacées. */
+function Label({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("rounded-2xl border border-white/10 bg-white/[0.04] p-1.5", className)}>
-      <div className={cn("relative overflow-hidden rounded-xl bg-[#07080e] shadow-[inset_0_1px_1px_rgba(255,255,255,0.14)]", inner)}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-/** CTA magnétique. La position du curseur passe par `gsap.quickTo` : la valeur
- *  est interpolée hors du cycle de rendu React, aucune frame n'est perdue. */
-function Cta({
-  label,
-  onClick,
-  tone = "light",
-  className,
-}: {
-  label: string;
-  onClick?: () => void;
-  tone?: "light" | "glass";
-  className?: string;
-}) {
-  const ref = useRef<HTMLButtonElement>(null);
-  const move = useRef<{ x: (v: number) => void; y: (v: number) => void } | null>(null);
-
-  useGSAP(
-    () => {
-      const el = ref.current;
-      if (!el) return;
-      const mm = gsap.matchMedia();
-      // Le magnétisme n'a de sens qu'avec un vrai pointeur : au doigt, il
-      // déplacerait la cible sous l'utilisateur au moment du tap.
-      mm.add("(prefers-reduced-motion: no-preference) and (pointer: fine)", () => {
-        move.current = {
-          x: gsap.quickTo(el, "x", { duration: 0.5, ease: "power3" }),
-          y: gsap.quickTo(el, "y", { duration: 0.5, ease: "power3" }),
-        };
-        return () => {
-          move.current = null;
-          gsap.set(el, { x: 0, y: 0 });
-        };
-      });
-      return () => mm.revert();
-    },
-    { scope: ref }
-  );
-
-  return (
-    <button
-      ref={ref}
-      onClick={onClick}
-      onPointerMove={(e) => {
-        const el = ref.current;
-        if (!move.current || !el) return;
-        const r = el.getBoundingClientRect();
-        move.current.x(((e.clientX - r.left) / r.width - 0.5) * 22);
-        move.current.y(((e.clientY - r.top) / r.height - 0.5) * 12);
-      }}
-      onPointerLeave={() => {
-        move.current?.x(0);
-        move.current?.y(0);
-      }}
-      className={cn(
-        "group inline-flex items-center gap-4 rounded-full py-2 pl-7 pr-2 text-sm font-semibold tracking-tight",
-        "transition-colors duration-500 active:scale-[0.98]",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc38a] focus-visible:ring-offset-2 focus-visible:ring-offset-[#05060c]",
-        tone === "light"
-          ? "bg-white text-[#08090f] hover:bg-white/90"
-          : "border border-white/20 bg-white/[0.06] text-white hover:border-white/40 hover:bg-white/[0.11]",
-        className
-      )}
-    >
-      {label}
-      <span
-        className={cn(
-          "flex h-9 w-9 items-center justify-center rounded-full transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:-translate-y-px group-hover:translate-x-1",
-          tone === "light" ? "bg-black/[0.08]" : "bg-white/12"
-        )}
-      >
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
-          <path d="M4.5 11.5L11.5 4.5M6 4.5h5.5V10" />
-        </svg>
-      </span>
-    </button>
-  );
-}
-
-function Wordmark() {
-  return (
-    <span className="flex items-center gap-2.5">
-      <span className="relative flex h-7 w-7 items-center justify-center rounded-full border border-white/15">
-        <span className="absolute inset-0 rounded-full bg-[#ffc38a]/25 blur-[7px]" aria-hidden />
-        <svg className="relative h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" aria-hidden>
-          <circle cx="12" cy="12" r="8.5" />
-          <path d="M12 7.5V12l3 2.2" />
-        </svg>
-      </span>
-      <span className="text-[15px] font-semibold tracking-tight text-white">FocusFlow</span>
+    <span className={cn("block font-mono text-[10px] uppercase tracking-[0.3em] text-white/40", className)}>
+      {children}
     </span>
   );
 }
 
-/** Titre découpé en mots, chacun dans son propre masque : à l'entrée, les mots
- *  montent derrière une ligne nette, comme un volet qui se lève. */
+/** Bouton rectangulaire à filet. Le remplissage arrive par la GAUCHE au survol,
+ *  en `scaleX` depuis l'origine gauche : c'est du transform, donc composé par
+ *  le GPU, là où une transition de `background` repeindrait la surface. */
+function Cta({
+  label,
+  onClick,
+  className,
+  tone = "line",
+}: {
+  label: string;
+  onClick?: () => void;
+  className?: string;
+  tone?: "line" | "solid";
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "group relative isolate inline-flex items-center justify-center overflow-hidden px-9 py-4",
+        "font-mono text-[11px] uppercase tracking-[0.24em] transition-colors duration-500",
+        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+        tone === "solid"
+          ? "bg-white text-black hover:bg-white/90"
+          : "border border-white/25 text-white hover:border-white/60 hover:text-black",
+        className
+      )}
+    >
+      {tone === "line" && (
+        <span
+          aria-hidden
+          className="absolute inset-0 -z-10 origin-left scale-x-0 bg-white transition-transform duration-[650ms] ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-x-100"
+        />
+      )}
+      {label}
+    </button>
+  );
+}
+
+function Wordmark({ className }: { className?: string }) {
+  return (
+    <span className={cn("flex items-center gap-2.5", className)}>
+      <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.2} aria-hidden>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3.2 2.3" strokeLinecap="round" />
+      </svg>
+      <span className="font-mono text-[11px] uppercase tracking-[0.3em] text-white">FocusFlow</span>
+    </span>
+  );
+}
+
+/** Titre serif découpé en mots, chacun dans son masque : à l'entrée, les mots
+ *  montent derrière une ligne nette. */
 function MaskedLine({ text, className }: { text: string; className?: string }) {
+  const words = text.split(" ");
   return (
     <span className={cn("block", className)}>
-      {text.split(" ").map((w, i) => (
-        <span key={`${w}-${i}`} className="inline-block overflow-hidden pb-[0.12em] align-bottom">
+      {words.map((w, i) => (
+        <span key={`${w}-${i}`} className="inline-block overflow-hidden pb-[0.14em] align-bottom">
           <span data-word className="inline-block">
             {w}
-            {i < text.split(" ").length - 1 ? " " : ""}
+            {i < words.length - 1 ? " " : ""}
           </span>
         </span>
       ))}
+    </span>
+  );
+}
+
+/** Mot fantôme : la serif en très grand et très basse opacité, DERRIÈRE le
+ *  paragraphe. Il dérive doucement au scroll, ce qui creuse la profondeur sans
+ *  rien ajouter à l'écran. */
+function Ghost({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <span
+      aria-hidden
+      data-ghost
+      className={cn(
+        "pointer-events-none absolute -z-10 select-none font-display text-[clamp(5rem,13vw,11rem)] font-light leading-[0.8] text-white/[0.07]",
+        className
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** Cadre photographique : filet blanc très fin, image en 16:10.
+ *  Les vignettes YouTube `hqdefault` font 480x360 avec des bandes noires en
+ *  haut et en bas ; un cadre en 16:10 les recadre exactement dans la zone
+ *  utile, sans jamais laisser voir les bandes. */
+function Frame({
+  src,
+  alt,
+  className,
+  ratio = "16/10",
+  local = false,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  ratio?: string;
+  /** Photo servie depuis `public/` : on passe par `next/image` pour l'AVIF. Les
+   *  vignettes YouTube, elles, sont distantes et restent en `<img>`. */
+  local?: boolean;
+}) {
+  return (
+    <span className={cn("relative block overflow-hidden border border-white/12", className)} style={{ aspectRatio: ratio }}>
+      {local ? (
+        <Image src={src} alt={alt} fill sizes="(max-width: 768px) 92vw, 45vw" className="object-cover" />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={alt} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+      )}
     </span>
   );
 }
@@ -230,17 +247,15 @@ function MaskedLine({ text, className }: { text: string; className?: string }) {
    L'HORLOGE DE LA PAGE — la landing EST un pomodoro
    ══════════════════════════════════════════════════════════════════════════
 
-   Sur un site de Pomodoro, le temps ne doit pas être un argument, il doit être
-   l'expérience. Le compteur logé dans la nav part de 25:00 en haut de page et
-   atteint 00:00 en bas : parcourir la page, c'est dérouler une session. Et si
-   le visiteur lance le vrai minuteur de la section démo, CELUI-CI PREND LE
-   RELAIS : la page cesse de mimer le temps pour afficher le sien.
+   Le compteur du bandeau part de 25:00 en haut de page et atteint 00:00 en
+   bas : parcourir la page, c'est dérouler une session. Et si le visiteur lance
+   le vrai minuteur de la section démo, CELUI-CI PREND LE RELAIS.
 
-   Implémentation : un unique `gsap.ticker`, qui lit l'état partagé et écrit
-   directement dans le DOM, avec une garde par valeur pour ne toucher au DOM
-   que lorsque l'affichage change réellement. Aucun re-render React. */
+   Un unique `gsap.ticker` lit l'état partagé et écrit directement dans le DOM,
+   avec une garde par valeur pour ne toucher au DOM que si l'affichage change.
+   Aucun re-render React. */
 
-const CLOCK_R = 13;
+const CLOCK_R = 11;
 const CLOCK_C = 2 * Math.PI * CLOCK_R;
 
 function SessionClock({ clock, onDoneChange }: { clock: React.RefObject<Clock>; onDoneChange: (done: boolean) => void }) {
@@ -248,20 +263,12 @@ function SessionClock({ clock, onDoneChange }: { clock: React.RefObject<Clock>; 
   const timeRef = useRef<HTMLSpanElement>(null);
   const labelRef = useRef<HTMLSpanElement>(null);
   const ringRef = useRef<SVGCircleElement>(null);
-  const dotRef = useRef<HTMLSpanElement>(null);
 
   useGSAP(
     () => {
-      // Micro-boucle perpétuelle : le point ne bat QUE quand une vraie session
-      // tourne. Le mouvement dit un état, il ne décore pas.
-      const pulse = gsap
-        .to(dotRef.current, { scale: 1.45, opacity: 1, duration: 1, repeat: -1, yoyo: true, ease: "sine.inOut" })
-        .pause();
-
       let lastText = "";
       let lastLabel = "";
       let lastRatio = -1;
-      let wasLive: boolean | null = null;
       let wasDone: boolean | null = null;
 
       const tick = () => {
@@ -277,73 +284,49 @@ function SessionClock({ clock, onDoneChange }: { clock: React.RefObject<Clock>; 
           lastText = text;
           timeRef.current.textContent = text;
         }
-
         const label = done ? "pause méritée" : c.live ? "ta session" : "cette page";
         if (label !== lastLabel && labelRef.current) {
           lastLabel = label;
           labelRef.current.textContent = label;
         }
-
         const rounded = Math.round(ratio * 400) / 400;
         if (rounded !== lastRatio && ringRef.current) {
           lastRatio = rounded;
           ringRef.current.style.strokeDashoffset = String(CLOCK_C * (1 - rounded));
         }
-
-        if (c.live !== wasLive) {
-          wasLive = c.live;
-          if (c.live) pulse.play();
-          else {
-            pulse.pause();
-            gsap.set(dotRef.current, { scale: 1, opacity: 0 });
-          }
-        }
-
         if (done !== wasDone) {
           wasDone = done;
           onDoneChange(done);
-          gsap.to(ringRef.current, { stroke: done ? "#ffffff" : "#ffc38a", duration: 0.4 });
         }
       };
 
       gsap.ticker.add(tick);
-      return () => {
-        gsap.ticker.remove(tick);
-        pulse.kill();
-      };
+      return () => gsap.ticker.remove(tick);
     },
     { scope: root }
   );
 
   return (
-    <span
-      ref={root}
-      className="flex items-center gap-2.5"
-      title="La page se déroule comme une session de 25 minutes. Lance le minuteur plus bas et il prend le relais."
-    >
-      <span className="relative flex h-8 w-8 items-center justify-center">
-        <svg viewBox="0 0 32 32" className="absolute inset-0 h-full w-full -rotate-90">
-          <circle cx="16" cy="16" r={CLOCK_R} fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth="2" />
-          <circle
-            ref={ringRef}
-            cx="16"
-            cy="16"
-            r={CLOCK_R}
-            fill="none"
-            stroke="#ffc38a"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeDasharray={CLOCK_C}
-            strokeDashoffset={CLOCK_C}
-          />
-        </svg>
-        <span ref={dotRef} className="h-1.5 w-1.5 rounded-full bg-[#ffc38a] opacity-0" aria-hidden />
-      </span>
-      <span className="flex flex-col leading-none">
-        <span ref={timeRef} className="font-mono text-[13px] tabular-nums text-white">
+    <span ref={root} className="flex items-center gap-2.5" title="La page se déroule comme une session de 25 minutes.">
+      <svg viewBox="0 0 26 26" className="h-[26px] w-[26px] -rotate-90">
+        <circle cx="13" cy="13" r={CLOCK_R} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="1" />
+        <circle
+          ref={ringRef}
+          cx="13"
+          cy="13"
+          r={CLOCK_R}
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth="1"
+          strokeDasharray={CLOCK_C}
+          strokeDashoffset={CLOCK_C}
+        />
+      </svg>
+      <span className="hidden flex-col leading-none sm:flex">
+        <span ref={timeRef} className="font-mono text-[11px] tabular-nums tracking-wider text-white">
           25:00
         </span>
-        <span ref={labelRef} className="mt-1 font-mono text-[8px] uppercase tracking-[0.16em] text-white/50">
+        <span ref={labelRef} className="mt-1 font-mono text-[8px] uppercase tracking-[0.2em] text-white/40">
           cette page
         </span>
       </span>
@@ -352,249 +335,82 @@ function SessionClock({ clock, onDoneChange }: { clock: React.RefObject<Clock>; 
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   HERO — une fenêtre allumée, posée sur la ville
-   ══════════════════════════════════════════════════════════════════════════ */
+   HERO — le produit au centre, encadré par deux paysages
+   ══════════════════════════════════════════════════════════════════════════
 
-// Un pays différent à chaque rotation : le catalogue ne se résume pas au Japon.
-const HERO_TRACKS = pick(["hk-02", "driv-05", "cn-01", "np-01", "abao-11"]);
+   Composition reprise de la référence, où trois véhicules détourés cadrent le
+   titre, celui du milieu étant le seul en couleur. Ici : deux paysages du
+   catalogue en retrait, assombris, et AU CENTRE l'écran de session, seul
+   élément à porter de la lumière. Le sujet du site est donc littéralement au
+   centre du cadre. */
 
-/** La fenêtre du hero. Les vignettes s'enchaînent par une timeline GSAP qui
- *  fait un fondu entre des couches empilées : aucun state React, donc aucun
- *  re-render toutes les cinq secondes. */
-function HeroWindow() {
-  const root = useRef<HTMLDivElement>(null);
-  const ring = useRef<SVGCircleElement>(null);
-  const dash = 2 * Math.PI * 44;
+const HERO_TRACK = byId("driv-05") ?? defaultVideos[0];
 
-  useGSAP(
-    () => {
-      const slides = gsap.utils.toArray<HTMLElement>("[data-slide]", root.current);
-      const mm = gsap.matchMedia();
-
-      mm.add("(prefers-reduced-motion: reduce)", () => {
-        gsap.set(slides, { autoAlpha: 0 });
-        gsap.set(slides[0], { autoAlpha: 1 });
-        gsap.set(ring.current, { strokeDashoffset: dash * 0.36 });
-      });
-
-      mm.add("(prefers-reduced-motion: no-preference)", () => {
-        gsap.set(slides, { autoAlpha: 0 });
-        gsap.set(slides[0], { autoAlpha: 1 });
-
-        // L'anneau se dessine une fois à l'arrivée : il dit « une session est
-        // en cours », puis se tait.
-        const draw = gsap.fromTo(
-          ring.current,
-          { strokeDashoffset: dash },
-          { strokeDashoffset: dash * 0.36, duration: 2.2, delay: 0.5, ease: "power2.inOut" }
-        );
-
-        const tl = gsap.timeline({ repeat: -1 });
-        slides.forEach((slide, i) => {
-          const next = slides[(i + 1) % slides.length];
-          tl.to(slide, { autoAlpha: 0, duration: 1.1, ease: "power2.inOut" }, "+=4.4").to(
-            next,
-            { autoAlpha: 1, duration: 1.1, ease: "power2.inOut" },
-            "<"
-          );
-        });
-
-        return () => {
-          tl.kill();
-          draw.kill();
-        };
-      });
-
-      return () => mm.revert();
-    },
-    { scope: root }
-  );
-
+function HeroStage() {
   return (
-    <div ref={root} className="w-[20rem] sm:w-[24rem]">
-      <Panel>
-        <div className="relative aspect-[4/3]">
-          {HERO_TRACKS.map((v) => (
-            <div key={v.id} data-slide className="absolute inset-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={thumb(v.youtubeId)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45" />
-              <span className="absolute inset-0 bg-gradient-to-t from-[#05060c] via-[#05060c]/60 to-[#05060c]/25" aria-hidden />
-              <span className="absolute inset-x-4 bottom-4 flex items-center gap-2.5 rounded-full border border-white/12 bg-[#0a0c14]/85 py-2 pl-2.5 pr-4">
-                <span className="flex h-3 items-end gap-[2px]" aria-hidden>
-                  {[1.2, 1.5, 1.35].map((d, k) => (
-                    <span
-                      key={k}
-                      className="anim-eq w-[2px] rounded-full bg-[#ffc38a]"
-                      style={{ height: "100%", animationDuration: `${d}s`, animationDelay: `${-k * 0.4}s` }}
-                    />
-                  ))}
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-[11.5px] text-white">{v.title}</span>
-                  <span className="block truncate font-mono text-[9.5px] text-white/55">{v.country}</span>
-                </span>
-              </span>
-            </div>
-          ))}
+    <div className="relative mx-auto mt-12 grid w-full max-w-[78rem] grid-cols-1 items-end gap-5 md:mt-14 md:grid-cols-[1fr_1.35fr_1fr] md:gap-8">
+      {/* Deux photographies de Séoul en portrait, hautes, qui cadrent le
+          produit. Elles DÉBORDENT sous le bord de l'écran : c'est ce qui fait
+          que le hero se lit comme une image et non comme un bloc de texte
+          suivi de vignettes. */}
+      <span data-stage className="hidden md:block">
+        <Frame src={SEOUL.lotte} alt="" local ratio="3/4" className="opacity-80" />
+      </span>
 
-          <span className="absolute inset-0 flex items-start justify-center pt-12">
-            <span className="relative h-28 w-28">
+      {/* L'écran de session : le seul élément lumineux de la composition, et le
+          seul à porter de la couleur. C'est le sujet du site, il est donc
+          littéralement au centre du cadre. */}
+      <div data-stage className="relative border border-white/20 bg-black shadow-[0_40px_120px_-40px_rgba(0,0,0,1)]">
+        <div className="relative aspect-[4/3] w-full md:aspect-[5/4]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={thumb(HERO_TRACK.youtubeId)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />
+          <span className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/20" aria-hidden />
+          <span className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="relative h-24 w-24">
               <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="2.5" />
+                <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" />
                 <circle
-                  ref={ring}
+                  data-hero-ring
                   cx="50"
                   cy="50"
-                  r="44"
+                  r="45"
                   fill="none"
                   stroke="#ffc38a"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeDasharray={dash}
-                  strokeDashoffset={dash}
+                  strokeWidth="1.5"
+                  strokeDasharray={2 * Math.PI * 45}
+                  strokeDashoffset={2 * Math.PI * 45}
                 />
               </svg>
-              <span className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="font-mono text-[26px] tabular-nums text-white">16:02</span>
-                <span className="mt-1 font-mono text-[9px] uppercase tracking-[0.2em] text-white/50">Focus</span>
+              <span className="absolute inset-0 flex items-center justify-center font-mono text-[22px] tabular-nums text-white">
+                16:02
               </span>
             </span>
+            <span className="mt-6 max-w-[80%] truncate text-center text-[12px] text-white/70">{HERO_TRACK.title}</span>
+            <Label className="mt-2">{HERO_TRACK.country}</Label>
           </span>
         </div>
-      </Panel>
-    </div>
-  );
-}
-/* ══════════════════════════════════════════════════════════════════════════
-   LE MONDE — la ville derrière toute la page
-   ══════════════════════════════════════════════════════════════════════════
+      </div>
 
-   La scène 3D (`CityScene`) n'est plus une SECTION, c'est le DÉCOR DE LA PAGE.
-   Le scroll fait marcher la caméra du haut du document jusqu'en bas, et tout
-   le contenu se lit par-dessus.
-
-   Trois tentatives ont précédé celle-ci, et les deux premières ont échoué pour
-   la même raison de fond :
-     1. une grille de blocs qui se refermait en volet. Correcte techniquement,
-        mais une grille de carrés colorés se lit comme un calendrier.
-     2. une photo qui grossissait pendant que des vignettes passaient en CSS
-        3D : une image plate qui grossit donne un ZOOM, jamais un DÉPLACEMENT.
-     3. la même scène 3D, mais enfermée dans une section épinglée au milieu
-        d'une page photographique : un bloc noir rapporté, impossible à
-        raccorder puisque le décor changeait de nature en cours de route.
-
-   D'où ce parti : une seule et même ville, du premier au dernier pixel de la
-   page. Il n'y a plus de raccord à faire, donc plus de raccord à rater.
-
-   La photo de Séoul et son composant `CityBackdrop` ont été retirés : ils
-   faisaient doublon avec la scène, et leur couche `mix-blend-screen` en plein
-   écran obligeait le navigateur à recomposer tout le viewport à chaque frame
-   de scroll, ce qui était l'une des deux causes des saccades. (Le fichier
-   reste récupérable dans l'historique Git.) */
-
-const WORLD_SCREENS = pick(["cn-01", "tw-02", "hk-02", "no-01", "vn-01", "abao-11", "id-02", "uk-01", "th-01", "np-01"]);
-const WORLD_THUMBS = WORLD_SCREENS.map((v) => thumb(v.youtubeId));
-
-/** Grain argentique : bruit SVG en data-URI, zéro requête réseau. */
-const GRAIN =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
-
-// `three` est chargé à part : il ne doit pas retarder l'affichage du hero.
-const CityScene = dynamic(() => import("@/components/CityScene"), { ssr: false });
-
-/** Sonde de capacité. La disponibilité de WebGL est un état du navigateur, pas
- *  de React : elle se lit dans un effet, jamais pendant le rendu, qui doit
- *  rester pur. `null` tant qu'on ne sait pas. */
-function useWebGL() {
-  const [ok, setOk] = useState<boolean | null>(null);
-  useEffect(() => {
-    const probe = () => {
-      try {
-        const c = document.createElement("canvas");
-        setOk(Boolean(c.getContext("webgl2") || c.getContext("webgl")));
-      } catch {
-        setOk(false);
-      }
-    };
-    probe();
-  }, []);
-  return ok;
-}
-
-function World() {
-  const reduced = useReducedMotionPref();
-  const webgl = useWebGL();
-  const live = webgl === true && !reduced;
-
-  // L'avancée de la marche, écrite par le scroll et lue à la frame par la
-  // scène : la position de la caméra ne passe jamais par un state React.
-  const walk = useRef({ v: 0 });
-
-  useGSAP(() => {
-    if (!live) return;
-    const st = ScrollTrigger.create({
-      start: 0,
-      end: "max",
-      refreshPriority: PRIO.backdrop,
-      onUpdate: (self) => {
-        walk.current.v = self.progress;
-      },
-    });
-    return () => st.kill();
-  }, { dependencies: [live], revertOnUpdate: true });
-
-  return (
-    <div className="pointer-events-none fixed inset-0 z-0 bg-[#05060c]">
-      {live && <CityScene progress={walk} thumbnails={WORLD_THUMBS} />}
-
-      {/* Finition photographique : grain argentique et vignettage, posés SUR le
-          rendu. C'est ce qui fait basculer une image de synthèse du côté de la
-          photo plutôt que du jeu vidéo, pour deux couches statiques et zéro
-          coût de calcul. Elles sont `fixed` et `pointer-events-none`, jamais
-          attachées à un conteneur qui défile. */}
-      <div
-        aria-hidden
-        className="absolute inset-0 opacity-[0.055] mix-blend-overlay"
-        style={{ backgroundImage: GRAIN }}
-      />
-      <div
-        aria-hidden
-        className="absolute inset-0"
-        style={{ background: "radial-gradient(ellipse 110% 95% at 50% 45%, transparent 52%, rgba(2,3,8,0.55) 100%)" }}
-      />
-      {/* Sans WebGL, ou en mouvement réduit : un ciel de nuit fixe. Le contenu
-          de la page reste entièrement lisible, c'est tout ce qui compte. */}
-      {!live && (
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(to bottom, #060a1c 0%, #0a1026 42%, #171432 72%, #2a1a20 100%)",
-          }}
-        />
-      )}
+      <span data-stage className="hidden md:block">
+        <Frame src={SEOUL.rue} alt="" local ratio="3/4" className="opacity-80" />
+      </span>
     </div>
   );
 }
 
-
 /* ══════════════════════════════════════════════════════════════════════════
-   LE MANIFESTE — les mots s'allument un par un, comme les fenêtres
-   ══════════════════════════════════════════════════════════════════════════
+   LE MANIFESTE — plein cadre, la seconde ligne s'allume mot par mot
+   ══════════════════════════════════════════════════════════════════════════ */
 
-   Le geste de la page appliqué à la typographie : au fil du scroll, chaque
-   mot passe de l'ombre à la pleine lumière. Ce n'est pas un effet de style,
-   c'est le propos du produit rendu littéral, et c'est ce qui donne à ce
-   paragraphe le droit d'occuper un écran entier. */
+const CLAIM_1 = "On ne t'ajoute pas des outils.";
+const CLAIM_2 = "On t'enlève le bruit.";
 
-const MANIFESTO = "Les fenêtres s'allument une par une. Derrière chacune, quelqu'un vient de s'y mettre. Tu en allumes une par session de vingt-cinq minutes.";
-
-function Manifesto() {
+function Statement() {
   const root = useRef<HTMLElement>(null);
 
   useGSAP(
     () => {
-      const words = gsap.utils.toArray<HTMLElement>("[data-lw]", root.current);
+      const words = gsap.utils.toArray<HTMLElement>("[data-claim-word]", root.current);
       const mm = gsap.matchMedia();
 
       mm.add("(prefers-reduced-motion: reduce)", () => {
@@ -604,17 +420,17 @@ function Manifesto() {
       mm.add("(prefers-reduced-motion: no-preference)", () => {
         const tween = gsap.fromTo(
           words,
-          { opacity: 0.13 },
+          { opacity: 0.12 },
           {
             opacity: 1,
             ease: "none",
-            stagger: { amount: 1, from: "start" },
+            stagger: { amount: 0.9, from: "start" },
             scrollTrigger: {
               trigger: root.current,
-              start: "top 80%",
-              end: "bottom 65%",
-              scrub: 0.45,
-              refreshPriority: PRIO.hero,
+              start: "top 72%",
+              end: "bottom 72%",
+              scrub: 0.5,
+              refreshPriority: PRIO.top,
             },
           }
         );
@@ -630,169 +446,40 @@ function Manifesto() {
   );
 
   return (
-    <section ref={root} className="mx-auto w-full max-w-[86rem] px-4 py-32 sm:px-8 md:py-48">
-      <p className="max-w-4xl text-[clamp(1.7rem,4.4vw,3.5rem)] font-semibold leading-[1.14] tracking-[-0.035em]">
-        {MANIFESTO.split(" ").map((w, i) => (
-          <span key={i} data-lw>
-            {w}{" "}
-          </span>
-        ))}
+    <section ref={root} className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden px-5">
+      <span data-parallax aria-hidden className="absolute inset-0">
+        <Image src={SEOUL.skyline} alt="" fill sizes="100vw" className="object-cover opacity-45" />
+      </span>
+      <span aria-hidden className="absolute inset-0 bg-black/60" />
+      <p className="relative max-w-5xl text-center font-display text-[clamp(2.2rem,6.4vw,5.2rem)] font-light leading-[1.08]">
+        <span className="block text-white">{CLAIM_1}</span>
+        <span className="mt-2 block">
+          {CLAIM_2.split(" ").map((w, i) => (
+            <span key={i} data-claim-word className="text-white">
+              {w}{" "}
+            </span>
+          ))}
+        </span>
       </p>
     </section>
   );
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   L'INDEX DE CHAPITRES — où tu en es dans la page
+   LE CATALOGUE — panneau épinglé, travelling horizontal
    ══════════════════════════════════════════════════════════════════════════
 
-   Rail fixe en bas à gauche : la liste des chapitres, et un repère qui se
-   remplit sur celui qu'on est en train de lire. Il remplace les liens de la
-   barre du haut (qui n'indiquaient rien) et donne à la page une structure
-   lisible d'un coup d'oeil, sans jamais masquer le contenu.
+   Le scroll vertical devient un déplacement latéral : un mot fantôme géant
+   traverse le cadre, suivi des paysages, puis du propos et de l'action.
+   `ease: "none"` est obligatoire, c'est ce qui garde le rapport 1:1 entre la
+   position de scroll et la position horizontale.
 
-   L'état actif est écrit directement par GSAP sur le DOM (`onToggle`) : aucun
-   state React, donc aucun rendu de l'arbre pendant le scroll. */
+   Sur mobile et sous mouvement réduit, aucun détournement du scroll : la
+   rangée redevient un défilement horizontal natif, au doigt. */
 
-const CHAPTERS = [
-  { id: "catalogue", label: "Catalogue" },
-  { id: "sources", label: "Sources" },
-  { id: "parcours", label: "Parcours" },
-  { id: "minuteur", label: "Minuteur" },
-  { id: "trace", label: "Trace" },
-] as const;
+const BELT = pick(["hk-02", "driv-05", "cn-01", "tw-02", "vn-01", "abao-11", "no-01", "noma-07", "uk-01", "id-02"]);
 
-function ChapterRail() {
-  const root = useRef<HTMLDivElement>(null);
-  const reduce = useReducedMotionPref();
-
-  useGSAP(
-    () => {
-      // ── Pourquoi PAS un ScrollTrigger par chapitre ────────────────────
-      // Un index de chapitres doit être juste, toujours, y compris pendant les
-      // deux épinglages de la page. Or un épinglage allonge le document, et
-      // tout déclencheur mesuré avant lui démarre trop tôt (c'est le piège de
-      // `refreshPriority`, documenté en tête de fichier). Plutôt que de faire
-      // dépendre le repère de l'ordre de rafraîchissement, on lit la position
-      // RÉELLE des ancres dans le document : c'est vrai par construction.
-      //
-      // Les positions sont mises en cache et recalculées seulement au
-      // `refresh` de ScrollTrigger (redimensionnement, polices, images), jamais
-      // pendant le scroll : la boucle ne fait que cinq comparaisons de nombres
-      // par mise à jour, et aucune lecture de mise en page.
-      const anchor = (id: string) => document.querySelector<HTMLElement>(`[data-anchor="${id}"]`);
-
-      // Position dans le document par la chaîne des `offsetTop`, et NON par
-      // `getBoundingClientRect`, qui est une position À L'ÉCRAN : pendant un
-      // épinglage elle ne bouge plus, et toute transformation d'un ancêtre la
-      // fausse. `offsetTop` ignore les transformations, tout en tenant compte
-      // de l'espace réservé par les épinglages, qui lui est bien du layout.
-      const docTop = (el: HTMLElement) => {
-        let y = 0;
-        let n: HTMLElement | null = el;
-        while (n) {
-          y += n.offsetTop;
-          n = n.offsetParent as HTMLElement | null;
-        }
-        return y;
-      };
-
-      const rows = CHAPTERS.map((c) => {
-        const row = root.current?.querySelector<HTMLElement>(`[data-chapter="${c.id}"]`);
-        return {
-          id: c.id,
-          label: c.label,
-          mark: row?.querySelector<HTMLElement>("[data-mark]") ?? null,
-          text: row?.querySelector<HTMLElement>("[data-text]") ?? null,
-        };
-      });
-
-      rows.forEach((r) => r.mark && gsap.set(r.mark, { scaleX: 0, transformOrigin: "left center" }));
-
-      let tops: number[] = [];
-      let endTop = Infinity;
-      const measure = () => {
-        tops = CHAPTERS.map((c) => {
-          const el = anchor(c.id);
-          return el ? docTop(el) : Infinity;
-        });
-        const fin = anchor("fin");
-        endTop = fin ? docTop(fin) : Infinity;
-      };
-      measure();
-      ScrollTrigger.addEventListener("refresh", measure);
-
-      const light = (i: number, on: boolean) => {
-        const r = rows[i];
-        if (!r || !r.mark || !r.text) return;
-        gsap.to(r.mark, { scaleX: on ? 1 : 0, duration: 0.45, ease: "power3.out" });
-        gsap.to(r.text, { color: on ? "rgb(255,255,255)" : "rgba(255,255,255,0.45)", duration: 0.35 });
-        // Le libellé se recompose lettre par lettre en devenant actif. C'est
-        // un accusé de réception, pas un décor : il ne se joue qu'au
-        // changement d'état, jamais en boucle.
-        if (on && !reduce) {
-          gsap.to(r.text, { duration: 0.55, scrambleText: { text: r.label, chars: "upperCase", speed: 0.7 } });
-        }
-      };
-
-      let current = -1;
-      const st = ScrollTrigger.create({
-        start: 0,
-        end: "max",
-        onUpdate: () => {
-          const probe = window.scrollY + window.innerHeight * 0.55;
-          let next = -1;
-          if (probe < endTop) for (let i = 0; i < tops.length; i++) if (probe >= tops[i]) next = i;
-          if (next === current) return;
-          light(current, false);
-          light(next, true);
-          current = next;
-        },
-      });
-
-      return () => {
-        ScrollTrigger.removeEventListener("refresh", measure);
-        st.kill();
-      };
-    },
-    { scope: root, dependencies: [reduce], revertOnUpdate: true }
-  );
-
-  return (
-    <div className="pointer-events-none fixed bottom-8 left-8 z-40 hidden flex-col gap-2.5 lg:flex" ref={root}>
-      {CHAPTERS.map((c) => (
-        <a
-          key={c.id}
-          href={`#${c.id}`}
-          data-chapter={c.id}
-          className="pointer-events-auto flex items-center gap-3 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc38a]"
-        >
-          <span className="relative block h-[2px] w-5 overflow-hidden bg-white/15">
-            <span data-mark className="absolute inset-0 block bg-[#ffc38a]" />
-          </span>
-          <span data-text className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">
-            {c.label}
-          </span>
-        </a>
-      ))}
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   LE BOULEVARD — le catalogue en travelling horizontal
-   ══════════════════════════════════════════════════════════════════════════
-
-   L'avenue rectiligne de la photo, reprise comme geste : le scroll vertical
-   devient un travelling latéral le long d'une rangée de paysages, décalés en
-   hauteur comme une ligne d'immeubles.
-
-   Sur mobile ET sous reduced-motion, aucun détournement du scroll : la rangée
-   redevient un simple défilement horizontal natif, au doigt. */
-
-const BOULEVARD = pick(["hk-02", "driv-05", "cn-01", "tw-02", "vn-01", "abao-11", "no-01", "noma-07", "uk-01", "id-02"]);
-
-function Boulevard() {
+function Catalogue() {
   const wrap = useRef<HTMLElement>(null);
   const track = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotionPref();
@@ -806,9 +493,7 @@ function Boulevard() {
 
       const mm = gsap.matchMedia();
       mm.add("(min-width: 768px)", () => {
-        // `ease: "none"` est obligatoire : c'est ce qui garde le rapport 1:1
-        // entre la position de scroll et la position horizontale.
-        const distance = () => Math.max(1, t.scrollWidth - window.innerWidth + 64);
+        const distance = () => Math.max(1, t.scrollWidth - window.innerWidth + 80);
         const tween = gsap.to(t, {
           x: () => -distance(),
           ease: "none",
@@ -817,62 +502,12 @@ function Boulevard() {
             start: "top top",
             end: () => `+=${distance()}`,
             pin: true,
-            scrub: 0.6,
+            scrub: 0.5,
             invalidateOnRefresh: true,
-            refreshPriority: PRIO.boulevard,
+            refreshPriority: PRIO.pan,
           },
         });
-
-        // Deuxième couche, propre au travelling : chaque carte se lève et se
-        // révèle en ENTRANT DANS LE CADRE, pas en entrant dans le viewport.
-        // C'est exactement ce que `containerAnimation` permet : déclencher sur
-        // la progression HORIZONTALE plutôt que sur le scroll vertical. Sans
-        // lui, toutes les cartes seraient déjà « entrées » dès l'épinglage.
-        const cards = gsap.utils.toArray<HTMLElement>("[data-belt]", t);
-        const inner: gsap.core.Tween[] = [];
-
-        cards.forEach((card) => {
-          const rest = Number(card.dataset.off || 0);
-
-          // (a) l'arrivée : la carte monte à sa hauteur de repos
-          inner.push(
-            gsap.fromTo(
-              card,
-              { y: rest + 90, autoAlpha: 0.25 },
-              {
-                y: rest,
-                autoAlpha: 1,
-                ease: "power2.out",
-                // Bornes en MOTS-CLÉS, pas en pourcentages : avec
-                // `containerAnimation`, un « left 58% » se mesure dans
-                // l'espace de la piste et non du viewport, et la carte
-                // atteignait le centre de l'écran encore à demi effacée.
-                scrollTrigger: { trigger: card, containerAnimation: tween, start: "left right", end: "left center", scrub: true },
-              }
-            )
-          );
-
-          // (b) l'orientation : la carte pivote face à nous en passant au
-          // centre, puis se referme. C'est ce qui fait qu'on longe une rangée
-          // de façades au lieu de faire défiler une bande d'images plates.
-          inner.push(
-            gsap.fromTo(
-              card,
-              { rotateY: 26 },
-              {
-                rotateY: -26,
-                ease: "none",
-                scrollTrigger: { trigger: card, containerAnimation: tween, start: "left right", end: "right left", scrub: true },
-              }
-            )
-          );
-        });
-
         return () => {
-          inner.forEach((i) => {
-            i.scrollTrigger?.kill();
-            i.kill();
-          });
           tween.scrollTrigger?.kill();
           tween.kill();
         };
@@ -887,71 +522,26 @@ function Boulevard() {
     <section
       id="catalogue"
       ref={wrap}
-      className={cn("relative", reduced ? "overflow-x-auto" : "overflow-x-auto md:overflow-x-clip")}
-      style={{ perspective: "1600px" }}
+      className={cn("relative bg-black", reduced ? "overflow-x-auto" : "overflow-x-auto md:overflow-x-clip")}
     >
-      {/* Le sol qui fuit. Une seule grille en dégradés répétés, basculée en
-          perspective : l'avenue de la photo du fond, rendue en CSS pur. Aucun
-          canvas, aucune 3D calculée, et rien à repeindre pendant le
-          travelling puisque c'est le contenu qui bouge, pas elle. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-[42%] opacity-45"
-        style={{
-          backgroundImage:
-            "linear-gradient(to right, rgba(255,195,138,0.16) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,195,138,0.16) 1px, transparent 1px)",
-          backgroundSize: "90px 90px",
-          transform: "perspective(680px) rotateX(71deg)",
-          transformOrigin: "center top",
-          maskImage: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, #000 34%, #000 100%)",
-          WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, #000 34%, #000 100%)",
-        }}
-      />
-
-      <div
-        ref={track}
-        className="relative flex h-[70vh] w-max items-center gap-7 px-4 sm:px-8 md:h-[100dvh] md:gap-10"
-        // `perspective` est posée sur la SECTION (fixe, de la taille du
-        // viewport) et non ici : le point de fuite doit rester au centre de
-        // l'écran. Sur la piste, qui se translate sur plusieurs milliers de
-        // pixels, il voyagerait avec elle et déformerait les cartes des
-        // extrémités.
-        style={{ transformStyle: "preserve-3d" }}
-      >
-        {/* Le titre voyage avec la rangée : la section n'a pas besoin d'un
-            en-tête séparé. */}
-        <div className="w-[min(78vw,30rem)] shrink-0">
-          <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-semibold leading-[1.05] tracking-[-0.04em]">
+      <div ref={track} className="flex h-[70vh] w-max items-center gap-10 px-5 sm:px-10 md:h-[100dvh] md:gap-14">
+        <div className="relative w-[min(80vw,30rem)] shrink-0">
+          <Ghost className="-left-4 -top-16">Catalogue</Ghost>
+          <Label>Le catalogue</Label>
+          <h2 className="mt-7 font-display text-[clamp(2.2rem,5vw,4rem)] font-light leading-[1.02]">
             Cinquante-six endroits où poser ta soirée.
           </h2>
-          <p className="mt-6 max-w-sm text-[15px] leading-relaxed text-white/70">
-            Study with me à Osaka, la pluie sur Shinjuku, le Bund à minuit, un drive lofi au pied du Fuji. Tu choisis la
-            fenêtre, le minuteur s&apos;occupe du reste.
+          <p className="mt-7 max-w-sm text-[14.5px] leading-relaxed text-white/60">
+            Study with me à Osaka, la pluie sur Shinjuku, le Bund à minuit, un drive lofi au pied du Fuji. Tenus à la
+            main, un par un.
           </p>
         </div>
 
-        {BOULEVARD.map((v, i) => (
-          <article
-            key={v.id}
-            data-belt
-            // Décalage vertical de repos, en DONNÉE et non en classe : GSAP
-            // réécrit `transform` en entier, une translation Tailwind sur la
-            // même carte serait écrasée au premier tween.
-            data-off={i % 3 === 0 ? -56 : i % 3 === 1 ? 40 : -8}
-            className="w-[17rem] shrink-0 md:w-[19rem]"
-          >
-            <div className="overflow-hidden rounded-2xl border border-white/12 bg-[#07080e] shadow-[0_24px_60px_-28px_rgba(0,0,0,0.95)]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={thumb(v.youtubeId)}
-                alt=""
-                loading="lazy"
-                draggable={false}
-                className="aspect-[16/10] w-full object-cover opacity-85 transition-opacity duration-700 hover:opacity-100"
-              />
-            </div>
-            <p className="mt-4 truncate text-[14px] font-medium text-white">{v.title}</p>
-            <p className="mt-1 font-mono text-[11px] text-white/55">{v.country}</p>
+        {BELT.map((v) => (
+          <article key={v.id} className="w-[19rem] shrink-0 md:w-[23rem]">
+            <Frame src={thumb(v.youtubeId)} alt="" />
+            <p className="mt-4 truncate text-[13px] text-white/80">{v.title}</p>
+            <Label className="mt-2">{v.country}</Label>
           </article>
         ))}
       </div>
@@ -960,324 +550,238 @@ function Boulevard() {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   LES SOURCES — quatre marques réelles, un fragment de leur interface
+   LES TROIS PILIERS — diaporama épinglé, numéroté
+   ══════════════════════════════════════════════════════════════════════════
+
+   Une section épinglée, trois volets qui se succèdent au scroll. Chaque volet :
+   l'image nette dans son cadre à gauche, LA MÊME IMAGE floutée en plein cadre
+   derrière (c'est ce doublon flou qui donne le fond sans jamais jurer avec le
+   sujet), le mot fantôme, le propos, et un compteur.
+
+   Les volets sont empilés au même endroit : on ne fait varier que l'opacité et
+   un léger décalage, jamais la mise en page. */
+
+const DECK = [
+  {
+    ghost: "Minuteur",
+    label: "01",
+    title: "Le minuteur",
+    body: "Vingt-cinq minutes, cinquante, ou un chrono libre qui s'arrête quand tu décroches. Les pauses se prennent toutes seules.",
+    img: SEOUL.rue,
+  },
+  {
+    ghost: "Musique",
+    label: "02",
+    title: "La musique",
+    body: "Le catalogue, tes playlists YouTube dans TON ordre, Spotify Premium, un live Twitch. Dans le même écran que le minuteur.",
+    img: SEOUL.skyline,
+  },
+  {
+    ghost: "Trace",
+    label: "03",
+    title: "La trace",
+    body: "Série, score de concentration, récap du dimanche. Construits tout seuls pendant que tu travaillais.",
+    img: SEOUL.pont,
+  },
+];
+
+function Deck({ signIn }: { signIn: () => void }) {
+  const section = useRef<HTMLElement>(null);
+  const reduced = useReducedMotionPref();
+
+  useGSAP(
+    () => {
+      if (reduced) return;
+      const panels = gsap.utils.toArray<HTMLElement>("[data-panel]", section.current);
+      const backs = gsap.utils.toArray<HTMLElement>("[data-panel-back]", section.current);
+      if (panels.length === 0) return;
+
+      gsap.set(panels.slice(1), { autoAlpha: 0, y: 40 });
+      gsap.set(backs.slice(1), { autoAlpha: 0 });
+
+      const tl = gsap.timeline({
+        defaults: { ease: "power2.inOut" },
+        scrollTrigger: {
+          trigger: section.current,
+          start: "top top",
+          end: "+=" + panels.length * 100 + "%",
+          pin: true,
+          scrub: 0.6,
+          anticipatePin: 1,
+          refreshPriority: PRIO.deck,
+        },
+      });
+
+      panels.forEach((p, i) => {
+        if (i === 0) return;
+        const at = i - 1;
+        tl.to(panels[i - 1], { autoAlpha: 0, y: -40, duration: 0.45 }, at)
+          .to(backs[i - 1], { autoAlpha: 0, duration: 0.45 }, at)
+          .to(p, { autoAlpha: 1, y: 0, duration: 0.45 }, at + 0.25)
+          .to(backs[i], { autoAlpha: 1, duration: 0.45 }, at + 0.25);
+      });
+
+      return () => {
+        tl.scrollTrigger?.kill();
+        tl.kill();
+      };
+    },
+    { scope: section, dependencies: [reduced], revertOnUpdate: true }
+  );
+
+  // Sous mouvement réduit, l'empilement n'a pas de sens : les trois volets se
+  // lisent à la suite, comme une liste.
+  if (reduced) {
+    return (
+      <section className="mx-auto w-full max-w-[86rem] space-y-24 px-5 py-28 sm:px-10">
+        {DECK.map((d) => {
+          return (
+            <div key={d.label} className="grid items-center gap-10 md:grid-cols-2 md:gap-16">
+              <Frame src={d.img} alt="" local ratio="4/5" />
+              <div>
+                <Label>{d.label} / 03</Label>
+                <h3 className="mt-6 font-display text-[clamp(2rem,4vw,3.2rem)] font-light leading-[1.05]">{d.title}</h3>
+                <p className="mt-6 max-w-md text-[14.5px] leading-relaxed text-white/60">{d.body}</p>
+              </div>
+            </div>
+          );
+        })}
+      </section>
+    );
+  }
+
+  return (
+    <section ref={section} className="relative h-[100dvh] overflow-hidden bg-black">
+      {/* Les fonds : LA MÊME IMAGE que le volet, floutée et assombrie. C'est ce
+          doublon flou qui donne un fond à chaque volet sans jamais jurer avec
+          son sujet, et c'est l'un des gestes les plus efficaces de la
+          référence. */}
+      {DECK.map((d) => (
+        <span key={`b-${d.label}`} data-panel-back aria-hidden className="absolute inset-0">
+          <Image src={d.img} alt="" fill sizes="100vw" className="scale-110 object-cover opacity-30 blur-2xl" />
+          <span className="absolute inset-0 bg-black/60" />
+        </span>
+      ))}
+
+      <div className="relative mx-auto flex h-full w-full max-w-[86rem] items-center px-5 sm:px-10">
+        {DECK.map((d) => {
+          return (
+            <div
+              key={d.label}
+              data-panel
+              className="absolute inset-x-5 grid items-center gap-10 sm:inset-x-10 md:grid-cols-2 md:gap-16"
+            >
+              <Frame src={d.img} alt="" local ratio="4/5" className="mx-auto w-full max-w-[26rem] bg-black" />
+              <div className="relative">
+                {/* Assez haut pour ne pas retomber sur le compteur : le mot
+                    fantôme est un filigrane, il ne doit jamais gêner la
+                    lecture de ce qu'il accompagne. */}
+                <Ghost className="-top-28 left-0">{d.ghost}</Ghost>
+                <Label>
+                  {d.label} <span className="text-white/25">/ 03</span>
+                </Label>
+                <h3 className="mt-6 font-display text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]">
+                  {d.title}
+                </h3>
+                <p className="mt-6 max-w-md text-[14.5px] leading-relaxed text-white/60">{d.body}</p>
+                <Cta label="Commencer" onClick={signIn} className="mt-10" />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LES SOURCES — quatre marques réelles, quatre panneaux cadrés
    ══════════════════════════════════════════════════════════════════════════ */
 
 function YoutubeMark() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="#ff0033" aria-hidden>
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="#ff0033" aria-hidden>
       <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1c.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8zM9.6 15.6V8.4l6.2 3.6-6.2 3.6z" />
     </svg>
   );
 }
 function SpotifyMark() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="#1db954" aria-hidden>
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="#1db954" aria-hidden>
       <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.6 0 12 0zm5.5 17.3a.75.75 0 0 1-1 .25c-2.8-1.7-6.3-2.1-10.4-1.2a.75.75 0 1 1-.33-1.46c4.5-1 8.4-.55 11.5 1.35.35.22.46.68.25 1.06zm1.47-3.27a.94.94 0 0 1-1.29.31c-3.2-2-8.07-2.54-11.85-1.39a.94.94 0 1 1-.54-1.8c4.32-1.31 9.69-.7 13.37 1.58.44.28.58.86.31 1.3zm.13-3.4C15.26 8.4 8.9 8.2 5.24 9.3a1.12 1.12 0 1 1-.65-2.15C8.79 5.88 15.81 6.12 20.24 8.75a1.12 1.12 0 1 1-1.14 1.93z" />
     </svg>
   );
 }
 function TwitchMark() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="#9146ff" aria-hidden>
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="#9146ff" aria-hidden>
       <path d="M4.3 0 1 4.4v15.2h5.2V24h4.2l3.3-4.4h4.2L24 13V0H4.3zm17.2 12.2-3.3 3.3h-5.2l-3.3 3.3v-3.3H6.2V2.2h15.3v10z" />
       <path d="M13.6 5.4h2.2v6.5h-2.2zM8.7 5.4h2.2v6.5H8.7z" />
     </svg>
   );
 }
-
-function SourceCell({
-  mark,
-  name,
-  line,
-  className,
-  children,
-}: {
-  mark: React.ReactNode;
-  name: string;
-  line: string;
-  className?: string;
-  children: React.ReactNode;
-}) {
+function FolderMark() {
   return (
-    <div
-      data-wipe
-      className={cn("flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#080a12]/75 p-7", className)}
-    >
-      <span className="flex items-center gap-3">
-        <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/40">{mark}</span>
-        <span className="text-[15px] font-medium text-white">{name}</span>
-      </span>
-      <p className="mt-4 max-w-md text-[13.5px] leading-relaxed text-white/70">{line}</p>
-      <div className="mt-7 flex-1">{children}</div>
-    </div>
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="#ffc38a" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 17.5V7a1 1 0 0 1 1-1h5l2 2.5h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
+    </svg>
   );
 }
 
-const CATALOGUE_TILES = pick(["hk-01", "vn-01", "no-01", "tw-01", "th-01", "abao-03"]);
-const QUEUE_ROWS = pick(["driv-05", "cn-03", "id-02", "np-01"]);
-
-function Sources() {
-  const root = useRef<HTMLDivElement>(null);
-
-  // Révélation en VOLET DÉCOUPÉ, et non en fondu : la tuile se dévoile du haut
-  // vers le bas comme un store qu'on lève. C'est le seul endroit de la page qui
-  // utilise `clip-path`, et c'est ce qui distingue ce bloc des révélations
-  // ordinaires du reste de la page. Le découpage est figé une fois joué, donc
-  // aucun coût de composition résiduel.
-  useGSAP(
-    () => {
-      const tiles = gsap.utils.toArray<HTMLElement>("[data-wipe]", root.current);
-      const mm = gsap.matchMedia();
-
-      mm.add("(prefers-reduced-motion: reduce)", () => {
-        gsap.set(tiles, { clipPath: "none", autoAlpha: 1 });
-      });
-
-      mm.add("(prefers-reduced-motion: no-preference)", () => {
-        gsap.set(tiles, { clipPath: "inset(0% 0% 100% 0%)" });
-        const batched = ScrollTrigger.batch(tiles, {
-          start: "top 86%",
-          once: true,
-          onEnter: (batch) =>
-            gsap.to(batch, {
-              clipPath: "inset(0% 0% 0% 0%)",
-              duration: 1.05,
-              stagger: 0.13,
-              ease: "power3.inOut",
-              overwrite: true,
-              onComplete: () => gsap.set(batch, { clipPath: "none" }),
-            }),
-        });
-        return () => batched.forEach((t) => t.kill());
-      });
-
-      return () => mm.revert();
-    },
-    { scope: root }
-  );
-
-  return (
-    <div ref={root} className="grid gap-5 md:grid-cols-3">
-      <SourceCell
-        className="md:col-span-2"
-        name="Catalogue"
-        line="Une cinquantaine de paysages tenus à la main, classés par ambiance. Rien à chercher, tu cliques et ça tourne."
-        mark={
-          <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="#ffc38a" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M3 17.5V7a1 1 0 0 1 1-1h5l2 2.5h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
-          </svg>
-        }
-      >
-        <div className="grid grid-cols-3 gap-2">
-          {CATALOGUE_TILES.map((v) => (
-            <span key={v.id} className="group relative overflow-hidden rounded-[3px]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={thumb(v.youtubeId)}
-                alt=""
-                loading="lazy"
-                className="aspect-[16/10] w-full object-cover opacity-70 transition-opacity duration-500 group-hover:opacity-100"
-              />
-              <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/85 to-transparent px-2 pb-1.5 pt-6 text-[10px] text-white/80">
-                {v.country}
-              </span>
-            </span>
-          ))}
-        </div>
-      </SourceCell>
-
-      <SourceCell
-        name="YouTube"
-        line="Tes playlists et ta file d'attente, jouées dans TON ordre. YouTube ne reprend jamais la main."
-        mark={<YoutubeMark />}
-      >
-        <div className="flex flex-col gap-1.5">
-          {QUEUE_ROWS.map((v, i) => (
-            <span
-              key={v.id}
-              className={cn("flex items-center gap-3 rounded-full px-2.5 py-1.5", i === 0 && "bg-white/[0.07]")}
-            >
-              <span className="w-3 shrink-0 text-center font-mono text-[10px] text-white/50">{i + 1}</span>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={thumb(v.youtubeId)} alt="" loading="lazy" className="h-7 w-11 shrink-0 rounded-[3px] object-cover" />
-              <span className="min-w-0 flex-1 truncate text-[12px] text-white/75">{v.title}</span>
-            </span>
-          ))}
-        </div>
-      </SourceCell>
-
-      <SourceCell
-        name="Spotify"
-        line="Ta bibliothèque Premium se lit dans la session, sans changer d'onglet ni couper le minuteur."
-        mark={<SpotifyMark />}
-      >
-        <div className="flex flex-col gap-1">
-          {[
-            { t: "Weightless", a: "Marconi Union", d: "8:08" },
-            { t: "Nuvole Bianche", a: "Ludovico Einaudi", d: "5:57" },
-            { t: "An Ending (Ascent)", a: "Brian Eno", d: "4:24" },
-          ].map((r, i) => (
-            <span key={r.t} className={cn("flex items-center gap-3 rounded-full px-3 py-2", i === 1 && "bg-white/[0.06]")}>
-              <span className="min-w-0 flex-1">
-                <span className={cn("block truncate text-[12.5px]", i === 1 ? "text-[#1db954]" : "text-white/80")}>{r.t}</span>
-                <span className="block truncate text-[11px] text-white/55">{r.a}</span>
-              </span>
-              <span className="font-mono text-[10px] tabular-nums text-white/55">{r.d}</span>
-            </span>
-          ))}
-          <span className="mt-3 block h-[3px] w-full overflow-hidden rounded-full bg-white/10">
-            <span className="block h-full w-[38%] rounded-full bg-[#1db954]" />
-          </span>
-        </div>
-      </SourceCell>
-
-      <SourceCell
-        className="md:col-span-2"
-        name="Twitch"
-        line="Un live ou une rediffusion en fond, pour travailler à côté de quelqu'un."
-        mark={<TwitchMark />}
-      >
-        <div className="grid gap-3 sm:grid-cols-[1fr_minmax(0,13rem)]">
-          <span className="relative block overflow-hidden rounded-[3px] bg-black/50">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={thumb(byId("uk-01")?.youtubeId ?? defaultVideos[0].youtubeId)}
-              alt=""
-              loading="lazy"
-              className="aspect-[16/9] w-full object-cover opacity-50"
-            />
-            <span className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-[#9146ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white">
-              Live
-            </span>
-            <span className="absolute bottom-3 left-3 font-mono text-[11px] text-white/75">studywithme_fr</span>
-          </span>
-          <span className="flex flex-col gap-2 rounded-[3px] bg-white/[0.03] p-3">
-            {[
-              { u: "lenaCodes", m: "quelqu'un révise la bio ce soir ?" },
-              { u: "marco_dev", m: "3e pomodoro, ça pique" },
-              { u: "sora", m: "la pluie sur le stream est parfaite" },
-              { u: "juliette", m: "on repart pour 25 min" },
-            ].map((c) => (
-              <span key={c.u} className="block text-[11px] leading-snug text-white/70">
-                <span className="text-[#9146ff]">{c.u}</span> {c.m}
-              </span>
-            ))}
-          </span>
-        </div>
-      </SourceCell>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   LE PARCOURS — un tracé qui se dessine, et dépose ses étapes au passage
-   ══════════════════════════════════════════════════════════════════════════
-
-   L'avenue rectiligne qui traverse la photo du fond, reprise en repère de
-   lecture. Une seule timeline scrubée coordonne trois choses : le trait qui
-   descend, le point qui s'allume quand le trait l'atteint, et le texte qui
-   se pose juste après. Le mouvement RACONTE ici un ordre (on fait ça, puis
-   ça), ce qui est la seule bonne raison d'animer une liste.
-
-   Le trait est un `div` en `scaleY`, pas un tracé SVG : sur une ligne droite
-   le rendu est identique et c'est composé par le GPU, sans recalcul de
-   `getTotalLength` à chaque redimensionnement. */
-
-const STEPS = [
-  { t: "Choisis une fenêtre", d: "Un paysage du catalogue, ta playlist, un live. La musique démarre avec la session." },
-  { t: "Règle ton rythme", d: "Vingt-cinq minutes, cinquante, ou un chrono libre qui s'arrête quand tu décroches." },
-  { t: "Travaille", d: "Minuteur, tâches et lecteur dans le même écran. Rien d'autre à l'image." },
-  { t: "Relis ta semaine", d: "Série, score de concentration, récap du dimanche. Construits pendant que tu bossais." },
+const SOURCES = [
+  {
+    mark: <FolderMark />,
+    name: "Catalogue",
+    body: "Une cinquantaine de paysages classés par ambiance. Rien à chercher, tu cliques et ça tourne.",
+    id: "th-01",
+  },
+  {
+    mark: <YoutubeMark />,
+    name: "YouTube",
+    body: "Tes playlists et ta file d'attente, jouées dans TON ordre. YouTube ne reprend jamais la main.",
+    id: "id-02",
+  },
+  {
+    mark: <SpotifyMark />,
+    name: "Spotify",
+    body: "Ta bibliothèque Premium se lit dans la session, sans changer d'onglet ni couper le minuteur.",
+    id: "np-01",
+  },
+  {
+    mark: <TwitchMark />,
+    name: "Twitch",
+    body: "Un live ou une rediffusion en fond, pour travailler à côté de quelqu'un.",
+    id: "uk-01",
+  },
 ];
 
-function Parcours() {
-  const root = useRef<HTMLDivElement>(null);
-
-  useGSAP(
-    () => {
-      const line = root.current?.querySelector<HTMLElement>("[data-line]");
-      const dots = gsap.utils.toArray<HTMLElement>("[data-dot]", root.current);
-      const bodies = gsap.utils.toArray<HTMLElement>("[data-step]", root.current);
-      if (!line || dots.length === 0) return;
-      const mm = gsap.matchMedia();
-
-      mm.add("(prefers-reduced-motion: reduce)", () => {
-        gsap.set(line, { scaleY: 1 });
-        gsap.set(dots, { scale: 1, backgroundColor: "#ffc38a" });
-        gsap.set(bodies, { autoAlpha: 1, x: 0 });
-      });
-
-      mm.add("(prefers-reduced-motion: no-preference)", () => {
-        gsap.set(line, { scaleY: 0, transformOrigin: "center top" });
-        gsap.set(dots, { scale: 0.4, backgroundColor: "rgba(255,195,138,0)" });
-        gsap.set(bodies, { autoAlpha: 0.22, x: -20 });
-
-        const tl = gsap.timeline({
-          defaults: { ease: "none" },
-          scrollTrigger: {
-            trigger: root.current,
-            start: "top 76%",
-            end: "bottom 82%",
-            scrub: 0.5,
-            refreshPriority: PRIO.below,
-          },
-        });
-
-        tl.to(line, { scaleY: 1, duration: 1 }, 0);
-        dots.forEach((dot, i) => {
-          const at = (i / dots.length) * 0.9;
-          tl.to(dot, { scale: 1, backgroundColor: "#ffc38a", duration: 0.05, ease: "power2.out" }, at);
-          tl.to(bodies[i], { autoAlpha: 1, x: 0, duration: 0.13, ease: "power2.out" }, at);
-        });
-
-        return () => {
-          tl.scrollTrigger?.kill();
-          tl.kill();
-        };
-      });
-
-      return () => mm.revert();
-    },
-    { scope: root }
-  );
-
+function Sources() {
   return (
-    <div ref={root} className="relative pl-10 sm:pl-14">
-      {/* Le trait, et sa gaine éteinte */}
-      <span aria-hidden className="absolute left-[5px] top-2 bottom-2 w-px bg-white/12 sm:left-[13px]" />
-      <span
-        data-line
-        aria-hidden
-        className="absolute left-[4px] top-2 bottom-2 w-[3px] rounded-full bg-[#ffc38a] sm:left-3"
-      />
-
-      <ol className="grid gap-12 sm:gap-16">
-        {STEPS.map((s) => (
-          <li key={s.t} className="relative">
-            <span
-              data-dot
-              aria-hidden
-              className="absolute left-[-2.15rem] top-[0.45rem] block h-[11px] w-[11px] rounded-full ring-2 ring-[#ffc38a]/45 sm:left-[-3rem]"
-            />
-            <div data-step>
-              <h3 className="text-[clamp(1.25rem,2.2vw,1.7rem)] font-semibold tracking-[-0.025em] text-white">{s.t}</h3>
-              <p className="mt-3 max-w-md text-[14.5px] leading-relaxed text-white/65">{s.d}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
+    <div className="grid gap-px border border-white/10 bg-white/10 md:grid-cols-2">
+      {SOURCES.map((s) => {
+        const v = byId(s.id);
+        return (
+          <div key={s.name} data-reveal className="bg-black p-8 sm:p-10">
+            <span className="flex items-center gap-3">
+              {s.mark}
+              <Label className="text-white/70">{s.name}</Label>
+            </span>
+            <p className="mt-6 max-w-sm text-[14px] leading-relaxed text-white/60">{s.body}</p>
+            {v && <Frame src={thumb(v.youtubeId)} alt="" className="mt-8 opacity-70" />}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   LE MINUTEUR JOUABLE — la démo la plus honnête possible : le vrai geste
+   LE MINUTEUR JOUABLE — la démonstration la plus honnête possible
    ══════════════════════════════════════════════════════════════════════════ */
 
 const PRESETS = [
   { key: "classic", label: "Classique", work: "25 / 5", total: 25 * 60 },
-  { key: "deep", label: "Concentration longue", work: "50 / 10", total: 50 * 60 },
+  { key: "deep", label: "Longue", work: "50 / 10", total: 50 * 60 },
   { key: "court", label: "Court", work: "15 / 3", total: 15 * 60 },
 ] as const;
 
@@ -1287,12 +791,11 @@ function TryPomodoro({ publish }: { publish: (live: boolean, total: number, left
   const [left, setLeft] = useState(total);
   const [running, setRunning] = useState(false);
   // « touched » = le visiteur a lancé SA session au moins une fois. C'est ce
-  // qui fait basculer l'horloge de la nav du temps de la page au sien.
+  // qui fait basculer l'horloge du bandeau du temps de la page au sien.
   const [touched, setTouched] = useState(false);
 
   // « En cours » est DÉRIVÉ, jamais stocké : arrivé à zéro, `active` retombe
-  // seul et l'effet nettoie son intervalle. Pas de `setState` dans un effet,
-  // donc pas de rendu en cascade.
+  // seul et l'effet nettoie son intervalle. Pas de `setState` dans un effet.
   const active = running && left > 0;
 
   useEffect(() => {
@@ -1301,27 +804,27 @@ function TryPomodoro({ publish }: { publish: (live: boolean, total: number, left
     return () => clearInterval(t);
   }, [active]);
 
-  // Publication vers l'horloge de la nav. Le parent écrit dans SON ref (on ne
-  // mute pas un ref reçu en prop), donc aucun re-render ne remonte l'arbre.
   useEffect(() => {
     publish(touched, total, left);
   }, [publish, touched, total, left]);
 
   const progress = total > 0 ? 1 - left / total : 0;
-  const dash = 2 * Math.PI * 52;
+  const dash = 2 * Math.PI * 54;
 
   return (
-    <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-20">
-      <div data-reveal>
-        <h2 className="text-[clamp(1.9rem,4.2vw,3.2rem)] font-semibold leading-[1.05] tracking-[-0.04em]">
-          Essaie-le tout de suite.
+    <div className="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
+      <div data-reveal className="relative">
+        <Ghost className="-top-12 left-0">Essaie</Ghost>
+        <Label>La démonstration</Label>
+        <h2 className="mt-6 font-display text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]">
+          Le vrai minuteur, ici même.
         </h2>
-        <p className="mt-6 max-w-md text-[15px] leading-relaxed text-white/70">
-          C&apos;est le minuteur de l&apos;application, pas une capture. Lance-le et le compteur en haut de page arrête
-          de suivre ton scroll pour suivre ta session.
+        <p className="mt-6 max-w-md text-[14.5px] leading-relaxed text-white/60">
+          Ce n&apos;est pas une capture. Lance-le, et le compteur en haut de page arrête de suivre ton scroll pour
+          suivre ta session.
         </p>
 
-        <div className="mt-9 flex flex-wrap gap-2">
+        <div className="mt-10 flex flex-wrap gap-3">
           {PRESETS.map((p) => {
             const on = p.key === preset;
             return (
@@ -1335,13 +838,13 @@ function TryPomodoro({ publish }: { publish: (live: boolean, total: number, left
                 }}
                 aria-pressed={on}
                 className={cn(
-                  "rounded-full border px-5 py-2.5 text-[13px] transition-colors duration-500",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc38a] focus-visible:ring-offset-2 focus-visible:ring-offset-[#05060c]",
-                  on ? "border-white/45 bg-white/10 text-white" : "border-white/12 text-white/60 hover:border-white/28 hover:text-white"
+                  "border px-5 py-3 font-mono text-[10px] uppercase tracking-[0.2em] transition-colors duration-500",
+                  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white",
+                  on ? "border-white/60 text-white" : "border-white/15 text-white/45 hover:border-white/35 hover:text-white/80"
                 )}
               >
                 {p.label}
-                <span className="ml-2 font-mono text-[11px] text-white/50">{p.work}</span>
+                <span className="ml-3 text-white/35">{p.work}</span>
               </button>
             );
           })}
@@ -1349,97 +852,84 @@ function TryPomodoro({ publish }: { publish: (live: boolean, total: number, left
       </div>
 
       <div data-reveal className="justify-self-center">
-        <Panel className="w-[19rem]">
-          <div className="flex flex-col items-center gap-7 px-8 py-10">
-            <div className="relative h-[13.5rem] w-[13.5rem]">
-              <svg className="h-full w-full -rotate-90" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="3" />
-                <circle
-                  cx="60"
-                  cy="60"
-                  r="52"
-                  fill="none"
-                  stroke="#ffc38a"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeDasharray={dash}
-                  strokeDashoffset={dash * (1 - progress)}
-                  style={{ transition: "stroke-dashoffset 1s linear" }}
-                />
-              </svg>
-              <span className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="font-mono text-[42px] leading-none tabular-nums text-white">
-                  {pad(left / 60)}:{pad(left % 60)}
-                </span>
-                <span className="mt-2 font-mono text-[9px] uppercase tracking-[0.22em] text-white/50">
-                  {left === 0 ? "Terminé" : active ? "En cours" : "En attente"}
-                </span>
+        <div className="border border-white/12 bg-black p-12">
+          <div className="relative h-[15rem] w-[15rem]">
+            <svg className="h-full w-full -rotate-90" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="1.5" />
+              <circle
+                cx="60"
+                cy="60"
+                r="54"
+                fill="none"
+                stroke="#ffc38a"
+                strokeWidth="1.5"
+                strokeDasharray={dash}
+                strokeDashoffset={dash * (1 - progress)}
+                style={{ transition: "stroke-dashoffset 1s linear" }}
+              />
+            </svg>
+            <span className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="font-mono text-[44px] leading-none tabular-nums text-white">
+                {pad(left / 60)}:{pad(left % 60)}
               </span>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  setTouched(true);
-                  if (left === 0) {
-                    setLeft(total);
-                    setRunning(true);
-                  } else setRunning((r) => !r);
-                }}
-                className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#08090f] transition-transform duration-500 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc38a] focus-visible:ring-offset-2 focus-visible:ring-offset-[#07080e]"
-                aria-label={active ? "Mettre en pause le minuteur" : "Démarrer le minuteur"}
-              >
-                {active ? (
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
-                    <rect x="6" y="5" width="4" height="14" rx="1" />
-                    <rect x="14" y="5" width="4" height="14" rx="1" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" className="ml-0.5 h-4 w-4" fill="currentColor" aria-hidden>
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                )}
-              </button>
-              <button
-                onClick={() => {
-                  setRunning(false);
-                  setTouched(false);
-                  setLeft(total);
-                }}
-                className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 text-white/70 transition-colors hover:border-white/35 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc38a] focus-visible:ring-offset-2 focus-visible:ring-offset-[#07080e]"
-                aria-label="Réinitialiser le minuteur"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M3 12a9 9 0 1 0 2.6-6.4M3 4.5V10h5.5" />
-                </svg>
-              </button>
-            </div>
+              <Label className="mt-3">{left === 0 ? "Terminé" : active ? "En cours" : "En attente"}</Label>
+            </span>
           </div>
-        </Panel>
+
+          <div className="mt-10 flex items-center justify-center gap-4">
+            <button
+              onClick={() => {
+                setTouched(true);
+                if (left === 0) {
+                  setLeft(total);
+                  setRunning(true);
+                } else setRunning((r) => !r);
+              }}
+              className="flex h-12 w-12 items-center justify-center border border-white/25 text-white transition-colors duration-500 hover:border-white hover:bg-white hover:text-black focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white"
+              aria-label={active ? "Mettre en pause le minuteur" : "Démarrer le minuteur"}
+            >
+              {active ? (
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor" aria-hidden>
+                  <rect x="6" y="5" width="4" height="14" />
+                  <rect x="14" y="5" width="4" height="14" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" className="ml-0.5 h-3.5 w-3.5" fill="currentColor" aria-hidden>
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                setRunning(false);
+                setTouched(false);
+                setLeft(total);
+              }}
+              className="flex h-12 w-12 items-center justify-center border border-white/15 text-white/50 transition-colors duration-500 hover:border-white/40 hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white"
+              aria-label="Réinitialiser le minuteur"
+            >
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M3 12a9 9 0 1 0 2.6-6.4M3 4.5V10h5.5" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   LA TRACE — la même grille, mais devenue tes données
+   LA TRACE — la grille se remplit, les chiffres se comptent
    ══════════════════════════════════════════════════════════════════════════
 
-   Le paiement de la métaphore : la façade de la section « mur » revient ici
-   sous forme de heatmap. Une case, une soirée, une fenêtre allumée.
-
-   Trame déterministe (aucun Math.random au rendu : le composant doit produire
-   deux fois la même grille). */
+   Trame déterministe : aucun `Math.random` au rendu, le composant doit
+   produire deux fois la même grille. */
 
 const HEAT = Array.from({ length: 91 }, (_, i) => (i * 37) % 11);
-const HEAT_STEPS = ["bg-white/[0.07]", "bg-[#ffc38a]/30", "bg-[#ffc38a]/55", "bg-[#ffc38a]/80", "bg-[#ffc38a]"];
+const HEAT_STEPS = ["bg-white/[0.06]", "bg-[#ffc38a]/25", "bg-[#ffc38a]/50", "bg-[#ffc38a]/75", "bg-[#ffc38a]"];
 const heatStep = (v: number) => (v > 8 ? 4 : v > 6 ? 3 : v > 4 ? 2 : v > 2 ? 1 : 0);
-const HEAT_DAYS = ["L", "", "M", "", "V", "", "D"];
 
-// Les chiffres se COMPTENT à l'arrivée : un total qui monte dit « ça s'est
-// accumulé pendant que tu travaillais », ce qu'un chiffre déjà posé ne dit pas.
-// Le rendu initial contient déjà la valeur finale : sans JavaScript, la section
-// reste juste.
 const TRACE_STATS = [
   { k: "Série en cours", to: 17, kind: "days" as const },
   { k: "Cette semaine", to: 560, kind: "hm" as const },
@@ -1461,27 +951,24 @@ function Trace() {
       const mm = gsap.matchMedia();
 
       mm.add("(prefers-reduced-motion: reduce)", () => {
-        gsap.set(cells, { autoAlpha: 1, scale: 1 });
+        gsap.set(cells, { autoAlpha: 1 });
       });
 
       mm.add("(prefers-reduced-motion: no-preference)", () => {
-        // Même geste que la façade, en plus court : la grille se remplit
-        // colonne par colonne, de la plus ancienne à aujourd'hui.
-        const tween = gsap.fromTo(
+        const grid = gsap.fromTo(
           cells,
-          { autoAlpha: 0, scale: 0.4 },
+          { autoAlpha: 0 },
           {
             autoAlpha: 1,
-            scale: 1,
             duration: 0.5,
             ease: "power2.out",
             stagger: { amount: 0.9, grid: "auto", from: "start", axis: "x" },
             scrollTrigger: { trigger: root.current, start: "top 78%", once: true, refreshPriority: PRIO.below },
           }
         );
+
         // Les totaux montent jusqu'à leur valeur. On anime un objet, pas le
-        // DOM : une seule écriture de texte par frame, et le formatage reste
-        // au même endroit que le rendu initial.
+        // DOM : une seule écriture de texte par frame.
         const counters = gsap.utils.toArray<HTMLElement>("[data-count]", root.current).map((el) => {
           const target = Number(el.dataset.count);
           const kind = (el.dataset.kind ?? "plain") as "days" | "hm" | "plain";
@@ -1494,16 +981,14 @@ function Trace() {
             onUpdate: () => {
               el.textContent = fmtStat(box.v, kind);
             },
-            scrollTrigger: { trigger: el, start: "top 90%", once: true },
+            scrollTrigger: { trigger: el, start: "top 90%", once: true, refreshPriority: PRIO.below },
           });
         });
 
         return () => {
-          tween.scrollTrigger?.kill();
-          tween.kill();
-          counters.forEach((c) => {
-            c.scrollTrigger?.kill();
-            c.kill();
+          [grid, ...counters].forEach((t) => {
+            t.scrollTrigger?.kill();
+            t.kill();
           });
         };
       });
@@ -1515,45 +1000,24 @@ function Trace() {
 
   return (
     <div ref={root}>
-      <div data-reveal className="rounded-2xl border border-white/10 bg-[#080a12]/70 p-7 sm:p-9">
-        <div className="flex flex-wrap items-baseline justify-between gap-4">
-          <p className="text-[15px] text-white/75">Treize semaines. Une case par soirée.</p>
-          <span className="flex items-center gap-2 font-mono text-[10px] text-white/60">
-            moins
-            <span className="flex gap-1" aria-hidden>
-              {HEAT_STEPS.map((c) => (
-                <span key={c} className={cn("h-2.5 w-2.5 rounded-[3px]", c)} />
-              ))}
-            </span>
-            plus
-          </span>
-        </div>
-
-        <div className="mt-7 flex gap-2.5">
-          <div className="grid grid-rows-7 gap-[6px] pr-1">
-            {HEAT_DAYS.map((d, i) => (
-              <span key={i} className="flex h-[14px] items-center font-mono text-[9px] leading-none text-white/45">
-                {d}
-              </span>
-            ))}
-          </div>
-          <div className="grid flex-1 grid-flow-col grid-rows-7 gap-[6px]">
-            {HEAT.map((v, i) => (
-              <span key={i} data-heat className={cn("h-[14px] rounded-[3px]", HEAT_STEPS[heatStep(v)])} />
-            ))}
-          </div>
+      <div data-reveal className="border border-white/10 p-8 sm:p-12">
+        <Label>Treize semaines, une case par soirée</Label>
+        <div className="mt-8 grid grid-flow-col grid-rows-7 gap-[5px]">
+          {HEAT.map((v, i) => (
+            <span key={i} data-heat className={cn("h-[13px]", HEAT_STEPS[heatStep(v)])} />
+          ))}
         </div>
       </div>
 
       {/* Les chiffres, nus, sous un filet. Pas de cartes : ils n'ont pas besoin
           d'élévation, ils ont besoin d'espace. */}
-      <div data-reveal className="mt-10 grid gap-8 border-t border-white/[0.09] pt-9 sm:grid-cols-3">
+      <div data-reveal className="mt-12 grid gap-10 border-t border-white/10 pt-12 sm:grid-cols-3">
         {TRACE_STATS.map((s) => (
           <div key={s.k}>
-            <p data-count={s.to} data-kind={s.kind} className="font-mono text-[34px] leading-none tabular-nums text-white">
+            <p data-count={s.to} data-kind={s.kind} className="font-mono text-[38px] leading-none tabular-nums text-white">
               {fmtStat(s.to, s.kind)}
             </p>
-            <p className="mt-3 text-[13px] text-white/60">{s.k}</p>
+            <Label className="mt-4">{s.k}</Label>
           </div>
         ))}
       </div>
@@ -1566,16 +1030,13 @@ function Trace() {
    ══════════════════════════════════════════════════════════════════════════ */
 
 export default function LandingPage() {
-  const root = useRef<HTMLDivElement>(null);
-  const halo = useRef<HTMLDivElement>(null);
-  const bell = useRef<HTMLSpanElement>(null);
+  const root = useRef<HTMLElement>(null);
+  const bar = useRef<HTMLSpanElement>(null);
 
   const clock = useRef<Clock>({ scroll: 0, live: false, total: POMODORO_SECONDS, left: POMODORO_SECONDS });
-  const [done, setDone] = useState(false);
+  const [, setDone] = useState(false);
   const onDoneChange = useCallback((d: boolean) => setDone(d), []);
 
-  /** Le minuteur de la démo publie son état ici : c'est lui qui fait basculer
-   *  l'horloge de la nav du temps de la page au temps de la session. */
   const publish = useCallback((live: boolean, total: number, left: number) => {
     clock.current.live = live;
     clock.current.total = total;
@@ -1590,98 +1051,83 @@ export default function LandingPage() {
     () => {
       const mm = gsap.matchMedia();
 
-      /* ── Progression de la page, source de l'horloge de la nav ─────────── */
+      /* ── Progression de la page ───────────────────────────────────────── */
+      // Sans élément déclencheur : `start: 0` / `end: "max"` couvre le document
+      // entier en positions de scroll absolues.
       const progress = ScrollTrigger.create({
         start: 0,
         end: "max",
-        refreshPriority: PRIO.hero,
+        refreshPriority: PRIO.top,
         onUpdate: (self) => {
           if (clock.current) clock.current.scroll = self.progress;
+          if (bar.current) bar.current.style.transform = `scaleX(${self.progress})`;
         },
-      });
-
-      /* ── Halo du curseur ──────────────────────────────────────────────── */
-      mm.add("(prefers-reduced-motion: no-preference) and (pointer: fine)", () => {
-        const el = halo.current;
-        if (!el) return;
-        gsap.set(el, { xPercent: -50, yPercent: -50, x: window.innerWidth / 2, y: window.innerHeight / 2 });
-        const xTo = gsap.quickTo(el, "x", { duration: 0.85, ease: "power3" });
-        const yTo = gsap.quickTo(el, "y", { duration: 0.85, ease: "power3" });
-        const onMove = (e: PointerEvent) => {
-          xTo(e.clientX);
-          yTo(e.clientY);
-        };
-        window.addEventListener("pointermove", onMove, { passive: true });
-        return () => window.removeEventListener("pointermove", onMove);
-      });
-
-      /* ── Voile de lecture ─────────────────────────────────────────────── */
-      // Transparent sur le hero (on veut voir la ville), il monte ensuite pour
-      // que TOUT le texte de la page repose sur un fond stable.
-      mm.add("(prefers-reduced-motion: reduce)", () => {
-        gsap.set("[data-veil]", { opacity: 0.86 });
-      });
-      mm.add("(prefers-reduced-motion: no-preference)", () => {
-        const tween = gsap.fromTo(
-          "[data-veil]",
-          { opacity: 0 },
-          {
-            opacity: 0.86,
-            ease: "none",
-            scrollTrigger: { start: 0, end: () => window.innerHeight * 1.15, scrub: 0.5, refreshPriority: PRIO.hero, invalidateOnRefresh: true },
-          }
-        );
-
-        // Le voile SE RETIRE le temps de la rue seule, puis revient. Sans ça,
-        // le seul moment où le décor passe au premier plan se jouerait derrière
-        // un aplat à 86 % d'opacité. Les trois plages de scroll ne se
-        // chevauchent pas, les tweens ne se disputent donc jamais la propriété.
-        const sky = root.current?.querySelector("[data-open-sky]");
-        const open = sky
-          ? gsap.to("[data-veil]", {
-              opacity: 0.1,
-              ease: "none",
-              scrollTrigger: { trigger: sky, start: "top 90%", end: "top 25%", scrub: 0.5, refreshPriority: PRIO.below },
-            })
-          : null;
-        const close = sky
-          ? gsap.to("[data-veil]", {
-              opacity: 0.86,
-              ease: "none",
-              scrollTrigger: { trigger: sky, start: "bottom 85%", end: "bottom 25%", scrub: 0.5, refreshPriority: PRIO.below },
-            })
-          : null;
-
-        return () => {
-          [tween, open, close].forEach((t) => {
-            t?.scrollTrigger?.kill();
-            t?.kill();
-          });
-        };
       });
 
       /* ── Entrée du hero ───────────────────────────────────────────────── */
       mm.add("(prefers-reduced-motion: reduce)", () => {
         gsap.set("[data-hero]", { autoAlpha: 1, y: 0 });
         gsap.set("[data-word]", { yPercent: 0 });
+        gsap.set("[data-hero-ring]", { strokeDashoffset: 2 * Math.PI * 45 * 0.36 });
       });
+
+      /* ── L'ARRIVÉE ────────────────────────────────────────────────────
+         Le premier écran ne doit pas se poser, il doit ARRIVER. La photo se
+         détend depuis un léger sur-cadrage (une caméra qui se cale), les mots
+         du titre montent derrière leur masque, puis la composition se lève.
+         C'est la seule séquence de la page qui joue au temps et non au
+         scroll : elle accueille, elle ne raconte pas. */
       mm.add("(prefers-reduced-motion: no-preference)", () => {
         const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-        tl.from("[data-hero='eyebrow']", { autoAlpha: 0, y: 18, duration: 0.7 })
-          .from("[data-word]", { yPercent: 115, duration: 0.95, stagger: 0.055 }, 0.12)
-          .from("[data-hero='sub']", { autoAlpha: 0, y: 22, duration: 0.8 }, 0.55)
-          .from("[data-hero='cta']", { autoAlpha: 0, y: 20, duration: 0.8 }, 0.68)
-          .from("[data-hero='window']", { autoAlpha: 0, y: 56, duration: 1.2 }, 0.3);
+        tl.from("[data-hero-img]", { scale: 1.16, duration: 2.6, ease: "power2.out" }, 0)
+          .from("[data-hero='eyebrow']", { autoAlpha: 0, y: 14, duration: 0.7 }, 0.15)
+          .from("[data-word]", { yPercent: 110, duration: 1.05, stagger: 0.05 }, 0.25)
+          .from("[data-hero='sub']", { autoAlpha: 0, y: 18, duration: 0.8 }, 0.75)
+          .from("[data-hero='cta']", { autoAlpha: 0, y: 16, duration: 0.8 }, 0.85)
+          .from("[data-stage]", { autoAlpha: 0, y: 90, duration: 1.4, stagger: 0.12 }, 0.6)
+          .fromTo(
+            "[data-hero-ring]",
+            { strokeDashoffset: 2 * Math.PI * 45 },
+            { strokeDashoffset: 2 * Math.PI * 45 * 0.36, duration: 2.2, ease: "power2.inOut" },
+            1.2
+          );
         return () => tl.kill();
       });
 
-      /* ── Parallaxe de sortie du hero ──────────────────────────────────── */
+      /* ── LA BALADE ────────────────────────────────────────────────────
+         Chaque photographie plein cadre dérive plus lentement que la page qui
+         la traverse. C'est ce décalage, et lui seul, qui donne la sensation
+         d'avancer DANS quelque chose plutôt que de faire défiler une liste de
+         sections. Le sur-cadrage (`scale`) est indispensable : sans lui, la
+         dérive découvrirait le bord de l'image. */
       mm.add("(prefers-reduced-motion: no-preference)", () => {
-        const tween = gsap.to("[data-hero-inner]", {
-          y: 110,
-          autoAlpha: 0,
+        const layers = gsap.utils.toArray<HTMLElement>("[data-parallax]", root.current);
+        gsap.set(layers, { scale: 1.18 });
+        const tweens = layers.map((el) =>
+          gsap.fromTo(
+            el,
+            { yPercent: -9 },
+            {
+              yPercent: 9,
+              ease: "none",
+              scrollTrigger: { trigger: el, start: "top bottom", end: "bottom top", scrub: 0.6, refreshPriority: PRIO.below },
+            }
+          )
+        );
+        return () => {
+          tweens.forEach((t) => {
+            t.scrollTrigger?.kill();
+            t.kill();
+          });
+        };
+      });
+
+      /* ── Sortie du hero ───────────────────────────────────────────────── */
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        const tween = gsap.to("[data-hero-img]", {
+          yPercent: 12,
           ease: "none",
-          scrollTrigger: { trigger: "[data-hero-section]", start: "top top", end: "bottom 30%", scrub: 0.6, refreshPriority: PRIO.hero },
+          scrollTrigger: { trigger: "[data-hero-section]", start: "top top", end: "bottom top", scrub: 0.6, refreshPriority: PRIO.top },
         });
         return () => {
           tween.scrollTrigger?.kill();
@@ -1689,34 +1135,52 @@ export default function LandingPage() {
         };
       });
 
-      /* ── Révélations au scroll, pour toutes les sections en flux ──────── */
+      /* ── Dérive des mots fantômes ─────────────────────────────────────── */
+      // Ils montent un peu moins vite que la page : la profondeur se lit sans
+      // qu'on ajoute quoi que ce soit à l'écran.
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        const ghosts = gsap.utils.toArray<HTMLElement>("[data-ghost]", root.current);
+        const tweens = ghosts.map((g) =>
+          gsap.fromTo(
+            g,
+            { y: 60 },
+            {
+              y: -60,
+              ease: "none",
+              scrollTrigger: { trigger: g, start: "top bottom", end: "bottom top", scrub: 0.6, refreshPriority: PRIO.below },
+            }
+          )
+        );
+        return () => {
+          tweens.forEach((t) => {
+            t.scrollTrigger?.kill();
+            t.kill();
+          });
+        };
+      });
+
+      /* ── Révélations au scroll ────────────────────────────────────────── */
       const items = gsap.utils.toArray<HTMLElement>("[data-reveal]", root.current);
       mm.add("(prefers-reduced-motion: reduce)", () => {
         gsap.set(items, { autoAlpha: 1, y: 0 });
       });
       mm.add("(prefers-reduced-motion: no-preference)", () => {
-        gsap.set(items, { autoAlpha: 0, y: 44 });
+        gsap.set(items, { autoAlpha: 0, y: 36 });
         const batched = ScrollTrigger.batch(items, {
           start: "top 88%",
           once: true,
           onEnter: (batch) =>
-            gsap.to(batch, { autoAlpha: 1, y: 0, duration: 0.9, stagger: 0.09, ease: "power3.out", overwrite: true }),
+            gsap.to(batch, { autoAlpha: 1, y: 0, duration: 0.95, stagger: 0.1, ease: "power3.out", overwrite: true }),
         });
         return () => batched.forEach((t) => t.kill());
       });
 
       /* ── Recalcul obligatoire ─────────────────────────────────────────── */
       // Les effets React s'exécutent ENFANT D'ABORD : quand ce composant monte
-      // ses propres déclencheurs, les deux sections épinglées ont déjà inséré
-      // leur `pin-spacer` et allongé le document. Mais les déclencheurs créés
-      // AVANT ces insertions gardent des bornes calculées sur une page plus
-      // courte. Sans ce recalcul, le catalogue s'épinglait plusieurs centaines
-      // de pixels trop tôt et se superposait au mur de fenêtres.
-      // Un `requestAnimationFrame` laisse le navigateur poser la mise en page
-      // avant la mesure.
+      // ses propres déclencheurs, les sections épinglées ont déjà inséré leur
+      // `pin-spacer` et allongé le document. Sans ce recalcul, les déclencheurs
+      // créés avant gardent des bornes calculées sur une page trop courte.
       const raf = requestAnimationFrame(() => ScrollTrigger.refresh());
-
-      // Les polices modifient la hauteur des titres, donc les bornes.
       let cancelled = false;
       void document.fonts?.ready.then(() => {
         if (!cancelled) ScrollTrigger.refresh();
@@ -1732,206 +1196,138 @@ export default function LandingPage() {
     { scope: root }
   );
 
-  /* La sonnerie de fin : deux ondes qui partent du bouton quand les
-     vingt-cinq minutes de la page (ou de ta session) sont écoulées. Elle ne
-     tourne pas en boucle décorative, elle marque un instant précis. */
-  useGSAP(
-    () => {
-      if (!done || !bell.current) return;
-      const mm = gsap.matchMedia();
-      mm.add("(prefers-reduced-motion: no-preference)", () => {
-        const rings = gsap.utils.toArray<HTMLElement>("[data-ring]", bell.current);
-        const tween = gsap.fromTo(
-          rings,
-          { scale: 0.85, autoAlpha: 0.7 },
-          { scale: 1.9, autoAlpha: 0, duration: 2.6, ease: "power2.out", repeat: -1, stagger: 0.9 }
-        );
-        return () => tween.kill();
-      });
-      return () => mm.revert();
-    },
-    { dependencies: [done], revertOnUpdate: true }
-  );
-
   return (
-    <main ref={root} className="relative w-full max-w-full overflow-x-clip bg-[#05060c] text-white">
-      {/* ── LE DÉCOR ─────────────────────────────────────────────────────
-          Une seule ville, derrière toute la page. Le scroll y fait marcher la
-          caméra du premier au dernier écran. */}
-      <World />
-
-      {/* Voile de lisibilité, au-dessus de la ville et sous le contenu.
-          Une simple opacité sur un aplat : surtout PAS de mode de fusion, qui
-          obligerait le navigateur à recomposer tout le viewport à chaque
-          frame de scroll (c'était l'une des deux causes des saccades). */}
-      <div data-veil aria-hidden className="pointer-events-none fixed inset-0 z-[1] bg-[#05060c] opacity-0" />
-      {/* Halo du curseur, sur toute la page */}
+    <main ref={root} className="relative w-full max-w-full overflow-x-clip bg-[#050505] text-white">
+      {/* Grain : couche fixe, jamais attachée à un conteneur qui défile. */}
       <div
-        ref={halo}
         aria-hidden
-        className="pointer-events-none fixed left-0 top-0 z-[2] h-[46rem] w-[46rem] rounded-full"
-        style={{ background: "radial-gradient(circle, rgba(255,183,110,0.11), transparent 62%)" }}
+        className="pointer-events-none fixed inset-0 z-[60] opacity-[0.05] mix-blend-overlay"
+        style={{ backgroundImage: GRAIN }}
       />
 
-      {/* Nav : île de verre détachée du bord. Hors du conteneur de contenu,
-          pour passer au-dessus des sections épinglées par ScrollTrigger.
-          Les liens de section ont été retirés : ils n'indiquaient pas où on se
-          trouvait. C'est l'index de chapitres qui tient ce rôle, en le disant.
-          Le flou d'arrière-plan est volontairement MODESTE : un
-          `backdrop-blur-2xl` fixe re-floute sa zone à chaque frame de scroll,
-          par-dessus une scène 3D qui change en permanence. */}
-      <header className="fixed inset-x-0 top-6 z-40 flex justify-center px-4">
-        <nav className="flex w-max items-center gap-5 rounded-full border border-white/12 bg-[#080a12]/88 py-2 pl-5 pr-2 backdrop-blur-sm">
-          <Wordmark />
-          <span className="hidden h-8 w-px bg-white/10 sm:block" aria-hidden />
-          <div className="hidden sm:block">
-            <SessionClock clock={clock} onDoneChange={onDoneChange} />
-          </div>
-          <Cta label="Commencer" onClick={signIn} className="py-1.5 pl-5 pr-1.5 text-[13px]" />
-        </nav>
+      {/* Barre de progression de lecture, en bas de l'écran. Un `scaleX` sur un
+          filet d'un pixel : composé par le GPU, aucun repaint. */}
+      <div aria-hidden className="pointer-events-none fixed inset-x-0 bottom-0 z-40 h-px bg-white/10">
+        <span ref={bar} className="block h-full origin-left scale-x-0 bg-white/70" />
+      </div>
+
+      {/* Chrome minuscule : l'horloge à gauche, le nom au centre, l'action à
+          droite. Aucun lien de section : sur une page qui se lit d'un trait,
+          ils n'indiquent rien. */}
+      <header className="fixed inset-x-0 top-0 z-40 flex items-center justify-between px-5 py-5 sm:px-10">
+        <SessionClock clock={clock} onDoneChange={onDoneChange} />
+        <Wordmark className="absolute left-1/2 hidden -translate-x-1/2 sm:flex" />
+        <Cta label="Commencer" onClick={signIn} className="px-6 py-3 text-[10px]" />
       </header>
 
-      {/* L'index de chapitres. `fixed`, donc sa place dans le DOM ne change
-          rien à sa position : il ne mesure rien au montage, il lit les ancres
-          à chaque `refresh`. */}
-      <ChapterRail />
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
+      {/* Le hero est UNE IMAGE, pas un bloc de texte suivi de vignettes : une
+          photographie de Séoul occupe tout le cadre, le titre se pose dessus,
+          et la composition déborde sous le bord de l'écran. */}
+      {/* `isolate` est OBLIGATOIRE : sans contexte d'empilement propre, la
+          couche photographique en `-z-10` passe DERRIÈRE le fond de `main` et
+          disparaît complètement. */}
+      <section
+        data-hero-section
+        className="relative isolate flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden px-5 pb-0 pt-28 text-center sm:px-10"
+      >
+        <span data-hero-img aria-hidden className="absolute inset-0 -z-10">
+          <Image src={SEOUL.aerien} alt="" fill priority sizes="100vw" className="object-cover opacity-70" />
+          {/* Les voiles doivent ASSEOIR le texte, pas effacer la photo : un
+              `from-black ... to-black` plein, doublé d'un vignettage à 0,9,
+              recouvrait l'image en entier. On garde du noir franc derrière le
+              bandeau et sous le pied de page, et on laisse le milieu respirer. */}
+          <span className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/35 to-black/85" />
+          <span
+            className="absolute inset-0"
+            style={{ background: "radial-gradient(ellipse 80% 65% at 50% 45%, transparent 40%, rgba(5,5,5,0.7) 100%)" }}
+          />
+        </span>
 
-      <div className="relative z-10">
-        {/* ── Hero ───────────────────────────────────────────────────────── */}
-        <section data-hero-section className="relative flex min-h-[100dvh] items-center px-4 pb-24 pt-24 sm:px-8">
-          <div
-            data-hero-inner
-            className="relative mx-auto grid w-full max-w-[86rem] items-center gap-16 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-20"
-          >
-            <div className="max-w-3xl">
-              <span
-                data-hero="eyebrow"
-                className="inline-flex items-center rounded-full border border-white/15 bg-white/[0.05] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-white/70"
-              >
-                Gratuit, sans compte obligatoire
-              </span>
+        <span data-hero="eyebrow" className="block">
+          <Label>Gratuit, sans compte obligatoire</Label>
+        </span>
 
-              <h1 className="mt-8 text-[clamp(2.7rem,6.4vw,5.4rem)] font-semibold leading-[1.02] tracking-[-0.04em] [text-shadow:0_4px_44px_rgba(0,0,0,0.85)]">
-                <MaskedLine text="Il fait presque nuit." />
-                <MaskedLine text="Allume ta fenêtre." />
-              </h1>
+        <h1 className="mt-8 max-w-5xl font-display text-[clamp(2.6rem,7.2vw,6rem)] font-light leading-[0.98]">
+          <MaskedLine text="Il fait presque nuit." />
+          <MaskedLine text="Allume ta fenêtre." />
+        </h1>
 
-              <p
-                data-hero="sub"
-                className="mt-8 max-w-lg text-[17px] leading-relaxed text-white/75 [text-shadow:0_1px_20px_rgba(0,0,0,0.9)]"
-              >
-                Un minuteur Pomodoro et ta musique dans le même écran, posés sur un paysage qui tourne en boucle.
-              </p>
-
-              <div data-hero="cta" className="mt-11 flex flex-wrap items-center gap-4">
-                <Cta label="Commencer" onClick={signIn} />
-                <Cta
-                  label="Voir le catalogue"
-                  tone="glass"
-                  onClick={() => document.getElementById("catalogue")?.scrollIntoView({ behavior: "smooth" })}
-                />
-              </div>
-            </div>
-
-            <div data-hero="window" className="hidden justify-self-end lg:block">
-              <HeroWindow />
-            </div>
-          </div>
-        </section>
-
-        {/* ── Le manifeste : les mots s'allument un par un ───────────────── */}
-        <Manifesto />
-
-        {/* ── La rue seule ───────────────────────────────────────────────
-            Deux écrans sans aucun contenu : la ville a le cadre pour elle, on
-            marche, on croise des enseignes, la nuit finit de tomber. C'est le
-            seul endroit de la page où le décor passe au premier plan, et il
-            n'a besoin de rien d'autre que d'espace. Le voile de lecture, lui,
-            se retire le temps de la traversée. */}
-        <section data-open-sky aria-hidden className="h-[190vh]" />
-        <p className="sr-only">
-          Descente d&apos;une avenue la nuit. Les paysages du catalogue sont affichés en grand sur les façades :{" "}
-          {WORLD_SCREENS.map((v) => v.country).join(", ")}.
+        <p data-hero="sub" className="mt-7 max-w-md text-[14.5px] leading-relaxed text-white/55">
+          Un minuteur Pomodoro et ta musique dans le même écran, posés sur un paysage qui tourne en boucle.
         </p>
 
-        {/* ── Le boulevard (catalogue) ───────────────────────────────────── */}
-        <span data-anchor="catalogue" aria-hidden className="block h-0" />
-        <Boulevard />
+        <div data-hero="cta" className="mt-9">
+          <Cta label="Commencer" onClick={signIn} tone="solid" />
+        </div>
 
-        {/* ── Les sources ────────────────────────────────────────────────── */}
-        <span data-anchor="sources" aria-hidden className="block h-0" />
-        <section id="sources" className="mx-auto w-full max-w-[86rem] px-4 py-28 sm:px-8 md:py-36">
+        <HeroStage />
+      </section>
+
+      {/* ── Le manifeste ─────────────────────────────────────────────────── */}
+      <Statement />
+
+      {/* ── Le catalogue ─────────────────────────────────────────────────── */}
+      <Catalogue />
+
+      {/* ── Les trois piliers ────────────────────────────────────────────── */}
+      <Deck signIn={signIn} />
+
+      {/* ── Les sources ──────────────────────────────────────────────────── */}
+      <section id="sources" className="mx-auto w-full max-w-[86rem] px-5 py-32 sm:px-10">
+        <h2
+          data-reveal
+          className="mb-16 max-w-3xl font-display text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]"
+        >
+          Quatre façons de remplir le silence.
+        </h2>
+        <Sources />
+      </section>
+
+      {/* ── Le minuteur jouable ──────────────────────────────────────────── */}
+      <section id="minuteur" className="mx-auto w-full max-w-[86rem] px-5 pb-32 sm:px-10">
+        <TryPomodoro publish={publish} />
+      </section>
+
+      {/* ── La trace ─────────────────────────────────────────────────────── */}
+      <section className="mx-auto w-full max-w-[86rem] px-5 pb-32 sm:px-10">
+        <h2
+          data-reveal
+          className="mb-16 max-w-3xl font-display text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]"
+        >
+          Le lendemain, tu sais ce que tu as fait.
+        </h2>
+        <Trace />
+      </section>
+
+      {/* ── Action ───────────────────────────────────────────────────────── */}
+      <section className="relative flex min-h-[80vh] items-center justify-center overflow-hidden px-5 text-center">
+        <span data-parallax aria-hidden className="absolute inset-0">
+          <Image src={SEOUL.pontLarge} alt="" fill sizes="100vw" className="object-cover opacity-35" />
+        </span>
+        <span aria-hidden className="absolute inset-0 bg-black/65" />
+        <div className="relative">
           <h2
             data-reveal
-            className="mb-14 max-w-3xl text-[clamp(1.9rem,4.2vw,3.2rem)] font-semibold leading-[1.05] tracking-[-0.04em]"
-          >
-            Quatre façons de remplir le silence.
-          </h2>
-          <Sources />
-        </section>
-
-        {/* ── Le parcours ────────────────────────────────────────────────── */}
-        <span data-anchor="parcours" aria-hidden className="block h-0" />
-        <section id="parcours" className="mx-auto w-full max-w-[86rem] px-4 pb-28 sm:px-8 md:pb-36">
-          <h2
-            data-reveal
-            className="mb-16 max-w-3xl text-[clamp(1.9rem,4.2vw,3.2rem)] font-semibold leading-[1.05] tracking-[-0.04em]"
-          >
-            Une soirée, du début à la fin.
-          </h2>
-          <Parcours />
-        </section>
-
-        {/* ── Le minuteur jouable ────────────────────────────────────────── */}
-        <span data-anchor="minuteur" aria-hidden className="block h-0" />
-        <section id="minuteur" className="mx-auto w-full max-w-[86rem] px-4 pb-28 sm:px-8 md:pb-36">
-          <TryPomodoro publish={publish} />
-        </section>
-
-        {/* ── La trace ───────────────────────────────────────────────────── */}
-        <span data-anchor="trace" aria-hidden className="block h-0" />
-        <section id="trace" className="mx-auto w-full max-w-[86rem] px-4 pb-28 sm:px-8 md:pb-36">
-          <h2
-            data-reveal
-            className="mb-14 max-w-3xl text-[clamp(1.9rem,4.2vw,3.2rem)] font-semibold leading-[1.05] tracking-[-0.04em]"
-          >
-            Le lendemain, tu sais ce que tu as fait.
-          </h2>
-          <Trace />
-        </section>
-
-        {/* ── Action ─────────────────────────────────────────────────────── */}
-        <section className="mx-auto w-full max-w-[86rem] px-4 pb-32 text-center sm:px-8 md:pb-44">
-          <h2
-            data-reveal
-            className="mx-auto max-w-4xl text-[clamp(2.4rem,6vw,4.8rem)] font-semibold leading-[1.02] tracking-[-0.04em]"
+            className="mx-auto max-w-4xl font-display text-[clamp(2.4rem,7vw,5.6rem)] font-light leading-[1.02]"
           >
             Il fait nuit. Tu as une heure devant toi.
           </h2>
-          <p data-reveal className="mx-auto mt-8 max-w-md text-[15px] leading-relaxed text-white/70">
+          <p data-reveal className="mx-auto mt-10 max-w-md text-[14.5px] leading-relaxed text-white/55">
             Utilisable sans compte. Google sert seulement à retrouver ta progression d&apos;un appareil à l&apos;autre.
           </p>
-          <div data-reveal className="relative mt-12 flex justify-center">
-            {done && (
-              <span ref={bell} className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
-                <span data-ring className="absolute h-16 w-56 rounded-full border border-[#ffc38a]/45" />
-                <span data-ring className="absolute h-16 w-56 rounded-full border border-[#ffc38a]/45" />
-              </span>
-            )}
-            <Cta label="Commencer" onClick={signIn} />
+          <div data-reveal className="mt-12">
+            <Cta label="Commencer" onClick={signIn} tone="solid" />
           </div>
-        </section>
+        </div>
+      </section>
 
-        <span data-anchor="fin" aria-hidden className="block h-0" />
-        <footer className="border-t border-white/[0.07]">
-          <div className="mx-auto flex w-full max-w-[86rem] flex-col items-center justify-between gap-5 px-4 py-10 sm:flex-row sm:px-8">
-            <Wordmark />
-            <p className="font-mono text-[11px] tracking-wider text-white/50">
-              Pomodoro, lofi, focus. {new Date().getFullYear()}
-            </p>
-          </div>
-        </footer>
-      </div>
+      <footer className="border-t border-white/10">
+        <div className="mx-auto flex w-full max-w-[86rem] flex-col items-center justify-between gap-6 px-5 py-12 sm:flex-row sm:px-10">
+          <Wordmark />
+          <Label>Pomodoro, lofi, focus. {new Date().getFullYear()}</Label>
+        </div>
+      </footer>
     </main>
   );
 }
