@@ -1124,3 +1124,41 @@ un changement de famille. La référence fait d'ailleurs pareil.
 > ⚠️ **« Commencer » n'apparaît qu'à TROIS endroits** : bandeau, hero, action
 > finale. Il y en avait six, ce qui banalisait l'action et hachait la lecture.
 > Ne pas en rajouter à chaque section.
+
+### Suite même jour — refonte de la COUCHE DE MOUVEMENT (SplitText)
+
+Retour utilisateur : « la traînée n'est pas dingue, on ne voit pas du GSAP comme
+je t'ai envoyé, refacto tout ». Fondé. Le diagnostic, à garder en tête :
+
+> **C'était de l'animation POSÉE SUR une page, pas une page CONSTRUITE par son
+> animation.** Concrètement : des fondus vers le haut de 0,95 s sur 36 px. Ça se
+> lit comme « une page correcte », jamais comme une pièce animée.
+
+Trois principes désormais tenus partout dans `LandingPage.tsx` :
+
+1. **RIEN N'APPARAÎT, TOUT ARRIVE.** Chaque texte passe par le composant
+   **`Lines`** : découpage en LIGNES par **SplitText** (gratuit depuis GSAP
+   3.13), chaque ligne montant derrière un masque (`mask: "lines"`). C'est la
+   signature visuelle du GSAP soigné, et c'est ce qui manquait le plus.
+   `autoSplit: true` est indispensable : sans lui les lignes sont calculées sur
+   la police de repli et les masques tombent au mauvais endroit. L'animation est
+   créée DANS `onSplit` et **retournée**, ce qui laisse SplitText la nettoyer et
+   la resynchroniser à chaque redécoupage.
+2. **DU POIDS.** `EASE = "power4.out"`, `DUR = 1.2`, `STAGGER = 0.085`, et de
+   grandes distances (une ligne monte de 118 % de sa hauteur). Les BLOCS
+   (panneaux, cadres, grilles) se dévoilent en `clip-path` par le bas plutôt
+   qu'en opacité, et le découpage est figé à la fin (`clipPath: "none"`) pour ne
+   laisser aucun coût de composition résiduel.
+3. **LES SECTIONS SE PASSENT LE RELAIS** (`[data-recede]`) : les plein-cadres
+   reculent et s'effacent pendant que la suivante arrive par-dessus. On traverse
+   des plans, on ne fait pas défiler une liste.
+
+**Traînée d'images densifiée** : pas ramené de 145 à **78 px** (à 145 px on
+obtenait trois vignettes éparses, c'est-à-dire rien), vignettes agrandies à
+17rem, et surtout une **entrée nette (0,55 s) contre une sortie longue (1,1 s)**.
+C'est cet écart qui fait un ruban ; deux durées égales ne donnent qu'un
+clignotement.
+
+⚠️ **Piège React 19** : `createElement(tag, { ref })` déclenche
+`react-hooks` « Cannot access refs during render ». `Lines` utilise donc du JSX
+avec un **ref de rappel**, jamais `createElement` avec un ref.

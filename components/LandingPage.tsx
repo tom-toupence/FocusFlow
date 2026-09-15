@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { SplitText } from "gsap/SplitText";
 import { useGSAP } from "@gsap/react";
 import type LenisInstance from "lenis";
 import { signInWithGoogle } from "@/lib/supabase";
@@ -36,7 +37,7 @@ import { cn } from "@/lib/utils";
 //   2. `ImageTrail` : bouger la souris sur le premier écran laisse une traînée
 //      de paysages DU CATALOGUE. Bouger, c'est feuilleter le produit ;
 //   3. parallaxe de pointeur sur les trois cadres du hero (`HeroStage`) ;
-//   4. boutons magnétiques (`Cta`), titres découpés en mots (`MaskedLine`),
+//   4. boutons magnétiques (`Cta`), titres découpés en LIGNES par SplitText (`Lines`),
 //      et parallaxe de scroll sur chaque photographie plein cadre.
 //
 // ── La police ─────────────────────────────────────────────────────────────
@@ -74,7 +75,7 @@ import { cn } from "@/lib/utils";
 // conséquences de la direction, et il se tient de bout en bout.
 // ═══════════════════════════════════════════════════════════════════════════
 
-if (typeof window !== "undefined") gsap.registerPlugin(useGSAP, ScrollTrigger);
+if (typeof window !== "undefined") gsap.registerPlugin(useGSAP, ScrollTrigger, SplitText);
 
 const thumb = (id: string) => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 const byId = (id: string) => defaultVideos.find((v) => v.id === id);
@@ -136,6 +137,99 @@ function useReducedMotionPref() {
 // `below` vaut 0 (la valeur par défaut) parce que `ScrollTrigger.batch()`
 // n'expose pas `refreshPriority`.
 const PRIO = { top: 30, pan: 20, deck: 10, below: 0 } as const;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LE SYSTÈME DE MOUVEMENT
+   ══════════════════════════════════════════════════════════════════════════
+
+   Le défaut de la version précédente : de l'animation POSÉE SUR une page, au
+   lieu d'une page CONSTRUITE par son animation. Concrètement, des fondus vers
+   le haut de 0,95 s sur 36 pixels. Ça se lit comme « une page correcte », pas
+   comme une pièce animée.
+
+   Trois principes, tenus partout :
+
+   1. RIEN N'APPARAÎT, TOUT ARRIVE. Chaque texte est découpé en LIGNES par
+      SplitText et chaque ligne se lève derrière un masque. C'est la signature
+      visuelle du GSAP soigné, et c'est ce qui manquait le plus.
+   2. DU POIDS. Des durées longues (1,2 s), une courbe très décélérée
+      (`power4.out`) et de grandes distances. Une ligne qui monte de 118 % de
+      sa hauteur a une masse ; une opacité qui passe de 0 à 1 n'en a aucune.
+   3. LES SECTIONS SE PASSENT LE RELAIS. Les plein-cadres ne défilent pas : ils
+      RECULENT et s'effacent pendant que la suivante arrive par-dessus. On
+      traverse des plans, on ne fait pas défiler une liste.                  */
+
+const EASE = "power4.out";
+const DUR = 1.2;
+const STAGGER = 0.085;
+
+/** Un bloc de texte qui arrive LIGNE PAR LIGNE, chacune derrière son masque.
+ *
+ *  `autoSplit` re-découpe au chargement des polices et aux changements de
+ *  largeur : sans lui, les lignes seraient calculées sur la police de repli et
+ *  les masques tomberaient au mauvais endroit. L'animation est créée DANS
+ *  `onSplit` et retournée, ce qui laisse SplitText la nettoyer et la
+ *  resynchroniser à chaque redécoupage. */
+function Lines({
+  children,
+  as = "p",
+  className,
+  delay = 0,
+  start = "top 85%",
+}: {
+  children: React.ReactNode;
+  as?: "h1" | "h2" | "h3" | "p";
+  className?: string;
+  delay?: number;
+  start?: string;
+}) {
+  const ref = useRef<HTMLElement | null>(null);
+
+  useGSAP(
+    () => {
+      const el = ref.current;
+      if (!el) return;
+      const mm = gsap.matchMedia();
+
+      mm.add("(prefers-reduced-motion: reduce)", () => {
+        gsap.set(el, { autoAlpha: 1 });
+      });
+
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        const split = SplitText.create(el, {
+          type: "lines",
+          mask: "lines",
+          autoSplit: true,
+          onSplit(self) {
+            return gsap.from(self.lines, {
+              yPercent: 118,
+              duration: DUR,
+              ease: EASE,
+              stagger: STAGGER,
+              delay,
+              scrollTrigger: { trigger: el, start, once: true, refreshPriority: PRIO.below },
+            });
+          },
+        });
+        return () => split.revert();
+      });
+
+      return () => mm.revert();
+    },
+    { scope: ref }
+  );
+
+  // ⚠️ Pas de `createElement(as, { ref })` : passer un ref à une fonction est
+  // considéré comme une lecture de ref PENDANT LE RENDU. On garde donc du JSX,
+  // avec un ref de RAPPEL, qui n'est appelé qu'après le montage.
+  const set = (el: HTMLElement | null) => {
+    ref.current = el;
+  };
+  if (as === "h1") return <h1 ref={set} className={className}>{children}</h1>;
+  if (as === "h2") return <h2 ref={set} className={className}>{children}</h2>;
+  if (as === "h3") return <h3 ref={set} className={className}>{children}</h3>;
+  return <p ref={set} className={className}>{children}</p>;
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    LE DÉFILEMENT AMORTI
@@ -209,8 +303,10 @@ function SmoothScroll() {
        réduit. */
 
 const TRAIL = pick(["hk-02", "driv-05", "cn-01", "tw-02", "vn-01", "abao-11", "no-01", "id-02", "th-01", "uk-01", "np-01", "noma-07"]);
-/** Distance en pixels entre deux vignettes de la traînée. */
-const TRAIL_STEP = 145;
+/** Distance en pixels entre deux vignettes. Plus elle est courte, plus la
+ *  traînée est DENSE : à 145 px on obtenait trois images éparses, c'est-à-dire
+ *  rien du tout. À 78 px le geste laisse un vrai ruban derrière le curseur. */
+const TRAIL_STEP = 78;
 
 function ImageTrail() {
   const root = useRef<HTMLDivElement>(null);
@@ -255,10 +351,17 @@ function ImageTrail() {
             zIndex: next,
             rotate: gsap.utils.random(-8, 8),
           });
+          // Entrée nette, sortie longue : c'est l'écart entre les deux qui
+          // crée le ruban. Une entrée et une sortie de même durée donnent un
+          // clignotement, pas une traînée.
           gsap
             .timeline()
-            .fromTo(el, { autoAlpha: 0, scale: 0.72 }, { autoAlpha: 1, scale: 1, duration: 0.4, ease: "power3.out" })
-            .to(el, { autoAlpha: 0, scale: 1.08, duration: 0.75, ease: "power2.in" }, 0.45);
+            .fromTo(
+              el,
+              { autoAlpha: 0, scale: 0.6, filter: "blur(6px)" },
+              { autoAlpha: 1, scale: 1, filter: "blur(0px)", duration: 0.55, ease: "power4.out" }
+            )
+            .to(el, { autoAlpha: 0, scale: 1.14, duration: 1.1, ease: "power2.in" }, 0.75);
         };
 
         window.addEventListener("pointermove", onMove, { passive: true });
@@ -273,7 +376,7 @@ function ImageTrail() {
   return (
     <div ref={root} aria-hidden className="pointer-events-none absolute inset-0 z-[-5] overflow-hidden">
       {TRAIL.map((v) => (
-        <span key={v.id} data-trail-item className="absolute left-0 top-0 block w-[13rem] border border-white/15">
+        <span key={v.id} data-trail-item className="absolute left-0 top-0 block w-[17rem] border border-white/20">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={thumb(v.youtubeId)} alt="" loading="lazy" className="block aspect-[16/10] w-full object-cover" />
         </span>
@@ -384,26 +487,13 @@ function Wordmark({ className }: { className?: string }) {
   );
 }
 
-/** Titre serif découpé en mots, chacun dans son masque : à l'entrée, les mots
- *  montent derrière une ligne nette. */
-function MaskedLine({ text, className }: { text: string; className?: string }) {
-  const words = text.split(" ");
-  return (
-    <span className={cn("block", className)}>
-      {words.map((w, i) => (
-        <span key={`${w}-${i}`} className="inline-block overflow-hidden pb-[0.14em] align-bottom">
-          <span data-word className="inline-block">
-            {w}
-            {i < words.length - 1 ? " " : ""}
-          </span>
-        </span>
-      ))}
-    </span>
-  );
-}
+/* `MaskedLine` a été retiré : le découpage en mots fait maison est remplacé
+   partout par `Lines`, qui découpe en LIGNES via SplitText et les fait monter
+   derrière un masque. Une ligne qui se lève a du poids ; un mot qui apparaît
+   n'en a pas. */
 
-/** Mot fantôme : la serif en très grand et très basse opacité, DERRIÈRE le
- *  paragraphe. Il dérive doucement au scroll, ce qui creuse la profondeur sans
+/** Mot fantôme : le titrage en très grand et très basse opacité, DERRIÈRE le
+*  paragraphe. Il dérive doucement au scroll, ce qui creuse la profondeur sans
  *  rien ajouter à l'écran. */
 function Ghost({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
@@ -701,7 +791,7 @@ function Statement() {
         <Image src={SEOUL.skyline} alt="" fill sizes="100vw" className="object-cover opacity-45" />
       </span>
       <span aria-hidden className="absolute inset-0 bg-black/60" />
-      <p className="relative max-w-5xl text-center tracking-[-0.035em] text-[clamp(2.2rem,6.4vw,5.2rem)] font-light leading-[1.08]">
+      <p data-recede className="relative max-w-5xl text-center tracking-[-0.035em] text-[clamp(2.2rem,6.4vw,5.2rem)] font-light leading-[1.08]">
         <span className="block text-white">{CLAIM_1}</span>
         <span className="mt-2 block">
           {CLAIM_2.split(" ").map((w, i) => (
@@ -778,13 +868,13 @@ function Catalogue() {
         <div className="relative w-[min(80vw,30rem)] shrink-0">
           <Ghost className="-left-4 -top-16">Catalogue</Ghost>
           <Label>Le catalogue</Label>
-          <h2 className="mt-7 tracking-[-0.035em] text-[clamp(2.2rem,5vw,4rem)] font-light leading-[1.02]">
+          <Lines as="h2" start="top bottom" className="mt-7 tracking-[-0.035em] text-[clamp(2.2rem,5vw,4rem)] font-light leading-[1.02]">
             Cinquante-six endroits où poser ta soirée.
-          </h2>
-          <p className="mt-7 max-w-sm text-[14.5px] leading-relaxed text-white/60">
+          </Lines>
+          <Lines as="p" start="top bottom" delay={0.12} className="mt-7 max-w-sm text-[14.5px] leading-relaxed text-white/60">
             Study with me à Osaka, la pluie sur Shinjuku, le Bund à minuit, un drive lofi au pied du Fuji. Tenus à la
             main, un par un.
-          </p>
+          </Lines>
         </div>
 
         {BELT.map((v) => (
@@ -1069,9 +1159,9 @@ function TryPomodoro({ publish }: { publish: (live: boolean, total: number, left
       <div data-reveal className="relative">
         <Ghost className="-top-12 left-0">Essaie</Ghost>
         <Label>La démonstration</Label>
-        <h2 className="mt-6 tracking-[-0.035em] text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]">
+        <Lines as="h2" className="mt-6 tracking-[-0.035em] text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]">
           Le vrai minuteur, ici même.
-        </h2>
+        </Lines>
         <p className="mt-6 max-w-md text-[14.5px] leading-relaxed text-white/60">
           Ce n&apos;est pas une capture. Lance-le, et le compteur en haut de page arrête de suivre ton scroll pour
           suivre ta session.
@@ -1418,14 +1508,57 @@ export default function LandingPage() {
         gsap.set(items, { autoAlpha: 1, y: 0 });
       });
       mm.add("(prefers-reduced-motion: no-preference)", () => {
-        gsap.set(items, { autoAlpha: 0, y: 36 });
+        // Les BLOCS (panneaux, cadres, grilles) arrivent autrement que le
+        // texte : ils se dévoilent par le bas en `clip-path` tout en montant.
+        // Un bloc qui se découvre a une matière ; un bloc qui passe de 0 à 1
+        // d'opacité n'en a aucune.
+        gsap.set(items, { y: 96, clipPath: "inset(0% 0% 100% 0%)" });
         const batched = ScrollTrigger.batch(items, {
           start: "top 88%",
           once: true,
           onEnter: (batch) =>
-            gsap.to(batch, { autoAlpha: 1, y: 0, duration: 0.95, stagger: 0.1, ease: "power3.out", overwrite: true }),
+            gsap.to(batch, {
+              y: 0,
+              clipPath: "inset(0% 0% 0% 0%)",
+              duration: 1.35,
+              stagger: 0.12,
+              ease: EASE,
+              overwrite: true,
+              // Le découpage est figé une fois joué : plus aucun coût de
+              // composition résiduel sur la page.
+              onComplete: () => gsap.set(batch, { clipPath: "none" }),
+            }),
         });
         return () => batched.forEach((t) => t.kill());
+      });
+
+      /* ── LE RELAIS ENTRE SECTIONS ─────────────────────────────────────
+         Les plein-cadres ne défilent pas : ils RECULENT et s'effacent pendant
+         que la suivante arrive par-dessus. C'est ce qui donne l'impression de
+         traverser des plans successifs plutôt que de faire défiler une liste
+         de sections empilées. */
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        const layers = gsap.utils.toArray<HTMLElement>("[data-recede]", root.current);
+        const tweens = layers.map((el) =>
+          gsap.to(el, {
+            scale: 0.92,
+            autoAlpha: 0,
+            ease: "none",
+            scrollTrigger: {
+              trigger: el.closest("section") ?? el,
+              start: "center center",
+              end: "bottom top",
+              scrub: 0.5,
+              refreshPriority: PRIO.below,
+            },
+          })
+        );
+        return () => {
+          tweens.forEach((t) => {
+            t.scrollTrigger?.kill();
+            t.kill();
+          });
+        };
       });
 
       /* ── Recalcul obligatoire ─────────────────────────────────────────── */
@@ -1507,10 +1640,19 @@ export default function LandingPage() {
           <Label>Gratuit, sans compte obligatoire</Label>
         </span>
 
-        <h1 className="mt-8 max-w-5xl tracking-[-0.035em] text-[clamp(2.6rem,7.2vw,6rem)] font-light leading-[0.98]">
-          <MaskedLine text="Il fait presque nuit." />
-          <MaskedLine text="Allume ta fenêtre." />
-        </h1>
+        {/* L'arrivée du titre est pilotée par la timeline du hero, pas par le
+            scroll : `start` est calé très haut pour que le ScrollTrigger soit
+            déjà franchi au chargement. */}
+        <Lines
+          as="h1"
+          start="top bottom"
+          delay={0.25}
+          className="mt-8 max-w-5xl tracking-[-0.035em] text-[clamp(2.6rem,7.2vw,6rem)] font-light leading-[0.98]"
+        >
+          Il fait presque nuit.
+          <br />
+          Allume ta fenêtre.
+        </Lines>
 
         <p data-hero="sub" className="mt-7 max-w-md text-[14.5px] leading-relaxed text-white/55">
           Un minuteur Pomodoro et ta musique dans le même écran, posés sur un paysage qui tourne en boucle.
@@ -1534,12 +1676,9 @@ export default function LandingPage() {
 
       {/* ── Les sources ──────────────────────────────────────────────────── */}
       <section id="sources" className="mx-auto w-full max-w-[86rem] px-5 py-32 sm:px-10">
-        <h2
-          data-reveal
-          className="mb-16 max-w-3xl tracking-[-0.035em] text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]"
-        >
+        <Lines as="h2" className="mb-16 max-w-3xl tracking-[-0.035em] text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]">
           Quatre façons de remplir le silence.
-        </h2>
+        </Lines>
         <Sources />
       </section>
 
@@ -1550,12 +1689,9 @@ export default function LandingPage() {
 
       {/* ── La trace ─────────────────────────────────────────────────────── */}
       <section className="mx-auto w-full max-w-[86rem] px-5 pb-32 sm:px-10">
-        <h2
-          data-reveal
-          className="mb-16 max-w-3xl tracking-[-0.035em] text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]"
-        >
+        <Lines as="h2" className="mb-16 max-w-3xl tracking-[-0.035em] text-[clamp(2rem,4.4vw,3.4rem)] font-light leading-[1.04]">
           Le lendemain, tu sais ce que tu as fait.
-        </h2>
+        </Lines>
         <Trace />
       </section>
 
@@ -1565,16 +1701,13 @@ export default function LandingPage() {
           <Image src={SEOUL.pontLarge} alt="" fill sizes="100vw" className="object-cover opacity-35" />
         </span>
         <span aria-hidden className="absolute inset-0 bg-black/65" />
-        <div className="relative">
-          <h2
-            data-reveal
-            className="mx-auto max-w-4xl tracking-[-0.035em] text-[clamp(2.4rem,7vw,5.6rem)] font-light leading-[1.02]"
-          >
+        <div data-recede className="relative">
+          <Lines as="h2" className="mx-auto max-w-4xl tracking-[-0.035em] text-[clamp(2.4rem,7vw,5.6rem)] font-light leading-[1.02]">
             Il fait nuit. Tu as une heure devant toi.
-          </h2>
-          <p data-reveal className="mx-auto mt-10 max-w-md text-[14.5px] leading-relaxed text-white/55">
+          </Lines>
+          <Lines as="p" className="mx-auto mt-10 max-w-md text-[14.5px] leading-relaxed text-white/55">
             Utilisable sans compte. Google sert seulement à retrouver ta progression d&apos;un appareil à l&apos;autre.
-          </p>
+          </Lines>
           <div data-reveal className="mt-12">
             <Cta label="Commencer" onClick={signIn} tone="solid" />
           </div>
