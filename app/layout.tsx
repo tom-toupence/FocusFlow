@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Hahmlet, Azeret_Mono, Atkinson_Hyperlegible_Next } from "next/font/google";
 import "./globals.css";
 import SupabaseProvider from "@/components/SupabaseProvider";
 import AuthGate from "@/components/AuthGate";
@@ -11,14 +11,28 @@ import FriendsDrawer from "@/components/FriendsDrawer";
 import FriendsLayoutShell from "@/components/FriendsLayoutShell";
 import PresenceProvider from "@/components/PresenceProvider";
 
-const geist = Geist({
-  variable: "--font-geist",
-  subsets: ["latin"],
+// Trois familles, trois rôles (docs/redesign/03-SYSTEM.md) :
+// . Hahmlet : titres. Serif dessinée conjointement pour le hangeul et le latin
+//   (fil coréen de la Clepsydre, sans pastiche).
+// . Azeret Mono : tout ce qui est MESURÉ (minuteur, durées, graduations).
+// . Atkinson Hyperlegible Next : corps. Conçue pour les basses visions, donc
+//   lisible la nuit, écran baissé.
+const hahmlet = Hahmlet({
+  variable: "--font-hahmlet",
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const azeret = Azeret_Mono({
+  variable: "--font-azeret",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const atkinson = Atkinson_Hyperlegible_Next({
+  variable: "--font-atkinson",
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
 });
 
 // `viewport-fit=cover` active env(safe-area-inset-*) sur iPhone à encoche —
@@ -30,8 +44,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "FocusFlow — Pomodoro + Lofi",
-  description: "Reste focus avec un timer Pomodoro et de la musique lofi YouTube",
+  title: "FocusFlow",
+  description: "Un minuteur Pomodoro et une ville la nuit dans le même écran. Gratuit, sans compte.",
 };
 
 export default function RootLayout({
@@ -40,7 +54,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className={`${geist.variable} ${geistMono.variable} h-full dark`}>
+    <html lang="fr" className={`${hahmlet.variable} ${azeret.variable} ${atkinson.variable} h-full dark`} suppressHydrationWarning>
       <head>
         {/* Apply saved theme before first paint to avoid flash */}
         <script dangerouslySetInnerHTML={{ __html: `try{var t=JSON.parse(localStorage.getItem('focusflow-theme')||'{}').state?.theme;if(t==='light')document.documentElement.classList.remove('dark');else document.documentElement.classList.add('dark');}catch(e){}` }} />

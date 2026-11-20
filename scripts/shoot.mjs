@@ -92,6 +92,7 @@ const PLANS = [
   { name: "insights", path: "/insights", profile: "full", steps: [] },
   { name: "wrapped", path: "/wrapped", profile: "full", steps: [] },
   { name: "session", path: "/session", profile: "full", steps: [], wait: 4000 },
+  { name: "design", path: "/_design", profile: "full", steps: [] },
   { name: "notfound", path: "/nope-404", profile: "full", steps: [] },
 ];
 
@@ -137,6 +138,14 @@ for (const theme of themes) {
           }
           await page.waitForTimeout(700);
         }
+        // Parcourt la page pour déclencher les images lazy, puis revient en haut.
+        await page.evaluate(async () => {
+          for (let y = 0; y < document.documentElement.scrollHeight; y += 700) {
+            window.scrollTo(0, y);
+            await new Promise((r) => setTimeout(r, 60));
+          }
+          window.scrollTo(0, 0);
+        });
         await page.waitForTimeout(plan.wait ?? 900);
         const file = path.join(outDir, `${plan.name}-${vk}-${theme}.jpg`);
         await page.screenshot({ path: file, type: "jpeg", quality: 72, timeout: 120000, fullPage: plan.name !== "session" && plan.name !== "cmdk" && plan.name !== "onboarding" });
