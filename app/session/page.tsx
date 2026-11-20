@@ -21,6 +21,8 @@ import SpotifyPlayer from "@/components/SpotifyPlayer";
 import TwitchPlayer from "@/components/TwitchPlayer";
 import PipTimer from "@/components/PipTimer";
 import BreathingExercise from "@/components/BreathingExercise";
+import SessionCity from "@/components/SessionCity";
+import type { CityHandle } from "@/components/CityScene";
 import Equalizer from "@/components/Equalizer";
 import TimerDigits from "@/components/TimerDigits";
 import { useIdleHide } from "@/lib/useIdleHide";
@@ -132,6 +134,8 @@ export default function SessionPage() {
   // d'IDs arbitraires de façon fiable → on gère nous-mêmes la progression).
   const queueRef = useRef<{ ids: string[]; index: number }>({ ids: [], index: 0 });
   const isBreakRef = useRef(mode !== "work");
+  // Ruelle (halte + mode Spotify) : événements de ville déclenchés par la session.
+  const city = useRef<CityHandle>(null);
   const isRunningRef = useRef(isRunning);
   const [showTodos, setShowTodos] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -168,7 +172,6 @@ export default function SessionPage() {
   useEffect(() => setMounted(true), []);
 
   const isBreak = mode !== "work";
-  const isLong = mode === "long-break";
 
   // Keep refs in sync for use inside IFrame API callbacks
   useEffect(() => { isBreakRef.current = isBreak; }, [isBreak]);
@@ -535,7 +538,9 @@ export default function SessionPage() {
       if (progress.reached) {
         goalCelebratedRef.current = true;
         playWorkChime();
-        toast({ title: "Objectif du jour atteint", description: "Bravo, continue sur ta lancée.", accent: "emerald" });
+        toast({ title: "Objectif du jour atteint", description: "Un taxi traverse la ruelle.", accent: "emerald" });
+        // Événement de ville : le taxi passe, une fois la halte installée.
+        setTimeout(() => city.current?.goal(), 3200);
       }
     }
   };
@@ -605,6 +610,7 @@ export default function SessionPage() {
     if (isBreakRef.current) return; // only count during focus
     markDistraction();
     setDistractionFlash((n) => n + 1); // trigger a brief visual feedback
+    city.current?.flicker(); // Spotify : une enseigne grésille dans la ruelle
   }, [markDistraction]);
 
   // Keyboard shortcuts (ignored while typing in a field):
@@ -745,10 +751,25 @@ export default function SessionPage() {
     <div className="fixed inset-0 bg-black overflow-hidden">
       {/* Audio/video source — YouTube, Spotify, or Twitch */}
       {isSpotifyMode ? (
-        <SpotifyPlayer
-          shouldPlay={!isBreak && isRunning}
-          playlistUri={selectedPlaylistUri!}
-        />
+        <>
+          {/* Aucune vidéo avec Spotify : la ruelle sert de décor, le panneau
+              à LED décompte les minutes. Démontée pendant la halte (qui a la
+              sienne) pour ne jamais faire tourner deux scènes. */}
+          {!isBreak && (
+            <SessionCity
+              ref={city}
+              phase="work"
+              board={isFlowtime ? "FLOW" : `${Math.max(1, Math.ceil(secondsLeft / 60))} MIN`}
+              className="absolute inset-0"
+              label="La ruelle sous la pluie, décor de la session Spotify."
+            />
+          )}
+          <SpotifyPlayer
+            shouldPlay={!isBreak && isRunning}
+            playlistUri={selectedPlaylistUri!}
+            backdrop={false}
+          />
+        </>
       ) : isTwitchMode ? (
         <TwitchPlayer
           channel={selectedChannel ?? undefined}
@@ -829,73 +850,66 @@ export default function SessionPage() {
         </div>
       )}
 
-      {/* ── Break overlay ──────────────────────────────────────────────────── */}
+      {/* ── La halte (pause) : la ruelle, enseignes éteintes ──────────────── */}
       {isBreak && (
-        <div className="absolute inset-0 z-20 bg-[#0a0a0c]/95 flex flex-col items-center justify-center gap-5 sm:gap-8 px-4 py-6 overflow-y-auto">
-          {/* Teinte d'ambiance en variante froide (data-ambient-phase="break"
-              posé par AmbientProvider décale --ambient vers le bleu) */}
-          <div
-            className="absolute inset-0 opacity-20 pointer-events-none"
-            style={{ background: "radial-gradient(ellipse at center, var(--ambient) 0%, transparent 70%)" }}
+        <div className="absolute inset-0 z-20 bg-[#0b1016]">
+          <SessionCity
+            ref={city}
+            phase="break"
+            board={`${Math.max(1, Math.ceil(secondsLeft / 60))} MIN`}
+            className="absolute inset-0"
+            label={`La halte : les enseignes de la ruelle sont éteintes, il reste ${formatTime(secondsLeft)} de pause.`}
           />
-          {/* Aurore douce : moment de repos (transform-only via .anim-aurora →
-              neutralisé en reduced-motion, mis en pause si l'onglet est caché) */}
-          <div aria-hidden className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="anim-aurora absolute -top-1/4 left-1/5 w-[70vmin] h-[70vmin] rounded-full opacity-25 blur-3xl" style={{ background: "radial-gradient(circle, var(--ambient) 0%, transparent 65%)" }} />
-            <div className="anim-aurora-slow absolute -bottom-1/4 right-1/5 w-[60vmin] h-[60vmin] rounded-full opacity-20 blur-3xl" style={{ background: "radial-gradient(circle, var(--ambient-2) 0%, transparent 65%)" }} />
-          </div>
-          {/* Label */}
-          <div className="flex flex-col items-center gap-2 z-10">
-            <div className={cn("text-xs font-semibold uppercase tracking-[0.2em]", isLong ? "text-sky-400" : "text-emerald-400")}>
-              {breakLabel[mode]}
+          {/* Voile de lecture : à gauche sur grand écran, en bas sur mobile. */}
+          <div aria-hidden className="absolute inset-0 pointer-events-none bg-[linear-gradient(90deg,#0b1016_0%,rgba(11,16,22,0.86)_32%,rgba(11,16,22,0.15)_62%,transparent_80%)] max-md:bg-[linear-gradient(0deg,#0b1016_0%,rgba(11,16,22,0.9)_45%,rgba(11,16,22,0.2)_70%,transparent_85%)]" />
+          <div className="relative z-10 h-full overflow-y-auto flex items-end md:items-center px-5 sm:px-10 lg:px-16 py-8">
+            <div className="flex flex-col gap-6 max-w-md text-[#e9f2ff]">
+              <div>
+                <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#53e0a1]">{breakLabel[mode]}</p>
+                <h1 className="mt-2 font-display font-extrabold uppercase text-[clamp(3rem,8vw,5.5rem)] leading-[0.88]">La halte</h1>
+                <p className="mt-3 text-[15px] text-[#e9f2ff]/75">
+                  {sessionsCompleted > 0 ? `Pomodoro ${sessionsCompleted} terminé. ` : ""}La rue s&apos;éteint, la supérette reste ouverte.
+                </p>
+              </div>
+              <div>
+                <p className="font-led text-[clamp(4.5rem,12vw,7.5rem)] leading-none text-[#53e0a1]" role="timer" aria-label={`Pause : ${formatTime(secondsLeft)}`}>
+                  {formatTime(secondsLeft)}
+                </p>
+                <div className="mt-4 h-[3px] w-full max-w-[18rem] bg-[#e9f2ff]/10 rounded-[1px] overflow-hidden">
+                  <div
+                    className="h-full bg-[#53e0a1] origin-left"
+                    style={{ transform: `scaleX(${breakTotal > 0 ? secondsLeft / breakTotal : 0})`, transition: "transform 1s linear" }}
+                  />
+                </div>
+              </div>
+              {breathingEnabled && <BreathingExercise />}
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => nextSession(true)}
+                  className="ff-press inline-flex items-center gap-2 h-10 px-4 rounded-[4px] border border-[#e9f2ff]/30 hover:border-[#e9f2ff]/70 text-[#e9f2ff]/85 hover:text-[#e9f2ff] text-sm transition-colors"
+                >
+                  Passer la pause
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                    <path d="M5 4l15 8-15 8V4z" strokeLinecap="round" strokeLinejoin="round" />
+                    <line x1="19" y1="4" x2="19" y2="20" strokeLinecap="round" />
+                  </svg>
+                </button>
+                <button
+                  onClick={handleStop}
+                  className="ff-press inline-flex items-center gap-2 h-10 px-4 rounded-[4px] border border-[#ff6b5c]/40 hover:border-[#ff6b5c] text-[#ff8a7d] hover:text-[#ffb0a6] text-sm transition-colors"
+                >
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden><rect x="6" y="6" width="12" height="12" rx="1" /></svg>
+                  Terminer la session
+                </button>
+              </div>
+              <button
+                onClick={() => usePrefsStore.getState().setBreathingEnabled(!breathingEnabled)}
+                className="self-start text-[12px] text-[#e9f2ff]/55 hover:text-[#e9f2ff]/85 underline-offset-4 hover:underline transition-colors"
+              >
+                {breathingEnabled ? "Masquer la respiration guidée" : "Afficher la respiration guidée"}
+              </button>
             </div>
-            <h1 className="text-4xl sm:text-5xl font-thin text-white/90 tracking-tight">Repose-toi</h1>
-            <p className="text-white/30 text-sm mt-1 text-center">
-              Session {sessionsCompleted} terminée — bien joué.
-            </p>
           </div>
-          {/* Countdown */}
-          <div className={cn("text-6xl sm:text-8xl font-extralight tabular-nums tracking-tighter z-10", isLong ? "text-sky-300" : "text-emerald-300")}>
-            {formatTime(secondsLeft)}
-          </div>
-          {/* Progress bar */}
-          <div className="w-48 h-0.5 bg-white/10 rounded-full z-10 overflow-hidden">
-            <div
-              className={cn("h-full rounded-full", isLong ? "bg-sky-400" : "bg-emerald-400")}
-              style={{ width: `${breakTotal > 0 ? (secondsLeft / breakTotal) * 100 : 0}%`, transition: "width 1s linear" }}
-            />
-          </div>
-          {/* Guided breathing */}
-          {breathingEnabled && <BreathingExercise accent={isLong ? "sky" : "emerald"} />}
-          {/* Buttons */}
-          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 z-10">
-            <button
-              onClick={() => nextSession(true)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/50 hover:text-white text-xs font-medium transition-all"
-            >
-              Passer la pause
-              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path d="M5 4l15 8-15 8V4z" strokeLinecap="round" strokeLinejoin="round" />
-                <line x1="19" y1="4" x2="19" y2="20" strokeLinecap="round" />
-              </svg>
-            </button>
-            <button
-              onClick={handleStop}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400/70 hover:text-red-400 text-xs font-medium transition-all"
-            >
-              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="6" width="12" height="12" rx="1.5" />
-              </svg>
-              Terminer la session
-            </button>
-          </div>
-          {/* Breathing toggle */}
-          <button
-            onClick={() => usePrefsStore.getState().setBreathingEnabled(!breathingEnabled)}
-            className="z-10 text-[11px] text-white/30 hover:text-white/60 transition-colors"
-          >
-            {breathingEnabled ? "Masquer la respiration guidée" : "Afficher la respiration guidée"}
-          </button>
         </div>
       )}
 

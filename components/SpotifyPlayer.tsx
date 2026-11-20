@@ -40,11 +40,13 @@ declare global {
 interface Props {
   shouldPlay: boolean;
   playlistUri: string;
+  /** false : pas de pochette floutée plein écran (la ruelle sert de décor derrière). */
+  backdrop?: boolean;
 }
 
 type Status = "loading" | "connecting" | "ready" | "error";
 
-export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
+export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true }: Props) {
   const {
     accessToken, refreshToken, expiresAt,
     currentTrack, shuffle,
@@ -344,7 +346,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="absolute inset-0 w-full h-full overflow-hidden">
-      {currentTrack?.albumArt ? (
+      {!backdrop ? null : currentTrack?.albumArt ? (
         <img
           src={currentTrack.albumArt}
           alt=""
@@ -355,7 +357,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
         <div className="absolute inset-0 bg-gradient-to-br from-[#1a3a1a] to-black" />
       )}
 
-      {currentTrack?.albumArt && (
+      {backdrop && currentTrack?.albumArt && (
         <div className="absolute inset-0 flex items-center justify-center">
           <img
             src={currentTrack.albumArt}

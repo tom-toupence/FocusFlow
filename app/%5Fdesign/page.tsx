@@ -1,12 +1,12 @@
 "use client";
 
-// /_design : vitrine interne du système « Clepsydre de nuit ».
+// /_design : vitrine interne du système « la ville qui ne dort pas ».
 // Montre chaque token et chaque composant de base dans ses états, dans le
 // thème courant (bascule en haut). Sert aussi de banc de capture pour les
 // critiques (scripts/shoot.mjs).
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import type { WaterHandle } from "@/components/WaterScene";
+import type { CityHandle } from "@/components/CityScene";
 import { useThemeStore } from "@/store/themeStore";
 import { defaultVideos, getVideoColor } from "@/data/videos";
 import { Button, IconButton } from "@/components/ff/Button";
@@ -23,31 +23,31 @@ import {
   IconClose, IconHelp, IconMoon, IconMore, IconPip, IconPlay, IconPlus, IconStone, IconSun, IconTasks,
 } from "@/components/ff/icons";
 
-const WaterScene = dynamic(() => import("@/components/WaterScene"), { ssr: false });
+const CityScene = dynamic(() => import("@/components/CityScene"), { ssr: false });
 
 const SWATCHES = [
   ["bg", "Fond"], ["surface", "Surface"], ["surface-2", "Surface creusée"], ["line", "Filet"],
   ["line-strong", "Filet fort"], ["text", "Encre"], ["text-2", "Encre 2"], ["text-3", "Encre 3"],
-  ["sodium", "Sodium"], ["sodium-text", "Sodium texte"], ["danger", "Alerte"], ["water", "Eau"],
-  ["water-deep", "Eau profonde"],
+  ["sodium", "Sodium · maintenant"], ["sodium-text", "Sodium texte"], ["konbini", "Supérette · fait"],
+  ["taxi", "Taxi · événement"], ["danger", "Feu arrière · alerte"],
 ] as const;
 
 const TYPE = [
-  { cls: "font-display text-[clamp(2.4rem,6vw,4rem)] font-light leading-[1.02]", name: "Display · Hahmlet 300", txt: "Le bassin se remplit" },
-  { cls: "font-display text-[2rem] leading-tight", name: "Titre 1 · Hahmlet 400", txt: "Choisis ta ville" },
-  { cls: "font-display text-xl", name: "Titre 2 · Hahmlet 400", txt: "File d'attente" },
+  { cls: "font-display text-[clamp(2.6rem,7vw,4.6rem)] font-extrabold uppercase leading-[0.9]", name: "Enseigne · Big Shoulders 800", txt: "La ville ne dort pas" },
+  { cls: "font-display text-[2rem] font-bold leading-tight", name: "Titre 1 · Big Shoulders 700", txt: "Choisis ton ambiance" },
+  { cls: "font-display text-xl font-bold", name: "Titre 2 · Big Shoulders 700", txt: "File d'attente" },
   { cls: "text-[17px] leading-relaxed", name: "Corps large · Atkinson Next", txt: "La file se prolonge avec des titres proches de ta playlist." },
   { cls: "text-sm leading-relaxed", name: "Corps · Atkinson Next", txt: "Marque une distraction avec la touche D. Rien n'est détecté tout seul." },
   { cls: "text-[13px] text-ink-2", name: "Légende · Atkinson Next", txt: "Lancée 8 fois, souvent vers 22 h" },
-  { cls: "font-mono text-[44px] font-light tabular-nums tracking-tight", name: "Mesure · Azeret Mono 300", txt: "24:58" },
-  { cls: "font-mono text-xs text-ink-3 tabular-nums", name: "Graduation · Azeret Mono 400", txt: "21:00  21:25  21:30" },
+  { cls: "font-led text-[56px] leading-none text-sodium", name: "Panneau LED · Doto 700", txt: "24:58" },
+  { cls: "font-mono text-xs text-ink-3", name: "Chiffres · Atkinson tabulaires", txt: "21:00  21:25  21:30" },
 ];
 
 const RADII = [["--r-hair", "Instrument"], ["--r-media", "Média"], ["--r-control", "Contrôle"], ["--r-surface", "Surface"]];
 const SPACE = [4, 8, 12, 16, 24, 32, 48, 64, 96];
 const EASES = [
-  ["--ease-ui", "Interface", "160 ms"], ["--ease-fall", "Chute", "520 ms"],
-  ["--ease-settle", "Posée", "900 ms"], ["--ease-tide", "Marée", "4 s"],
+  ["--ease-ui", "Interface", "160 ms"], ["--ease-fall", "Coupure", "520 ms"],
+  ["--ease-settle", "Arrêt", "900 ms"], ["--ease-tide", "Nuit", "4 s"],
 ];
 
 export default function DesignPage() {
@@ -63,11 +63,10 @@ export default function DesignPage() {
   const [loop, setLoop] = useState(true);
   const [easeRun, setEaseRun] = useState(0);
   const vids = defaultVideos.slice(0, 4);
-  const water = useRef<WaterHandle>(null);
-  const [wLevel, setWLevel] = useState(0.45);
-  const [swell, setSwell] = useState(true);
-  const [refletIdx, setRefletIdx] = useState(0);
-  const reflets = ["#1e3a5f", "#4a2a1e", "#1db954", "#9146ff"];
+  const city = useRef<CityHandle>(null);
+  const [halte, setHalte] = useState(false);
+  const [mins, setMins] = useState(25);
+  const [friends, setFriends] = useState(3);
 
   return (
     <main className="min-h-screen bg-bg text-ink">
@@ -78,14 +77,14 @@ export default function DesignPage() {
         <header className="flex flex-wrap items-end gap-4 border-b border-line pb-6">
           <div className="min-w-0 flex-1">
             <p className="font-mono text-xs text-ink-3">docs/redesign/03-SYSTEM.md</p>
-            <h1 className="font-display text-[clamp(2.2rem,5vw,3.4rem)] font-light leading-none mt-2">Clepsydre de nuit</h1>
+            <h1 className="font-display text-[clamp(2.4rem,6vw,3.8rem)] font-extrabold uppercase leading-[0.9] mt-2">La ville qui ne dort pas</h1>
             <p className="mt-3 text-ink-2 max-w-xl">
-              Le système de FocusFlow : le jour, le papier du relevé ; la nuit, l&apos;eau. Un seul signal, le sodium.
+              Le système de FocusFlow : la nuit par défaut, le petit matin en thème clair. Chaque lumière a un rôle.
             </p>
           </div>
           <Button variant="line" onClick={toggle} aria-label="Changer de thème">
             {mounted && theme === "dark" ? <IconSun size={16} /> : <IconMoon size={16} />}
-            {mounted ? (theme === "dark" ? "Papier" : "Eau de nuit") : "Thème"}
+            {mounted ? (theme === "dark" ? "Petit matin" : "Nuit") : "Thème"}
           </Button>
         </header>
 
@@ -130,7 +129,7 @@ export default function DesignPage() {
             {SPACE.map((n) => (
               <div key={n} className="flex items-center gap-3">
                 <span className="w-8 font-mono text-[11px] text-ink-3 text-right">{n}</span>
-                <span className="h-2 bg-water rounded-[1px]" style={{ width: n * 2 }} />
+                <span className="h-2 bg-sodium rounded-[1px]" style={{ width: n * 2 }} />
               </div>
             ))}
           </div>
@@ -244,26 +243,24 @@ export default function DesignPage() {
           </div>
         </section>
 
-        {/* ── L'eau (WebGL) ───────────────────────────────────────── */}
+        {/* ── La ruelle (WebGL) ──────────────────────────────────── */}
         <section className="flex flex-col gap-4">
-          <SectionTitle measure="WebGL2 · shader maison">L&apos;eau</SectionTitle>
-          <div className="relative">
-            <WaterScene
-              ref={water}
-              level={wLevel}
-              swell={swell ? 1 : 0}
-              reflet={reflets[refletIdx]}
-              label={`Niveau ${Math.round(wLevel * 100)} %`}
-              className="h-[340px] sm:h-[420px] rounded-[var(--r-surface)]"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => water.current?.drop()}>Goutte</Button>
-            <Button size="sm" onClick={() => water.current?.stone()}>Caillou</Button>
-            <Button size="sm" onClick={() => { water.current?.overflow(0.15); setWLevel(0.15); }}>Débordement</Button>
-            <Button size="sm" onClick={() => setWLevel((l) => Math.min(1, l + 0.1))}>Monter</Button>
-            <Button size="sm" onClick={() => setSwell((s) => !s)}>{swell ? "Lecture en pause" : "Lecture active"}</Button>
-            <Button size="sm" onClick={() => setRefletIdx((i) => (i + 1) % reflets.length)}>Autre vidéo</Button>
+          <SectionTitle measure="three.js · modélisée en code">La ruelle</SectionTitle>
+          <CityScene
+            ref={city}
+            phase={halte ? "break" : "work"}
+            board={halte ? "HALTE" : `${mins} MIN`}
+            friends={friends}
+            label={halte ? "La halte : les enseignes sont éteintes" : `La ruelle, ${mins} minutes restantes`}
+            className="h-[380px] sm:h-[480px] rounded-[var(--r-surface)]"
+          />
+          <div className="flex flex-wrap gap-2" data-city-controls>
+            <Button size="sm" onClick={() => setHalte((h) => !h)}>{halte ? "Reprise" : "Fin de pomodoro"}</Button>
+            <Button size="sm" onClick={() => city.current?.flicker()}>Distraction</Button>
+            <Button size="sm" onClick={() => city.current?.extend()}>Playlist prolongée</Button>
+            <Button size="sm" onClick={() => city.current?.goal()}>Objectif atteint</Button>
+            <Button size="sm" onClick={() => setMins((m) => (m <= 1 ? 25 : m - 1))}>Une minute</Button>
+            <Button size="sm" onClick={() => setFriends((f) => (f >= 9 ? 0 : f + 3))}>Amis en focus : {friends}</Button>
           </div>
         </section>
 
@@ -277,7 +274,7 @@ export default function DesignPage() {
                 thumb={`https://i.ytimg.com/vi/${v.youtubeId}/hqdefault.jpg`}
                 title={v.title}
                 subtitle={v.channel}
-                meta={v.country}
+                meta={v.channel}
                 color={getVideoColor(v)}
                 selected={i === 0}
                 kind={i === 2 ? "Playlist" : undefined}
@@ -292,10 +289,10 @@ export default function DesignPage() {
           <div className="flex flex-col gap-3">
             <SectionTitle as="h3" measure="4 titres">Rangées de piste</SectionTitle>
             <div className="flex flex-col">
-              <TrackRow index={1} title="Study With Me — Rainy Shibuya Crossing" subtitle="Abao in Tokyo" duration="1:02:14" state="played" />
-              <TrackRow index={2} title="Osaka Midnight" subtitle="study with japan" duration="4:00:12" state="playing" />
-              <TrackRow index={3} title="Kyoto Dawn Drive" subtitle="Abao Vision" duration="58:40" />
-              <TrackRow index={4} title="Seoul Night Drive" subtitle="Seoul Walker" duration="3:12" suggestion
+              <TrackRow index={1} title="Study With Me · Rainy crossing at night" subtitle="Abao in Tokyo" duration="1:02:14" state="played" />
+              <TrackRow index={2} title="Midnight canal" subtitle="study with japan" duration="4:00:12" state="playing" />
+              <TrackRow index={3} title="Dawn drive" subtitle="Abao Vision" duration="58:40" />
+              <TrackRow index={4} title="Downtown night drive" subtitle="Seoul Walker" duration="3:12" suggestion
                 actions={<IconButton label="Retirer cette suggestion" size="sm"><IconClose size={14} /></IconButton>} />
             </div>
           </div>

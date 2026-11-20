@@ -54,10 +54,12 @@ const PAIRS = [
   ["danger", "bg", 4.5], ["danger", "surface", 4.5],
   ["line-strong", "bg", 3], ["line-strong", "surface", 3],
   ["on-text", "text", 4.5],
+  ["konbini", "bg", 3], ["konbini", "surface", 3], ["on-konbini", "konbini", 4.5],
+  ["taxi", "bg", 3], ["taxi", "surface", 3],
 ];
 
 let fail = 0;
-for (const [name, sel] of [["papier (clair)", ":root"], ["eau de nuit (sombre)", ".dark"]]) {
+for (const [name, sel] of [["petit matin (clair)", ":root"], ["nuit (sombre)", ".dark"]]) {
   const t = block(sel);
   console.log(`\n${name}`);
   for (const [fg, bg, min] of PAIRS) {

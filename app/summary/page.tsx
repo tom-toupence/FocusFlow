@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTimerStore } from "@/store/timerStore";
 import { useSessionStore } from "@/store/sessionStore";
@@ -11,10 +12,10 @@ import GoalRing from "@/components/GoalRing";
 import JournalReflection from "@/components/JournalReflection";
 import { cn } from "@/lib/utils";
 import dynamic from "next/dynamic";
+import type { CityHandle } from "@/components/CityScene";
 import { Button } from "@/components/ff/Button";
 import { Gauge } from "@/components/ff/Gauge";
 import { IconCheck, IconPlay } from "@/components/ff/icons";
-import { getVideoColor } from "@/data/videos";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -67,7 +68,7 @@ function Figure({ label, value, sub, signal }: { label: string; value: string; s
   );
 }
 
-const WaterScene = dynamic(() => import("@/components/WaterScene"), { ssr: false });
+const CityScene = dynamic(() => import("@/components/CityScene"), { ssr: false });
 
 // ─── Summary Page ─────────────────────────────────────────────────────────────
 
@@ -121,11 +122,8 @@ export default function SummaryPage() {
     router.push("/");
   };
 
-  const allVideos = useSessionStore.getState().getAllVideos();
-  const sessionVideo = allVideos.find((v) => v.id === useSessionStore.getState().selectedVideoId);
-  const reflet = sessionVideo ? getVideoColor(sessionVideo) : "#3d4a6b";
-  // L'eau se pose au niveau de la session, sur une échelle où 2 h remplissent l'échelle.
-  const waterLevel = Math.min(1, 0.12 + (focusMinutesThisSession / 120) * 0.8);
+  // Le panneau de la ruelle affiche le bilan ; objectif du jour tenu = un taxi passe.
+  const board = sessionsCompleted > 0 ? `${sessionsCompleted} POMODORO${sessionsCompleted > 1 ? "S" : ""}` : "FIN";
   const headline =
     sessionsCompleted > 0
       ? `${sessionsCompleted} pomodoro${sessionsCompleted > 1 ? "s" : ""}, ${formatMinutes(focusMinutesThisSession)} de focus.`
@@ -141,8 +139,8 @@ export default function SummaryPage() {
         <span className="w-16" />
       </header>
 
-      {/* L'eau se pose au niveau atteint par la session */}
-      <WaterScene level={waterLevel} swell={0} reflet={reflet} poleX={0.55} className="h-44 sm:h-56" label={`Niveau de la session : ${formatMinutes(focusMinutesThisSession)}`} />
+      {/* La ruelle en bandeau : halte de fin de session, le panneau affiche le bilan. */}
+      <SummaryCity board={board} goalReached={goalProgress.reached} label={`La ruelle à la fin de la session : ${board.toLowerCase()}`} />
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-8 py-12 flex flex-col gap-14">
         <div className="flex flex-col gap-2">
@@ -166,7 +164,7 @@ export default function SummaryPage() {
             <Figure
               label="Score de focus"
               value={String(focusScore)}
-              sub={focusScore >= 80 ? "surface calme" : focusScore >= 50 ? "quelques remous" : "beaucoup d'interruptions"}
+              sub={focusScore >= 80 ? "rue calme" : focusScore >= 50 ? "quelques coupures" : "beaucoup d'interruptions"}
               signal={focusScore >= 80 && sessionsCompleted > 0}
             />
             <Figure label="Distractions" value={String(distractionCount)} sub={distractionCount === 0 ? "aucune notée" : "notées avec D"} />
@@ -211,7 +209,7 @@ export default function SummaryPage() {
           <GoalRing progress={goalProgress} size={150} />
           <div>
             <h2 className="font-display text-xl text-ink">
-              {goalProgress.reached ? "L'eau a passé le trait du jour." : "Le trait du jour n'est pas encore atteint."}
+              {goalProgress.reached ? "Objectif du jour atteint." : "L'objectif du jour n'est pas encore atteint."}
             </h2>
             <p className="mt-2 text-[15px] text-ink-2 leading-relaxed">
               {goalProgress.reached
@@ -270,4 +268,15 @@ export default function SummaryPage() {
       </main>
     </div>
   );
+}
+
+/** Bandeau de la ruelle ; si l'objectif du jour est tenu, le taxi passe une fois. */
+function SummaryCity({ board, goalReached, label }: { board: string; goalReached: boolean; label: string }) {
+  const city = useRef<CityHandle>(null);
+  useEffect(() => {
+    if (!goalReached) return;
+    const id = setTimeout(() => city.current?.goal(), 1800);
+    return () => clearTimeout(id);
+  }, [goalReached]);
+  return <CityScene ref={city} phase="break" board={board} className="h-44 sm:h-60" label={label} />;
 }

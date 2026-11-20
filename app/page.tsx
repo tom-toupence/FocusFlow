@@ -68,7 +68,7 @@ function VideoCard({
       thumb={`https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`}
       title={video.title}
       subtitle={video.channel}
-      meta={video.country ?? moodLabels[video.mood]}
+      meta={moodLabels[video.mood]}
       color={getVideoColor(video)}
       selected={selected}
       onSelect={onStart}

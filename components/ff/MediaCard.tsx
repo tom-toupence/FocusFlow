@@ -18,7 +18,7 @@ export interface MediaCardProps {
   color?: string;
   selected?: boolean;
   onSelect?: () => void;
-  /** Libellé accessible de l'action principale (« Choisir Rainy Shibuya »). */
+  /** Libellé accessible de l'action principale (« Choisir Rainy crossing »). */
   actionLabel?: string;
   /** Petit marqueur de type (« Playlist », « Mix »), en mono. */
   kind?: string;
