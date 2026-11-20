@@ -105,7 +105,7 @@ export default function AddToMenu({
       <MenuButton label="Ma bibliothèque" done={inLibrary} onClick={handleAddLibrary} icon={<LibraryGlyph />} />
 
       <div className="h-px bg-foreground/10 my-1 mx-2" />
-      <p className="px-3 pt-0.5 pb-1.5 text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">
+      <p className="px-3 pt-0.5 pb-1.5 text-[13px] font-semibold text-ink-3">
         Ajouter à une playlist
       </p>
       {playlists.length > 0 && (
@@ -130,12 +130,12 @@ export default function AddToMenu({
               if (e.key === "Escape") setCreating(false);
             }}
             placeholder="Nom de la playlist…"
-            className="flex-1 min-w-0 bg-foreground/5 border border-foreground/10 rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-foreground/25"
+            className="flex-1 min-w-0 bg-foreground/5 border border-foreground/10 rounded-lg px-2.5 py-1.5 text-xs text-foreground placeholder:text-ink-3 focus:outline-none focus:border-foreground/25"
           />
           <button
             onClick={handleCreatePlaylist}
             disabled={!newName.trim()}
-            className="px-2.5 py-1.5 rounded-lg bg-foreground text-background text-xs font-semibold disabled:opacity-30 flex-shrink-0"
+            className="px-2.5 py-1.5 rounded-lg bg-ink text-on-ink text-xs font-semibold disabled:opacity-30 flex-shrink-0"
           >
             OK
           </button>
@@ -143,7 +143,7 @@ export default function AddToMenu({
       ) : (
         <button
           onClick={() => setCreating(true)}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-medium text-foreground/60 hover:text-foreground hover:bg-foreground/[0.06] transition-colors min-h-[40px]"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-xs font-medium text-ink-2 hover:text-foreground hover:bg-foreground/[0.06] transition-colors min-h-[40px]"
         >
           <PlusGlyph /> Nouvelle playlist…
         </button>
@@ -156,7 +156,7 @@ export default function AddToMenu({
       <button
         onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
         aria-label="Ajouter à…"
-        className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/15 text-foreground/70 hover:text-foreground transition-all flex-shrink-0"
+        className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/15 text-ink-2 hover:text-foreground transition-all flex-shrink-0"
       >
         <PlusGlyph />
       </button>
@@ -207,10 +207,10 @@ function MenuButton({
       onClick={onClick}
       className={cn(
         "flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm transition-colors min-h-[40px]",
-        done ? "text-foreground/30 cursor-default" : "text-foreground/85 hover:bg-foreground/[0.06]"
+        done ? "text-ink-3 cursor-default" : "text-ink hover:bg-foreground/[0.06]"
       )}
     >
-      {icon && <span className="flex-shrink-0 text-foreground/50">{icon}</span>}
+      {icon && <span className="flex-shrink-0 text-ink-3">{icon}</span>}
       <span className="flex-1 min-w-0 truncate">{label}</span>
       {done && <CheckGlyph />}
     </button>
@@ -246,7 +246,7 @@ function PlusGlyph() {
 }
 function CheckGlyph() {
   return (
-    <svg className="w-3.5 h-3.5 flex-shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+    <svg className="w-3.5 h-3.5 flex-shrink-0 text-sodium-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
       <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );

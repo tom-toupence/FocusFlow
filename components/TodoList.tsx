@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
 
 const SECTIONS: { status: TodoStatus; label: string; dot: string; text: string; panel: string }[] = [
   { status: "todo",        label: "À faire",  dot: "bg-white/35",    text: "text-white/45",       panel: "bg-white/[0.03] border-white/[0.07]" },
-  { status: "in-progress", label: "En cours", dot: "bg-amber-400",   text: "text-amber-300/80",   panel: "bg-amber-500/[0.06] border-amber-500/15" },
-  { status: "done",        label: "Terminé",  dot: "bg-emerald-400", text: "text-emerald-300/80", panel: "bg-emerald-500/[0.06] border-emerald-500/15" },
+  { status: "in-progress", label: "En cours", dot: "bg-sodium",   text: "text-sodium-text",   panel: "bg-sodium/[0.06] border-sodium/15" },
+  { status: "done",        label: "Terminé",  dot: "bg-sodium", text: "text-sodium-text", panel: "bg-sodium/[0.06] border-sodium/15" },
 ];
 
 const PREV: Partial<Record<TodoStatus, TodoStatus>> = { "in-progress": "todo", done: "in-progress" };
@@ -44,7 +44,7 @@ function MiniCard({ todo }: { todo: Todo }) {
       <div className="flex items-center gap-0.5">
         <button
           onClick={() => deleteTodo(todo.id)}
-          className="w-6 h-6 sm:w-5 sm:h-5 flex items-center justify-center rounded sm:opacity-0 sm:group-hover:opacity-100 text-white/40 sm:text-white/25 hover:text-red-400 transition-all"
+          className="w-6 h-6 sm:w-5 sm:h-5 flex items-center justify-center rounded sm:opacity-0 sm:group-hover:opacity-100 text-white/40 sm:text-white/25 hover:text-danger transition-all"
           title="Supprimer"
         >
           <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -68,8 +68,8 @@ function MiniCard({ todo }: { todo: Todo }) {
               className={cn(
                 "w-6 h-5 flex items-center justify-center rounded transition-all text-[11px]",
                 next === "done"
-                  ? "text-emerald-400/70 hover:text-emerald-300 hover:bg-emerald-500/15"
-                  : "text-amber-400/70 hover:text-amber-300 hover:bg-amber-500/15"
+                  ? "text-sodium-text hover:text-sodium-text hover:bg-sodium/15"
+                  : "text-sodium-text hover:text-sodium-text hover:bg-sodium/15"
               )}
             >
               →
@@ -105,7 +105,7 @@ export default function TodoList() {
     <div className="flex flex-col gap-3 h-full">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-white/30 font-mono uppercase tracking-[0.14em]">
+        <p className="text-[13px] font-semibold text-white/30">
           Tâches
         </p>
         {done.length > 0 && (
@@ -142,7 +142,7 @@ export default function TodoList() {
       {/* Mini kanban — 3 colonnes */}
       {todos.length === 0 ? (
         <p className="text-white/20 text-xs text-center py-6">
-          Aucune tâche — profite du flow
+          Aucune tâche, profite du flow
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 min-h-0">

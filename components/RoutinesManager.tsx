@@ -16,11 +16,11 @@ export default function RoutinesManager() {
     <section>
       <div className="mb-4">
         <h2 className="text-sm font-semibold text-foreground">Mes routines</h2>
-        <p className="text-xs text-foreground/40 mt-0.5">Lance une configuration complète en un clic. Crée-en depuis l&apos;écran de configuration (bouton « Routine »).</p>
+        <p className="text-xs text-ink-3 mt-0.5">Lance une configuration complète en un clic. Crée-en depuis l&apos;écran de configuration (bouton « Routine »).</p>
       </div>
 
       {routines.length === 0 ? (
-        <p className="text-sm text-foreground/25 text-center py-8">Aucune routine. Configure une session puis enregistre-la comme routine.</p>
+        <p className="text-sm text-ink-3 text-center py-8">Aucune routine. Configure une session puis enregistre-la comme routine.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {routines.map((r) => (
@@ -28,7 +28,7 @@ export default function RoutinesManager() {
               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: r.color || "#818cf8" }} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground truncate">{r.name}</p>
-                <p className="text-[11px] text-foreground/40">
+                <p className="text-[11px] text-ink-3">
                   {r.workDuration}/{r.shortBreakDuration} min
                   {r.media && ` · ${MEDIA_LABEL[r.media.kind]}`}
                   {r.tasks.length > 0 && ` · ${r.tasks.length} tâche${r.tasks.length > 1 ? "s" : ""}`}
@@ -36,11 +36,11 @@ export default function RoutinesManager() {
               </div>
               <button
                 onClick={() => { applyRoutine(r); router.push("/settings"); }}
-                className="px-3 py-1.5 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground/80 text-xs font-medium transition-all flex-shrink-0"
+                className="px-3 py-1.5 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-ink text-xs font-medium transition-all flex-shrink-0"
               >
                 Lancer
               </button>
-              <button onClick={() => removeRoutine(r.id)} className="text-foreground/20 hover:text-red-400 transition-colors flex-shrink-0">
+              <button onClick={() => removeRoutine(r.id)} className="text-ink-3 hover:text-danger transition-colors flex-shrink-0">
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
               </button>
             </div>

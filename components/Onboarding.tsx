@@ -46,7 +46,7 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-md px-4">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 px-4">
       <div className="w-full max-w-md bg-card border border-foreground/10 rounded-3xl shadow-2xl p-6 flex flex-col gap-5">
         {/* Progress dots */}
         <div className="flex items-center justify-center gap-1.5">
@@ -59,20 +59,20 @@ export default function Onboarding() {
           <>
             <div className="text-center">
               <h2 className="text-xl font-semibold text-foreground">Bienvenue sur FocusFlow</h2>
-              <p className="text-sm text-foreground/45 mt-1.5">Choisis une ambiance pour ta première session.</p>
+              <p className="text-sm text-ink-3 mt-1.5">Choisis une ambiance pour ta première session.</p>
             </div>
             <div className="grid grid-cols-1 gap-2">
               {MOOD_OPTIONS.map((o) => (
                 <button
                   key={o.mood}
                   onClick={() => { setMood(o.mood); setStep(1); }}
-                  className="px-4 py-3 rounded-2xl bg-foreground/[0.04] hover:bg-foreground/[0.09] border border-foreground/10 transition-all text-center text-sm font-medium text-foreground/85"
+                  className="px-4 py-3 rounded-2xl bg-foreground/[0.04] hover:bg-foreground/[0.09] border border-foreground/10 transition-all text-center text-sm font-medium text-ink"
                 >
                   {moodLabels[o.mood]}
                 </button>
               ))}
             </div>
-            <button onClick={() => finish(false)} className="text-xs text-foreground/35 hover:text-foreground/60 transition-colors self-center">
+            <button onClick={() => finish(false)} className="text-xs text-ink-3 hover:text-ink-2 transition-colors self-center">
               Explorer par moi-même
             </button>
           </>
@@ -82,7 +82,7 @@ export default function Onboarding() {
           <>
             <div className="text-center">
               <h2 className="text-xl font-semibold text-foreground">Quel rythme ?</h2>
-              <p className="text-sm text-foreground/45 mt-1.5">Tu pourras changer à tout moment dans les réglages.</p>
+              <p className="text-sm text-ink-3 mt-1.5">Tu pourras changer à tout moment dans les réglages.</p>
             </div>
             <div className="flex flex-col gap-2">
               {PRESET_OPTIONS.map((o) => (
@@ -95,14 +95,14 @@ export default function Onboarding() {
                   )}
                 >
                   <div>
-                    <p className="text-sm font-medium text-foreground/90">{o.title}</p>
-                    <p className="text-xs text-foreground/40">{o.desc}</p>
+                    <p className="text-sm font-medium text-ink">{o.title}</p>
+                    <p className="text-xs text-ink-3">{o.desc}</p>
                   </div>
-                  <svg className="w-4 h-4 text-foreground/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  <svg className="w-4 h-4 text-ink-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </button>
               ))}
             </div>
-            <button onClick={() => setStep(0)} className="text-xs text-foreground/35 hover:text-foreground/60 transition-colors self-center">← Retour</button>
+            <button onClick={() => setStep(0)} className="text-xs text-ink-3 hover:text-ink-2 transition-colors self-center">← Retour</button>
           </>
         )}
 
@@ -110,19 +110,19 @@ export default function Onboarding() {
           <>
             <div className="text-center">
               <h2 className="text-xl font-semibold text-foreground">Tout est prêt</h2>
-              <p className="text-sm text-foreground/45 mt-1.5">
-                Ambiance <strong className="text-foreground/70">{mood ? moodLabels[mood] : "Lofi"}</strong> · rythme{" "}
-                <strong className="text-foreground/70">{PRESET_OPTIONS.find((p) => p.preset === preset)?.title}</strong>.
+              <p className="text-sm text-ink-3 mt-1.5">
+                Ambiance <strong className="text-ink-2">{mood ? moodLabels[mood] : "Lofi"}</strong> · rythme{" "}
+                <strong className="text-ink-2">{PRESET_OPTIONS.find((p) => p.preset === preset)?.title}</strong>.
               </p>
             </div>
             <button
               onClick={() => finish(true)}
-              className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-foreground text-background font-semibold text-sm hover:bg-foreground/90 transition-all shadow-lg shadow-black/20"
+              className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-ink text-on-ink font-semibold text-sm hover:bg-foreground/90 transition-all shadow-lg shadow-black/20"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
               Lancer ma première session
             </button>
-            <button onClick={() => finish(false)} className="text-xs text-foreground/35 hover:text-foreground/60 transition-colors self-center">
+            <button onClick={() => finish(false)} className="text-xs text-ink-3 hover:text-ink-2 transition-colors self-center">
               Plus tard, explorer d&apos;abord
             </button>
           </>

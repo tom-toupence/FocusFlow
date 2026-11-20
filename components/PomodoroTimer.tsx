@@ -78,8 +78,8 @@ export default function PomodoroTimer() {
   const totalSeconds = mode === "work" ? settings.workDuration * 60 : mode === "short-break" ? settings.shortBreakDuration * 60 : settings.longBreakDuration * 60;
   const progress = totalSeconds > 0 ? secondsLeft / totalSeconds : 1;
 
-  const accentColor = mode === "work" ? "text-red-400" : mode === "short-break" ? "text-green-400" : "text-blue-400";
-  const btnColor = mode === "work" ? "bg-red-500 hover:bg-red-400" : mode === "short-break" ? "bg-green-500 hover:bg-green-400" : "bg-blue-500 hover:bg-blue-400";
+  const accentColor = mode === "work" ? "text-danger" : mode === "short-break" ? "text-sodium-text" : "text-ink-2";
+  const btnColor = mode === "work" ? "bg-danger hover:bg-danger" : mode === "short-break" ? "bg-sodium hover:bg-sodium" : "bg-ink/10 hover:bg-ink/10";
 
   return (
     <div className="flex flex-col items-center gap-7">
@@ -108,7 +108,7 @@ export default function PomodoroTimer() {
           <span className={cn("text-6xl font-thin tabular-nums tracking-tight", accentColor)}>
             {formatTime(secondsLeft)}
           </span>
-          <span className="text-white/40 text-xs mt-2 font-medium font-mono uppercase tracking-[0.14em]">
+          <span className="text-white/40 text-[13px] mt-2 font-medium">
             {modeLabels[mode]}
           </span>
         </div>
@@ -161,7 +161,7 @@ export default function PomodoroTimer() {
             className={cn(
               "w-2 h-2 rounded-full transition-all duration-300",
               i < sessionsCompleted % settings.sessionsBeforeLongBreak
-                ? "bg-red-400 scale-110"
+                ? "bg-danger scale-110"
                 : "bg-white/10"
             )}
           />

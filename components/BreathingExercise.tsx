@@ -34,11 +34,11 @@ export default function BreathingExercise({ accent = "emerald" }: { accent?: "em
   }, []);
 
   const phase = PHASES[phaseIndex];
-  const ring = accent === "sky" ? "ring-sky-400/40" : "ring-emerald-400/40";
+  const ring = accent === "sky" ? "ring-line-strong/40" : "ring-sodium/40";
   const glow = accent === "sky"
     ? "bg-[radial-gradient(circle,_rgba(56,189,248,0.35)_0%,_rgba(56,189,248,0.05)_70%)]"
     : "bg-[radial-gradient(circle,_rgba(52,211,153,0.35)_0%,_rgba(52,211,153,0.05)_70%)]";
-  const text = accent === "sky" ? "text-sky-300" : "text-emerald-300";
+  const text = accent === "sky" ? "text-ink-2" : "text-sodium-text";
 
   return (
     <div className="flex flex-col items-center gap-5 z-10">

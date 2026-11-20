@@ -405,6 +405,15 @@
   html {
     @apply font-sans;
   }
+  /* Clepsydre : les titres sont en Hahmlet partout, sans exception à gérer
+     écran par écran. Les graisses lourdes héritées passent en régulier. */
+  h1, h2, h3 {
+    font-family: var(--font-hahmlet), ui-serif, Georgia, serif;
+    letter-spacing: -0.01em;
+  }
+  h1.font-semibold, h2.font-semibold, h3.font-semibold,
+  h1.font-bold, h2.font-bold, h3.font-bold { font-weight: 500; }
+  :focus-visible { outline-color: var(--sodium); }
   /* Transition GLOBALE : ne couvre volontairement que les couleurs.
      Les animations custom doivent rester sur opacity/transform/background-image
      pour ne pas entrer en conflit avec cette règle. */

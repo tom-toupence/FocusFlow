@@ -8,7 +8,7 @@ export default function VideoPlayer() {
 
   if (!video) {
     return (
-      <div className="aspect-video bg-gray-900 rounded-2xl flex items-center justify-center text-gray-500">
+      <div className="aspect-video bg-ink/10 rounded-2xl flex items-center justify-center text-ink-2">
         Sélectionne une vidéo dans le catalogue
       </div>
     );

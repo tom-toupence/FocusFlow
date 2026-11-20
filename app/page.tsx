@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "motion/react";
-import { VideoMood, moodLabels, moodColors, extractYouTubeId, getVideoColor, Video, defaultVideos } from "@/data/videos";
+import { VideoMood, moodLabels, extractYouTubeId, getVideoColor, Video, defaultVideos } from "@/data/videos";
 import { useSessionStore } from "@/store/sessionStore";
 import { usePlaylistStore, SavedPlaylist, extractPlaylistId, extractFirstVideoId, fetchPlaylistMeta, isRadioMix } from "@/store/playlistStore";
 import { useSpotifyStore, SpotifyPlaylist } from "@/store/spotifyStore";
@@ -22,7 +21,11 @@ import SprintWizard from "@/components/SprintWizard";
 import JournalTimeline from "@/components/JournalTimeline";
 import QueuePanel from "@/components/QueuePanel";
 import AppNav from "@/components/AppNav";
-import AmbientBackdrop from "@/components/AmbientBackdrop";
+import { MediaCard } from "@/components/ff/MediaCard";
+import { IconButton } from "@/components/ff/Button";
+import { IconClose, IconSearch } from "@/components/ff/icons";
+import { Segmented } from "@/components/ff/Segmented";
+import { cleanTitle } from "@/lib/text";
 import { useNavStore, MediaSource } from "@/store/navStore";
 import { useCommandPalette } from "@/components/CommandPalette";
 import Onboarding from "@/components/Onboarding";
@@ -45,6 +48,8 @@ const catalogueMoods: VideoMood[] = allMoods.filter((m) => defaultVideos.some((v
 // Position de chaque section dans la nav (pour la direction du slide de section).
 const SECTION_INDEX: Record<string, number> = { accueil: 0, ecouter: 1, organisation: 2, activite: 3 };
 
+// Carte vidéo du catalogue et de la bibliothèque : la MediaCard du système
+// (fenêtre 16:9 posée sur sa ligne d'eau à la couleur de la vidéo).
 function VideoCard({
   video,
   selected,
@@ -58,96 +63,22 @@ function VideoCard({
   onStart: () => void;
   onRemove?: () => void;
 }) {
-  const [imgError, setImgError] = useState(false);
-  const [imgLoaded, setImgLoaded] = useState(false);
-  const imgRef = useRef<HTMLImageElement>(null);
-  // Image déjà en cache : l'événement load peut partir avant l'attache du
-  // handler React → on vérifie `complete` au montage pour ne pas bloquer le skeleton.
-  useEffect(() => {
-    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setImgLoaded(true);
-    }
-  }, []);
-
   return (
-    <div
-      className={cn(
-        "group relative rounded-xl overflow-hidden aspect-video cursor-pointer transition-all duration-200",
-        // Glow teinté de la couleur de la vidéo au survol
-        "hover:shadow-[0_0_20px_-4px_var(--card-glow)]",
-        selected ? "ring-2 ring-foreground" : "hover:ring-1 hover:ring-foreground/30"
-      )}
-      style={{ "--card-glow": getVideoColor(video) } as React.CSSProperties}
-      onClick={onStart}
-    >
-      {/* Thumbnail (lazy) + skeleton le temps du chargement */}
-      {!imgError ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          ref={imgRef}
-          src={`https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`}
-          alt={video.title}
-          loading="lazy"
-          onLoad={() => setImgLoaded(true)}
-          className={cn(
-            "w-full h-full object-cover transition-transform duration-300 group-hover:scale-105",
-            !imgLoaded && "opacity-0"
-          )}
-          onError={() => setImgError(true)}
-        />
-      ) : (
-        <div
-          className="w-full h-full transition-transform duration-300 group-hover:scale-105"
-          style={{ background: `linear-gradient(135deg, ${getVideoColor(video)} 0%, #0d0d0f 100%)` }}
-        />
-      )}
-      {!imgLoaded && !imgError && (
-        <div className="absolute inset-0 anim-skeleton bg-foreground/[0.07]" />
-      )}
-
-      {/* Base gradient */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-
-      {/* Hover overlay */}
-      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-2">
-        <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-lg">
-          <svg className="w-4 h-4 text-black ml-0.5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        </div>
-        <span className="text-white text-xs font-semibold tracking-wide">Démarrer</span>
-      </div>
-
-      {/* Info (hidden on hover) */}
-      <div className="absolute bottom-0 left-0 right-0 p-2.5 transition-opacity duration-200 group-hover:opacity-0">
-        <p className="text-white text-xs font-medium leading-tight line-clamp-1">{video.title}</p>
-        <p className="text-white/50 text-[10px] mt-0.5">{video.channel}</p>
-      </div>
-
-      {/* Mood badge */}
-      <div className="absolute top-2 right-2">
-        <span className={cn("text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm", moodColors[video.mood])}>
-          {moodLabels[video.mood]}
-        </span>
-      </div>
-
-      {/* Selected dot */}
-      {selected && <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-white shadow" />}
-
-      {/* Remove custom video */}
-      {isCustom && onRemove && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onRemove(); }}
-          className="absolute top-2 left-2 w-6 h-6 sm:w-5 sm:h-5 rounded-full bg-black/60 text-white/70 hover:text-white sm:opacity-0 sm:group-hover:opacity-100 transition-all flex items-center justify-center"
-          title="Supprimer"
-        >
-          <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-            <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
-          </svg>
-        </button>
-      )}
-    </div>
+    <MediaCard
+      thumb={`https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`}
+      title={video.title}
+      subtitle={video.channel}
+      meta={video.country ?? moodLabels[video.mood]}
+      color={getVideoColor(video)}
+      selected={selected}
+      onSelect={onStart}
+      actionLabel={`Démarrer avec ${cleanTitle(video.title)}`}
+      actions={isCustom && onRemove ? (
+        <IconButton label="Retirer de la bibliothèque" size="sm" onClick={onRemove}>
+          <IconClose size={14} />
+        </IconButton>
+      ) : undefined}
+    />
   );
 }
 
@@ -188,14 +119,14 @@ function AddVideoModal({ onClose, onAdd }: { onClose: () => void; onAdd: (video:
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
         className="w-full max-w-md max-h-[85vh] overflow-y-auto bg-card border border-foreground/10 rounded-2xl shadow-2xl p-5 flex flex-col gap-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">Ajouter une vidéo</h2>
-          <button onClick={onClose} className="text-foreground/40 hover:text-foreground transition-colors">
+          <button onClick={onClose} className="text-ink-3 hover:text-foreground transition-colors">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
             </svg>
@@ -217,29 +148,29 @@ function AddVideoModal({ onClose, onAdd }: { onClose: () => void; onAdd: (video:
 
         {/* URL input */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-foreground/40">URL YouTube</label>
+          <label className="text-xs text-ink-3">URL YouTube</label>
           <input
             value={input}
             onChange={(e) => handleUrlChange(e.target.value)}
             placeholder="https://www.youtube.com/watch?v=..."
-            className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-foreground/25 transition-colors"
+            className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:border-foreground/25 transition-colors"
           />
         </div>
 
         {/* Title */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-foreground/40">Titre</label>
+          <label className="text-xs text-ink-3">Titre</label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Nom de la vidéo..."
-            className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-foreground/25 transition-colors"
+            className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:border-foreground/25 transition-colors"
           />
         </div>
 
         {/* Mood */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-foreground/40">Catégorie</label>
+          <label className="text-xs text-ink-3">Catégorie</label>
           <div className="flex gap-1.5 flex-wrap">
             {allMoods.map((m) => (
               <button
@@ -247,7 +178,7 @@ function AddVideoModal({ onClose, onAdd }: { onClose: () => void; onAdd: (video:
                 onClick={() => setMood(m)}
                 className={cn(
                   "px-2.5 py-1 rounded-lg text-xs font-medium transition-all",
-                  mood === m ? "bg-foreground/15 text-foreground": "text-foreground/40 bg-foreground/5 hover:text-foreground/70"
+                  mood === m ? "bg-foreground/15 text-foreground": "text-ink-3 bg-foreground/5 hover:text-ink-2"
                 )}
               >
                 {moodLabels[m]}
@@ -256,11 +187,11 @@ function AddVideoModal({ onClose, onAdd }: { onClose: () => void; onAdd: (video:
           </div>
         </div>
 
-        {error && <p className="text-red-400 text-xs">{error}</p>}
+        {error && <p className="text-danger text-xs">{error}</p>}
 
         <button
           onClick={handleAdd}
-          className="py-2.5 bg-foreground text-background font-semibold text-sm rounded-xl hover:bg-foreground/90 transition-all"
+          className="py-2.5 bg-ink text-on-ink font-semibold text-sm rounded-xl hover:bg-foreground/90 transition-all"
         >
           Ajouter au catalogue
         </button>
@@ -329,14 +260,14 @@ function AddPlaylistModal({ onClose, onAdd }: { onClose: () => void; onAdd: (p: 
   const previewSrc = thumbnailUrl ?? (firstVideoId ? `https://img.youtube.com/vi/${firstVideoId}/mqdefault.jpg` : null);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
         className="w-full max-w-md max-h-[85vh] overflow-y-auto bg-card border border-foreground/10 rounded-2xl shadow-2xl p-5 flex flex-col gap-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">Ajouter une playlist</h2>
-          <button onClick={onClose} className="text-foreground/40 hover:text-foreground transition-colors">
+          <button onClick={onClose} className="text-ink-3 hover:text-foreground transition-colors">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
             </svg>
@@ -358,15 +289,15 @@ function AddPlaylistModal({ onClose, onAdd }: { onClose: () => void; onAdd: (p: 
 
         {/* URL input */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-foreground/40">URL YouTube (playlist)</label>
+          <label className="text-xs text-ink-3">URL YouTube (playlist)</label>
           <input
             value={input}
             onChange={(e) => handleUrlChange(e.target.value)}
             placeholder="https://www.youtube.com/playlist?list=PL..."
-            className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-foreground/25 transition-colors"
+            className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:border-foreground/25 transition-colors"
           />
           {mix && (
-            <p className="text-amber-400/90 text-xs leading-relaxed flex gap-1.5">
+            <p className="text-sodium-text text-xs leading-relaxed flex gap-1.5">
               <svg className="w-3.5 h-3.5 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path d="M12 9v4M12 17h.01" strokeLinecap="round" />
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
@@ -380,7 +311,7 @@ function AddPlaylistModal({ onClose, onAdd }: { onClose: () => void; onAdd: (p: 
         <button
           onClick={handleFetchMeta}
           disabled={!input.trim() || loading}
-          className="flex items-center justify-center gap-1.5 py-2 bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 rounded-xl text-xs font-medium text-foreground/60 hover:text-foreground disabled:opacity-30 transition-all"
+          className="flex items-center justify-center gap-1.5 py-2 bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 rounded-xl text-xs font-medium text-ink-2 hover:text-foreground disabled:opacity-30 transition-all"
         >
           {loading ? (
             <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -396,20 +327,20 @@ function AddPlaylistModal({ onClose, onAdd }: { onClose: () => void; onAdd: (p: 
 
         {/* Title */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-foreground/40">Titre</label>
+          <label className="text-xs text-ink-3">Titre</label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Nom de la playlist..."
-            className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-foreground/25 transition-colors"
+            className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:border-foreground/25 transition-colors"
           />
         </div>
 
-        {error && <p className="text-red-400 text-xs">{error}</p>}
+        {error && <p className="text-danger text-xs">{error}</p>}
 
         <button
           onClick={handleAdd}
-          className="py-2.5 bg-foreground text-background font-semibold text-sm rounded-xl hover:bg-foreground/90 transition-all"
+          className="py-2.5 bg-ink text-on-ink font-semibold text-sm rounded-xl hover:bg-foreground/90 transition-all"
         >
           Ajouter au catalogue
         </button>
@@ -451,7 +382,7 @@ function PlaylistCard({
           onError={() => setImgError(true)}
         />
       ) : (
-        <div className="w-full h-full transition-transform duration-300 group-hover:scale-105 bg-gradient-to-br from-violet-900/60 to-indigo-900/60 flex items-center justify-center">
+        <div className="w-full h-full transition-transform duration-300 group-hover:scale-105 bg-gradient-to-br from-ink/60 to-ink/60 flex items-center justify-center">
           <svg className="w-10 h-10 text-white/20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
             <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" strokeLinecap="round" />
             <path d="M9 12h6M9 16h4" strokeLinecap="round" />
@@ -485,7 +416,7 @@ function PlaylistCard({
       <div className="absolute top-2 right-2 flex items-center gap-1.5">
         <button
           onClick={(e) => { e.stopPropagation(); onShowTracks(); }}
-          className="w-6 h-6 flex items-center justify-center rounded-md backdrop-blur-sm bg-black/60 text-white/70 hover:text-white hover:bg-black/80 transition-all"
+          className="w-6 h-6 flex items-center justify-center rounded-md bg-black/60 text-white/70 hover:text-white hover:bg-black/80 transition-all"
           title="Voir les titres & recommandations"
           aria-label="Voir les titres de la playlist"
         >
@@ -498,7 +429,7 @@ function PlaylistCard({
             <circle cx="4" cy="18" r="1" fill="currentColor" stroke="none" />
           </svg>
         </button>
-        <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-violet-500/30 text-violet-200">
+        <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-ink/30 text-ink-2">
           Playlist
         </span>
       </div>
@@ -561,7 +492,7 @@ function LocalPlaylistCard({
           ))}
         </div>
       ) : (
-        <div className="w-full h-full bg-gradient-to-br from-emerald-900/60 to-teal-900/60 flex items-center justify-center">
+        <div className="w-full h-full bg-gradient-to-br from-sodium/60 to-sodium/60 flex items-center justify-center">
           <svg className="w-8 h-8 text-white/20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
             <path d="M9 18V5l12-2v13" strokeLinecap="round" strokeLinejoin="round" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
           </svg>
@@ -605,7 +536,7 @@ function LocalPlaylistCard({
       <div className="absolute top-2 right-2">
         <button
           onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
-          className="w-6 h-6 flex items-center justify-center rounded-md backdrop-blur-sm bg-black/60 text-white/70 hover:text-white hover:bg-black/80 transition-all"
+          className="w-6 h-6 flex items-center justify-center rounded-md bg-black/60 text-white/70 hover:text-white hover:bg-black/80 transition-all"
           title="Options"
         >
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg>
@@ -619,13 +550,13 @@ function LocalPlaylistCard({
             >
               <button
                 onClick={() => { setNameDraft(playlist.name); setRenaming(true); setMenuOpen(false); }}
-                className="text-left px-3 py-2 rounded-lg text-xs text-foreground/80 hover:bg-foreground/[0.06] transition-colors"
+                className="text-left px-3 py-2 rounded-lg text-xs text-ink hover:bg-foreground/[0.06] transition-colors"
               >
                 Renommer
               </button>
               <button
                 onClick={() => { onDelete(); setMenuOpen(false); }}
-                className="text-left px-3 py-2 rounded-lg text-xs text-red-400 hover:bg-red-500/10 transition-colors"
+                className="text-left px-3 py-2 rounded-lg text-xs text-danger hover:bg-danger/10 transition-colors"
               >
                 Supprimer
               </button>
@@ -645,14 +576,14 @@ function NewLocalPlaylistModal({ onClose, onCreate }: { onClose: () => void; onC
     onCreate(trimmed);
   };
   return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
         className="w-full max-w-sm bg-card border border-foreground/10 rounded-2xl shadow-2xl p-5 flex flex-col gap-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">Nouvelle playlist</h2>
-          <button onClick={onClose} className="text-foreground/40 hover:text-foreground transition-colors">
+          <button onClick={onClose} className="text-ink-3 hover:text-foreground transition-colors">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
             </svg>
@@ -664,12 +595,12 @@ function NewLocalPlaylistModal({ onClose, onCreate }: { onClose: () => void; onC
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); }}
           placeholder="Nom de la playlist…"
-          className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-foreground/25 transition-colors"
+          className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:border-foreground/25 transition-colors"
         />
         <button
           onClick={handleCreate}
           disabled={!name.trim()}
-          className="py-2.5 bg-foreground text-background font-semibold text-sm rounded-xl hover:bg-foreground/90 disabled:opacity-30 transition-all"
+          className="py-2.5 bg-ink text-on-ink font-semibold text-sm rounded-xl hover:bg-foreground/90 disabled:opacity-30 transition-all"
         >
           Créer
         </button>
@@ -692,7 +623,7 @@ function CompletedTodosBacklog() {
   // Group by completedAt date
   const groups: Record<string, typeof done> = {};
   for (const t of done) {
-    const key = t.completedAt ?? "—";
+    const key = t.completedAt ?? ", ";
     if (!groups[key]) groups[key] = [];
     groups[key].push(t);
   }
@@ -700,10 +631,10 @@ function CompletedTodosBacklog() {
   return (
     <section className="pt-8 pb-8">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Tâches accomplies</h2>
+        <h2 className="text-sm font-semibold text-ink-3">Tâches accomplies</h2>
         <button
           onClick={() => done.forEach((t) => deleteTodo(t.id))}
-          className="text-xs text-foreground/20 hover:text-foreground/50 transition-colors"
+          className="text-xs text-ink-3 hover:text-ink-3 transition-colors"
         >
           Tout effacer
         </button>
@@ -711,19 +642,19 @@ function CompletedTodosBacklog() {
       <div className="flex flex-col gap-4">
         {Object.entries(groups).sort(([a], [b]) => b.localeCompare(a)).map(([date, items]) => (
           <div key={date}>
-            <p className="text-[10px] text-foreground/25 font-mono uppercase tracking-[0.14em] mb-2">{date}</p>
+            <p className="text-[13px] text-ink-3 mb-2">{date}</p>
             <div className="flex flex-col gap-1">
               {items.map((t) => (
                 <div key={t.id} className="flex items-center gap-3 px-3 py-2 rounded-xl bg-foreground/[0.02] group">
-                  <div className="w-3.5 h-3.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
-                    <svg className="w-1.5 h-1.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                  <div className="w-3.5 h-3.5 rounded-full bg-sodium/20 border border-sodium/30 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-1.5 h-1.5 text-sodium-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
                       <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
-                  <span className="flex-1 text-xs text-foreground/35 line-through">{t.text}</span>
+                  <span className="flex-1 text-xs text-ink-3 line-through">{t.text}</span>
                   <button
                     onClick={() => deleteTodo(t.id)}
-                    className="sm:opacity-0 sm:group-hover:opacity-100 text-foreground/40 sm:text-foreground/20 hover:text-foreground/50 transition-all p-1 -m-1"
+                    className="sm:opacity-0 sm:group-hover:opacity-100 text-ink-3 sm:text-ink-3 hover:text-ink-3 transition-all p-1 -m-1"
                   >
                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                       <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
@@ -791,7 +722,7 @@ function SpotifyPlaylistCard({
         )}
       </div>
       <div className="absolute top-2 right-2">
-        <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-[#1db954]/20 text-[#1db954]">
+        <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-[#1db954]/20 text-[#1db954]">
           Spotify
         </span>
       </div>
@@ -851,12 +782,12 @@ function TwitchChannelCard({
       </div>
       <div className="absolute top-2 right-2">
         {channel.isLive ? (
-          <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-red-500/20 text-red-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+          <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-danger/20 text-danger">
+            <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" />
             Live
           </span>
         ) : (
-          <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-[#9146ff]/20 text-[#9146ff]">
+          <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-[#9146ff]/20 text-[#9146ff]">
             Twitch
           </span>
         )}
@@ -867,38 +798,6 @@ function TwitchChannelCard({
 }
 
 // Sous-onglet de la section « Écouter » (catalogue / bibliothèque / Spotify / Twitch)
-function MediaTab({ id, label, accent, badge }: { id: MediaSource; label: string; accent?: "spotify" | "twitch"; badge?: string }) {
-  const { mediaSource, openMedia } = useNavStore();
-  const active = mediaSource === id;
-  // La couleur de marque n'est portée que par l'onglet actif : elle dit QUELLE
-  // plateforme est ouverte, elle ne décore pas la barre.
-  const activeText = accent === "spotify" ? "text-[#1db954]" : accent === "twitch" ? "text-[#9146ff]" : "text-foreground";
-  return (
-    <button
-      onClick={() => openMedia(id)}
-      className={cn(
-        "relative flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold transition-colors",
-        active ? activeText : "text-foreground/40 hover:text-foreground/75"
-      )}
-    >
-      {/* Indicateur qui glisse d'un onglet à l'autre (état, pas décor) */}
-      {active && (
-        <motion.span
-          layoutId="media-tab-pill"
-          className="absolute inset-0 rounded-lg bg-foreground/[0.1]"
-          transition={{ type: "spring", stiffness: 420, damping: 34 }}
-        />
-      )}
-      <span className="relative">{label}</span>
-      {badge && (
-        <span className="relative rounded-full bg-foreground/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-foreground/55">
-          {badge}
-        </span>
-      )}
-    </button>
-  );
-}
-
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
@@ -1115,24 +1014,25 @@ export default function LandingPage() {
 
   return (
     <div className="relative isolate min-h-screen bg-background md:flex">
-      <AmbientBackdrop />
       <AppNav />
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Header */}
-        <header className="sticky top-0 z-20 bg-background/85 backdrop-blur-md border-b border-foreground/[0.06] px-4 sm:px-6 h-14 flex items-center justify-between">
-          <span className="text-sm font-semibold text-foreground/90 tracking-tight md:hidden">FocusFlow</span>
-          <span className="hidden md:block font-mono text-[11px] uppercase tracking-[0.16em] text-foreground/45">{sectionTitle}</span>
+        <header className="sticky top-0 z-20 bg-bg/95 border-b border-line px-4 sm:px-8 h-14 flex items-center justify-between">
+          <span className="relative font-display font-light text-lg text-ink tracking-tight md:hidden pb-0.5">
+            FocusFlow
+            <span aria-hidden className="absolute left-0 right-0 bottom-0 h-[2px] bg-sodium" />
+          </span>
+          <span className="hidden md:block font-display text-lg text-ink">{sectionTitle}</span>
           <div className="flex items-center gap-2">
             <button
               onClick={() => useCommandPalette.getState().setOpen(true)}
-              className="flex items-center gap-2 w-8 h-8 justify-center sm:w-auto sm:h-auto sm:px-2.5 sm:py-1.5 rounded-lg bg-foreground/5 hover:bg-foreground/10 text-foreground/40 hover:text-foreground/70 text-xs transition-all"
-              title="Recherche rapide"
-              aria-label="Recherche rapide"
+              className="flex items-center gap-2 h-9 w-9 justify-center sm:w-auto sm:px-3 rounded-[var(--r-control)] text-ink-2 hover:text-ink hover:bg-surface-2 text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-sodium"
+              title="Aller à… (⌘K)"
+              aria-label="Aller à, palette de commandes"
             >
-              <svg className="w-4 h-4 sm:w-3.5 sm:h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" strokeLinecap="round" />
-              </svg>
-              <kbd className="hidden sm:inline text-[10px] border border-foreground/15 rounded px-1">⌘K</kbd>
+              <IconSearch size={16} />
+              <span className="hidden lg:inline">Aller à</span>
+              <kbd className="hidden sm:inline font-mono text-[11px] text-ink-3">⌘K</kbd>
             </button>
             <CreateMenu />
             <button
@@ -1144,12 +1044,12 @@ export default function LandingPage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={profile.avatarUrl} alt={profile.displayName} className="w-full h-full object-cover" />
               ) : (
-                <span className="text-xs font-semibold text-foreground/60">
+                <span className="text-xs font-semibold text-ink-2">
                   {profile.displayName.charAt(0).toUpperCase()}
                 </span>
               )}
               {(isSpotifyConnected || isTwitchConnected) && (
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-background" />
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-sodium border-2 border-background" />
               )}
             </button>
             <ThemeToggle />
@@ -1159,13 +1059,19 @@ export default function LandingPage() {
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 pb-28 sm:px-8 sm:py-12 md:pb-16">
         {/* Sous-sélecteur de sources (section Écouter) */}
         {section === "ecouter" && (
-          <div className="mb-7 inline-flex flex-wrap gap-1 rounded-xl border border-foreground/[0.08] bg-foreground/[0.025] p-1">
-            <MediaTab id="catalogue" label="Catalogue" />
-            <MediaTab id="discover" label="Découvrir" />
-            <MediaTab id="library" label="Ma bibliothèque" badge={hasLibraryContent ? `${customVideos.length + playlists.length + localPlaylists.length}` : undefined} />
-            <MediaTab id="spotify" label="Spotify" accent="spotify" badge={isSpotifyConnected ? "Premium" : undefined} />
-            <MediaTab id="twitch" label="Twitch" accent="twitch" badge={selectedChannel ? "Live" : undefined} />
-          </div>
+          <Segmented
+            label="Sources d'écoute"
+            className="mb-10"
+            value={mediaSource}
+            onChange={(id) => openMedia(id)}
+            items={[
+              { id: "catalogue", label: "Catalogue", count: defaultVideos.length },
+              { id: "discover", label: "Découvrir" },
+              { id: "library", label: "Ma bibliothèque", count: hasLibraryContent ? customVideos.length + playlists.length + localPlaylists.length : undefined },
+              { id: "spotify", label: "Spotify", brand: "#1db954" },
+              { id: "twitch", label: "Twitch", brand: "#9146ff" },
+            ]}
+          />
         )}
 
         {/* Contenu de section : remonté à chaque changement d'onglet (key) →
@@ -1180,43 +1086,21 @@ export default function LandingPage() {
         {/* ── Catalogue ──────────────────────────────────────────────────────── */}
         {activeTab === "catalogue" && (
           <>
-            <div className="flex items-end justify-between mb-8">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">Choisis ton ambiance</h1>
-                <p className="text-foreground/40 mt-1 text-sm">Passe ta souris sur une vidéo et clique Démarrer.</p>
+            <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5 mb-10">
+              <div className="max-w-xl">
+                <h1 className="font-display font-light text-[clamp(1.9rem,4vw,2.6rem)] leading-tight text-ink">Choisis ta ville</h1>
+                <p className="text-ink-2 mt-2 text-[15px]">Une vidéo pour toute la session. Sa lumière teinte l&apos;eau ; clique pour régler la durée.</p>
               </div>
+              <Segmented
+                label="Filtrer par ambiance"
+                size="sm"
+                value={activeFilter ?? "all"}
+                onChange={(id) => setActiveFilter(id === "all" ? null : (id as VideoMood))}
+                items={[{ id: "all", label: "Tout" }, ...catalogueMoods.map((m) => ({ id: m as string, label: moodLabels[m] }))]}
+              />
             </div>
 
-            {/* Mood filters */}
-            <div className="flex gap-2 mb-6 flex-wrap">
-              <button
-                onClick={() => setActiveFilter(null)}
-                className={cn(
-                  "rounded-lg border px-3.5 py-1.5 text-xs font-medium transition-colors",
-                  activeFilter === null
-                    ? "border-foreground/20 bg-foreground/[0.1] text-foreground"
-                    : "border-foreground/[0.08] bg-foreground/[0.025] text-foreground/45 hover:border-foreground/20 hover:text-foreground/80"
-                )}
-              >
-                Tout
-              </button>
-              {catalogueMoods.map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setActiveFilter(activeFilter === m ? null : m)}
-                  className={cn(
-                    "rounded-lg border px-3.5 py-1.5 text-xs font-medium transition-colors",
-                    activeFilter === m
-                      ? "border-foreground/20 bg-foreground/[0.1] text-foreground"
-                      : "border-foreground/[0.08] bg-foreground/[0.025] text-foreground/45 hover:border-foreground/20 hover:text-foreground/80"
-                  )}
-                >
-                  {moodLabels[m]}
-                </button>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-9">
               {catalogueVideos.map((video) => (
                 <VideoCard
                   key={video.id}
@@ -1235,7 +1119,7 @@ export default function LandingPage() {
           <>
             <div className="mb-8">
               <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">Ma bibliothèque</h1>
-              <p className="text-foreground/40 mt-1 text-sm">Ta file, tes playlists et tes vidéos personnelles, sauvegardées sur ton compte.</p>
+              <p className="text-ink-3 mt-1 text-sm">Ta file, tes playlists et tes vidéos personnelles, sauvegardées sur ton compte.</p>
             </div>
 
             {/* File de lecture FocusFlow — titres exacts contrôlables */}
@@ -1245,11 +1129,11 @@ export default function LandingPage() {
 
             {/* Mes playlists — collections locales, nommées, créées depuis AddToMenu */}
             <section className="mb-10">
-              <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-4">Mes playlists</p>
+              <p className="text-[13px] font-semibold text-ink-3 mb-4">Mes playlists</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                 <button
                   onClick={() => setShowNewLocalPlaylistModal(true)}
-                  className="aspect-video rounded-xl border-2 border-dashed border-foreground/15 hover:border-foreground/30 flex flex-col items-center justify-center gap-1.5 text-foreground/30 hover:text-foreground/60 transition-all"
+                  className="aspect-video rounded-xl border-2 border-dashed border-foreground/15 hover:border-foreground/30 flex flex-col items-center justify-center gap-1.5 text-ink-3 hover:text-ink-2 transition-all"
                 >
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
@@ -1272,17 +1156,17 @@ export default function LandingPage() {
             {/* Playlists YouTube — playlists/mixes YouTube référencées (pas modifiables) */}
             <section className="mb-10">
               <div className="flex items-center justify-between mb-4">
-                <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Playlists YouTube</p>
+                <p className="text-[13px] font-semibold text-ink-3">Playlists YouTube</p>
                 <button
                   onClick={() => setShowAddPlaylistModal(true)}
-                  className="text-xs text-foreground/40 hover:text-foreground transition-colors flex items-center gap-1"
+                  className="text-xs text-ink-3 hover:text-foreground transition-colors flex items-center gap-1"
                 >
                   <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M12 5v14M5 12h14" strokeLinecap="round" /></svg>
                   Ajouter
                 </button>
               </div>
               {playlists.length === 0 ? (
-                <p className="text-sm text-foreground/25">Aucune playlist YouTube ajoutée.</p>
+                <p className="text-sm text-ink-3">Aucune playlist YouTube ajoutée.</p>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                   {playlists.map((playlist) => (
@@ -1302,17 +1186,17 @@ export default function LandingPage() {
             {/* Vidéos */}
             <section>
               <div className="flex items-center justify-between mb-4">
-                <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Vidéos</p>
+                <p className="text-[13px] font-semibold text-ink-3">Vidéos</p>
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="text-xs text-foreground/40 hover:text-foreground transition-colors flex items-center gap-1"
+                  className="text-xs text-ink-3 hover:text-foreground transition-colors flex items-center gap-1"
                 >
                   <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M12 5v14M5 12h14" strokeLinecap="round" /></svg>
                   Ajouter
                 </button>
               </div>
               {customVideos.length === 0 ? (
-                <p className="text-sm text-foreground/25">Aucune vidéo ajoutée.</p>
+                <p className="text-sm text-ink-3">Aucune vidéo ajoutée.</p>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                   {customVideos.map((video) => (
@@ -1344,9 +1228,9 @@ export default function LandingPage() {
                   <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
                 </svg>
               </h1>
-              <p className="text-foreground/40 mt-1 text-sm">
+              <p className="text-ink-3 mt-1 text-sm">
                 {isSpotifyConnected
-                  ? "Tes playlists — clique sur une playlist pour démarrer."
+                  ? "Tes playlists, clique sur une playlist pour démarrer."
                   : "Connecte ton compte Spotify Premium pour écouter tes playlists."}
               </p>
             </div>
@@ -1354,8 +1238,8 @@ export default function LandingPage() {
             {!isSpotifyConnected ? (
               spotifyAuthError ? (
                 <div className="flex flex-col items-center justify-center py-24 gap-6">
-                  <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center">
-                    <svg className="w-8 h-8 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <div className="w-16 h-16 rounded-full bg-sodium/10 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-sodium-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                       <path d="M12 9v4M12 17h.01" strokeLinecap="round" />
                       <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -1363,19 +1247,19 @@ export default function LandingPage() {
                   <div className="text-center max-w-md">
                     {spotifyAuthError === "token_failed" ? (
                       <>
-                        <p className="text-sm font-medium text-foreground/70">Connexion Spotify échouée</p>
-                        <p className="text-xs text-foreground/40 mt-2 leading-relaxed">
+                        <p className="text-sm font-medium text-ink-2">Connexion Spotify échouée</p>
+                        <p className="text-xs text-ink-3 mt-2 leading-relaxed">
                           Quelque chose s&apos;est mal passé pendant la connexion. Réessaie.
                         </p>
                       </>
                     ) : (
                       <>
-                        <p className="text-sm font-medium text-foreground/70">Ton compte n&apos;est pas autorisé sur cette app</p>
-                        <p className="text-xs text-foreground/40 mt-2 leading-relaxed">
-                          Cette app Spotify est en <strong className="text-foreground/60">mode développement</strong> : seuls les comptes ajoutés manuellement peuvent l&apos;utiliser.
-                          Demande à l&apos;<strong className="text-foreground/60">administrateur</strong> d&apos;ajouter ton adresse e-mail Spotify dans le <strong className="text-foreground/60">Spotify Developer Dashboard</strong> (Settings → User Management), puis réessaie.
+                        <p className="text-sm font-medium text-ink-2">Ton compte n&apos;est pas autorisé sur cette app</p>
+                        <p className="text-xs text-ink-3 mt-2 leading-relaxed">
+                          Cette app Spotify est en <strong className="text-ink-2">mode développement</strong> : seuls les comptes ajoutés manuellement peuvent l&apos;utiliser.
+                          Demande à l&apos;<strong className="text-ink-2">administrateur</strong> d&apos;ajouter ton adresse e-mail Spotify dans le <strong className="text-ink-2">Spotify Developer Dashboard</strong> (Settings → User Management), puis réessaie.
                         </p>
-                        <p className="text-[11px] text-foreground/25 mt-2">
+                        <p className="text-[11px] text-ink-3 mt-2">
                           (Si tu as annulé l&apos;autorisation volontairement, clique simplement sur Réessayer.)
                         </p>
                       </>
@@ -1399,8 +1283,8 @@ export default function LandingPage() {
                   </svg>
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-medium text-foreground/60">Compte Spotify Premium requis</p>
-                  <p className="text-xs text-foreground/30 mt-1 max-w-xs">
+                  <p className="text-sm font-medium text-ink-2">Compte Spotify Premium requis</p>
+                  <p className="text-xs text-ink-3 mt-1 max-w-xs">
                     La lecture directe dans le navigateur nécessite un abonnement Premium.
                   </p>
                 </div>
@@ -1421,47 +1305,47 @@ export default function LandingPage() {
               </div>
             ) : spotifyApiError === "forbidden" ? (
               <div className="flex flex-col items-center justify-center py-24 gap-6">
-                <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <div className="w-16 h-16 rounded-full bg-danger/10 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-danger" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <circle cx="12" cy="12" r="10" />
                     <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" strokeLinecap="round" />
                   </svg>
                 </div>
                 <div className="text-center max-w-sm">
-                  <p className="text-sm font-medium text-foreground/70">Accès refusé par Spotify</p>
-                  <p className="text-xs text-foreground/40 mt-2 leading-relaxed">
-                    L&apos;application est en <strong className="text-foreground/60">mode développement</strong> — seuls les comptes ajoutés manuellement peuvent l&apos;utiliser.
-                    Demande au propriétaire de l&apos;app de t&apos;ajouter dans le <strong className="text-foreground/60">Spotify Developer Dashboard</strong>.
+                  <p className="text-sm font-medium text-ink-2">Accès refusé par Spotify</p>
+                  <p className="text-xs text-ink-3 mt-2 leading-relaxed">
+                    L&apos;application est en <strong className="text-ink-2">mode développement</strong>, seuls les comptes ajoutés manuellement peuvent l&apos;utiliser.
+                    Demande au propriétaire de l&apos;app de t&apos;ajouter dans le <strong className="text-ink-2">Spotify Developer Dashboard</strong>.
                   </p>
                 </div>
                 <button
                   onClick={() => clearAuth()}
-                  className="text-xs text-foreground/30 hover:text-foreground/50 transition-colors"
+                  className="text-xs text-ink-3 hover:text-ink-3 transition-colors"
                 >
                   Déconnecter
                 </button>
               </div>
             ) : spotifyApiError === "error" ? (
-              <div className="flex flex-col items-center justify-center py-24 gap-4 text-foreground/25">
+              <div className="flex flex-col items-center justify-center py-24 gap-4 text-ink-3">
                 <p className="text-sm">Erreur lors du chargement des playlists</p>
                 <button
                   onClick={() => setSpotifyReloadNonce((n) => n + 1)}
-                  className="text-xs text-foreground/30 hover:text-foreground/50 underline"
+                  className="text-xs text-ink-3 hover:text-ink-3 underline"
                 >
                   Réessayer
                 </button>
               </div>
             ) : isPremium === false ? (
               <div className="flex flex-col items-center justify-center py-24 gap-6">
-                <div className="w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-orange-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <div className="w-16 h-16 rounded-full bg-sodium/10 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-sodium-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
                   </svg>
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-medium text-foreground/70">Compte Spotify Free détecté</p>
-                  <p className="text-xs text-foreground/40 mt-1 max-w-xs">
-                    La lecture directe dans le navigateur nécessite un abonnement <strong className="text-foreground/60">Spotify Premium</strong>. Les playlists ne peuvent pas être récupérées avec un compte gratuit.
+                  <p className="text-sm font-medium text-ink-2">Compte Spotify Free détecté</p>
+                  <p className="text-xs text-ink-3 mt-1 max-w-xs">
+                    La lecture directe dans le navigateur nécessite un abonnement <strong className="text-ink-2">Spotify Premium</strong>. Les playlists ne peuvent pas être récupérées avec un compte gratuit.
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1473,18 +1357,18 @@ export default function LandingPage() {
                   </button>
                   <button
                     onClick={() => clearAuth()}
-                    className="text-xs text-foreground/30 hover:text-foreground/50 transition-colors"
+                    className="text-xs text-ink-3 hover:text-ink-3 transition-colors"
                   >
                     Déconnecter
                   </button>
                 </div>
               </div>
             ) : spotifyPlaylists.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-24 gap-3 text-foreground/25">
+              <div className="flex flex-col items-center justify-center py-24 gap-3 text-ink-3">
                 <p className="text-sm">Aucune playlist trouvée</p>
                 <button
                   onClick={() => setSpotifyReloadNonce((n) => n + 1)}
-                  className="text-xs text-foreground/30 hover:text-foreground/50 underline"
+                  className="text-xs text-ink-3 hover:text-ink-3 underline"
                 >
                   Actualiser
                 </button>
@@ -1515,9 +1399,9 @@ export default function LandingPage() {
                     <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
                   </svg>
                 </h1>
-                <p className="text-foreground/40 mt-1 text-sm">
+                <p className="text-ink-3 mt-1 text-sm">
                   {isTwitchConnected
-                    ? `Connecté en tant que ${twitchUserLogin} — tes abonnements Twitch.`
+                    ? `Connecté en tant que ${twitchUserLogin}, tes abonnements Twitch.`
                     : "Connecte ton compte Twitch pour voir tes abonnements, ou entre directement un nom de chaîne."}
                 </p>
               </div>
@@ -1527,7 +1411,7 @@ export default function LandingPage() {
             <div className="relative mb-6 max-w-lg">
               <div className="flex gap-2">
                 <div className="relative flex-1">
-                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" strokeLinecap="round" />
                   </svg>
                   <input
@@ -1537,7 +1421,7 @@ export default function LandingPage() {
                       if (e.key === "Enter" && !searchResults.length) handleStartTwitch(twitchInput);
                     }}
                     placeholder={isTwitchConnected ? "Rechercher une chaîne Twitch…" : "Nom du streamer (ex: lofigirl)"}
-                    className="w-full bg-foreground/5 border border-foreground/10 rounded-xl pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-foreground/25 transition-colors"
+                    className="w-full bg-foreground/5 border border-foreground/10 rounded-xl pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:border-foreground/25 transition-colors"
                   />
                   {searchLoading && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border border-foreground/20 border-t-[#9146ff] rounded-full animate-spin" />
@@ -1573,11 +1457,11 @@ export default function LandingPage() {
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-foreground font-medium truncate">{ch.displayName}</p>
-                        {ch.gameName && <p className="text-xs text-foreground/40 truncate">{ch.gameName}</p>}
+                        {ch.gameName && <p className="text-xs text-ink-3 truncate">{ch.gameName}</p>}
                       </div>
                       {ch.isLive && (
-                        <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-red-500/15 text-red-400 flex-shrink-0">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                        <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-danger/15 text-danger flex-shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" />
                           Live
                           {ch.viewerCount !== undefined && ` · ${ch.viewerCount.toLocaleString()}`}
                         </span>
@@ -1597,8 +1481,8 @@ export default function LandingPage() {
                   </svg>
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-medium text-foreground/60">Connecte ton compte Twitch</p>
-                  <p className="text-xs text-foreground/30 mt-1 max-w-xs">
+                  <p className="text-sm font-medium text-ink-2">Connecte ton compte Twitch</p>
+                  <p className="text-xs text-ink-3 mt-1 max-w-xs">
                     Pour voir tes abonnements et rechercher des chaînes directement depuis FocusFlow.
                   </p>
                 </div>
@@ -1621,14 +1505,14 @@ export default function LandingPage() {
                   <div className="w-6 h-6 border-2 border-foreground/10 border-t-[#9146ff] rounded-full animate-spin" />
                 </div>
               ) : followedChannels.length === 0 ? (
-                <p className="text-foreground/25 text-sm text-center py-10">Aucun abonnement trouvé</p>
+                <p className="text-ink-3 text-sm text-center py-10">Aucun abonnement trouvé</p>
               ) : (
                 <div className="flex flex-col gap-10">
                   {/* Live now */}
                   {followedChannels.some((c) => c.isLive) && (
                     <section>
-                      <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-4 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                      <p className="text-[13px] font-semibold text-ink-3 mb-4 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" />
                         En direct maintenant
                       </p>
                       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
@@ -1645,7 +1529,7 @@ export default function LandingPage() {
                   )}
                   {/* All followed */}
                   <section>
-                    <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-4">Mes abonnements</p>
+                    <p className="text-[13px] font-semibold text-ink-3 mb-4">Mes abonnements</p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                       {followedChannels.map((ch) => (
                         <TwitchChannelCard
@@ -1663,8 +1547,8 @@ export default function LandingPage() {
 
             {/* VOD / Rediffusion */}
             <div className="mt-10">
-              <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-1">Rediffusion (VOD)</p>
-              <p className="text-xs text-foreground/30 mb-4">
+              <p className="text-[13px] font-semibold text-ink-3 mb-1">Rediffusion (VOD)</p>
+              <p className="text-xs text-ink-3 mb-4">
                 {"Colle le lien d'une rediffusion Twitch. Les VODs abonné uniquement nécessitent un abonnement actif au streamer."}
               </p>
               <div className="flex gap-2 max-w-lg">
@@ -1673,7 +1557,7 @@ export default function LandingPage() {
                   onChange={(e) => { setVodInput(e.target.value); setVodError(""); }}
                   onKeyDown={(e) => e.key === "Enter" && handleStartTwitchVod()}
                   placeholder="https://www.twitch.tv/videos/1234567890"
-                  className="flex-1 bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-foreground/25 transition-colors"
+                  className="flex-1 bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:border-foreground/25 transition-colors"
                 />
                 <button
                   onClick={handleStartTwitchVod}
@@ -1683,7 +1567,7 @@ export default function LandingPage() {
                   Démarrer
                 </button>
               </div>
-              {vodError && <p className="text-red-400 text-xs mt-2">{vodError}</p>}
+              {vodError && <p className="text-danger text-xs mt-2">{vodError}</p>}
               {selectedVodId && (
                 <p className="text-[#9146ff]/70 text-xs mt-2">VOD sélectionnée : {selectedVodId}</p>
               )}
@@ -1695,7 +1579,7 @@ export default function LandingPage() {
           <>
             <div className="mb-8">
               <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">Activité</h1>
-              <p className="text-foreground/40 mt-1 text-sm">Ton niveau, tes stats et ton récap hebdo.</p>
+              <p className="text-ink-3 mt-1 text-sm">Ton niveau, tes stats et ton récap hebdo.</p>
             </div>
             <SubTabs<ActivityTab>
               tabs={[
@@ -1722,7 +1606,7 @@ export default function LandingPage() {
           <>
             <div className="mb-8">
               <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">Organisation</h1>
-              <p className="text-foreground/40 mt-1 text-sm">
+              <p className="text-ink-3 mt-1 text-sm">
                 {orgTab === "projets" && "Suis tes gros objectifs et le rythme à tenir."}
                 {orgTab === "planning" && "Planifie ta semaine en blocs de focus."}
                 {orgTab === "sprint" && "Un objectif, une deadline, un plan généré pour toi."}

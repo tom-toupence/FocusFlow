@@ -27,7 +27,7 @@ const SEND_MESSAGES: Record<SendResult, { title: string; accent: "emerald" | "am
   already_pending: { title: "Demande déjà en attente", accent: "amber" },
   invalid_code: { title: "Code invalide", accent: "amber" },
   cannot_add_self: { title: "C'est ton propre code", accent: "amber" },
-  error: { title: "Erreur — réessaie", accent: "amber" },
+  error: { title: "Erreur, réessaie", accent: "amber" },
 };
 
 type Presence = "focus" | "online" | "offline";
@@ -42,14 +42,14 @@ function Avatar({ url, name, size = 34, focusing = false, status }: { url: strin
           // eslint-disable-next-line @next/next/no-img-element
           <img src={url} alt={name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
         ) : (
-          <span className="text-xs font-semibold text-foreground/60">{name.charAt(0).toUpperCase()}</span>
+          <span className="text-xs font-semibold text-ink-2">{name.charAt(0).toUpperCase()}</span>
         )}
       </div>
       {dot === "focus" && (
-        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-background animate-pulse" title="En focus" />
+        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-sodium border-2 border-background animate-pulse" title="En focus" />
       )}
       {dot === "online" && (
-        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-background" title="En ligne" />
+        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-sodium border-2 border-background" title="En ligne" />
       )}
       {dot === "offline" && (
         <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-foreground/25 border-2 border-background" title="Hors ligne" />
@@ -68,7 +68,7 @@ function fmtMin(min: number): string {
 function SectionLabel({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2 mb-2.5 px-0.5">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-foreground/35">{children}</span>
+      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-3">{children}</span>
       {right}
     </div>
   );
@@ -137,13 +137,13 @@ export default function FriendsPanel() {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4 text-center px-2">
         <div className="w-14 h-14 rounded-2xl bg-foreground/[0.06] flex items-center justify-center">
-          <UsersIcon className="w-7 h-7 text-foreground/40" />
+          <UsersIcon className="w-7 h-7 text-ink-3" />
         </div>
         <div>
           <p className="text-sm font-semibold text-foreground">Connecte-toi pour tes amis</p>
-          <p className="text-xs text-foreground/40 mt-1">Comparez vos semaines de focus et voyez qui travaille en direct.</p>
+          <p className="text-xs text-ink-3 mt-1">Comparez vos semaines de focus et voyez qui travaille en direct.</p>
         </div>
-        <button onClick={() => signInWithGoogle()} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-foreground text-background text-sm font-semibold hover:bg-foreground/90 transition-all">
+        <button onClick={() => signInWithGoogle()} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-ink text-on-ink text-sm font-semibold hover:bg-foreground/90 transition-all">
           <svg className="w-4 h-4" viewBox="0 0 24 24"><path fill="currentColor" d="M12 11v2h5.5c-.2 1.3-1.5 3.8-5.5 3.8-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.6 2.7 14.5 1.8 12 1.8 6.5 1.8 2 6.3 2 11.8s4.5 10 10 10c5.8 0 9.6-4 9.6-9.7 0-.7-.1-1.2-.2-1.7z"/></svg>
           Continuer avec Google
         </button>
@@ -181,13 +181,13 @@ export default function FriendsPanel() {
           <Avatar url={me.avatarUrl} name={me.displayName} size={42} />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">{me.displayName}</p>
-            <p className="text-[11px] text-foreground/40">Niveau {myAgg.level} · {myAgg.badges} badge{myAgg.badges > 1 ? "s" : ""}</p>
+            <p className="text-[11px] text-ink-3">Niveau {myAgg.level} · {myAgg.badges} badge{myAgg.badges > 1 ? "s" : ""}</p>
           </div>
         </div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-foreground/35 mb-1.5">Ton code d&apos;ami</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-3 mb-1.5">Ton code d&apos;ami</p>
         <div className="flex items-center gap-2">
           <div className="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-background/80 border border-foreground/10 font-mono text-base font-bold tracking-[0.2em] text-center text-foreground">
-            {myInvite ? myInvite.inviteCode : <span className="text-foreground/20 tracking-normal font-sans text-xs">génération…</span>}
+            {myInvite ? myInvite.inviteCode : <span className="text-ink-3 tracking-normal font-sans text-xs">génération…</span>}
           </div>
           <IconBtn onClick={copyCode} title="Copier le code" disabled={!myInvite}>
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -207,9 +207,9 @@ export default function FriendsPanel() {
             onChange={(e) => setCode(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
             placeholder="Coller un code…"
-            className="flex-1 min-w-0 bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-foreground/25 transition-colors uppercase tracking-wide"
+            className="flex-1 min-w-0 bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:border-foreground/25 transition-colors uppercase tracking-wide"
           />
-          <button onClick={handleAdd} disabled={!code.trim() || sending} className="px-3.5 py-2 rounded-xl bg-foreground text-background text-xs font-semibold disabled:opacity-30 transition-all flex-shrink-0">
+          <button onClick={handleAdd} disabled={!code.trim() || sending} className="px-3.5 py-2 rounded-xl bg-ink text-on-ink text-xs font-semibold disabled:opacity-30 transition-all flex-shrink-0">
             Ajouter
           </button>
         </div>
@@ -221,27 +221,27 @@ export default function FriendsPanel() {
           right={
             <div className="flex gap-0.5 p-0.5 rounded-lg bg-foreground/5">
               {SORT_TABS.map((t) => (
-                <button key={t.id} onClick={() => setSort(t.id)} className={cn("px-2 py-0.5 rounded-md text-[10px] font-medium transition-all", sort === t.id ? "bg-background text-foreground shadow-sm" : "text-foreground/40 hover:text-foreground/70")}>
+                <button key={t.id} onClick={() => setSort(t.id)} className={cn("px-2 py-0.5 rounded-md text-[10px] font-medium transition-all", sort === t.id ? "bg-background text-foreground shadow-sm" : "text-ink-3 hover:text-ink-2")}>
                   {t.label}
                 </button>
               ))}
             </div>
           }
         >
-          Classement {focusingFriends.length > 0 && <span className="text-emerald-500 dark:text-emerald-400 normal-case tracking-normal">· {focusingFriends.length} en focus</span>}
+          Classement {focusingFriends.length > 0 && <span className="text-sodium-text dark:text-sodium-text normal-case tracking-normal">· {focusingFriends.length} en focus</span>}
         </SectionLabel>
 
         {leaderboard.length <= 1 ? (
-          <p className="text-[13px] text-foreground/35 px-0.5 py-3 leading-relaxed">Ajoute des amis avec leur code pour comparer vos semaines de focus.</p>
+          <p className="text-[13px] text-ink-3 px-0.5 py-3 leading-relaxed">Ajoute des amis avec leur code pour comparer vos semaines de focus.</p>
         ) : (
           <div className="flex flex-col gap-1">
             {leaderboard.map((r, i) => (
               <div key={r.id} className={cn("flex items-center gap-2.5 pl-2 pr-2.5 py-2 rounded-xl transition-colors", r.isMe ? "bg-foreground/[0.07]" : "hover:bg-foreground/[0.03]")}>
-                <span className={cn("w-4 text-center text-[13px] font-bold tabular-nums flex-shrink-0", i === 0 ? "text-amber-400" : i === 1 ? "text-foreground/50" : i === 2 ? "text-orange-400/70" : "text-foreground/25")}>{i + 1}</span>
+                <span className={cn("w-4 text-center text-[13px] font-bold tabular-nums flex-shrink-0", i === 0 ? "text-sodium-text" : i === 1 ? "text-ink-3" : i === 2 ? "text-sodium-text" : "text-ink-3")}>{i + 1}</span>
                 <Avatar url={r.avatar} name={r.name} size={32} focusing={r.focusing} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-foreground truncate">{r.name}{r.isMe && <span className="text-foreground/35 font-normal"> · toi</span>}</p>
-                  <p className="text-[10px] text-foreground/35">Niv. {r.level}{r.focusing && <span className="text-emerald-500 dark:text-emerald-400"> · en focus</span>}</p>
+                  <p className="text-[13px] font-medium text-foreground truncate">{r.name}{r.isMe && <span className="text-ink-3 font-normal"> · toi</span>}</p>
+                  <p className="text-[10px] text-ink-3">Niv. {r.level}{r.focusing && <span className="text-sodium-text dark:text-sodium-text"> · en focus</span>}</p>
                 </div>
                 <span className="text-[13px] font-semibold text-foreground tabular-nums flex-shrink-0">
                   {sort === "minutes" ? fmtMin(r.minutes) : sort === "sessions" ? r.sessions : `${r.streak}j`}
@@ -257,7 +257,7 @@ export default function FriendsPanel() {
         <div>
           <SectionLabel>
             Mes amis · {friends.length}
-            {onlineTotal > 0 && <span className="text-emerald-500 dark:text-emerald-400 normal-case tracking-normal"> · {onlineTotal} en ligne</span>}
+            {onlineTotal > 0 && <span className="text-sodium-text dark:text-sodium-text normal-case tracking-normal"> · {onlineTotal} en ligne</span>}
           </SectionLabel>
           <div className="flex flex-col gap-2">
             {groups.focus.length > 0 && (
@@ -285,7 +285,7 @@ export default function FriendsPanel() {
 function FriendGroup({ label, count, dim, children }: { label: string; count: number; dim?: boolean; children: React.ReactNode }) {
   return (
     <div className={cn(dim && "opacity-70")}>
-      <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-foreground/30 px-1 mb-1">{label} · {count}</p>
+      <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-ink-3 px-1 mb-1">{label} · {count}</p>
       <div className="flex flex-col gap-0.5">{children}</div>
     </div>
   );
@@ -293,18 +293,18 @@ function FriendGroup({ label, count, dim, children }: { label: string; count: nu
 
 function FriendRow({ f, status, unread, onOpen, onRemove }: { f: Friend; status: Presence; unread: number; onOpen: () => void; onRemove: () => void }) {
   const sub = status === "focus" ? (f.stats?.activity || "En focus") : status === "online" ? "En ligne" : "Hors ligne";
-  const subColor = status === "focus" ? "text-emerald-500 dark:text-emerald-400" : status === "online" ? "text-emerald-500/70 dark:text-emerald-400/70" : "text-foreground/30";
+  const subColor = status === "focus" ? "text-sodium-text dark:text-sodium-text" : status === "online" ? "text-sodium-text dark:text-sodium-text" : "text-ink-3";
   return (
     <div className="group flex items-center gap-2.5 pl-2 pr-1.5 py-1.5 rounded-xl hover:bg-foreground/[0.04] transition-colors cursor-pointer" onClick={onOpen} title={`Discuter avec ${f.displayName}`}>
       <Avatar url={f.avatarUrl} name={f.displayName} size={30} status={status} />
       <div className="flex-1 min-w-0">
-        <p className={cn("text-[13px] truncate", status === "offline" ? "text-foreground/55" : "text-foreground/90 font-medium")}>{f.displayName}</p>
+        <p className={cn("text-[13px] truncate", status === "offline" ? "text-ink-2" : "text-ink font-medium")}>{f.displayName}</p>
         <p className={cn("text-[10px] truncate", subColor)}>{sub}</p>
       </div>
       {unread > 0 && (
-        <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-sky-500 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{unread > 9 ? "9+" : unread}</span>
+        <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-ink/10 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{unread > 9 ? "9+" : unread}</span>
       )}
-      <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="sm:opacity-0 sm:group-hover:opacity-100 text-foreground/25 hover:text-red-400 transition-all p-1.5 -m-0.5 flex-shrink-0" title="Retirer">
+      <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="sm:opacity-0 sm:group-hover:opacity-100 text-ink-3 hover:text-danger transition-all p-1.5 -m-0.5 flex-shrink-0" title="Retirer">
         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
       </button>
     </div>
@@ -313,7 +313,7 @@ function FriendRow({ f, status, unread, onOpen, onRemove }: { f: Friend; status:
 
 function IconBtn({ children, onClick, title, disabled }: { children: React.ReactNode; onClick: () => void; title: string; disabled?: boolean }) {
   return (
-    <button onClick={onClick} title={title} disabled={disabled} className="w-9 h-9 flex items-center justify-center rounded-xl bg-foreground/5 hover:bg-foreground/10 text-foreground/55 hover:text-foreground disabled:opacity-30 transition-all flex-shrink-0">
+    <button onClick={onClick} title={title} disabled={disabled} className="w-9 h-9 flex items-center justify-center rounded-xl bg-foreground/5 hover:bg-foreground/10 text-ink-2 hover:text-foreground disabled:opacity-30 transition-all flex-shrink-0">
       {children}
     </button>
   );
@@ -329,7 +329,7 @@ function UsersIcon({ className }: { className?: string }) {
 
 function Empty({ title, text }: { title: string; text: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 gap-3 text-center text-foreground/40 px-2">
+    <div className="flex flex-col items-center justify-center py-16 gap-3 text-center text-ink-3 px-2">
       <UsersIcon className="w-9 h-9" />
       <p className="text-sm font-medium text-foreground">{title}</p>
       <p className="text-xs max-w-[15rem]">{text}</p>

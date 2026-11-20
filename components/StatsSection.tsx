@@ -96,7 +96,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
 
   return (
     <section className={cn(embedded ? "pb-8" : "border-t border-foreground/[0.06] py-8 px-6 max-w-7xl mx-auto w-full")}>
-      {!embedded && <h2 className="text-sm font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-6">Activité</h2>}
+      {!embedded && <h2 className="text-sm font-semibold text-ink-3 mb-6">Activité</h2>}
 
       {/* ── Niveau, jardin & défis ────────────────────────────────────────────── */}
       <ProgressionPanel />
@@ -107,7 +107,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
         <div className="flex-1 flex flex-col gap-3 min-w-0">
           <div>
             <p className="text-sm font-semibold text-foreground">Objectif quotidien</p>
-            <p className="text-xs text-foreground/40 mt-0.5">
+            <p className="text-xs text-ink-3 mt-0.5">
               {goalProgress.reached
                 ? "Objectif atteint pour aujourd'hui. Bravo"
                 : "Fixe une cible de focus et garde le cap chaque jour."}
@@ -121,7 +121,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
                 onClick={() => setUnit(u)}
                 className={cn(
                   "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
-                  goalUnit === u ? "bg-foreground/15 text-foreground" : "bg-foreground/5 text-foreground/40 hover:text-foreground/70"
+                  goalUnit === u ? "bg-foreground/15 text-foreground" : "bg-foreground/5 text-ink-3 hover:text-ink-2"
                 )}
               >
                 {u === "minutes" ? "Minutes" : "Pomodoros"}
@@ -131,7 +131,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
             <div className="flex items-center gap-2 ml-auto">
               <button
                 onClick={() => setTarget(goalTarget - goalStep)}
-                className="w-7 h-7 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground/70 flex items-center justify-center transition-colors text-sm"
+                className="w-7 h-7 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-ink-2 flex items-center justify-center transition-colors text-sm"
               >
                 −
               </button>
@@ -140,7 +140,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
               </span>
               <button
                 onClick={() => setTarget(goalTarget + goalStep)}
-                className="w-7 h-7 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground/70 flex items-center justify-center transition-colors text-sm"
+                className="w-7 h-7 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-ink-2 flex items-center justify-center transition-colors text-sm"
               >
                 +
               </button>
@@ -178,31 +178,31 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
         <div className="bg-foreground/[0.03] border border-foreground/[0.06] rounded-xl px-4 py-3 flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
-            <svg className="w-4 h-4 text-foreground/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4 text-ink-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
           <div>
-            <p className="text-[11px] text-foreground/30">Temps total</p>
+            <p className="text-[11px] text-ink-3">Temps total</p>
             <p className="text-lg font-semibold text-foreground tracking-tight">{formatMinutes(total.minutesWorked)}</p>
           </div>
         </div>
         <div className="bg-foreground/[0.03] border border-foreground/[0.06] rounded-xl px-4 py-3 flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
-            <svg className="w-4 h-4 text-foreground/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4 text-ink-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M12 2v20M2 12h20" strokeLinecap="round" />
               <circle cx="12" cy="12" r="4" />
             </svg>
           </div>
           <div>
-            <p className="text-[11px] text-foreground/30">Sessions totales</p>
+            <p className="text-[11px] text-ink-3">Sessions totales</p>
             <p className="text-lg font-semibold text-foreground tracking-tight">{total.sessions}</p>
           </div>
         </div>
         <div className="bg-foreground/[0.03] border border-foreground/[0.06] rounded-xl px-4 py-3 flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
-            <svg className="w-4 h-4 text-foreground/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4 text-ink-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <rect x="3" y="4" width="18" height="18" rx="2" />
               <line x1="16" y1="2" x2="16" y2="6" strokeLinecap="round" />
               <line x1="8" y1="2" x2="8" y2="6" strokeLinecap="round" />
@@ -210,7 +210,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
             </svg>
           </div>
           <div>
-            <p className="text-[11px] text-foreground/30">Jours actifs</p>
+            <p className="text-[11px] text-ink-3">Jours actifs</p>
             <p className="text-lg font-semibold text-foreground tracking-tight">{total.activeDays}</p>
           </div>
         </div>
@@ -218,7 +218,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
 
       {/* ── 7 derniers jours ─────────────────────────────────────────────────── */}
       <div className="mb-8">
-        <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-4">7 derniers jours</p>
+        <p className="text-[13px] font-semibold text-ink-3 mb-4">7 derniers jours</p>
         <div className="flex items-end gap-2 h-24">
           {last7.map((day) => {
             const pct = maxMinutes7 > 0 ? day.minutes / maxMinutes7 : 0;
@@ -237,7 +237,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
                     style={{ height: `${Math.max(pct * 100, day.minutes > 0 ? 8 : 4)}%` }}
                   />
                 </div>
-                <span className={cn("text-[10px]", isToday ? "text-foreground/70 font-semibold" : "text-foreground/25")}>
+                <span className={cn("text-[10px]", isToday ? "text-ink-2 font-semibold" : "text-ink-3")}>
                   {day.label}
                 </span>
               </div>
@@ -248,7 +248,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
           {last7.map((day) => (
             <div key={day.date} className="flex-1 text-center">
               {day.minutes > 0 && (
-                <span className="text-[9px] text-foreground/25">{formatMinutes(day.minutes)}</span>
+                <span className="text-[9px] text-ink-3">{formatMinutes(day.minutes)}</span>
               )}
             </div>
           ))}
@@ -258,7 +258,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
       {/* ── Top lectures ─────────────────────────────────────────────────────── */}
       {topPlays.length > 0 && (
         <div className="mb-8">
-          <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-4">Top lectures</p>
+          <p className="text-[13px] font-semibold text-ink-3 mb-4">Top lectures</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {topPlays.map((play) => (
               <div key={play.mediaKey} className="flex items-center gap-3 bg-foreground/[0.03] border border-foreground/[0.06] rounded-xl p-3 min-w-0">
@@ -273,8 +273,8 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-foreground truncate leading-tight">{play.title}</p>
-                  <p className="text-[11px] text-foreground/40 truncate">{play.subtitle}</p>
-                  <p className="text-[10px] text-foreground/25 mt-0.5">{formatMinutes(play.totalMinutes)} · {play.playCount}×</p>
+                  <p className="text-[11px] text-ink-3 truncate">{play.subtitle}</p>
+                  <p className="text-[10px] text-ink-3 mt-0.5">{formatMinutes(play.totalMinutes)} · {play.playCount}×</p>
                 </div>
               </div>
             ))}
@@ -285,7 +285,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
       {/* ── Écoutes récentes ─────────────────────────────────────────────────── */}
       {recentPlays.length > 0 && (
         <div className="mb-8">
-          <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-4">Écoutes récentes</p>
+          <p className="text-[13px] font-semibold text-ink-3 mb-4">Écoutes récentes</p>
           <div className="flex flex-col gap-1.5">
             {recentPlays.map((entry) => (
               <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-foreground/[0.02] hover:bg-foreground/[0.04] transition-colors group">
@@ -300,11 +300,11 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-foreground truncate">{entry.title}</p>
-                  <p className="text-[11px] text-foreground/35 truncate">{entry.subtitle}</p>
+                  <p className="text-[11px] text-ink-3 truncate">{entry.subtitle}</p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-xs text-foreground/40">{formatMinutes(entry.minutes)}</p>
-                  <p className="text-[10px] text-foreground/20">{formatDate(entry.date)}</p>
+                  <p className="text-xs text-ink-3">{formatMinutes(entry.minutes)}</p>
+                  <p className="text-[10px] text-ink-3">{formatDate(entry.date)}</p>
                 </div>
               </div>
             ))}
@@ -315,8 +315,8 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
       {/* ── Succès / Badges ──────────────────────────────────────────────────── */}
       <div className="mb-8">
         <div className="flex items-baseline justify-between mb-4">
-          <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Succès</p>
-          <span className="text-[10px] text-foreground/25">{Object.keys(unlocked).length}/{ACHIEVEMENTS.length}</span>
+          <p className="text-[13px] font-semibold text-ink-3">Succès</p>
+          <span className="text-[10px] text-ink-3">{Object.keys(unlocked).length}/{ACHIEVEMENTS.length}</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
           {ACHIEVEMENTS.map((a) => {
@@ -332,14 +332,14 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
                     : "bg-foreground/[0.02] border-foreground/[0.06]"
                 )}
               >
-                <svg className={cn("w-5 h-5 flex-shrink-0 transition-all", isUnlocked ? "text-focus" : "text-foreground/25")} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7}>
+                <svg className={cn("w-5 h-5 flex-shrink-0 transition-all", isUnlocked ? "text-focus" : "text-ink-3")} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7}>
                   <circle cx="12" cy="8" r="6" /><path d="M15.5 13.5L17 22l-5-3-5 3 1.5-8.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 <div className="min-w-0">
-                  <p className={cn("text-xs font-semibold truncate", isUnlocked ? "text-foreground" : "text-foreground/40")}>
+                  <p className={cn("text-xs font-semibold truncate", isUnlocked ? "text-foreground" : "text-ink-3")}>
                     {a.title}
                   </p>
-                  <p className="text-[10px] text-foreground/30 leading-tight line-clamp-2">{a.description}</p>
+                  <p className="text-[10px] text-ink-3 leading-tight line-clamp-2">{a.description}</p>
                 </div>
               </div>
             );
@@ -349,7 +349,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
 
       {/* ── Heatmap calendar ─────────────────────────────────────────────────── */}
       <div>
-        <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-4">Calendrier</p>
+        <p className="text-[13px] font-semibold text-ink-3 mb-4">Calendrier</p>
         <div className="overflow-x-auto pb-2">
           <div className="inline-flex flex-col gap-1 min-w-max">
             {/* Month labels */}
@@ -357,7 +357,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
               {weeks.map((_, wi) => {
                 const label = monthLabels.find((m) => m.weekIndex === wi);
                 return (
-                  <div key={wi} className="w-3 text-[9px] text-foreground/25 text-center">
+                  <div key={wi} className="w-3 text-[9px] text-ink-3 text-center">
                     {label ? label.label : ""}
                   </div>
                 );
@@ -368,7 +368,7 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
             <div className="flex gap-1">
               <div className="flex flex-col gap-1 mr-1">
                 {dayLabels.map((d, i) => (
-                  <div key={i} className="w-3 h-3 text-[9px] text-foreground/20 flex items-center justify-center">
+                  <div key={i} className="w-3 h-3 text-[9px] text-ink-3 flex items-center justify-center">
                     {i % 2 === 0 ? d : ""}
                   </div>
                 ))}
@@ -398,11 +398,11 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
 
             {/* Legend */}
             <div className="flex items-center gap-1.5 mt-1 ml-6">
-              <span className="text-[9px] text-foreground/25 mr-0.5">Moins</span>
+              <span className="text-[9px] text-ink-3 mr-0.5">Moins</span>
               {intensityClasses.map((cls, i) => (
                 <div key={i} className={cn("w-3 h-3 rounded-sm", cls)} />
               ))}
-              <span className="text-[9px] text-foreground/25 ml-0.5">Plus</span>
+              <span className="text-[9px] text-ink-3 ml-0.5">Plus</span>
             </div>
           </div>
         </div>
@@ -424,7 +424,7 @@ function PlayTypeIcon({ type, small }: { type: PlayType; small?: boolean }) {
     </svg>
   );
   return (
-    <svg className={cn(sz, "text-red-500")} viewBox="0 0 24 24" fill="currentColor">
+    <svg className={cn(sz, "text-danger")} viewBox="0 0 24 24" fill="currentColor">
       <path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/>
     </svg>
   );
@@ -439,9 +439,9 @@ function StatCard({ label, value, sub, highlight = false }: { label: string; val
         highlight ? "border-focus/25 bg-focus/[0.07]" : "border-foreground/[0.08] bg-foreground/[0.025]"
       )}
     >
-      <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-foreground/35">{label}</p>
+      <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3">{label}</p>
       <p className="mt-1.5 text-xl font-semibold tracking-tight text-foreground tabular-nums">{value}</p>
-      <p className="mt-0.5 text-[11px] text-foreground/40">{sub}</p>
+      <p className="mt-0.5 text-[11px] text-ink-3">{sub}</p>
     </div>
   );
 }
