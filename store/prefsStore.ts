@@ -8,6 +8,9 @@ interface PrefsState {
   setBreathingEnabled: (v: boolean) => void;
   onboarded: boolean;
   setOnboarded: (v: boolean) => void;
+  /** Scènes d'eau WebGL (landing, pauses, Spotify, résumé). false = image fixe. */
+  waterEffects: boolean;
+  setWaterEffects: (v: boolean) => void;
 }
 
 export const usePrefsStore = create<PrefsState>()(
@@ -17,6 +20,8 @@ export const usePrefsStore = create<PrefsState>()(
       setBreathingEnabled: (v) => set({ breathingEnabled: v }),
       onboarded: false,
       setOnboarded: (v) => set({ onboarded: v }),
+      waterEffects: true,
+      setWaterEffects: (v) => set({ waterEffects: v }),
     }),
     { name: "focusflow-prefs" }
   )

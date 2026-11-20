@@ -4,7 +4,9 @@
 // Montre chaque token et chaque composant de base dans ses états, dans le
 // thème courant (bascule en haut). Sert aussi de banc de capture pour les
 // critiques (scripts/shoot.mjs).
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import type { WaterHandle } from "@/components/WaterScene";
 import { useThemeStore } from "@/store/themeStore";
 import { defaultVideos, getVideoColor } from "@/data/videos";
 import { Button, IconButton } from "@/components/ff/Button";
@@ -20,6 +22,8 @@ import { toast } from "@/components/Toast";
 import {
   IconClose, IconHelp, IconMoon, IconMore, IconPip, IconPlay, IconPlus, IconStone, IconSun, IconTasks,
 } from "@/components/ff/icons";
+
+const WaterScene = dynamic(() => import("@/components/WaterScene"), { ssr: false });
 
 const SWATCHES = [
   ["bg", "Fond"], ["surface", "Surface"], ["surface-2", "Surface creusée"], ["line", "Filet"],
@@ -59,9 +63,17 @@ export default function DesignPage() {
   const [loop, setLoop] = useState(true);
   const [easeRun, setEaseRun] = useState(0);
   const vids = defaultVideos.slice(0, 4);
+  const water = useRef<WaterHandle>(null);
+  const [wLevel, setWLevel] = useState(0.45);
+  const [swell, setSwell] = useState(true);
+  const [refletIdx, setRefletIdx] = useState(0);
+  const reflets = ["#1e3a5f", "#4a2a1e", "#1db954", "#9146ff"];
 
   return (
     <main className="min-h-screen bg-bg text-ink">
+      {/* React 19 hisse ces balises dans <head> : page interne non indexée. */}
+      <title>Système · FocusFlow</title>
+      <meta name="robots" content="noindex, nofollow" />
       <div className="mx-auto max-w-6xl px-4 sm:px-8 py-10 sm:py-16 flex flex-col gap-16">
         <header className="flex flex-wrap items-end gap-4 border-b border-line pb-6">
           <div className="min-w-0 flex-1">
@@ -229,6 +241,29 @@ export default function DesignPage() {
                 <Button size="sm" onClick={() => setLevel((l) => (l >= 0.96 ? 0.04 : l + 0.08))}>Une graduation</Button>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* ── L'eau (WebGL) ───────────────────────────────────────── */}
+        <section className="flex flex-col gap-4">
+          <SectionTitle measure="WebGL2 · shader maison">L&apos;eau</SectionTitle>
+          <div className="relative">
+            <WaterScene
+              ref={water}
+              level={wLevel}
+              swell={swell ? 1 : 0}
+              reflet={reflets[refletIdx]}
+              label={`Niveau ${Math.round(wLevel * 100)} %`}
+              className="h-[340px] sm:h-[420px] rounded-[var(--r-surface)]"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => water.current?.drop()}>Goutte</Button>
+            <Button size="sm" onClick={() => water.current?.stone()}>Caillou</Button>
+            <Button size="sm" onClick={() => { water.current?.overflow(0.15); setWLevel(0.15); }}>Débordement</Button>
+            <Button size="sm" onClick={() => setWLevel((l) => Math.min(1, l + 0.1))}>Monter</Button>
+            <Button size="sm" onClick={() => setSwell((s) => !s)}>{swell ? "Lecture en pause" : "Lecture active"}</Button>
+            <Button size="sm" onClick={() => setRefletIdx((i) => (i + 1) % reflets.length)}>Autre vidéo</Button>
           </div>
         </section>
 
