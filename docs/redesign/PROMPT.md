@@ -100,3 +100,7 @@ Tests unitaires (adaptateurs, logique de file, sélection des suggestions, API m
 # Règles de conduite
 
 Ne me pose pas de question pour les décisions de design : décide, justifie dans les docs, avance. Arrête-toi et demande uniquement pour l'irréversible ou le coûteux (migration SQL Supabase, suppression de données, nouveau service, clé manquante). Ne supprime aucune feature sans la documenter. Entre « rapide » et « juste », choisis « juste ».
+
+# Ajout de l'utilisateur (2026-11-20)
+
+On garde l'effet goutte d'eau au début (le shader du `SplashIntro` : surface d'eau, onde de choc au clic, vague de révélation). Phase 5 : le splash est ADAPTÉ à la nouvelle identité (texture, typographie, couleurs, cohérence avec la landing), jamais remplacé par autre chose. Ce mécanisme devient un invariant de la refonte.
