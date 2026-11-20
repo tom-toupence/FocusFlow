@@ -192,3 +192,44 @@
     Sketchfab ou pack low-poly comme élément principal ;
   - une animation `linear` ou `ease` par défaut, ou une rotation infinie ;
   - un éclairage « HDRI par défaut + metalness 1 ».
+
+---
+
+## H. Clichés du thème « mégapole asiatique la nuit » (cadrage utilisateur, 2026-11-20)
+
+Le thème est imposé : la vie nocturne d'une mégapole asiatique, version
+cyberpunk, comme décor du travail concentré. Il est d'autant plus exposé aux
+clichés. Interdits, en plus de tout ce qui précède :
+
+1. **La palette magenta + cyan par défaut**, et tout néon rose. Le thème doit
+   être reconnaissable sans un seul néon rose.
+2. **Le glitch RGB partout** (aberration chromatique, décalage de canaux) et
+   les **scanlines**.
+3. **Le « Blade Runner » copié** : pluie bleue, publicités géantes de visages,
+   voitures volantes, brume violette uniforme.
+4. **La grille synthwave au sol**, le **soleil rétro** à bandes, les palmiers.
+5. **Les faux idéogrammes** et tout texte en caractères asiatiques décoratif
+   ou dénué de sens. Si une écriture non latine apparaît, elle est réelle,
+   correcte, et justifiée par ce qu'elle dit ; sinon il n'y en a aucune.
+6. **Les clichés culturels** : lanternes, cerisiers, torii, dragons, katanas,
+   éventails, vagues d'Hokusai. On veut la ville contemporaine de nuit, pas une
+   carte postale.
+7. **Les noms de pays ou de villes dans l'interface** (y compris les
+   métadonnées « pays » affichées sur les cartes du catalogue).
+8. Le néon comme **décor plaqué sur une UI** (texte qui « brille », halos sur
+   les boutons) : le néon vit dans le décor 3D et dans la lumière, pas sur les
+   contrôles.
+9. Sacrifier la lisibilité au thème : la typographie s'inspire de la
+   signalétique de nuit pour la hiérarchie et les chiffres, le texte courant
+   reste parfaitement lisible.
+
+**Palette recherchée** : sodium orangé des lampadaires, vert de supérette,
+blanc froid des tubes néon et des enseignes, rouge des feux arrière, jaune des
+taxis, bleu-noir de l'asphalte mouillé. Clair : la même ville au petit matin
+(ciel lavé, béton humide, lumières qui s'éteignent).
+
+**Le prototype Céladon du lab est éliminé** : beau mais hors thème. Les
+réflexes R1 (sombre + un accent) et R8 (shader plein écran nocturne) restent
+interdits même si le thème est nocturne : la nuit se construit avec plusieurs
+sources colorées, de la matière et des objets modélisés, pas avec un fond noir
+et un accent.

@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Pas de badge flottant en dev : il masquait des contrôles sur les captures
+  // de critique. Les erreurs de build et d'exécution s'affichent toujours.
+  devIndicators: false,
   async headers() {
     return [
       {

@@ -29,7 +29,7 @@ await page.goto(`${base}/lab/${slug}`, { waitUntil: "domcontentloaded", timeout:
 const tag = mobile ? "m" : "d";
 const shot = async (name) => page.screenshot({ path: path.join(outDir, `${slug}-${tag}-${name}.jpg`), type: "jpeg", quality: 82, timeout: 120000 });
 const fps = async () => page.evaluate(() => ({ fps: window.__labFps ?? 0, ...(window.__labInfo ?? {}) }));
-const click = async (label) => page.locator("[data-lab-controls] button", { hasText: label }).first().click().catch(() => {});
+const click = async (label) => page.locator("[data-lab-controls] button", { hasText: label }).first().dispatchEvent("click").catch(() => {});
 const samples = [];
 
 await page.waitForTimeout(2500); await shot("01-entree");

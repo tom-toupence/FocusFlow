@@ -170,3 +170,23 @@ matière là où je fais lumière, objet là où je fais plein écran, terre et
 - Ne jamais poser le vase par-dessus une vidéo qui joue.
 - Prévoir un repli statique (rendu précalculé de la pièce) et le thème sombre
   (« le four la nuit »).
+
+---
+
+## Élimination après le cadrage du thème (2026-11-20)
+
+Le thème imposé (la vie nocturne d'une mégapole asiatique, version cyberpunk)
+élimine les prototypes qui ne le tiennent pas. Leur code est retiré du dépôt ;
+captures et vidéos restent ici comme archive.
+
+| Prototype | Verdict | Raison |
+|---|---|---|
+| 1 Céladon | **éliminé** | atelier de céramique : beau, mais aucune ville, aucune nuit |
+| 2 Chiffres physiques | **éliminé** | jouet Bauhaus en plein jour, illisible |
+| 3 Presse (textmode) | **éliminé** | papier journal ; l'ASCII est une mode 2025 et la photo de nuit se convertit mal |
+| 4 Riso | **éliminé** | impression 2D sur papier, hors thème et sans 3D |
+| 5 Maquette | **conservé et repris** | c'est déjà une ville et des fenêtres qui s'allument : il passe de nuit dans le lab 2 |
+| 6 Compteur | **éliminé** | objet de bureau rétro, hors thème ; la méthode Blender en script est gardée |
+
+Le module `lib/atelier` (Céladon) est également retiré. Dépendances
+désinstallées : opentype.js, Rapier, textmode.js, Paper.js, @theatre/core.

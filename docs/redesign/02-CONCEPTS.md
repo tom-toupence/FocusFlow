@@ -506,3 +506,45 @@ la trace de chaque distraction, qui part au four quand la pause commence : non,
 pas de serif légère ni de mono (pas R2, R3), objet modélisé et non shader plein
 écran (pas R8, R9), métaphore de geste et de matière liée au produit et non
 instrument scientifique (pas R10), couleurs franches de matière (pas R14).
+
+
+---
+
+# CADRAGE DU THÈME (2026-11-20) : la ville qui ne dort pas
+
+Le thème est désormais imposé par l'utilisateur : **la vie nocturne d'une
+mégapole asiatique, version cyberpunk, comme décor du travail concentré la
+nuit**. FocusFlow, c'est travailler pendant que la ville ne dort pas.
+
+**Céladon (C7) est abandonné** : c'était la direction la plus forte du premier
+lab, mais elle ne raconte pas la ville la nuit. La Clepsydre reste abandonnée
+pour les raisons données plus haut (réflexes). Un second lab est lancé
+entièrement dans le thème (`LAB.md`, « Lab 2 »), avec des librairies jamais
+utilisées ; la direction sera choisie à partir de lui.
+
+## Ce que le thème doit faire (non décoratif)
+
+| Mécanique | Dans la ville |
+|---|---|
+| le temps de la session | **la nuit avance** : l'heure, des enseignes qui s'allument puis s'éteignent, le dernier train, l'aube |
+| travail / pause | deux ambiances lisibles : la rue active, bruyante de lumières ; puis la halte (une rue plus calme, une enseigne qui s'éteint, la supérette) |
+| tu n'es pas seul | d'autres fenêtres allumées dans les tours : les amis « en focus » |
+| fin de pomodoro | un événement de ville (une rame passe, une façade s'éteint étage par étage) |
+| fin de playlist prolongée | une nouvelle enseigne s'allume plus loin dans la rue : la nuit continue |
+| objectif atteint | le premier taxi libre / le ciel qui pâlit sur les toits |
+| distraction | une enseigne qui grésille, un tube qui clignote |
+| couleur de la vidéo | la lumière dominante de la rue (reflets au sol) |
+
+## Contraintes
+
+- 3D modélisée à la main dans cet univers (façades, caissons lumineux,
+  ruelle, climatiseurs, câbles, sol mouillé, pluie, vapeur), éclairage de nuit
+  dirigé à sources colorées multiples, reflets humides, brume ; motion
+  chorégraphié.
+- Typographie inspirée de la signalétique de nuit, hiérarchie nette, texte
+  courant parfaitement lisible.
+- L'app connectée est plus sobre ; le clair existe : la même ville au petit
+  matin.
+- Liste noire § H : pas de magenta + cyan, pas de néon rose, pas de glitch ni
+  de scanlines, pas de faux idéogrammes, pas de carte postale, aucun nom de
+  pays ou de ville dans l'interface.
