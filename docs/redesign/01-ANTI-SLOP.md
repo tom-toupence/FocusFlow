@@ -143,3 +143,52 @@
 - [ ] Aucun faux visualiseur audio
 - [ ] Copy concret, spécifique, sans em-dash ni emoji
 - [ ] Le test « une autre app pourrait-elle l'utiliser ? » répond non
+
+
+---
+
+## G. Mes réflexes par défaut (ajout après recadrage, 2026-11-20)
+
+> Liste honnête de ce que je refais à chaque projet quand on me laisse
+> faire. Elle a été écrite APRÈS avoir produit les phases 3 à 6 : la colonne
+> de droite dit où je suis tombé dedans. Tout ce qui est coché « produit » est
+> à refaire ou à justifier par le lab, pas par l'habitude.
+
+| # | Réflexe | Produit dans cette refonte ? |
+|---|---|---|
+| R1 | **Fond sombre + un seul accent chaud** (ici « sodium » sur bleu-nuit), et je l'habille d'une histoire pour le rendre légitime | oui : tout le système « Eau de nuit » |
+| R2 | **Serif d'affichage légère** pour faire « éditorial » (Hahmlet 300, chasse resserrée) + sans très lisible pour le corps | oui : landing, titres de toute l'app |
+| R3 | **Mono pour les chiffres** et les durées, « parce que c'est un instrument » | oui : minuteur, mesures, graduations |
+| R4 | **Filets fins et feuilles sans boîtes** (border-t 1 px, sections « relevé ») présentés comme l'anti-bento, alors que c'est mon autre gabarit par défaut | oui : dashboard, résumé, landing |
+| R5 | **Texte aligné à gauche sur un plein cadre sombre** avec un voile en dégradé pour la lisibilité : le hero « cinéma » | oui : landing, hero et toutes les sections |
+| R6 | **Un seul bouton plein + un lien discret** à côté, en croyant esquiver le hero à 2 boutons | oui : landing, dashboard, réglages |
+| R7 | **Indicateur qui glisse** (layoutId) sous l'onglet actif | oui : Segmented, rail |
+| R8 | **Shader plein écran « scène nocturne »** : eau, horizon, lumières lointaines, vignette. C'est le même registre que les héros « aurora » que j'interdis, en plus sophistiqué | oui : WaterScene, landing, résumé |
+| R9 | **Raymarching analytique sur un plan** pour éviter de modéliser : aucune géométrie, aucun objet, juste un quad et du bruit. C'est de la « 3D » qui évite la 3D | oui : lib/water |
+| R10 | **Métaphore scientifique ou technique** (instrument, relevé, échelle de marée) plaquée sur une app pour légitimer un style sobre | oui : concept Clepsydre / Marégraphe |
+| R11 | **Rayons « presque vifs » 2-10 px** et cartes à bordure fine | oui : tokens, MediaCard, modales |
+| R12 | **Layouts symétriques et colonnes centrées max-w-6xl / 3xl** | oui : toutes les pages |
+| R13 | **Fade et cascade d'entrée** (staggerChildren, ff-rise) même quand je dis les limiter | oui : dashboard, modales |
+| R14 | **Palette désaturée « bon goût »** : encre bleu-noir, crème, gris chauds, aucune couleur franche | oui : les deux thèmes |
+| R15 | **Composants « système » shadcn-like** renommés (Button ink/line/quiet, Field à ligne basse) | oui : components/ff |
+| R16 | **Grille fine / graduations en fond** comme décor de « précision » | oui : graduations partout, échelle du splash |
+| R17 | **Animations CSS keyframes génériques** (scale + opacity pour une « goutte ») au lieu d'un vrai plan chorégraphié | oui : ff-drop, ff-stone |
+| R18 | **Copy en phrases courtes assertives** de manifeste (« La ville est déjà allumée. ») | oui : landing |
+
+### Ce qui en découle
+
+- Le concept « Clepsydre de nuit » est **suspendu** : il est né de mes
+  réflexes R1, R8, R9, R10, R14. Il ne revient que s'il gagne le lab face à des
+  directions qui n'en ont aucun.
+- Le splash goutte d'eau reste (demande explicite), mais sa texture et sa
+  palette suivront la direction gagnante.
+- Nouvelle question à poser avant chaque écran : **« Est-ce que j'aurais
+  produit ça par défaut ? »** Si oui, on change.
+- Ajouts à la liste noire, applicables dès maintenant :
+  - un fond sombre + un accent unique comme base du système (R1) ;
+  - une serif légère d'affichage choisie « pour l'élégance » (R2) ;
+  - un shader plein écran comme héros (R8) et toute « 3D » sans objet modélisé (R9) ;
+  - toute primitive posée telle quelle (sphère, tore, boîte, nœud), modèle
+    Sketchfab ou pack low-poly comme élément principal ;
+  - une animation `linear` ou `ease` par défaut, ou une rotation infinie ;
+  - un éclairage « HDRI par défaut + metalness 1 ».

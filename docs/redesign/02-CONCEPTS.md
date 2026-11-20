@@ -422,3 +422,87 @@ refonte :
    partagé ni de minuteur synchronisé, donc pas de Focus Rooms) et restent
    absents de `/session`, la distraction reste manuelle (touche D, aucune
    détection via `visibilitychange`, donc pas de Mode Strict).
+
+---
+
+# RECADRAGE (2026-11-20) : la Clepsydre est abandonnée
+
+Relue après la section « Mes réflexes par défaut » (01-ANTI-SLOP § G), la
+Clepsydre de nuit coche R1 (sombre + un accent), R2 (serif légère), R8
+(shader plein écran nocturne), R9 (3D sans objet), R10 (métaphore technique
+plaquée), R14 (palette désaturée). Elle ne tient pas. **Elle est jetée.** La
+direction est choisie à partir du lab (`docs/redesign/LAB.md`), pas de mes
+habitudes.
+
+## C7 · Céladon, l'atelier (issu du lab, retenu)
+
+**Métaphore.** Une session est une **pièce de céramique** qu'on émaille puis
+qu'on cuit. Le travail fait monter l'émail céladon sur la terre crue ; la fin
+du pomodoro envoie la pièce au four ; la pause est le four qui refroidit ; la
+journée est une **étagère** de pièces. Le céladon est la grande céramique
+coréenne (dynastie Goryeo, XIIe siècle) : vert de jade obtenu par réduction de
+fer dans l'émail, craquelé, un savoir-faire de patience. On y retrouve ce que
+FocusFlow demande : un geste répété, du temps qui ne se rattrape pas, un
+résultat qu'on voit le lendemain.
+
+**Pourquoi elle colle aux mécaniques réelles**
+
+| Mécanique de l'app | Dans l'atelier |
+|---|---|
+| session lancée | la pièce est posée sur la tournette (entrée : elle monte d'un léger creux, tourne d'un quart et se pose) |
+| temps de travail | l'émail monte le long de la pièce ; la hauteur se lit du coin de l'œil |
+| distraction (touche D) | un **picot** : petite bulle éclatée dans l'émail (vrai défaut de cuisson). Il reste sur la pièce, et donc sur l'étagère : l'historique des distractions est visible, sans reproche |
+| fin de pomodoro | l'émail atteint la lèvre, un tour de tournette, la pièce part au four (lueur de four) |
+| pause | le four refroidit : la lumière glisse vers le bleu gris du soir ; respiration guidée = la porte du four qui « respire » (lueur qui monte 4 s, tient, descend) |
+| pause longue | défournement : les pièces du cycle sont posées sur l'étagère |
+| Flowtime | l'émail dépasse la lèvre et **coule** le long de la panse : plus le flow dure, plus les coulures descendent. La pause méritée = le volume coulé ÷ 5 |
+| file qui avance / changement de piste | une goutte d'émail tombe sur la pièce (le geste du splash, conservé) |
+| fin de playlist prolongée | une **deuxième couche d'émail** d'une teinte voisine recouvre la première : la session continue avec « la même terre, un émail proche » |
+| objectif du jour atteint | l'étagère du jour est pleine ; un **sceau** de potier (cachet) s'imprime au pied de la dernière pièce |
+| jardin / défis / XP | l'étagère de la semaine ; les niveaux deviennent des formes de pièces débloquées (bol, coupe, jarre, maebyeong) |
+| amis en focus | sur l'étagère de l'accueil, la pièce d'un ami en cours d'émaillage brille faiblement (présence passive, pas d'espace partagé) |
+| couleur de la vidéo | elle **teinte l'émail** : céladon jade pour Shibuya sous la pluie, céladon gris bleu pour Osaka à minuit, ambré pour un coucher de soleil. Chaque pièce garde la couleur de la ville où elle a été faite |
+| session avec vidéo | la vidéo reste l'immersion ; la pièce n'apparaît qu'en silhouette (le profil du vase, en SVG, qui se remplit) dans le coin, jamais en 3D par-dessus |
+
+**La 3D (faite main)**
+- **La pièce** : tournée en code (profils dessinés à la main, quatre familles
+  de formes, variations procédurales par graine), émail en TSL (montée,
+  coulures, craquelure, picots, épaississement dans les creux, teinte de la
+  vidéo), terre crue mouchetée.
+- **Le four** et **l'étagère** : modélisés en script Blender headless
+  (`scripts/blender/*.py`), exportés en `.glb` compressé, moins de 1 Mo par scène.
+- **Lumière** : direction photo de studio, key chaude en softbox, fill froide,
+  contre-jour ; ombre de contact précalculée.
+- **Où** : landing, accueil (étagère), pause (four), session Spotify
+  (la pièce tourne pendant que la musique joue, sans vidéo), résumé (la pièce
+  de la session, avec ses picots), Wrapped (l'étagère de la semaine).
+
+**Palette** (matière, pas « un accent »)
+- Jour (défaut) : os `#ece6da`, terre crue `#c3b49a`, terre sombre `#6d6150`,
+  oxyde de fer (encre) `#2f2a22`, céladon `#a9c2ad` → céladon profond `#4f6a5c`,
+  lueur de four `#d9622b` (uniquement pour « en train de cuire / maintenant »).
+- Nuit (« le four la nuit ») : charbon chaud `#1d1a17`, surfaces `#27231f`,
+  encre os, céladon lumineux, lueur de four plus vive.
+
+**Typographie**
+- **Bricolage Grotesque** (Mathieu Triay, OFL) pour l'affichage et les grands
+  chiffres : grotesque à pièges d'encre et axes de largeur et de taille
+  optique ; son dessin légèrement irrégulier répond à la pièce tournée à la
+  main. Chiffres tabulaires présents (vérifié : `tnum`).
+- **Gowun Dodum** (Yanghee Ryu, OFL) pour l'interface et le texte : sans
+  humaniste arrondie dessinée pour le coréen et le latin, douceur d'argile,
+  lisible petit. `tnum` présent.
+- Plus de mono, plus de serif d'affichage légère (réflexes R2, R3).
+
+**Mouvement** : voir 03-SYSTEM § Mouvement (révisé). Références : la
+tournette et le geste du potier (Lucie Rie, Hans Coper), la cuisson de
+céladon (fours dragons de Gangjin), les génériques de Saul Bass pour la
+chorégraphie par formes simples, le motion design de ManvsMachine et Buck
+pour les objets en studio, Dieter Rams pour la retenue.
+
+**Test « autre app »** : une pièce dont l'émail monte en 25 minutes, qui garde
+la trace de chaque distraction, qui part au four quand la pause commence : non,
+ça ne sert qu'à FocusFlow. **Test des réflexes** : clair et chaud (pas R1),
+pas de serif légère ni de mono (pas R2, R3), objet modélisé et non shader plein
+écran (pas R8, R9), métaphore de geste et de matière liée au produit et non
+instrument scientifique (pas R10), couleurs franches de matière (pas R14).

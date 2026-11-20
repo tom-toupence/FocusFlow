@@ -1,164 +1,102 @@
-# 03 · Système de design « Clepsydre de nuit »
+# 03 · Système de design « Céladon, l'atelier » (révisé après le lab)
 
+> La version précédente (« Clepsydre de nuit ») est abandonnée : elle venait de
+> mes réflexes (01-ANTI-SLOP § G). Ce document décrit le système issu du lab.
 > Source de vérité du code : `app/globals.css` (tokens), `lib/motion.ts`
-> (mouvement), `components/ff/*` (composants de base), page interne
-> **`/_design`** (vitrine de tout, dans le thème courant).
-> Contrastes : `node scripts/contrast.mjs` (sort en erreur si une paire échoue).
+> (mouvement), `components/ff/*` (composants), `lib/atelier/*` (3D),
+> page interne `/_design`. Contrastes : `node scripts/contrast.mjs`.
 
 ## 1. Principe
 
-Le temps de travail se lit comme une hauteur d'eau. Deux thèmes, deux
-situations, pas une inversion :
+L'interface est l'**atelier** ; la 3D est la **pièce** qui s'y fabrique. Le
+temps de travail fait monter l'émail ; les pauses passent au four ; l'histoire
+se range sur l'étagère. Le système graphique est fait de **matières** (terre,
+émail, oxyde de fer, lueur de four), pas d'un fond et d'un accent.
 
-| | Thème clair : **Papier du relevé** | Thème sombre : **Eau de nuit** (défaut) |
+| | Jour, « l'atelier » (défaut) | Nuit, « le four la nuit » |
 |---|---|---|
-| Quand | le jour, on relit sa trace | le soir, on travaille |
-| Fond | papier crème froid | encre bleu-noir à peine tiède (jamais `#000`) |
-| Encre | graphite bleuté | blanc papier chaud |
-| Signal | sodium brûlé (lisible sur papier) | sodium de lampadaire |
+| Fond | os, lumière de verrière | charbon chaud, jamais noir pur ni bleu |
+| Texte | oxyde de fer | os |
+| Fait / émaillé | céladon profond | céladon lumineux |
+| En cours / cuit maintenant | lueur de four, en petite surface | lueur de four plus vive |
+| Neutres | terres (crue, sombre) | terres assombries |
 
-**Un seul signal fixe : le sodium**, la lumière orangée des lampadaires des
-photos de Séoul. Il veut dire « maintenant, ce qui est mesuré » : trait de
-niveau, minute en cours, onglet actif, bouton qui met le temps en marche.
-**La couleur de la vidéo (`--reflet`, = `--ambient-raw`) n'est jamais un accent
-d'interface** : c'est un reflet, posé sur l'eau et sous les médias.
+Le **thème clair redevient le défaut** : c'est l'atelier en plein jour, et
+c'est le contraire de mon réflexe R1. La nuit reste disponible.
 
-## 2. Couleurs
+## 2. Couleurs (tokens)
 
-Tokens (oklch) : `--bg`, `--surface`, `--surface-2`, `--line`, `--line-strong`,
-`--text`, `--text-2`, `--text-3`, `--on-text`, `--sodium`, `--sodium-text`,
-`--on-sodium`, `--danger`, `--water`, `--water-deep`, `--reflet`.
-Utilitaires Tailwind : `bg-bg`, `bg-surface`, `bg-surface-2`, `border-line`,
-`border-line-strong`, `text-ink`, `text-ink-2`, `text-ink-3`, `text-on-ink`,
-`bg-sodium`, `text-sodium-text`, `text-on-sodium`, `text-danger`, `bg-water`,
-`bg-water-deep`, `bg-reflet`.
+`--bg`, `--surface`, `--surface-2`, `--line`, `--line-strong`, `--text`,
+`--text-2`, `--text-3`, `--on-text`, `--glaze` (céladon : fait, progression),
+`--glaze-deep`, `--glaze-text`, `--kiln` (four : maintenant, signal rare),
+`--kiln-text`, `--on-kiln`, `--clay`, `--clay-dark`, `--danger`, `--reflet`
+(couleur de la vidéo, teinte l'émail des pièces).
 
 Règles :
-- **Texte** : `ink` (titres, contenu), `ink-2` (secondaire), `ink-3` (méta).
-  Fini les `text-foreground/35` : ces opacités échouaient en AA. `ink-3` passe
-  4,5:1 sur toutes les surfaces dans les deux thèmes.
-- **Sodium** en graphisme (traits, points, remplissage de bouton) ;
-  **`sodium-text`** dès que c'est du texte (plus sombre sur papier).
-- **Couleurs sémantiques conservées** : marques (Spotify `#1db954`, Twitch
-  `#9146ff`), couleur choisie par l'utilisateur (projets, routines), pastilles
-  d'humeur, rouge destructif. Toujours en petite surface (point, filet).
-- **Interdit** : emerald/sky/violet/amber/orange décoratifs (254 occurrences à
-  migrer en phase 6), dégradés colorés, verre translucide.
-
-Contrastes vérifiés (extrait, ratio mini sur les 3 surfaces) :
-
-| Paire | Papier | Eau de nuit | Seuil |
-|---|---|---|---|
-| ink / fond | 13,5 | 13,0 | 4,5 |
-| ink-2 / fond | 7,4 | 8,3 | 4,5 |
-| ink-3 / fond | 5,1 | 5,5 | 4,5 |
-| sodium-text / fond | 5,7 | 9,4 | 4,5 |
-| on-sodium / sodium | 4,9 | 9,2 | 4,5 |
-| sodium (graphique) / fond | 4,5 | 9,0 | 3 |
-| line-strong (bord de contrôle) / fond | 3,5 | 3,3 | 3 |
-| danger / fond | 5,4 | 6,2 | 4,5 |
-
-Compatibilité : les anciens noms shadcn (`--background`, `--foreground`,
-`--card`, `--border`, `--focus`…) pointent vers les nouveaux tokens, pour que
-l'app reste cohérente pendant la migration écran par écran. `--focus` devient
-le sodium (même rôle, nouvelle couleur).
+- le **céladon** dit « fait / émaillé / en progression » (barres, niveau,
+  onglet actif) ;
+- la **lueur de four** dit « maintenant, en train de cuire » : le bouton qui
+  lance le temps, le minuteur en marche, la pièce au four. Jamais en décor ;
+- les **terres** remplacent les gris : bordures, surfaces creusées, textes
+  secondaires ;
+- couleurs sémantiques conservées en petite surface : marques Spotify et
+  Twitch, couleurs choisies par l'utilisateur, humeurs, rouge destructif.
 
 ## 3. Typographie
 
-| Famille | Rôle | Pourquoi elle, et pas une autre |
+| Famille | Rôle | Raison |
 |---|---|---|
-| **Hahmlet** (Hypertype, OFL) | titres (`font-display`, `font-heading`) | serif dessinée **conjointement pour le hangeul et le latin** : porte le fil coréen du concept (clepsydre de Sejong, Séoul) sans pastiche ni « police asiatique » décorative. Ce n'est pas la serif à la mode (Instrument Serif, Fraunces). |
-| **Azeret Mono** (Displaay, OFL) | tout ce qui est **mesuré** (`font-mono`) : minuteur, durées, graduations, compteurs | dessinée pour les données et les instruments ; chiffres étroits et stables, lisibles de loin sur une vidéo. |
-| **Atkinson Hyperlegible Next** (Braille Institute, OFL) | corps (`font-sans`) | conçue pour les basses visions : lisible **la nuit, écran baissé**. Seule raison valable de choisir une sans dans ce produit. |
+| **Bricolage Grotesque** (OFL) | titres, grands chiffres (minuteur, mesures) | grotesque à pièges d'encre, axes de largeur et de taille optique, dessin légèrement irrégulier comme une pièce tournée ; `tnum` vérifié |
+| **Gowun Dodum** (OFL) | interface, texte courant, légendes | humaniste arrondie coréenne et latine, douceur d'argile, lisible petit ; `tnum` vérifié |
 
-Geist est retirée (police par défaut de Next.js, aucun argument propre au
-produit). Toutes chargées par `next/font/google` (auto-hébergées, aucun appel
-externe à l'exécution).
+- Plus aucune mono (réflexe R3) : les chiffres sont en Bricolage tabulaire.
+- Plus aucune serif légère (réflexe R2).
+- Les grands chiffres utilisent l'axe de largeur (condensé) pour tenir sur la
+  vidéo sans masquer l'image.
 
-Échelle (px) : 11 · 12 · 13 · 14 · 15 · 17 · 20 · 26 · 32 · 42 · 56 ·
-`clamp()` pour les titres d'écran. Règles :
-- les titres d'écran en Hahmlet **300**, les titres de bloc en 400 ;
-- **la mono est réservée aux mesures** (liste noire C15) : pas de titres de
-  section en capitales mono espacées. Les anciens micro-labels deviennent des
-  titres Hahmlet courts ou disparaissent ;
-- chiffres toujours `tabular-nums` ;
-- capitales uniquement pour les marqueurs de type de 10 px (« PLAYLIST »).
+## 4. Formes, espace, élévation
 
-## 4. Espace, grille, rayons, élévation
+- **Rayons** : la terre est ronde. Surfaces `16px`, contrôles `999px` pour les
+  actions principales (galet), `10px` pour les champs ; vignettes média `12px`.
+  C'est un changement assumé par rapport aux angles vifs précédents (R11).
+- **Composition** : asymétrique. Les écrans s'organisent autour d'un **objet**
+  (la pièce, l'étagère) placé hors centre, le texte vit dans l'espace restant.
+  Pas de colonne centrée `max-w` par défaut (R12).
+- **Élévation** : les surfaces sont posées comme des pièces sur une table :
+  une ombre de contact courte et chaude (`--shadow-rest`), une ombre portée
+  plus large pour ce qui flotte (`--shadow-lift`).
 
-- **Espacements** : base 4, échelle 4 · 8 · 12 · 16 · 24 · 32 · 48 · 64 · 96.
-  Les graduations de l'eau sont sur 8 (mineure) et 64 (majeure).
-- **Grille** : contenu `max-w-6xl`, gouttière 16 px mobile, 32 px desktop. Le
-  dashboard s'aligne sur une **échelle verticale du jour** (voir phase 6), pas
-  sur une mosaïque.
-- **Rayons** : `--r-hair` 2 px (instruments, tags), `--r-media` 4 px (vignettes :
-  une fenêtre a des angles presque vifs), `--r-control` 6 px (boutons,
-  champs), `--r-surface` 10 px (panneaux, modales). **Pas de pilule** hors
-  points et gouttes.
-- **Élévation** : 0 = posée (la plupart des surfaces, séparées par un filet ou
-  par la valeur de fond), 1 = flottante (`--shadow-float` : menus, toasts),
-  2 = modale (`--shadow-modal` + voile d'encre 72 %). En sombre, l'élévation
-  se lit surtout par la surface plus claire.
+## 5. Mouvement (chorégraphie)
 
-## 5. Mouvement
+Chaque animation est un **plan** : intention, anticipation, action,
+dépassement maîtrisé, retour au repos, temps de pause. Easings nommés dans
+`lib/motion.ts` et en CSS ; jamais `linear` ni `ease` par défaut ; aucune
+rotation infinie.
 
-Deux familles de temps, jamais mélangées dans un même geste :
-
-| Token | Courbe | Durée | Usage |
-|---|---|---|---|
-| `ui` | `cubic-bezier(.25,.8,.3,1)` | 90 / 160 / 240 ms | réponse d'interface : survol, onglet, menu, modale |
-| `fall` | `cubic-bezier(.55,0,.9,.4)` | 520 ms | chute d'une goutte (gravité) |
-| `settle` | `cubic-bezier(.18,.9,.22,1.04)` | 900 ms | l'eau qui se pose (un léger dépassement, une seule fois) |
-| `tide` | `cubic-bezier(.45,0,.55,1)` | 4 s | marée, respiration guidée |
-| `spring` (motion) | raideur 380, amortissement 36 | | indicateurs qui glissent (trait de niveau des onglets) |
-
-Le niveau d'eau qui suit le minuteur monte en **linéaire 1 s** : c'est le
-temps réel, il ne doit pas être « embelli ».
-
-**Chorégraphie**
-1. Un seul événement d'eau à la fois (goutte, caillou, débordement). Un
-   deuxième attend la fin du premier ou le remplace.
-2. L'interface n'attend jamais l'eau : un clic répond en 160 ms, l'eau suit.
-3. Décalage (stagger) seulement pour une **séquence dans le temps** (pistes
-   d'une file) : 30 ms, 6 éléments au plus, le reste d'un bloc.
-4. **Ne bougent jamais** : le texte en lecture, l'échelle graduée, la position
-   des chiffres du minuteur, la navigation.
-5. **Aucune boucle décorative.** Seules boucles admises : la surface d'eau tant
-   qu'une lecture ou une session est active (processus réel), et l'attente
-   d'un chargement de plus de 600 ms (`ff-wait`).
-6. Tout est neutralisé par `prefers-reduced-motion` (classes `ff-*` dans
-   `globals.css`, `tr()` / `useReducedMotion` côté motion) ; l'information reste
-   donnée sans mouvement (niveau statique, texte).
-7. Onglet caché : toute animation continue s'arrête (`data-tab-hidden` posé par
-   `AmbientProvider`, `visibilitychange` côté WebGL).
-
-**Moteur d'animation (re-tranché)** : **`motion/react` partout**, landing
-comprise, plus des shaders WebGL2 écrits à la main pour l'eau. GSAP,
-ScrollTrigger, SplitText et Lenis sont retirés à la réécriture de la landing :
-- un seul modèle mental et un seul runtime pour toute l'app ;
-- `useScroll` / `useTransform` de motion suffisent pour une landing qui
-  avance avec le scroll **sans** scroll-jacking ni défilement amorti (Lenis
-  détourne le défilement natif, liste noire E27) ;
-- découper le texte en lignes masquées (SplitText) était l'un des tics de
-  la landing actuelle : la nouvelle n'en a pas besoin ;
-- trois dépendances de moins sur la landing (gain de poids mesuré en phase 7).
-
-## 6. Composants de base (`components/ff/`)
-
-| Composant | Rôle | Points d'attention |
+| Nom | Courbe | Usage |
 |---|---|---|
-| `Button` | `ink` (principal), `signal` (sodium : « Démarrer », « Reprendre »), `line`, `quiet`, `danger` ; tailles sm/md/lg | anneau de focus sodium, enfoncement de 1 px, pas de pilule |
-| `IconButton` | carré, `label` obligatoire (aria-label + infobulle + raccourci) ; `tone="on-media"` sur vidéo | aplat opaque sur vidéo, jamais de verre |
-| `Field` | champ avec libellé toujours présent, unité mono, indice / erreur reliés en `aria-describedby` | ligne d'encre basse qui passe au sodium au focus |
-| `Segmented` | sous-navigation : libellés sur une ligne d'échelle, trait de niveau sodium qui glisse | rôle `tablist`, flèches / Début / Fin |
-| `Gauge` | **la colonne** : niveau d'eau gradué, repère gravé (objectif), vases pleins (Flowtime), pulsations goutte / caillou | `role="meter"`, SVG/CSS seulement (posable sur une vidéo) |
-| `MediaCard` | vignette 16:9 sur sa **ligne d'eau** à la couleur de la vidéo ; sélection = ligne sodium + « Choisie » | titres normalisés sans em-dash (`cleanTitle`) |
-| `TrackRow` | ligne de relevé : position mono, titre, source, durée ; états `playing`, `played`, `suggestion` (« proche », retirable) | `aria-current` sur la piste en cours |
-| `PlayerControls` | précédent / suivant / aléatoire / **Boucler ⇄ Prolonger** ; ne connaît que des capacités | une capacité absente reste à sa place, désactivée, avec sa raison |
-| `Modal` | portalée sur `body`, voile d'encre, Échap, focus piégé et restitué | bottom-sheet sur mobile |
-| `Skeleton`, `EmptyState`, `SectionTitle` | chargement immobile (respire après 600 ms), état vide = **colonne sèche** + phrase + geste | |
-| `Toast` (existant, restylé) | bas d'écran, aplat d'encre, repère sodium (info) ou rouge (alerte), `aria-live` | ne couvre jamais le minuteur |
-| `icons.tsx` | une seule famille SVG, trait 1,6 | `IconStone` (distraction), `IconExtend` (prolonger) |
+| `wheel` | ressort raide 220 / 17 | la tournette : départ, élan, arrivée avec un dépassement |
+| `throw` | `cubic-bezier(.2,.8,.2,1)` + anticipation `cubic-bezier(.4,0,1,1)` 120 ms | une pièce posée : petit creux puis montée |
+| `glaze` | `cubic-bezier(.45,0,.55,1)` | l'émail qui monte, la lumière du four |
+| `drip` | `cubic-bezier(.55,0,.9,.4)` | une goutte, une coulure (gravité) |
+| `settle` | ressort doux 120 / 20 | ce qui se pose (étagère, carte) |
+| `ui` | `cubic-bezier(.25,.8,.3,1)` 160-240 ms | réponses d'interface |
 
-Helpers : `lib/text.ts` (`cleanTitle`, `formatMinutes`, `formatClock`, `plural`),
-`lib/motion.ts` (`EASE`, `DUR`, `T`, `tr`).
+**Séquences d'état** (écrites en code avec `motion`, voir 04-3D-MOTION) :
+entrée en scène, repos vivant (la pièce respire à peine : 0,6 % d'échelle sur
+6 s, seulement pendant une lecture), session lancée, distraction (picot),
+fin de pomodoro (tour + four), pause (refroidissement), fin de playlist
+prolongée (seconde couche), objectif atteint (sceau).
+
+Références hors web : la tournette du potier, les fours de Gangjin, les
+génériques de Saul Bass (formes simples, rythme), ManvsMachine et Buck (objets
+en studio), l'horlogerie (échappement : un cran net, puis repos).
+
+## 6. Composants
+
+Les composants `components/ff/*` sont repris sous ce système : boutons
+galets (four pour l'action qui lance le temps, terre pour les autres),
+champs à fond de terre creusée, sous-navigation par **pastille d'émail** qui
+coule d'un onglet à l'autre, cartes média posées comme des carreaux,
+rangées de piste, contrôles de lecture, modales posées sur la table,
+états vides représentés par **une pièce crue non émaillée**.

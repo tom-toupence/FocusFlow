@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 // Écran d'arrivée (identité Clepsydre, docs/redesign) : l'effet goutte est
@@ -153,6 +154,13 @@ function drawWordmark(width: number, height: number): HTMLCanvasElement | null {
 }
 
 export default function SplashIntro() {
+  // Pages internes (lab, système) : pas de splash.
+  const pathname = usePathname();
+  if (pathname?.startsWith("/lab") || pathname?.startsWith("/_design")) return null;
+  return <Splash />;
+}
+
+function Splash() {
   // show → revealing (vague qui découvre le site) → fading (résidu) → done.
   const [phase, setPhase] = useState<"show" | "revealing" | "fading" | "done">("show");
   // null = évaluation en cours (SSR + 1er paint : wordmark statique).

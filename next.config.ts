@@ -10,8 +10,9 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              // Scripts : app + YouTube IFrame API + Spotify Web Playback SDK
-              "script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com https://sdk.scdn.co https://embed.twitch.tv",
+              // Scripts : app + YouTube IFrame API + Spotify Web Playback SDK.
+              // 'wasm-unsafe-eval' : compilation WebAssembly (moteur physique), sans autoriser eval() JS.
+              "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://www.youtube.com https://s.ytimg.com https://sdk.scdn.co https://embed.twitch.tv",
               // Iframes : YouTube embed + Spotify SDK + Twitch player
               "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://sdk.scdn.co https://player.twitch.tv https://embed.twitch.tv",
               // Images : YouTube thumbnails + Spotify artwork + oEmbed
