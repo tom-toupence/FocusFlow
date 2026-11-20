@@ -31,16 +31,16 @@ export default function MaquetteLab() {
   useEffect(() => { scene.current?.setProgress(sim.phase === "work" ? (sim.pomodoros + sim.progress) / 4 : (sim.pomodoros) / 4); }, [sim.progress, sim.phase, sim.pomodoros]);
 
   return (
-    <main className={`fixed inset-0 bg-[#cfdde6] ${inst.className}`}>
+    <main className={`fixed inset-0 bg-[#141a24] ${inst.className}`}>
       <canvas ref={canvas} className="absolute inset-0 w-full h-full" />
       <div className="absolute top-6 right-6 text-right pointer-events-none">
-        <p className={`text-[44px] font-semibold tabular-nums leading-none ${sim.phase === "break" ? "text-white" : "text-[#1d2a33]"}`}>{clock(sim.remaining)}</p>
-        <p className={`mt-2 text-[14px] ${sim.phase === "break" ? "text-white/80" : "text-[#1d2a33]/70"}`}>
+        <p className={`text-[44px] font-semibold tabular-nums leading-none ${sim.phase === "break" ? "text-white" : "text-white"}`}>{clock(sim.remaining)}</p>
+        <p className={`mt-2 text-[14px] ${sim.phase === "break" ? "text-white/80" : "text-white/75"}`}>
           {sim.phase === "break" ? "le quartier passe au soir" : `${Math.floor((sim.pomodoros * 25 + sim.progress * 25))} fenêtres allumées aujourd'hui`}
         </p>
       </div>
       {err && <p className="absolute inset-x-8 top-1/2 text-red-700">{err}</p>}
-      <LabControls sim={sim} tone={sim.phase === "break" ? "dark" : "light"} name="5 maquette" />
+      <LabControls sim={sim} tone="dark" name="2·6 maquette de nuit" />
     </main>
   );
 }

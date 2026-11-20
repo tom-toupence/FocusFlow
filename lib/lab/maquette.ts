@@ -96,10 +96,13 @@ void main() {
     float win = step(0.22, f.x) * step(f.x, 0.78) * step(0.25, f.y) * step(f.y, 0.75) * step(0.6, vPos.y);
     float h = hash(vec3(cell, vId));
     float lit = step(h, uLit) * win;
+    // Amis en focus : quelques fenêtres vertes (supérette), toujours allumées.
+    float friend = step(h, 0.012) * win;
     float blink = step(abs(h - 0.5), 0.004) * win * uBlink;
     vec3 glass = mix(vec3(0.45, 0.55, 0.65), vec3(0.08, 0.1, 0.16), uDusk);
     col = mix(col, glass, win * 0.85);
-    col = mix(col, vec3(1.0, 0.82, 0.5) * mix(0.9, 1.6, uDusk), lit);
+    col = mix(col, mix(vec3(1.0, 0.72, 0.4), vec3(0.85, 0.92, 1.0), step(0.5, fract(h * 13.0))) * 1.4, lit);
+    col = mix(col, vec3(0.33, 0.88, 0.63) * 1.6, friend);
     col = mix(col, vec3(1.0, 0.3, 0.2), blink);
   }
   gl_FragColor = vec4(col, 1.0);
@@ -117,13 +120,14 @@ export function createMaquette(canvas: HTMLCanvasElement): MaquetteScene {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   const scene = new THREE.Scene();
-  const dayBg = new THREE.Color("#cfdde6"), duskBg = new THREE.Color("#2b3550");
+  // Lab 2 : la maquette passe la nuit (dayBg = nuit active, duskBg = fin de nuit plus sombre).
+  const dayBg = new THREE.Color("#141a24"), duskBg = new THREE.Color("#0a0d12");
   scene.background = dayBg.clone();
   const cam = new THREE.PerspectiveCamera(22, 1, 0.5, 200);
   cam.position.set(26, 30, 30);
   cam.lookAt(0, 0, 0);
 
-  const uniforms = { uLit: { value: 0 }, uDusk: { value: 0 }, uBlink: { value: 0 }, uSun: { value: new THREE.Vector3(-0.5, 0.9, 0.35) } };
+  const uniforms = { uLit: { value: 0 }, uDusk: { value: 1 }, uBlink: { value: 0 }, uSun: { value: new THREE.Vector3(-0.5, 0.9, 0.35) } };
   const mat = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms });
 
   // Quartier : grille d'îlots séparés par des rues, immeubles par îlot.
@@ -144,10 +148,10 @@ export function createMaquette(canvas: HTMLCanvasElement): MaquetteScene {
   }
   scene.add(city);
   // Sol : asphalte et îlots (dalles plus claires)
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshBasicMaterial({ color: "#9aa3a8" }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshBasicMaterial({ color: "#1b2028" }));
   ground.rotation.x = -Math.PI / 2;
   scene.add(ground);
-  const lots = new THREE.InstancedMesh(new THREE.PlaneGeometry(4.4, 4.4), new THREE.MeshBasicMaterial({ color: "#c9cdc4" }), 49);
+  const lots = new THREE.InstancedMesh(new THREE.PlaneGeometry(4.4, 4.4), new THREE.MeshBasicMaterial({ color: "#232831" }), 49);
   const mtx = new THREE.Matrix4();
   let li = 0;
   for (let bx = -3; bx <= 3; bx++) for (let bz = -3; bz <= 3; bz++) {
@@ -155,10 +159,26 @@ export function createMaquette(canvas: HTMLCanvasElement): MaquetteScene {
     lots.setMatrixAt(li++, mtx);
   }
   scene.add(lots);
+  // Circulation : phares (blancs) et feux arrière (rouges) qui suivent les rues.
+  const CARS = 70;
+  const cars = new THREE.InstancedMesh(new THREE.BoxGeometry(0.18, 0.08, 0.5), new THREE.MeshBasicMaterial({ toneMapped: false }), CARS);
+  const carState = Array.from({ length: CARS }, (_, i) => ({ lane: (i % 7) - 3, axis: i % 2, dir: i % 3 === 0 ? -1 : 1, t: Math.random() * 40, speed: 2.5 + Math.random() * 3, taxi: i % 5 === 0 }));
+  carState.forEach((c, i) => cars.setColorAt(i, new THREE.Color(c.taxi ? "#ffc21a" : c.dir > 0 ? "#e9f2ff" : "#ff3b2b")));
+  scene.add(cars);
+  const carM = new THREE.Matrix4();
+  const moveCars = (dt: number) => {
+    carState.forEach((c, i) => {
+      c.t = (c.t + dt * c.speed * c.dir + 80) % 40;
+      const along = c.t - 20, across = c.lane * 5.2 + 2.6 + (c.dir > 0 ? 0.5 : -0.5);
+      carM.makeRotationY(c.axis ? Math.PI / 2 : 0).setPosition(c.axis ? along : across, 0.06, c.axis ? across : along);
+      cars.setMatrixAt(i, carM);
+    });
+    cars.instanceMatrix.needsUpdate = true;
+  };
 
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, cam));
-  const tilt = new TiltShiftEffect({ focusArea: 0.32, feather: 0.22, offset: 0.04 });
+  const tilt = new TiltShiftEffect({ focusArea: 0.5, feather: 0.3, offset: 0.04 });
   composer.addPass(new EffectPass(cam, tilt, new SMAAEffect()));
 
   const resize = () => {
@@ -178,11 +198,13 @@ export function createMaquette(canvas: HTMLCanvasElement): MaquetteScene {
     onUpdate: () => cam.lookAt(0, 0, 0),
   });
 
-  let target = 0, frame = 0;
+  let target = 0, frame = 0, lastT = performance.now();
   const loop = () => {
     const t0 = performance.now();
+    moveCars(Math.min(0.1, (t0 - lastT) / 1000));
+    lastT = t0;
     uniforms.uLit.value += (target - uniforms.uLit.value) * 0.05;
-    (scene.background as THREE.Color).lerpColors(dayBg, duskBg, uniforms.uDusk.value);
+    (scene.background as THREE.Color).lerpColors(dayBg, duskBg, Math.max(0, uniforms.uDusk.value - 1) / 0.3);
     composer.render();
     if (++frame % 30 === 0) reportInfo({ cpuMs: +(performance.now() - t0).toFixed(2), triangles: renderer.info.render.triangles, calls: renderer.info.render.calls });
   };
@@ -190,7 +212,8 @@ export function createMaquette(canvas: HTMLCanvasElement): MaquetteScene {
 
   return {
     setProgress: (p) => { target = 0.02 + p * 0.38; },
-    dusk: (on) => { animate(uniforms.uDusk, { value: on ? 1 : 0 }, { duration: 2.2, ease: [0.45, 0, 0.55, 1] }); },
+    // Halte : la moitié des fenêtres s'éteint, la nuit devient plus profonde.
+    dusk: (on) => { animate(uniforms.uDusk, { value: on ? 1.3 : 1 }, { duration: 2.2, ease: [0.45, 0, 0.55, 1] }); target = on ? target * 0.45 : target; },
     blink: () => { animate(uniforms.uBlink, { value: [0, 1, 0, 1, 0, 1, 0] }, { duration: 1.2, ease: "easeInOut" }); },
     dispose: () => { renderer.setAnimationLoop(null); ro.disconnect(); composer.dispose(); renderer.dispose(); },
   };

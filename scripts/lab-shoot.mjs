@@ -17,7 +17,7 @@ fs.mkdirSync(outDir, { recursive: true });
 const vidDir = path.join(outDir, "_video");
 fs.mkdirSync(vidDir, { recursive: true });
 
-const browser = await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
+const browser = await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--enable-unsafe-webgpu"] });
 const ctx = await browser.newContext({ viewport: vp, recordVideo: { dir: vidDir, size: vp } });
 await ctx.route(/youtube|ytimg|spotify|twitch/, (r) => r.abort());
 const page = await ctx.newPage();

@@ -190,3 +190,98 @@ captures et vidéos restent ici comme archive.
 
 Le module `lib/atelier` (Céladon) est également retiré. Dépendances
 désinstallées : opentype.js, Rapier, textmode.js, Paper.js, @theatre/core.
+
+---
+
+# LAB 2 · la ville qui ne dort pas (2026-11-20)
+
+Six prototypes, tous dans le thème imposé, chacun avec une librairie ou une
+technique jamais utilisée dans le projet. Même séquence jouée (horloge simulée).
+Captures et vidéos : `docs/redesign/shots/lab2/`, montage `lab2-montage.mp4`.
+Polices locales (`public/lab/fonts`) : Big Shoulders (signalétique, Chicago),
+Doto (afficheur à points), Atkinson Hyperlegible Next (texte).
+Palette commune, sans un seul rose : sodium `#ff9a3c`, supérette `#53e0a1`,
+néon blanc `#e9f2ff`, feu arrière `#ff3b2b`, taxi `#ffc21a`, asphalte `#0a0e13`.
+
+## 2·1 Ruelle sous la pluie — `/lab/ruelle`
+- **Nouveau** : troika-three-text (enseignes en typographie SDF dans la 3D),
+  Reflector (sol mouillé), pluie et vapeur en shaders instanciés, bloom.
+- **Modélisé en code** : baies de façades à retraits, enseignes en drapeau et
+  colonnes de caissons empilés (un commerce par étage, mots réels), climatiseurs
+  instanciés, câbles en chaînette, distributeur, lampadaire au sodium.
+- **Mécanique** : panneau à LED au-dessus de la laverie = temps restant ;
+  distraction = une enseigne grésille ; fin de pomodoro = les enseignes
+  s'éteignent du fond vers nous (la halte), restent la supérette, le
+  distributeur et le lampadaire ; reprise = amorçage des tubes de près en loin.
+- **Ce que ça donne** : le prototype qui porte le mieux le thème. La halte se
+  lit immédiatement (enseignes éteintes, pluie plus fine).
+- **Ratés corrigés** : troika ne chargeait rien (son worker blob était bloqué
+  par la CSP, `useWorker: false`) ; façades orangées et fenêtres en « maison de
+  poupée » au premier jet ; extinction trop étalée.
+- **Reste** : façades encore lisses, reflets peu étirés, distributeur peu lisible.
+- **Perf** : 6 à 9 ms CPU par image en logiciel (texte SDF + bloom), à optimiser.
+
+## 2·2 Supérette 24 h — `/lab/konbini`
+- **Nouveau** : **manifold-3d** (booléens WASM) : coque, vitrine, porte,
+  meubles d'étagères et distributeurs obtenus par soustractions.
+- **Mécanique** : la rue s'assombrit avec la nuit, le magasin non ; fin de
+  pomodoro = les portes automatiques s'ouvrent et la caméra traverse la rue :
+  **la pause, c'est entrer dans la lumière** ; distraction = la porte s'entrouvre.
+- **Ce que ça donne** : la meilleure idée de pause du lab.
+- **Ratés** : murs teintés orange par le sodium, reflets du sol durs, bandeau
+  qui chevauche l'interface.
+- **Perf** : 0,6 à 1,3 ms CPU.
+
+## 2·3 Tour de bureaux — `/lab/tour`
+- **Nouveau** : **gpu-curtains** (WebGPU, plans synchronisés au DOM) : chaque
+  vignette du catalogue devient une fenêtre (store, reflet, lumière).
+- **Échec** : le WebGPU logiciel du conteneur perd son device même avec le
+  shader par défaut ; rien n'a pu être vu. Surtout, gpu-curtains n'a **aucun
+  repli WebGL** : pour un outil quotidien (Safari et Firefox encore partiels),
+  c'est rédhibitoire. L'idée « les cartes sont des fenêtres » est gardée pour
+  l'app, à faire en CSS.
+
+## 2·4 Le dernier métro — `/lab/quai`
+- **Nouveau** : **PixiJS v8** (2D WebGL, lueurs additives, flou), import
+  `pixi.js/unsafe-eval` exigé par notre CSP stricte.
+- **Mécanique** : le panneau d'affichage annonce le prochain train = temps
+  restant ; les phares grandissent au fond du tunnel ; distraction = « RETARD
+  +1 » ; fin de pomodoro = le train entre, portes ouvertes, la pause se passe
+  dans sa lumière ; reprise = il repart, feux rouges.
+- **Ce que ça donne** : **le panneau LED en Doto est la meilleure typographie
+  de minuteur du lab** : signalétique réelle, lisible de loin, chiffres
+  tabulaires. Le train, lui, est trop sommaire.
+- **Perf** : ≈ 0,2 ms CPU.
+
+## 2·5 Les toits au petit matin — `/lab/toits`
+- **Nouveau** : **@thi.ng/geom** (emprises, parapets par `offset`, semis des
+  équipements par `scatter`, cabanons en `roundedRect`).
+- **Mécanique** : l'aube avance avec la session, les fenêtres des tours
+  s'éteignent ; fin de pomodoro = le soleil passe au-dessus des tours.
+- **Ce que ça donne** : la preuve que le **thème clair** a du sens (la même
+  ville au petit matin). Mais rendu carton : aplats gris, fenêtres trop régulières.
+- **Perf** : 0,7 à 2 ms CPU, 97 appels de dessin (à instancier).
+
+## 2·6 Maquette de nuit — `/lab/maquette`
+- Le prototype conservé du lab 1, passé de nuit : circulation instanciée
+  (phares, feux arrière, taxis), fenêtres des amis en vert, bascule adoucie.
+- **Ce que ça donne** : la vue d'ensemble « tu n'es pas seul » fonctionne.
+- **Raté** : teinte bleu saturé à la halte (extrapolation du mélange).
+
+## Direction retenue : « la ville qui ne dort pas »
+
+Le meilleur de chaque prototype, organisé comme **une seule ville**, chaque
+partie de l'app étant un lieu :
+
+| Lieu | Où dans l'app | Venu de |
+|---|---|---|
+| **la ruelle** (3D héros) | landing, pause, session Spotify | 2·1 |
+| **le panneau à LED** | minuteur de session, PiP, chiffres clés | 2·4 |
+| **la supérette** | la pause longue : on entre dans la lumière | 2·2 |
+| **les fenêtres allumées** | amis en focus, catalogue (cartes = fenêtres, en CSS) | 2·3, 2·6 |
+| **le petit matin** | thème clair | 2·5 |
+
+Pourquoi : c'est le plus audacieux qui reste lisible et performant, et ce
+n'est pas ce que j'aurais fait sans le lab : une nuit à **plusieurs sources
+colorées** (pas un fond et un accent), dense en objets modélisés, une
+typographie de signalétique réelle, et un thème clair qui a sa propre heure.
