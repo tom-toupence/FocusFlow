@@ -13,14 +13,14 @@ export const STATUS_CONFIG: Record<TodoStatus, {
 }> = {
   todo:          { label: "À faire",  dot: "bg-white/30",    bg: "bg-white/5",        text: "text-white/50"   },
   "in-progress": { label: "En cours", dot: "bg-sodium",   bg: "bg-sodium/15",   text: "text-sodium-text"  },
-  done:          { label: "Terminé",  dot: "bg-sodium", bg: "bg-sodium/15", text: "text-sodium-text"},
+  done:          { label: "Terminé",  dot: "bg-konbini", bg: "bg-konbini/15", text: "text-konbini"},
 };
 
 // Light-mode overrides (settings page)
 const STATUS_CONFIG_LIGHT: Record<TodoStatus, { bg: string; text: string }> = {
   todo:          { bg: "bg-foreground/[0.05]",   text: "text-ink-3"  },
   "in-progress": { bg: "bg-sodium/10",        text: "text-sodium-text"      },
-  done:          { bg: "bg-sodium/10",      text: "text-sodium-text"    },
+  done:          { bg: "bg-konbini/10",     text: "text-konbini"        },
 };
 
 const ORDER: TodoStatus[] = ["todo", "in-progress", "done"];

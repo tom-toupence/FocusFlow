@@ -119,9 +119,9 @@ function KanbanCard({
 
   const advance =
     todo.status === "todo"
-      ? { label: "Commencer →", target: "in-progress" as const, cls: "text-sodium-text dark:text-sodium-text bg-sodium/10 hover:bg-sodium/20" }
+      ? { label: "Commencer →", target: "in-progress" as const, cls: "text-konbini bg-konbini/10 hover:bg-konbini/20" }
       : todo.status === "in-progress"
-      ? { label: "Terminer →", target: "done" as const, cls: "text-sodium-text dark:text-sodium-text bg-sodium/10 hover:bg-sodium/20" }
+      ? { label: "Terminer →", target: "done" as const, cls: "text-konbini bg-konbini/10 hover:bg-konbini/20" }
       : { label: "↺ À faire", target: "todo" as const, cls: "text-ink-3 bg-foreground/5 hover:bg-foreground/10" };
 
   return (

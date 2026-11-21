@@ -15,6 +15,7 @@ Captures : `shots/crit4/` (dark et light, desktop 1440 et mobile 390).
 | Projets | barres pleines génériques ; « sur la bonne voie » et « en retard » tous deux en sodium | rangée de fenêtres (`.ff-row`), vert = sur la voie, feu arrière = en retard |
 | Dashboard | rail horaire : texte quasi blanc sur `surface-2`, illisible en petit matin | blocs prévus en `line-strong`, filet sodium, texte `foreground` |
 | Réglages | diagramme du cycle en `--water` | travail en sodium (le minuteur), pause en trait neutre |
+| Kanban (session, réglages), menu de statut, planning | « Terminé » en sodium (= maintenant) au lieu du vert supérette (= fait), repéré sur la planche avant / après de la session | vert supérette partout pour ce qui est fait |
 | `/_design` | boutons « Goutte » et « Caillou » | « Clignement », « Grésillement » (types `blink`/`buzz` dans `Gauge`) |
 | Bibliothèque, Planning, Journal, Spotify, Twitch, Découvrir | conformes ; Découvrir reste sur ses squelettes quand YouTube est injoignable (réseau de l'environnement) | rien à corriger côté design |
 

@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 const SECTIONS: { status: TodoStatus; label: string; dot: string; text: string; panel: string }[] = [
   { status: "todo",        label: "À faire",  dot: "bg-white/35",    text: "text-white/45",       panel: "bg-white/[0.03] border-white/[0.07]" },
   { status: "in-progress", label: "En cours", dot: "bg-sodium",   text: "text-sodium-text",   panel: "bg-sodium/[0.06] border-sodium/15" },
-  { status: "done",        label: "Terminé",  dot: "bg-sodium", text: "text-sodium-text", panel: "bg-sodium/[0.06] border-sodium/15" },
+  { status: "done",        label: "Terminé",  dot: "bg-konbini", text: "text-konbini", panel: "bg-konbini/[0.06] border-konbini/15" },
 ];
 
 const PREV: Partial<Record<TodoStatus, TodoStatus>> = { "in-progress": "todo", done: "in-progress" };

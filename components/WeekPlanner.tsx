@@ -77,9 +77,9 @@ export default function WeekPlanner() {
 
               <div className="flex flex-col gap-1 flex-1">
                 {dayBlocks.map((b) => (
-                  <div key={b.id} className={cn("group flex items-center gap-1 px-1.5 py-1 rounded text-[11px]", b.done ? "bg-sodium/10" : "bg-foreground/[0.05]")}>
-                    <button onClick={() => toggleDone(b.id)} className={cn("w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center", b.done ? "bg-sodium border-sodium" : "border-foreground/25")}>
-                      {b.done && <svg className="w-2 h-2 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={4}><path d="M5 13l4 4L19 7" strokeLinecap="round" /></svg>}
+                  <div key={b.id} className={cn("group flex items-center gap-1 px-1.5 py-1 rounded text-[11px]", b.done ? "bg-konbini/10" : "bg-foreground/[0.05]")}>
+                    <button onClick={() => toggleDone(b.id)} className={cn("w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center", b.done ? "bg-konbini border-konbini" : "border-foreground/25")}>
+                      {b.done && <svg className="w-2 h-2 text-on-konbini" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={4}><path d="M5 13l4 4L19 7" strokeLinecap="round" /></svg>}
                     </button>
                     <span className="text-ink-3 tabular-nums">{formatMinOfDay(b.startMin)}</span>
                     <span className={cn("flex-1 truncate", b.done ? "text-ink-3 line-through" : "text-ink-2")}>{b.label || "Focus"}</span>
