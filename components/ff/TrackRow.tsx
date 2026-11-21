@@ -54,7 +54,7 @@ export function TrackRow({
         </span>
       )}
       {thumb !== undefined && (
-        <span className="w-12 h-7 shrink-0 overflow-hidden rounded-[2px] bg-water-deep">
+        <span className="w-12 h-7 shrink-0 overflow-hidden rounded-[2px] bg-surface-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {thumb && <img src={thumb} alt="" loading="lazy" className="w-full h-full object-cover" />}
         </span>

@@ -133,7 +133,7 @@ for (const theme of themes) {
         for (const step of plan.steps) {
           if (step.startsWith("key:")) { await page.keyboard.press(step.slice(4)); }
           else {
-            const loc = page.getByRole("button", { name: step, exact: false }).filter({ visible: true }).first();
+            const loc = page.getByRole("button", { name: step, exact: false }).or(page.getByRole("tab", { name: step, exact: false })).filter({ visible: true }).first();
             await loc.click({ timeout: 8000 });
           }
           await page.waitForTimeout(700);

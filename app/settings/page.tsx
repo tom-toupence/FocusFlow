@@ -35,15 +35,15 @@ function CycleShape({ work, rest, customWork, customRest }: { work: number; rest
   if (work === 0) {
     return (
       <span aria-hidden className="flex items-center h-2 w-full">
-        <span className="h-2 flex-1 rounded-l-[2px] bg-[linear-gradient(90deg,var(--water)_70%,transparent)]" />
+        <span className="h-2 flex-1 rounded-l-[2px] bg-[linear-gradient(90deg,var(--sodium)_70%,transparent)]" />
       </span>
     );
   }
   const scale = 70;
   return (
     <span aria-hidden className="flex items-center gap-[3px] h-2 w-full">
-      <span className="h-2 rounded-[2px] bg-water" style={{ width: `${Math.min(100, (w / scale) * 100)}%` }} />
-      <span className="h-[2px] bg-sodium" style={{ width: `${Math.min(30, (r / scale) * 100)}%` }} />
+      <span className="h-2 ff-row bg-sodium" style={{ width: `${Math.min(100, (w / scale) * 100)}%` }} />
+      <span className="h-[2px] bg-line-strong" style={{ width: `${Math.min(30, (r / scale) * 100)}%` }} />
     </span>
   );
 }
@@ -414,7 +414,7 @@ export default function SettingsPage() {
           <p className="text-[13px] text-ink-3 mb-3">
             {isTwitchMode ? "Stream Twitch" : isSpotifyMode ? "Playlist Spotify" : isPlaylistMode ? "Playlist choisie" : "Vidéo choisie"}
           </p>
-          <div ref={previewRef} className="rounded-[var(--r-media)] overflow-hidden aspect-video relative bg-water-deep">
+          <div ref={previewRef} className="rounded-[var(--r-media)] overflow-hidden aspect-video relative bg-surface-2">
             {isTwitchMode ? (
               <>
                 <div className="w-full h-full bg-gradient-to-br from-[#1a0a3a] to-[#0d0d1a] flex items-center justify-center">

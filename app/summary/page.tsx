@@ -40,10 +40,10 @@ function formatMinutes(min: number): string {
 // Heatmap = profondeur d'eau : plus le jour a été travaillé, plus l'eau est profonde.
 const HEAT_LEVELS = [
   "bg-surface-2",
-  "bg-water/35",
-  "bg-water/60",
-  "bg-water/85",
-  "bg-water",
+  "bg-konbini/30",
+  "bg-konbini/55",
+  "bg-konbini/80",
+  "bg-konbini",
 ];
 
 function heatLevel(minutes: number): number {
@@ -104,7 +104,9 @@ export default function SummaryPage() {
   heatmapData.forEach((d, i) => {
     const col = Math.floor(i / 7);
     const month = new Date(d.date).getMonth();
-    if (month !== lastMonth) {
+    // Un mois entamé en fin de grille ne doit pas chevaucher le suivant.
+    const prev = monthLabels[monthLabels.length - 1];
+    if (month !== lastMonth && (!prev || col - prev.col >= 3)) {
       monthLabels.push({ label: new Date(d.date).toLocaleString("fr", { month: "short" }), col });
       lastMonth = month;
     }
@@ -252,9 +254,9 @@ export default function SummaryPage() {
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-[12px] text-ink-3">
-            <span>Sec</span>
+            <span>Éteint</span>
             {HEAT_LEVELS.map((cls, i) => <div key={i} className={cn("w-3 h-3 rounded-[2px]", cls)} />)}
-            <span>Profond</span>
+            <span>Allumé</span>
           </div>
         </section>
 

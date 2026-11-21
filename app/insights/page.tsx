@@ -156,7 +156,7 @@ export function InsightsContent() {
         {/* Highlights */}
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Highlight label="Score de focus moyen" value={`${avgScore}`} sub="14 derniers jours" accent="emerald" />
-          <Highlight label="Heure la plus productive" value={byHour[peakHour] > 0 ? `${peakHour}h` : ", "} sub="cumul de focus" accent="violet" />
+          <Highlight label="Heure la plus productive" value={byHour[peakHour] > 0 ? `${peakHour} h` : "aucune"} sub="cumul de focus" accent="violet" />
           <Highlight
             label="Cette semaine"
             value={fmtMin(thisWeek.minutes)}

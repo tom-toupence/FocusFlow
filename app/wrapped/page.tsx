@@ -12,24 +12,42 @@ import { computeWrapped, formatWrappedMinutes, wrappedWeekLabel } from "@/lib/wr
 import WrappedShareCard from "@/components/WrappedShareCard";
 import { cn } from "@/lib/utils";
 
-function Panel({
-  label,
-  value,
-  sub,
-  className,
-  big = false,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  className?: string;
-  big?: boolean;
-}) {
+/** Un relevé sous filet : libellé, valeur, précision. Pas de carte en dégradé. */
+function Stat({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: "taxi" }) {
   return (
-    <div className={cn("flex flex-col justify-end gap-1 p-6 rounded-3xl border border-foreground/[0.08] overflow-hidden relative", className)}>
-      <span className="text-[13px] font-semibold text-ink-3">{label}</span>
-      <span className={cn("font-extralight tracking-tight tabular-nums", big ? "text-6xl" : "text-4xl")}>{value}</span>
-      {sub && <span className="text-xs text-ink-3 leading-snug">{sub}</span>}
+    <div className="border-t border-line pt-3">
+      <p className="font-mono uppercase tracking-[0.14em] text-[11px] text-ink-3">{label}</p>
+      <p className={cn("mt-1 font-display text-4xl leading-none", accent === "taxi" ? "text-taxi" : "text-foreground")}>{value}</p>
+      {sub && <p className="mt-1.5 text-xs text-ink-3">{sub}</p>}
+    </div>
+  );
+}
+
+const DAY_SHORT = ["L", "M", "M", "J", "V", "S", "D"];
+
+/** Les soirs allumés : une tour par jour, un étage par tranche de 25 min. */
+function Evenings({ perDay }: { perDay: number[] }) {
+  const max = Math.max(1, ...perDay);
+  const best = perDay.some((m) => m > 0) ? perDay.indexOf(Math.max(...perDay)) : -1;
+  const floors = 10;
+  return (
+    <div className="grid grid-cols-7 gap-2 sm:gap-4" role="img" aria-label={`Focus par jour : ${perDay.map((m, i) => `${["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"][i]} ${m} min`).join(", ")}`}>
+      {perDay.map((m, d) => {
+        const lit = m > 0 ? Math.max(1, Math.round((m / max) * floors)) : 0;
+        return (
+          <div key={d} className="flex flex-col items-center gap-2">
+            <div className="w-full flex flex-col-reverse gap-[3px]">
+              {Array.from({ length: floors }, (_, f) => (
+                <span
+                  key={f}
+                  className={cn("h-2.5 rounded-[1px]", f < lit ? (d === best && f === lit - 1 ? "bg-taxi" : "bg-konbini") : "bg-surface-2")}
+                />
+              ))}
+            </div>
+            <span className="font-mono text-[11px] text-ink-3">{DAY_SHORT[d]}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -88,110 +106,75 @@ export function WrappedContent() {
   if (!data) return null;
 
   return (
-        <main className="max-w-3xl mx-auto px-6 py-10 flex flex-col gap-6">
+        <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-10">
           {/* Title */}
           <div className="flex items-end justify-between gap-4 flex-wrap">
             <div>
               <p className="text-[13px] font-semibold text-ink-3 mb-1">
                 {weekOffset === -1 ? "Ta semaine passée" : "Semaine en cours"} · {wrappedWeekLabel(data)}
               </p>
-              <h1 className="text-3xl font-light text-foreground tracking-tight">
-                {data.minutes > 0 ? "Voilà ce que tu as accompli" : "Une semaine calme…"}
+              <h1 className="text-3xl sm:text-4xl text-foreground">
+                {data.minutes > 0 ? "Voilà ce que tu as accompli" : "Une semaine calme"}
               </h1>
             </div>
             <div className="flex items-center gap-1 text-xs">
               <button
                 onClick={() => setWeekOffset(-1)}
-                className={cn("px-2.5 py-1 rounded-lg transition-colors", weekOffset === -1 ? "bg-foreground/10 text-foreground" : "text-ink-3 hover:text-ink-2")}
+                className={cn("px-2.5 py-1 rounded-[4px] transition-colors", weekOffset === -1 ? "bg-foreground/10 text-foreground" : "text-ink-3 hover:text-ink-2")}
               >
                 Passée
               </button>
               <button
                 onClick={() => setWeekOffset(0)}
-                className={cn("px-2.5 py-1 rounded-lg transition-colors", weekOffset === 0 ? "bg-foreground/10 text-foreground" : "text-ink-3 hover:text-ink-2")}
+                className={cn("px-2.5 py-1 rounded-[4px] transition-colors", weekOffset === 0 ? "bg-foreground/10 text-foreground" : "text-ink-3 hover:text-ink-2")}
               >
                 En cours
               </button>
             </div>
           </div>
 
-          {/* Hero + grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Panel
-              label="Temps de focus"
-              value={formatWrappedMinutes(data.minutes)}
-              sub={
-                data.deltaPct !== null
-                  ? `${data.deltaPct >= 0 ? "+" : ""}${data.deltaPct}% vs semaine précédente`
-                  : "première semaine mesurée"
-              }
-              big
-              className="col-span-2 md:col-span-2 row-span-2 min-h-56 bg-gradient-to-br from-ink/30 via-ink/20 to-transparent text-foreground"
-            />
-            <Panel label="Sessions" value={String(data.sessions)} className="bg-foreground/[0.04] text-foreground" />
-            <Panel label="Jours actifs" value={`${data.activeDays}/7`} className="bg-foreground/[0.04] text-foreground" />
-            <Panel
-              label="Meilleur jour"
-              value={data.bestDay?.label ?? ", "}
-              sub={data.bestDay ? formatWrappedMinutes(data.bestDay.minutes) : undefined}
-              className="bg-gradient-to-br from-sodium/25 to-transparent text-foreground"
-            />
-            <Panel
-              label="Heure de pointe"
-              value={data.peakHour !== null ? `${data.peakHour}h` : ", "}
-              className="bg-gradient-to-br from-ink/25 to-transparent text-foreground"
-            />
+          {/* Le temps de focus sur le panneau à points. */}
+          <div className="rounded-[4px] bg-[#05070a] border border-white/10 px-5 sm:px-7 py-5 sm:py-6">
+            <p className="font-led text-sodium text-5xl sm:text-7xl leading-none [text-shadow:0_0_14px_rgba(255,154,60,0.4)]">
+              {formatWrappedMinutes(data.minutes)}
+            </p>
+            <p className="mt-3 text-sm text-white/70">
+              de focus{data.deltaPct !== null ? `, ${data.deltaPct >= 0 ? "+" : ""}${data.deltaPct} % sur la semaine d'avant` : ", première semaine mesurée"}
+            </p>
           </div>
 
-          {/* Top play */}
+          <section aria-labelledby="soirs">
+            <h2 id="soirs" className="text-lg mb-4">Les soirs allumés</h2>
+            <Evenings perDay={data.perDay} />
+          </section>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-6">
+            <Stat label="Sessions" value={String(data.sessions)} />
+            <Stat label="Soirs actifs" value={`${data.activeDays} / 7`} />
+            <Stat label="Meilleur soir" value={data.bestDay?.label ?? "aucun"} sub={data.bestDay ? formatWrappedMinutes(data.bestDay.minutes) : undefined} accent={data.bestDay ? "taxi" : undefined} />
+            <Stat label="Heure de pointe" value={data.peakHour !== null ? `${data.peakHour} h` : "aucune"} />
+            <Stat label="Humeur moyenne" value={data.avgMood !== null ? data.avgMood.toFixed(1) : "aucune"} sub={data.avgMood !== null ? moodLabel ?? undefined : "pas de réflexion notée"} />
+            <Stat label="Distractions" value={String(data.distractions)} sub={data.distractions === 0 && data.sessions > 0 ? "rue calme" : "marquées pendant le focus"} />
+            <div className="col-span-2 border-t border-line pt-3">
+              <p className="font-mono uppercase tracking-[0.14em] text-[11px] text-ink-3">Badges débloqués</p>
+              <p className="mt-1.5 text-sm text-foreground">{data.badges.length ? data.badges.map((b) => b.title).join(", ") : <span className="text-ink-3">Aucun cette semaine</span>}</p>
+            </div>
+          </div>
+
           {data.topPlay && (
-            <div className="flex items-center gap-4 p-5 rounded-3xl border border-foreground/[0.08] bg-foreground/[0.03]">
+            <div className="flex items-center gap-4 border-t border-line pt-4">
               {data.topPlay.thumbnailUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={data.topPlay.thumbnailUrl} alt="" className="w-20 h-14 rounded-xl object-cover flex-shrink-0" />
-              ) : (
-                <div className="w-20 h-14 rounded-xl bg-foreground/10 flex items-center justify-center flex-shrink-0 text-ink-3">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7}><path d="M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm12-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                </div>
-              )}
+                <img src={data.topPlay.thumbnailUrl} alt="" className="w-20 h-12 rounded-[3px] object-cover flex-shrink-0" />
+              ) : null}
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-semibold text-ink-3 mb-0.5">Ambiance préférée</p>
-                <p className="text-sm font-medium text-foreground truncate">{data.topPlay.title}</p>
+                <p className="font-mono uppercase tracking-[0.14em] text-[11px] text-ink-3">Ce qui jouait derrière</p>
+                <p className="mt-1 text-sm font-medium text-foreground truncate">{data.topPlay.title}</p>
                 <p className="text-xs text-ink-3 truncate">{data.topPlay.subtitle}</p>
               </div>
-              <span className="text-sm text-ink-3 tabular-nums flex-shrink-0">
-                {formatWrappedMinutes(data.topPlay.totalMinutes)}
-              </span>
+              <span className="text-sm text-ink-3 tabular-nums flex-shrink-0">{formatWrappedMinutes(data.topPlay.totalMinutes)}</span>
             </div>
           )}
-
-          {/* Badges + mood + distractions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="p-5 rounded-3xl border border-foreground/[0.08] bg-gradient-to-br from-sodium/15 to-transparent">
-              <p className="text-[13px] font-semibold text-ink-3 mb-2">Badges débloqués</p>
-              {data.badges.length === 0 ? (
-                <p className="text-sm text-ink-3">Aucun cette semaine</p>
-              ) : (
-                <div className="flex flex-col gap-1.5">
-                  {data.badges.map((b) => (
-                    <p key={b.id} className="text-sm font-medium text-foreground">{b.title}</p>
-                  ))}
-                </div>
-              )}
-            </div>
-            <Panel
-              label="Humeur moyenne"
-              value={data.avgMood !== null ? `${data.avgMood.toFixed(1)} · ${moodLabel}` : ", "}
-              sub={data.avgMood !== null ? "d'après ton journal" : "pas de réflexion notée"}
-              className="bg-foreground/[0.04] text-foreground"
-            />
-            <Panel
-              label="Distractions"
-              value={String(data.distractions)}
-              sub={data.distractions === 0 && data.sessions > 0 ? "focus parfait" : "marquées pendant le focus"}
-              className="bg-foreground/[0.04] text-foreground"
-            />
-          </div>
 
           {/* Share */}
           <div className="flex flex-col items-center gap-2 pt-2 pb-8">

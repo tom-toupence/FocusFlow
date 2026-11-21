@@ -20,7 +20,7 @@ export const DUR = {
   instant: 0.09,
   ui: 0.16,
   panel: 0.24,
-  water: 0.9,
+  slow: 0.9,
   overflow: 1.4,
 } as const;
 
@@ -32,8 +32,8 @@ export const STAGGER_MAX_ITEMS = 6;
 export const T = {
   ui: { duration: DUR.ui, ease: EASE.ui } satisfies Transition,
   panel: { duration: DUR.panel, ease: EASE.ui } satisfies Transition,
-  water: { duration: DUR.water, ease: EASE.settle } satisfies Transition,
-  /** Ressort d'eau : un dépassement, puis immobile (indicateurs qui glissent). */
+  slow: { duration: DUR.slow, ease: EASE.settle } satisfies Transition,
+  /** Ressort : un dépassement, puis immobile (indicateurs qui glissent). */
   spring: { type: "spring", stiffness: 380, damping: 36, mass: 0.9 } satisfies Transition,
   none: { duration: 0 } satisfies Transition,
 };

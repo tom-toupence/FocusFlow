@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 
+// En développement seulement, React reconstruit ses piles d'appels avec eval().
+// Jamais en production.
+const DEV_EVAL = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
+
 const nextConfig: NextConfig = {
   // Pas de badge flottant en dev : il masquait des contrôles sur les captures
   // de critique. Les erreurs de build et d'exécution s'affichent toujours.
@@ -15,7 +19,7 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               // Scripts : app + YouTube IFrame API + Spotify Web Playback SDK.
               // 'wasm-unsafe-eval' : WebAssembly du décodeur meshopt (modèles de la ville, lib/city), sans autoriser eval() JS.
-              "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://www.youtube.com https://s.ytimg.com https://sdk.scdn.co https://embed.twitch.tv",
+              `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${DEV_EVAL} https://www.youtube.com https://s.ytimg.com https://sdk.scdn.co https://embed.twitch.tv`,
               // Iframes : YouTube embed + Spotify SDK + Twitch player
               "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://sdk.scdn.co https://player.twitch.tv https://embed.twitch.tv",
               // Images : YouTube thumbnails + Spotify artwork + oEmbed

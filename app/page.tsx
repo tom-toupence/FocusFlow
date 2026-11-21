@@ -624,7 +624,7 @@ function CompletedTodosBacklog() {
   // Group by completedAt date
   const groups: Record<string, typeof done> = {};
   for (const t of done) {
-    const key = t.completedAt ?? ", ";
+    const key = t.completedAt ?? "Sans date";
     if (!groups[key]) groups[key] = [];
     groups[key].push(t);
   }

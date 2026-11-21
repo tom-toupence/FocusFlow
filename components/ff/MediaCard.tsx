@@ -39,7 +39,7 @@ export function MediaCard({
         aria-pressed={selected}
         aria-label={actionLabel ?? t}
         className={cn(
-          "relative block w-full aspect-video overflow-hidden rounded-[var(--r-media)] bg-water-deep",
+          "relative block w-full aspect-video overflow-hidden rounded-[var(--r-media)] bg-surface-2",
           "focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-sodium",
         )}
       >
@@ -53,7 +53,7 @@ export function MediaCard({
             className="absolute inset-0 w-full h-full object-cover brightness-[0.92] group-hover:brightness-100 transition-[filter] duration-[var(--d-panel)]"
           />
         ) : (
-          <span aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent, ${color ?? "var(--water)"})` }} />
+          <span aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent, ${color ?? "var(--surface-2)"})` }} />
         )}
         {kind && (
           <span className="absolute top-2 left-2 font-mono text-[10px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded-[2px] bg-[oklch(0.14_0.02_248/0.82)] text-[oklch(0.93_0.01_85)]">

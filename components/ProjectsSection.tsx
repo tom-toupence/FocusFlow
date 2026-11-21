@@ -30,7 +30,6 @@ export default function ProjectsSection() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-sm font-semibold text-foreground">Projets & deadlines</h2>
-          <p className="text-xs text-ink-3 mt-0.5">Suis tes gros objectifs et le rythme à tenir.</p>
         </div>
         <button
           onClick={() => setOpen((v) => !v)}
@@ -97,8 +96,10 @@ export default function ProjectsSection() {
                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
                   </button>
                 </div>
-                <div className="h-2 rounded-full bg-foreground/[0.06] overflow-hidden">
-                  <div className="h-full rounded-full transition-all" style={{ width: `${st.pct * 100}%`, background: p.color }} />
+                {/* Une rangée de fenêtres : allumées à la couleur du projet. */}
+                <div className="relative h-2.5 ff-row" role="progressbar" aria-label={`${p.name} : ${p.pomodorosDone} sur ${p.pomodoroBudget} pomodoros`} aria-valuemin={0} aria-valuemax={p.pomodoroBudget} aria-valuenow={p.pomodorosDone}>
+                  <div className="absolute inset-0 bg-foreground/[0.08]" />
+                  <div className="absolute inset-y-0 left-0 transition-[width] duration-[var(--d-slow)]" style={{ width: `${Math.min(st.pct, 1) * 100}%`, background: p.color }} />
                 </div>
                 <p className="text-[11px] mt-2 flex items-center gap-2 flex-wrap">
                   {p.deadline ? (
@@ -107,7 +108,7 @@ export default function ProjectsSection() {
                     : <span className="text-ink-3">{st.daysLeft}j restants · vise <strong className="text-ink-2">{st.perDayNeeded}/jour</strong></span>
                   ) : <span className="text-ink-3">Sans deadline · {st.pomodorosLeft} restants</span>}
                   {p.deadline && !st.overdue && (
-                    <span className={cn("px-1.5 py-0.5 rounded", st.onTrack ? "bg-sodium/10 text-sodium-text" : "bg-sodium/10 text-sodium-text")}>
+                    <span className={cn("px-1.5 py-0.5 rounded", st.onTrack ? "bg-konbini/12 text-konbini" : "bg-danger/10 text-danger")}>
                       {st.onTrack ? "sur la bonne voie" : "en retard"}
                     </span>
                   )}

@@ -166,10 +166,10 @@ function DayRail({
                 left: `${Math.max(left, 0)}%`,
                 width: `${Math.max(Math.min(width, 100 - Math.max(left, 0)), 3)}%`,
               }}
-              className="absolute bottom-0 top-2 flex items-start overflow-hidden rounded-t-[2px] bg-water px-2 pt-1"
+              className="absolute bottom-0 top-2 flex items-start overflow-hidden rounded-t-[2px] bg-line-strong border-t-2 border-sodium px-2 pt-1"
               title={`${formatMinOfDay(b.startMin)} · ${b.durationMin} min · ${b.label || "Focus"}`}
             >
-              <span className="truncate text-[11px] font-medium text-[oklch(0.95_0.01_85)]">{b.label || "Focus"}</span>
+              <span className="truncate text-[11px] font-medium text-foreground">{b.label || "Focus"}</span>
             </div>
           );
         })}
@@ -429,8 +429,8 @@ export default function TodayDashboard({
                     {activeProject.pomodorosDone}/{activeProject.pomodoroBudget}
                   </span>
                 </div>
-                <div className="mt-3 h-[6px] rounded-[2px] bg-surface-2 overflow-hidden" role="meter" aria-label={`Avancement de ${activeProject.name}`} aria-valuenow={Math.round(Math.min(st.pct, 1) * 100)} aria-valuemin={0} aria-valuemax={100}>
-                  <div className="h-full origin-left transition-transform duration-[var(--d-water)] ease-[var(--ease-settle)]" style={{ background: activeProject.color, transform: `scaleX(${Math.min(st.pct, 1)})` }} />
+                <div className="mt-3 h-[8px] ff-row bg-surface-2 overflow-hidden" role="meter" aria-label={`Avancement de ${activeProject.name}`} aria-valuenow={Math.round(Math.min(st.pct, 1) * 100)} aria-valuemin={0} aria-valuemax={100}>
+                  <div className="h-full origin-left transition-transform duration-[var(--d-slow)] ease-[var(--ease-settle)]" style={{ background: activeProject.color, transform: `scaleX(${Math.min(st.pct, 1)})` }} />
                 </div>
                 {st.daysLeft !== null && (
                   <p className="mt-3 text-[13px] text-ink-3">
