@@ -55,3 +55,22 @@ describe("TrackQueue", () => {
     expect(q.previous()).toEqual({ kind: "end" });
   });
 });
+
+describe("TrackQueue.remove / upcoming", () => {
+  it("retire un titre à venir, jamais la piste en cours ni une piste jouée", () => {
+    const q = new TrackQueue(["a", "b", "c", "d"]);
+    q.next(false); // b
+    expect(q.remove("a")).toBe(false);
+    expect(q.remove("b")).toBe(false);
+    expect(q.remove("c")).toBe(true);
+    expect(q.upcoming()).toEqual(["d"]);
+    expect(q.next(false)).toMatchObject({ id: "d" });
+  });
+  it("un titre retiré ne revient pas en dé-mélangeant", () => {
+    const q = new TrackQueue(["a", "b", "c"], { shuffle: true, random: () => 0 });
+    const later = q.upcoming()[0];
+    q.remove(later);
+    q.setShuffle(false);
+    expect(q.order).not.toContain(later);
+  });
+});

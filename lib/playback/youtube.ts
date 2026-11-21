@@ -10,7 +10,7 @@
 import { fetchMixVideos } from "@/store/playlistStore";
 import { TrackQueue } from "./queue";
 import { continuePlaylist, type ContinuationTrack } from "./continuation";
-import { Observable, type ExtendedEvent, type PlaybackState, type PlayerAdapter } from "./types";
+import { NO_CAPS, Observable, type ExtendedEvent, type PlaybackState, type PlayerAdapter, type Track } from "./types";
 
 interface YTPlayer {
   playVideo: () => void;
@@ -23,6 +23,7 @@ interface YTPlayer {
   loadVideoById: (id: string) => void;
   loadPlaylist: (opts: string[] | { list: string; listType: string; index?: number; startSeconds?: number }) => void;
   setLoop: (loop: boolean) => void;
+  seekTo: (seconds: number, allowSeekAhead: boolean) => void;
 }
 
 declare global {
@@ -90,13 +91,19 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
   private watchdog: ReturnType<typeof setTimeout> | null = null;
   private host: HTMLElement | null = null;
   private raceTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Titres ajoutés par la lecture continue ou une suggestion acceptée. */
+  private suggested = new Set<string>();
 
   constructor(private elementId: string, private source: YouTubeSource, private opts: YouTubeOptions) {
     const queued = source.type === "queue";
     super({
       kind: "youtube", ready: false, playing: false, track: null,
-      caps: { skip: queued || source.type === "native", shuffle: queued, loop: queued, volume: true },
-      shuffle: queued && opts.shuffle, loop: opts.loop, extending: false, error: null,
+      caps: {
+        ...NO_CAPS, volume: true, seek: true,
+        skip: queued || source.type === "native", shuffle: queued, loop: queued,
+        suggestions: source.type !== "native", removeUpcoming: queued,
+      },
+      shuffle: queued && opts.shuffle, loop: opts.loop, extending: false, upcoming: [], error: null,
     });
     this.wantPlay = opts.playing;
     this.volume = opts.volume;
@@ -105,7 +112,7 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
       this.queue = new TrackQueue(source.tracks.map((t) => t.id), { shuffle: opts.shuffle });
     }
     // Le titre est connu avant que le lecteur soit prêt : on l'affiche tout de suite.
-    this.state = { ...this.state, track: this.trackInfo() };
+    this.state = { ...this.state, track: this.trackInfo(), upcoming: this.upcomingInfo() };
     loadYouTubeApi().then(() => { if (!this.destroyed) this.create(); }).catch(() => {
       this.set({ error: "Le lecteur YouTube n'a pas pu se charger." });
     });
@@ -115,15 +122,30 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     }, 15000);
   }
 
+  private toTrack(id: string, subtitle?: string): Track {
+    return { id, title: this.titles[id] ?? "Titre", subtitle, artwork: thumb(id), source: "youtube", suggested: this.suggested.has(id) };
+  }
+
   /** Piste courante telle que l'interface l'affiche. */
   private trackInfo() {
     const s = this.source;
-    if (s.type === "video") return { id: s.id, title: s.title, subtitle: s.subtitle, artwork: thumb(s.id) };
-    if (s.type === "native") return { id: s.listId, title: s.title, subtitle: "Playlist YouTube" };
+    if (s.type === "video") return { id: s.id, title: s.title, subtitle: s.subtitle, artwork: thumb(s.id), source: "youtube" as const };
+    if (s.type === "native") return { id: s.listId, title: s.title, subtitle: "Playlist YouTube", source: "youtube" as const };
     const q = this.queue!;
     const id = q.current;
     if (!id) return null;
-    return { id, title: this.titles[id] ?? "Titre", subtitle: s.subtitle, artwork: thumb(id), index: q.index, total: q.size };
+    return { ...this.toTrack(id, s.subtitle), index: q.index, total: q.size };
+  }
+
+  private upcomingInfo(): Track[] {
+    if (!this.queue || this.source.type !== "queue") return [];
+    const sub = this.source.subtitle;
+    return this.queue.upcoming(10).map((id) => this.toTrack(id, sub));
+  }
+
+  /** Republie la piste courante et la file à venir. */
+  private sync(extra: Partial<PlaybackState> = {}) {
+    this.set({ track: this.trackInfo(), upcoming: this.upcomingInfo(), ...extra });
   }
 
   private onReady = (p: YTPlayer) => {
@@ -131,7 +153,7 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     p.setPlaybackQuality("hd1080");
     p.setVolume(Math.round(this.volume * 100));
     if (this.wantPlay) p.playVideo(); else p.pauseVideo();
-    this.set({ ready: true, playing: this.wantPlay, track: this.trackInfo(), error: null });
+    this.sync({ ready: true, playing: this.wantPlay, error: null });
   };
 
   /**
@@ -193,7 +215,7 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
   private load(id: string) {
     this.player?.loadVideoById(id);
     if (!this.wantPlay) this.player?.pauseVideo();
-    this.set({ track: this.trackInfo() });
+    this.sync();
   }
 
   /** Fin d'un titre de la file maison. */
@@ -222,6 +244,7 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     if (res.kind === "extend") {
       const added = q.append(res.tracks.map((t) => t.id));
       for (const t of res.tracks) this.titles[t.id] = t.title;
+      for (const id of added) this.suggested.add(id);
       this.opts.onExtended?.({ added: added.length, titles: Object.fromEntries(res.tracks.map((t) => [t.id, t.title])) });
       const n = q.next(false);
       if (n.kind === "track") { this.set({ extending: false }); this.load(n.id); return; }
@@ -262,9 +285,43 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
   setShuffle(on: boolean) {
     if (!this.queue) return;
     this.queue.setShuffle(on);
-    this.set({ shuffle: on, track: this.trackInfo() });
+    this.sync({ shuffle: on });
   }
   setLoop(on: boolean) { this.set({ loop: on }); }
+  seek(sec: number) { if (this.ready) this.player?.seekTo(Math.max(0, sec), true); }
+
+  /** Titres proches : mix radio de graines réparties sur toute la file. */
+  async getSuggestions(seeds?: string[], limit = 10): Promise<Track[]> {
+    const s = this.source;
+    if (s.type === "native") return [];
+    const pool = this.queue ? [...this.queue.order] : [s.type === "video" ? s.id : ""];
+    const res = await continuePlaylist(
+      seeds?.length ? seeds : pool, seeds?.length ? null : (this.queue?.current ?? pool[0]),
+      this.opts.recommend ?? defaultRecommend,
+      { exclude: this.queue?.all ?? new Set(pool), limit },
+    ).catch(() => ({ kind: "loop" as const }));
+    if (res.kind !== "extend") return [];
+    for (const t of res.tracks) this.titles[t.id] ??= t.title;
+    return res.tracks.map((t) => ({ id: t.id, title: t.title, subtitle: t.subtitle, artwork: thumb(t.id), source: "youtube" as const, suggested: true }));
+  }
+
+  /**
+   * Ajoute un titre suggéré en fin de file. Sans file (vidéo seule), rien à
+   * faire ici : la session le met dans la File FocusFlow.
+   */
+  async enqueue(t: Track) {
+    if (!this.queue) return false;
+    const added = this.queue.append([t.id]);
+    if (!added.length) return false;
+    this.titles[t.id] = t.title;
+    this.suggested.add(t.id);
+    this.sync();
+    return true;
+  }
+
+  removeUpcoming(id: string) {
+    if (this.queue?.remove(id)) this.sync();
+  }
   /** Titres connus (pour l'activité affichée aux amis, l'historique). */
   titleOf(id: string) { return this.titles[id]; }
 

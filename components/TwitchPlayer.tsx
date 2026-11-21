@@ -1,43 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Observable, type PlaybackState, type PlayerAdapter } from "@/lib/playback/types";
-
-interface TwitchEmbedPlayer {
-  setQuality: (quality: string) => void;
-  setVolume: (volume: number) => void;
-  play: () => void;
-  pause: () => void;
-}
-
-/** Adaptateur Twitch (live ou rediffusion) : lecture, pause, volume. Pas de
- *  piste suivante, d'aléatoire ni de boucle : déclaré dans `caps`. */
-class TwitchAdapter extends Observable<PlaybackState> implements PlayerAdapter {
-  readonly kind = "twitch" as const;
-  constructor(private getPlayer: () => TwitchEmbedPlayer | null, label: { id: string; title: string; subtitle: string }) {
-    super({
-      kind: "twitch", ready: false, playing: false, track: label,
-      caps: { skip: false, shuffle: false, loop: false, volume: true },
-      shuffle: false, loop: false, extending: false, error: null,
-    });
-  }
-  /** Dernière intention (lecture ou pause), réappliquée quand le flux est prêt :
-   *  une pause demandée avant VIDEO_READY n'est pas perdue (l'embed démarre en autoplay). */
-  private wantPlay = true;
-  markReady() {
-    this.set({ ready: true });
-    this.call((p) => (this.wantPlay ? p.play() : p.pause()));
-  }
-  private call(f: (p: TwitchEmbedPlayer) => void) { try { const p = this.getPlayer(); if (p) f(p); } catch { /* lecteur pas prêt */ } }
-  play() { this.wantPlay = true; this.call((p) => p.play()); this.set({ playing: true }); }
-  pause() { this.wantPlay = false; this.call((p) => p.pause()); this.set({ playing: false }); }
-  next() {}
-  previous() {}
-  setVolume(v: number) { this.call((p) => p.setVolume(v)); }
-  setShuffle() {}
-  setLoop() {}
-  destroy() {}
-}
+import type { PlayerAdapter } from "@/lib/playback/types";
+import { TwitchAdapter, type TwitchEmbedPlayer } from "@/lib/playback/twitch";
 
 interface TwitchEmbedInstance {
   destroy: () => void;
@@ -120,8 +85,8 @@ export default function TwitchPlayer({ channel, vodId, token, volume = 0.8, onAd
       const adapter = new TwitchAdapter(
         () => (embedRef.current === embed ? embed.getPlayer() : null),
         vodId
-          ? { id: `vod:${vodId}`, title: `Rediffusion ${vodId}`, subtitle: "Twitch" }
-          : { id: `live:${channel}`, title: channel ?? "Twitch", subtitle: "Live Twitch" },
+          ? { id: `vod:${vodId}`, title: `Rediffusion ${vodId}`, subtitle: "Twitch", vod: true }
+          : { id: `live:${channel}`, title: channel ?? "Twitch", subtitle: "Live Twitch", vod: false },
       );
       onAdapterRef.current?.(adapter);
 

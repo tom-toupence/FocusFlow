@@ -6,11 +6,21 @@ import { useSyncExternalStore } from "react";
 
 export type SourceKind = "youtube" | "spotify" | "twitch";
 
-export interface NowPlaying {
+/** Modèle de piste normalisé, quelle que soit la source. */
+export interface Track {
   id: string;
   title: string;
+  /** Artistes (Spotify) ou chaîne (YouTube, Twitch). */
   subtitle?: string;
   artwork?: string;
+  durationSec?: number;
+  source: SourceKind;
+  /** Ajoutée par la lecture continue (pas dans la playlist d'origine). */
+  suggested?: boolean;
+}
+
+export interface NowPlaying extends Omit<Track, "source"> {
+  source?: SourceKind;
   /** Position dans la file (0-based) et taille de la file, si connues. */
   index?: number;
   total?: number;
@@ -21,6 +31,12 @@ export interface Capabilities {
   shuffle: boolean;
   loop: boolean;
   volume: boolean;
+  /** Avancer dans la piste (VOD Twitch, YouTube, Spotify). */
+  seek: boolean;
+  /** Titres proches à la demande (pas pour un live). */
+  suggestions: boolean;
+  /** Retirer un titre à venir (impossible avec la file Spotify). */
+  removeUpcoming: boolean;
 }
 
 export interface PlaybackState {
@@ -33,6 +49,8 @@ export interface PlaybackState {
   loop: boolean;
   /** Une prolongation de playlist est en cours de calcul. */
   extending: boolean;
+  /** Les prochains titres (une dizaine au plus), suggestions marquées. */
+  upcoming: Track[];
   /** Message d'erreur lisible (compte, réseau…), sinon null. */
   error: string | null;
 }
@@ -48,6 +66,13 @@ export interface PlayerAdapter {
   setVolume(v: number): void;
   setShuffle(on: boolean): void;
   setLoop(on: boolean): void;
+  seek(seconds: number): void;
+  /** Titres proches de `seeds` (ou de toute la file si absent). */
+  getSuggestions(seeds?: string[], limit?: number): Promise<Track[]>;
+  /** Met un titre (une suggestion) dans la file, juste après les titres à venir. */
+  enqueue(track: Track): Promise<boolean>;
+  /** Retire un titre à venir (sans effet si `caps.removeUpcoming` est faux). */
+  removeUpcoming(id: string): void;
   destroy(): void;
 }
 
@@ -66,10 +91,11 @@ export class Observable<S> {
   }
 }
 
+export const NO_CAPS: Capabilities = { skip: false, shuffle: false, loop: false, volume: false, seek: false, suggestions: false, removeUpcoming: false };
+
 const IDLE: PlaybackState = {
-  kind: "youtube", ready: false, playing: false, track: null,
-  caps: { skip: false, shuffle: false, loop: false, volume: false },
-  shuffle: false, loop: true, extending: false, error: null,
+  kind: "youtube", ready: false, playing: false, track: null, caps: NO_CAPS,
+  shuffle: false, loop: true, extending: false, upcoming: [], error: null,
 };
 const noop = () => () => {};
 

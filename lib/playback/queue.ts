@@ -79,6 +79,24 @@ export class TrackQueue {
   }
 
   /**
+   * Retire un titre À VENIR (jamais la piste en cours ni une piste déjà jouée).
+   * Retourne vrai si le titre a été retiré.
+   */
+  remove(id: string): boolean {
+    const at = this.ids.indexOf(id);
+    if (at <= this.i) return false;
+    this.ids.splice(at, 1);
+    const o = this.original.indexOf(id);
+    if (o >= 0) this.original.splice(o, 1);
+    return true;
+  }
+
+  /** Les `n` prochains titres après la piste en cours. */
+  upcoming(n = 10): string[] {
+    return this.ids.slice(this.i + 1, this.i + 1 + n);
+  }
+
+  /**
    * Ajoute des pistes à la fin (prolongation). Ignore les doublons de la file.
    * Retourne les pistes réellement ajoutées.
    */

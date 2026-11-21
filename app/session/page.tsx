@@ -5,25 +5,22 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useTimerStore, TimerMode } from "@/store/timerStore";
 import { useSessionStore } from "@/store/sessionStore";
-import { usePlaylistStore, isRadioMix, fetchMixVideos, fetchPlaylistVideos } from "@/store/playlistStore";
-import { useQueueStore } from "@/store/queueStore";
 import { usePlaybackPrefsStore } from "@/store/playbackPrefsStore";
 import { useSessionSummaryStore } from "@/store/sessionSummaryStore";
 import { cn } from "@/lib/utils";
 import TodoList from "@/components/TodoList";
 import { useStatsStore } from "@/store/statsStore";
 import { useNotesStore } from "@/store/notesStore";
-import { useSpotifyStore } from "@/store/spotifyStore";
-import { useTwitchStore } from "@/store/twitchStore";
 import { usePlayHistoryStore } from "@/store/playHistoryStore";
 import StickyNote from "@/components/StickyNote";
-import SpotifyPlayer from "@/components/SpotifyPlayer";
-import TwitchPlayer from "@/components/TwitchPlayer";
+import SessionMedia, { TwitchGlyph } from "@/components/session/SessionMedia";
+import UpNext from "@/components/session/UpNext";
 import PipTimer from "@/components/PipTimer";
 import BreathingExercise from "@/components/BreathingExercise";
 import SessionCity from "@/components/SessionCity";
 import { usePlayback, type PlayerAdapter } from "@/lib/playback/types";
-import { YouTubeAdapter, type YouTubeSource } from "@/lib/playback/youtube";
+import { useSessionMedia } from "@/lib/playback/useSessionMedia";
+import type { ExtendedEvent, SourceKind } from "@/lib/playback/types";
 import type { CityHandle } from "@/components/CityScene";
 import Equalizer from "@/components/Equalizer";
 import { useIdleHide } from "@/lib/useIdleHide";
@@ -38,6 +35,9 @@ import { playBreakChime, playWorkChime } from "@/lib/sounds";
 import { upsertMyFriendStats } from "@/lib/friends";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Nom de la source affiché aux amis (YouTube : rien, le titre suffit). */
+const SOURCE_NAME: Record<SourceKind, string> = { youtube: "", spotify: "Spotify", twitch: "Twitch" };
 
 function formatTime(s: number) {
   const m = Math.floor(s / 60).toString().padStart(2, "0");
@@ -61,26 +61,16 @@ export default function SessionPage() {
     tick, start, pause, nextSession, finishFlow, accumulateFlow,
   } = useTimerStore();
   const isFlowtime = settings.preset === "flowtime";
-  const { selectedVideoId, selectedPlaylistId, playQueue, todos, getAllVideos } = useSessionStore();
-  const { playlists } = usePlaylistStore();
-  const { items: queueItems } = useQueueStore();
+  const { todos } = useSessionStore();
   const { recordSession } = useStatsStore();
   const { startSession } = useSessionSummaryStore();
   const { notes, addNote } = useNotesStore();
-  const { selectedPlaylistUri, accessToken, playlists: spotifyPlaylists } = useSpotifyStore();
-  const { selectedChannel, selectedVodId, accessToken: twitchToken } = useTwitchStore();
-  const { record: recordPlay } = usePlayHistoryStore();
+  const recordPlay = usePlayHistoryStore((st) => st.record);
   const { breathingEnabled } = usePrefsStore();
   const { sessionCount: distractionCount, markDistraction, resetSession: resetDistractions } = useDistractionStore();
 
-  const allVideos = getAllVideos();
-  const video = allVideos.find((v) => v.id === selectedVideoId) ?? allVideos[0];
-  const selectedPlaylist = playlists.find((p) => p.id === selectedPlaylistId) ?? null;
-  const isQueueMode = playQueue && queueItems.length > 0;
-  const isPlaylistMode = !isQueueMode && !!selectedPlaylistId && !!selectedPlaylist;
-  const isMix = isPlaylistMode && !!selectedPlaylist && isRadioMix(selectedPlaylist.playlistId);
-  const isSpotifyMode = !!selectedPlaylistUri && !!accessToken;
-  const isTwitchMode = !!selectedChannel || !!selectedVodId;
+  // Ce qui joue, décrit sans que la page connaisse les sources.
+  const media = useSessionMedia();
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevSecondsRef = useRef(secondsLeft);
@@ -98,11 +88,6 @@ export default function SessionPage() {
   // Mode ultra-zen : chrome masqué manuellement (touche H)
   const [zenHidden, setZenHidden] = useState(false);
   const [distractionFlash, setDistractionFlash] = useState(0);
-  // Mix radio YouTube résolu en pistes { id, title } (null = résolution en cours).
-  const [mixTracks, setMixTracks] = useState<{ id: string; title: string }[] | null>(null);
-  // Vraie playlist PL… résolue en pistes { id, title } (null = résolution en
-  // cours ; [] = échec → repli lecteur natif YouTube).
-  const [playlistTracks, setPlaylistTracks] = useState<{ id: string; title: string }[] | null>(null);
   // Préférences de lecture (shuffle / boucle), communes à toutes les sources.
   const { shuffle, loop } = usePlaybackPrefsStore();
   // L'adaptateur de la source en cours (interface de lecture unique, phase 8).
@@ -116,51 +101,6 @@ export default function SessionPage() {
   // Keep refs in sync for use inside IFrame API callbacks
   useEffect(() => { isBreakRef.current = isBreak; }, [isBreak]);
   useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
-
-  // ── Résolution des mixes radio YouTube (RD…) ──────────────────────────────
-  // Les radios ne sont pas embarquables : on les résout en liste de videoIds via
-  // /api/youtube/mix, puis on les joue comme une file contrôlable (skip + loop).
-  // Repli sur la vidéo de départ en boucle si la résolution échoue.
-  useEffect(() => {
-    if (!isMix || !selectedPlaylist) return;
-    let cancelled = false;
-    (async () => {
-      const { ids, titles } = await fetchMixVideos(selectedPlaylist.playlistId, selectedPlaylist.startVideoId);
-      if (cancelled) return;
-      if (ids.length > 0) {
-        setMixTracks(ids.map((id) => ({ id, title: titles[id] ?? "Titre" })));
-      } else {
-        const sv = selectedPlaylist.startVideoId;
-        setMixTracks(sv ? [{ id: sv, title: selectedPlaylist.title }] : []);
-        toast({
-          title: "Mix YouTube indisponible",
-          description: "Lecture de la vidéo de départ en boucle.",
-          accent: "amber",
-        });
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [isMix, selectedPlaylist?.playlistId, selectedPlaylist?.startVideoId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Résolution des vraies playlists (PL/OL/UU/FL/…) ───────────────────────
-  // On récupère la liste ordonnée { id, title } côté serveur pour jouer via la
-  // file maison (shuffle, titre exact, recos de fin). [] = échec → repli natif.
-  useEffect(() => {
-    if (!isPlaylistMode || isMix || !selectedPlaylist) return;
-    let cancelled = false;
-    (async () => {
-      const videos = await fetchPlaylistVideos(selectedPlaylist.playlistId, selectedPlaylist.startVideoId);
-      if (cancelled) return;
-      // Titres ajoutés par l'utilisateur (« + Playlist » dans Découvrir/modal),
-      // joués à la suite de la playlist (dédupliqués).
-      const extras = (selectedPlaylist.extraVideos ?? []).filter(
-        (e) => !videos.some((v) => v.id === e.id)
-      );
-      const all = videos.length > 0 ? [...videos, ...extras] : extras;
-      setPlaylistTracks(all);
-    })();
-    return () => { cancelled = true; };
-  }, [isPlaylistMode, isMix, selectedPlaylist?.playlistId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Chime sounds on mode transitions ─────────────────────────────────────
   // Fin de pomodoro : bloom doux plein écran de la teinte d'ambiance (une
@@ -220,50 +160,6 @@ export default function SessionPage() {
     return () => window.removeEventListener("pointerdown", ask);
   }, []);
 
-  // ── Source YouTube → adaptateur ───────────────────────────────────────────
-  // La source est décrite une fois (vidéo, file maison, repli natif) ; tout le
-  // pilotage passe ensuite par l'adaptateur (lib/playback/youtube.ts).
-  const ytSource: YouTubeSource | null = (() => {
-    if (isSpotifyMode || isTwitchMode) return null;
-    if (isQueueMode) {
-      return { type: "queue", subtitle: "File FocusFlow", tracks: queueItems.map((i) => ({ id: i.youtubeId, title: i.title })) };
-    }
-    if (isPlaylistMode && selectedPlaylist) {
-      if (isMix) {
-        if (mixTracks === null) return null; // résolution en cours
-        return mixTracks.length ? { type: "queue", subtitle: selectedPlaylist.title || "Mix radio", tracks: mixTracks } : null;
-      }
-      if (playlistTracks === null) return null;
-      return playlistTracks.length
-        ? { type: "queue", subtitle: selectedPlaylist.title, tracks: playlistTracks }
-        : { type: "native", listId: selectedPlaylist.playlistId, title: selectedPlaylist.title };
-    }
-    return video ? { type: "video", id: video.youtubeId, title: video.title, subtitle: video.channel } : null;
-  })();
-  const ytKey = ytSource ? JSON.stringify(ytSource.type === "queue" ? ytSource.tracks.map((t) => t.id) : ytSource) : "";
-  const ytSourceRef = useRef(ytSource);
-  // Mis à jour AVANT l'effet de création (les effets s'exécutent dans l'ordre).
-  useEffect(() => { ytSourceRef.current = ytSource; });
-
-  useEffect(() => {
-    const src = ytSourceRef.current;
-    if (!src) return;
-    const { shuffle: sh, loop: lp } = usePlaybackPrefsStore.getState();
-    const a = new YouTubeAdapter("yt-player", src, {
-      volume: volume,
-      shuffle: sh,
-      loop: lp,
-      playing: !isBreakRef.current && isRunningRef.current,
-      onExtended: ({ added }) => {
-        if (added === 0) return;
-        toast({ title: "Fin de la liste", description: "La lecture continue avec des titres proches de toute ta playlist.", accent: "emerald" });
-        city.current?.extend();
-      },
-    });
-    setAdapter(a);
-    return () => { a.destroy(); setAdapter((cur) => (cur === a ? null : cur)); };
-  }, [ytKey]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // ── Pilotage commun à toutes les sources ──────────────────────────────────
   // Une seule règle : la musique joue pendant le travail minuteur en marche,
   // s'arrête en pause et pendant la halte (Twitch compris, ce qui manquait).
@@ -284,26 +180,10 @@ export default function SessionPage() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [isRunning, tick]);
 
-  // ── Build play history entry ──────────────────────────────────────────────
-  const buildPlayEntry = (minutes: number) => {
-    const today = new Date();
-    const date = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, "0"), String(today.getDate()).padStart(2, "0")].join("-");
-    if (isSpotifyMode) {
-      const pl = spotifyPlaylists.find((p) => p.uri === selectedPlaylistUri);
-      return { type: "spotify" as const, title: pl?.name ?? "Playlist Spotify", subtitle: `${pl?.trackCount ?? 0} titres`, thumbnailUrl: pl?.imageUrl, mediaKey: selectedPlaylistUri ?? "spotify", date, timestamp: Date.now(), minutes };
-    }
-    if (isTwitchMode) {
-      if (selectedVodId) return { type: "twitch-vod" as const, title: `VOD ${selectedVodId}`, subtitle: "Twitch VOD", mediaKey: `vod:${selectedVodId}`, date, timestamp: Date.now(), minutes };
-      return { type: "twitch-live" as const, title: selectedChannel ?? "Twitch", subtitle: "Live Twitch", mediaKey: `live:${selectedChannel}`, date, timestamp: Date.now(), minutes };
-    }
-    if (isQueueMode) {
-      return { type: "playlist" as const, title: "File FocusFlow", subtitle: `${queueItems.length} titre${queueItems.length > 1 ? "s" : ""}`, thumbnailUrl: queueItems[0]?.thumbnailUrl, mediaKey: "queue", date, timestamp: Date.now(), minutes };
-    }
-    if (isPlaylistMode && selectedPlaylist) {
-      return { type: "playlist" as const, title: selectedPlaylist.title, subtitle: selectedPlaylist.channelName ?? "YouTube Playlist", thumbnailUrl: selectedPlaylist.thumbnailUrl, mediaKey: `pl:${selectedPlaylist.playlistId}`, date, timestamp: Date.now(), minutes };
-    }
-    return { type: "youtube" as const, title: video.title, subtitle: video.channel, thumbnailUrl: `https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`, mediaKey: video.youtubeId, date, timestamp: Date.now(), minutes };
-  };
+  // Lu dans des callbacks mémorisés : toujours la description courante.
+  const playEntryRef = useRef(media.playEntry);
+  useEffect(() => { playEntryRef.current = media.playEntry; });
+  const buildPlayEntry = (minutes: number) => playEntryRef.current(minutes);
 
   // ── Celebrations: achievements unlocked + daily goal reached ──────────────
   const celebrateProgress = () => {
@@ -328,7 +208,6 @@ export default function SessionPage() {
   };
 
   // ── Session end ───────────────────────────────────────────────────────────
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleSessionEnd = useCallback(() => {
     if (typeof window !== "undefined" && Notification.permission === "granted") {
       new Notification("FocusFlow", {
@@ -348,7 +227,7 @@ export default function SessionPage() {
       sessionEndedRef.current = false;
     }
     nextSession(true);
-  }, [mode, nextSession, recordSession, settings.workDuration]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, nextSession, recordSession, recordPlay, settings.workDuration]);
 
   useEffect(() => {
     if (prevSecondsRef.current > 0 && secondsLeft === 0) handleSessionEnd();
@@ -388,7 +267,6 @@ export default function SessionPage() {
 
   // ── Distraction tracking ──────────────────────────────────────────────────
   // Faithful to the original Pomodoro Technique: mark every interruption.
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleDistraction = useCallback(() => {
     if (isBreakRef.current) return; // only count during focus
     markDistraction();
@@ -421,7 +299,6 @@ export default function SessionPage() {
 
   // Auto-masquage du panneau de volume après 2,5 s sans interaction.
   const volumeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const armVolumeHide = useCallback(() => {
     if (volumeHideTimerRef.current) clearTimeout(volumeHideTimerRef.current);
     volumeHideTimerRef.current = setTimeout(() => setShowVolume(false), 2500);
@@ -434,6 +311,19 @@ export default function SessionPage() {
     setVolumeState(v);
     armVolumeHide();
     adapter?.setVolume(v);
+  };
+
+  // Fin de liste prolongée par des titres proches : toast et ville.
+  const handleExtended = ({ added }: ExtendedEvent, kind: SourceKind) => {
+    if (added === 0) return;
+    toast({
+      title: kind === "spotify" ? "Fin de la playlist" : "Fin de la liste",
+      description: kind === "spotify"
+        ? `${added} titre${added > 1 ? "s" : ""} proche${added > 1 ? "s" : ""} de toute ta playlist ajouté${added > 1 ? "s" : ""} à la suite.`
+        : "La lecture continue avec des titres proches de toute ta playlist.",
+      accent: "emerald",
+    });
+    city.current?.extend();
   };
 
   const skipTrack = (dir: "next" | "prev") => { if (dir === "next") adapter?.next(); else adapter?.previous(); };
@@ -450,7 +340,8 @@ export default function SessionPage() {
   // « En focus · <titre écouté> » / « En pause » / « Flowtime · … ». Éphémère,
   // publiée dans friend_stats.activity ; effacée à la sortie de session.
   const activityKind = mode !== "work" ? "En pause" : isFlowtime ? "Flowtime" : "En focus";
-  const activityMedia = nowPlaying ? `${nowPlaying.title}${isSpotifyMode ? " · Spotify" : isTwitchMode ? " · Twitch" : ""}` : isSpotifyMode ? "Spotify" : isTwitchMode ? "Twitch" : "";
+  const sourceName = SOURCE_NAME[media.kind];
+  const activityMedia = nowPlaying ? [nowPlaying.title, sourceName].filter(Boolean).join(" · ") : sourceName;
   const activityLabel = activityMedia ? `${activityKind} · ${activityMedia}` : activityKind;
   useEffect(() => {
     upsertMyFriendStats({ activity: activityLabel });
@@ -496,67 +387,25 @@ export default function SessionPage() {
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
-      {/* Audio/video source — YouTube, Spotify, or Twitch */}
-      {isSpotifyMode ? (
-        <>
-          {/* Aucune vidéo avec Spotify : la ville sert de décor, le panneau
-              à LED décompte les minutes. Démontée pendant la halte (qui a la
-              sienne) pour ne jamais faire tourner deux scènes. */}
-          {!isBreak && (
-            <SessionCity
-              ref={city}
-              phase="work"
-              board={isFlowtime ? "FLOW" : `${Math.max(1, Math.ceil(secondsLeft / 60))} MIN`}
-              className="absolute inset-0"
-              label="La ville la nuit derrière une vitre mouillée, décor de la session Spotify."
-            />
-          )}
-          <SpotifyPlayer
-            shouldPlay={!isBreak && isRunning}
-            playlistUri={selectedPlaylistUri!}
-            backdrop={false}
-            controls={false}
-            initialLoop={loop}
-            onAdapter={setAdapter}
-            onExtended={({ added }) => {
-              toast({ title: "Fin de la playlist", description: `${added} titre${added > 1 ? "s" : ""} proche${added > 1 ? "s" : ""} de toute ta playlist ajouté${added > 1 ? "s" : ""} à la suite.`, accent: "emerald" });
-              city.current?.extend();
-            }}
+      {/* Le lecteur, quelle que soit la source (seul endroit qui les distingue). */}
+      <SessionMedia
+        media={media}
+        playing={!isBreak && isRunning}
+        isBreak={isBreak}
+        volume={volume}
+        trackId={pb.track?.id}
+        onAdapter={setAdapter}
+        onExtended={handleExtended}
+        backdrop={
+          <SessionCity
+            ref={city}
+            phase="work"
+            board={isFlowtime ? "FLOW" : `${Math.max(1, Math.ceil(secondsLeft / 60))} MIN`}
+            className="absolute inset-0"
+            label="La ville la nuit derrière une vitre mouillée, décor de la session."
           />
-        </>
-      ) : isTwitchMode ? (
-        <TwitchPlayer
-          channel={selectedChannel ?? undefined}
-          vodId={selectedVodId ?? undefined}
-          token={twitchToken ?? undefined}
-          volume={volume}
-          onAdapter={setAdapter}
-        />
-      ) : (
-        <div
-          id="yt-player"
-          className="absolute inset-0 w-full h-full"
-          style={{ pointerEvents: "none" }}
-        />
-      )}
-
-      {/* Vignette (work only, not on Twitch to keep natural brightness) */}
-      {!isBreak && !isTwitchMode && (
-        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(0,0,0,0.45)_100%)]" />
-      )}
-
-      {/* Halo d'ambiance discret autour du lecteur (teinte du média) ; le
-          changement de `key` sur skip/fin de titre déclenche une pulsation unique */}
-      {!isBreak && !isTwitchMode && (
-        <div
-          key={`halo-${pb.track?.id ?? ""}`}
-          className="absolute inset-0 pointer-events-none anim-halo-pulse"
-          style={{
-            boxShadow: "inset 0 0 160px 20px color-mix(in oklab, var(--ambient) 55%, transparent)",
-            opacity: 0.35,
-          }}
-        />
-      )}
+        }
+      />
 
       {/* Bloom doux plein écran à la fin d'un pomodoro (opacité gérée par .anim-bloom) */}
       {bloomKey > 0 && (
@@ -578,30 +427,6 @@ export default function SessionPage() {
               transition: "transform 1s linear",
             }}
           />
-        </div>
-      )}
-
-      {/* Twitch sub-only fallback banner */}
-      {isTwitchMode && !isBreak && (
-        <div className="absolute bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-10 px-3 max-w-full">
-          <a
-            href={
-              selectedVodId
-                ? `https://www.twitch.tv/videos/${selectedVodId}`
-                : `https://www.twitch.tv/${selectedChannel}`
-            }
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2.5 px-4 py-2.5 rounded-[6px] bg-black/70 backdrop-blur-md border border-[#9146ff]/30 text-white/70 hover:text-white hover:border-[#9146ff]/60 text-xs font-medium transition-all"
-          >
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-[#9146ff]" fill="currentColor">
-              <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
-            </svg>
-            Contenu réservé aux abonnés ? Ouvrir sur Twitch
-            <svg className="w-3 h-3 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </a>
         </div>
       )}
 
@@ -709,7 +534,7 @@ export default function SessionPage() {
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-black/50 backdrop-blur-sm border border-white/10 max-w-full">
                   <Equalizer
                     playing={isRunning}
-                    mood={!isQueueMode && !isPlaylistMode && !isSpotifyMode && !isTwitchMode ? video.mood : undefined}
+                    mood={media.mood}
                   />
                   {/* key = index de piste → le titre glisse à chaque changement */}
                   <div key={pb.track?.id ?? ""} className="min-w-0 anim-track-in">
@@ -895,18 +720,20 @@ export default function SessionPage() {
                   </div>
                 )}
 
-                {/* Twitch shortcut */}
-                {isTwitchMode && (
+                {/* À venir : file, suggestions marquées, titres proches. */}
+                <UpNext adapter={adapter} pb={pb} />
+
+                {/* Ouvrir chez la source (Twitch). */}
+                {media.external && (
                   <a
-                    href={selectedVodId ? `https://www.twitch.tv/videos/${selectedVodId}` : `https://www.twitch.tv/${selectedChannel}`}
+                    href={media.external.href}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-[6px] text-white/75 hover:text-[#9146ff] hover:bg-[#9146ff]/10 transition-all"
-                    title="Ouvrir sur Twitch"
+                    title={media.external.label}
+                    aria-label={media.external.label}
                   >
-                    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
-                      <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
-                    </svg>
+                    <TwitchGlyph className="w-4 h-4" />
                   </a>
                 )}
 

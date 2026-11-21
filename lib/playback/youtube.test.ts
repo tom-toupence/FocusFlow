@@ -21,6 +21,7 @@ class FakePlayer {
   loadVideoById(id: string) { this.loaded.push(id); }
   loadPlaylist() {}
   setLoop() {}
+  seekTo() {}
   end() { this.cfg.events.onStateChange?.({ data: 0 }); }
 }
 
@@ -104,6 +105,45 @@ describe("YouTubeAdapter", async () => {
     expect(FakePlayer.last.playing).toBe(true);
     a.pause();
     expect(FakePlayer.last.playing).toBe(false);
+    a.destroy();
+  });
+});
+
+describe("YouTubeAdapter : file à venir et suggestions", async () => {
+  const { YouTubeAdapter } = await import("./youtube");
+  const rec = async (seed: string) => [{ id: `s-${seed}`, title: `Proche de ${seed}` }];
+
+  it("publie les titres à venir et permet d'en retirer un", async () => {
+    const a = new YouTubeAdapter("el", { type: "queue", tracks: tracks("a", "b", "c") }, { volume: 1, shuffle: false, loop: true, playing: true });
+    await tick();
+    expect(a.getState().upcoming.map((t) => t.id)).toEqual(["b", "c"]);
+    a.removeUpcoming("b");
+    expect(a.getState().upcoming.map((t) => t.id)).toEqual(["c"]);
+    FakePlayer.last.end();
+    expect(FakePlayer.last.loaded).toEqual(["a", "c"]);
+    a.destroy();
+  });
+
+  it("suggestions à la demande : hors file, marquées, et ajoutées à la suite", async () => {
+    const a = new YouTubeAdapter("el", { type: "queue", tracks: tracks("a", "b") }, { volume: 1, shuffle: false, loop: true, playing: true, recommend: rec });
+    await tick();
+    const sug = await a.getSuggestions();
+    expect(sug.map((t) => t.id).sort()).toEqual(["s-a", "s-b"]);
+    expect(sug.every((t) => t.suggested)).toBe(true);
+    expect(await a.enqueue(sug[0])).toBe(true);
+    expect(await a.enqueue(sug[0])).toBe(false); // déjà dans la file
+    const last = a.getState().upcoming.at(-1)!;
+    expect(last).toMatchObject({ id: sug[0].id, suggested: true });
+    a.destroy();
+  });
+
+  it("vidéo seule : suggestions possibles, pas de file où les ajouter", async () => {
+    const a = new YouTubeAdapter("el", { type: "video", id: "v", title: "V" }, { volume: 1, shuffle: false, loop: true, playing: true, recommend: rec });
+    await tick();
+    expect(a.getState().caps).toMatchObject({ suggestions: true, removeUpcoming: false, skip: false });
+    const sug = await a.getSuggestions();
+    expect(sug[0].id).toBe("s-v");
+    expect(await a.enqueue(sug[0])).toBe(false);
     a.destroy();
   });
 });
