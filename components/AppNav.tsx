@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useNavStore, NavSection } from "@/store/navStore";
 import { cn } from "@/lib/utils";
+import { T, tr } from "@/lib/motion";
 
 type IconProps = { className?: string };
 
@@ -48,38 +49,28 @@ function NavButton({
     <button
       onClick={onClick}
       className={cn(
-        "group relative flex flex-col items-center justify-center gap-1 rounded-xl transition-colors",
-        layout === "rail" ? "w-full py-2" : "flex-1 py-1.5",
-        active ? "text-foreground" : "text-foreground/40 hover:text-foreground/75"
+        "group relative flex flex-col items-center justify-center gap-1.5 transition-colors duration-[var(--d-ui)]",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sodium rounded-[var(--r-control)]",
+        layout === "rail" ? "w-full py-3" : "flex-1 py-2",
+        active ? "text-ink" : "text-ink-3 hover:text-ink-2"
       )}
       aria-current={active ? "page" : undefined}
     >
-      <span
-        className={cn(
-          "relative flex items-center justify-center rounded-xl transition-colors",
-          layout === "rail" ? "w-11 h-9" : "w-10 h-7"
-        )}
-      >
-        {/* Pastille active partagée : elle GLISSE d'une section à l'autre
-            (layoutId) — le déplacement dit d'où l'on vient. */}
-        {active && (
-          <motion.span
-            layoutId={`nav-pill-${layout}`}
-            className="absolute inset-0 rounded-xl bg-foreground/[0.12]"
-            transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }}
-          />
-        )}
-        <Icon className="relative w-[18px] h-[18px]" />
-      </span>
-      <span className="text-[10px] font-medium tracking-tight">{LABELS[s]}</span>
-      {/* Trait d'accent : le seul endroit coloré du rail */}
-      {active && layout === "rail" && (
+      {/* Trait de niveau sodium : il GLISSE d'une section à l'autre (layoutId),
+          à gauche sur le rail, en haut sur la barre mobile. */}
+      {active && (
         <motion.span
-          layoutId="nav-accent"
-          className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-focus"
-          transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }}
+          layoutId={`nav-level-${layout}`}
+          aria-hidden
+          className={cn(
+            "absolute bg-sodium",
+            layout === "rail" ? "left-0 top-2 bottom-2 w-[2px]" : "top-0 left-1/4 right-1/4 h-[2px]"
+          )}
+          transition={tr(T.spring, reduce)}
         />
       )}
+      <Icon className="relative w-[19px] h-[19px]" />
+      <span className={cn("text-[11px] tracking-tight", active && "font-semibold")}>{LABELS[s]}</span>
     </button>
   );
 }
@@ -90,21 +81,35 @@ export default function AppNav() {
 
   return (
     <>
-      {/* Desktop rail */}
-      <nav className="hidden md:flex flex-col items-center gap-1.5 w-20 shrink-0 sticky top-0 h-screen border-r border-foreground/[0.06] bg-background/70 backdrop-blur-sm py-4 px-2">
-        <div
-          className="w-9 h-9 rounded-xl bg-foreground text-background flex items-center justify-center font-semibold text-sm mb-4"
-          title="FocusFlow"
-        >
-          F
+      {/* Rail desktop : la marque est une petite tour dont les étages s'allument
+          (la même façade que la jauge : vert = fait, sodium = maintenant). */}
+      <nav aria-label="Navigation principale" className="hidden md:flex flex-col items-center gap-1 w-[84px] shrink-0 sticky top-0 h-screen border-r border-line bg-bg py-5">
+        <div className="mb-6 flex items-end h-9" title="FocusFlow" role="img" aria-label="FocusFlow">
+          <svg width="14" height="34" viewBox="0 0 14 34" aria-hidden>
+            {Array.from({ length: 6 }, (_, f) => (
+              [0, 1].map((c) => (
+                <rect
+                  key={`${f}-${c}`}
+                  x={c * 7}
+                  y={34 - (f + 1) * 5.6}
+                  width={6}
+                  height={4.6}
+                  rx={0.6}
+                  fill={f < 3 ? "var(--konbini)" : f === 3 && c === 0 ? "var(--sodium)" : "var(--surface-2)"}
+                  stroke={f > 3 || (f === 3 && c === 1) ? "var(--line)" : "none"}
+                  strokeWidth={0.5}
+                />
+              ))
+            ))}
+          </svg>
         </div>
         {ORDER.map((s) => (
           <NavButton key={s} s={s} active={section === s} onClick={() => setSection(s)} layout="rail" />
         ))}
       </nav>
 
-      {/* Mobile bottom bar */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 flex items-stretch gap-1 px-2 pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] border-t border-foreground/[0.08] bg-background/90 backdrop-blur-md">
+      {/* Barre basse mobile */}
+      <nav aria-label="Navigation principale" className="md:hidden fixed bottom-0 inset-x-0 z-30 flex items-stretch px-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] border-t border-line bg-bg">
         {ORDER.map((s) => (
           <NavButton key={s} s={s} active={section === s} onClick={() => setSection(s)} layout="bar" />
         ))}

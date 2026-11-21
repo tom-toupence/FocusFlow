@@ -7,21 +7,16 @@ import { cn } from "@/lib/utils";
 
 // ── Plant glyph ────────────────────────────────────────────────────────────────
 
+/** Un soir = un petit immeuble : un étage allumé par palier (25 min, 1 h, 2 h).
+ *  (Les données restent les « plantes » de lib/progression ; seule l'image change
+ *  pour la ville la nuit.) */
 function PlantGlyph({ plant }: { plant: Plant | null }) {
-  if (!plant) {
-    return (
-      <div className="flex flex-col items-center justify-end h-12">
-        <div className="w-6 h-1.5 rounded-full bg-foreground/[0.06]" />
-      </div>
-    );
-  }
-  // Croissance figurée par un point vert qui grossit et fonce selon le palier.
-  const size = plant.stage === 3 ? "w-5 h-5" : plant.stage === 2 ? "w-3.5 h-3.5" : "w-2 h-2";
-  const shade = plant.stage === 3 ? "bg-focus" : plant.stage === 2 ? "bg-focus/75" : "bg-focus/50";
+  const lit = plant?.stage ?? 0;
   return (
-    <div className="flex flex-col items-center justify-end h-12">
-      <span className={cn(size, shade, "rounded-full")} />
-      <div className="w-6 h-1.5 rounded-full bg-focus/20 mt-1" />
+    <div className="flex flex-col items-center justify-end h-12 gap-[2px]" aria-hidden>
+      {[3, 2, 1].map((f) => (
+        <span key={f} className={cn("w-5 h-2.5 rounded-[1px]", f <= lit ? "bg-konbini" : "bg-foreground/[0.07] border border-line")} />
+      ))}
     </div>
   );
 }
@@ -46,7 +41,7 @@ export default function ProgressionPanel() {
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">Niveau {level.level} · {level.title}</p>
-            <p className="text-xs text-foreground/40">{level.xp.toLocaleString("fr-FR")} XP au total</p>
+            <p className="text-xs text-ink-3">{level.xp.toLocaleString("fr-FR")} XP au total</p>
           </div>
         </div>
         <div>
@@ -56,11 +51,11 @@ export default function ProgressionPanel() {
               style={{ width: `${Math.round(level.progress * 100)}%` }}
             />
           </div>
-          <p className="text-[10px] text-foreground/30 mt-1.5 text-right tabular-nums">
+          <p className="text-[10px] text-ink-3 mt-1.5 text-right tabular-nums">
             {level.xpInLevel} / {level.xpForNext} XP → niveau {level.level + 1}
           </p>
         </div>
-        <p className="text-[10px] text-foreground/30 leading-relaxed">
+        <p className="text-[10px] text-ink-3 leading-relaxed">
           Tu gagnes de l&apos;XP à chaque pomodoro, minute de focus, succès débloqué et jour de série.
         </p>
       </div>
@@ -68,19 +63,19 @@ export default function ProgressionPanel() {
       {/* ── Focus garden ──────────────────────────────────────────────────── */}
       <div className="bg-foreground/[0.03] border border-foreground/[0.06] rounded-2xl p-5 flex flex-col gap-3">
         <div className="flex items-baseline justify-between">
-          <p className="text-sm font-semibold text-foreground">Jardin de focus</p>
-          <span className="text-[10px] text-foreground/30">cette semaine</span>
+          <p className="text-sm font-semibold text-foreground">Les soirs allumés</p>
+          <span className="text-[10px] text-ink-3">cette semaine</span>
         </div>
         <div className="flex items-end justify-between gap-1 flex-1">
           {garden.map((plant, i) => (
             <div key={i} className="flex flex-col items-center gap-1 flex-1">
               <PlantGlyph plant={plant} />
-              <span className="text-[9px] text-foreground/25">{dayLetters[i]}</span>
+              <span className="text-[9px] text-ink-3">{dayLetters[i]}</span>
             </div>
           ))}
         </div>
-        <p className="text-[10px] text-foreground/30 leading-relaxed">
-          Chaque jour de focus fait pousser une plante : un palier dès 25 min, un deuxième dès 1 h, un troisième dès 2 h.
+        <p className="text-[10px] text-ink-3 leading-relaxed">
+          Chaque soir de focus allume un immeuble : un étage dès 25 min, un deuxième dès 1 h, un troisième dès 2 h.
         </p>
       </div>
 
@@ -94,7 +89,7 @@ export default function ProgressionPanel() {
               c.done ? "bg-focus/[0.08] border-focus/25" : "bg-foreground/[0.02] border-foreground/[0.06]"
             )}>
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-[11px] text-foreground/60 leading-tight flex-1">{c.label}</span>
+                <span className="text-[11px] text-ink-2 leading-tight flex-1">{c.label}</span>
                 {c.done && <span className="text-focus text-xs">✓</span>}
               </div>
               <div className="h-1.5 rounded-full bg-foreground/[0.06] overflow-hidden">
@@ -103,7 +98,7 @@ export default function ProgressionPanel() {
                   style={{ width: `${(c.current / c.target) * 100}%` }}
                 />
               </div>
-              <p className="text-[10px] text-foreground/30 mt-1 tabular-nums">{c.current} / {c.target}</p>
+              <p className="text-[10px] text-ink-3 mt-1 tabular-nums">{c.current} / {c.target}</p>
             </div>
           ))}
         </div>

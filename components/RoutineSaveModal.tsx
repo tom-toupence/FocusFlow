@@ -23,18 +23,18 @@ export default function RoutineSaveModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div className="w-full max-w-sm bg-card border border-foreground/10 rounded-2xl shadow-2xl p-5 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">Enregistrer comme routine</h2>
-          <button onClick={onClose} className="text-foreground/40 hover:text-foreground transition-colors">
+          <button onClick={onClose} className="text-ink-3 hover:text-foreground transition-colors">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
           </button>
         </div>
-        <p className="text-[11px] text-foreground/40 -mt-2">Mémorise les durées, le média et les tâches actuelles pour les relancer en 1 clic.</p>
+        <p className="text-[11px] text-ink-3 -mt-2">Mémorise les durées, le média et les tâches actuelles pour les relancer en 1 clic.</p>
 
         {saved ? (
-          <div className="py-6 flex flex-col items-center gap-2 text-emerald-400">
+          <div className="py-6 flex flex-col items-center gap-2 text-sodium-text">
             <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" /></svg>
             <p className="text-sm font-medium">Routine enregistrée</p>
           </div>
@@ -44,7 +44,7 @@ export default function RoutineSaveModal({ onClose }: { onClose: () => void }) {
               value={name} onChange={(e) => setName(e.target.value)} autoFocus
               onKeyDown={(e) => e.key === "Enter" && save()}
               placeholder="Nom (ex: Deep Work matin)"
-              className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-foreground/25"
+              className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:border-foreground/25"
             />
             <div className="flex flex-wrap gap-2">
               {COLORS.map((c) => (
@@ -53,7 +53,7 @@ export default function RoutineSaveModal({ onClose }: { onClose: () => void }) {
                 </button>
               ))}
             </div>
-            <button onClick={save} disabled={!name.trim()} className="py-2.5 bg-foreground text-background font-semibold text-sm rounded-xl hover:bg-foreground/90 disabled:opacity-30 transition-all">Enregistrer</button>
+            <button onClick={save} disabled={!name.trim()} className="py-2.5 bg-ink text-on-ink font-semibold text-sm rounded-xl hover:bg-foreground/90 disabled:opacity-30 transition-all">Enregistrer</button>
           </>
         )}
       </div>

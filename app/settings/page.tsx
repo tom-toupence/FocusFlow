@@ -12,58 +12,42 @@ import { getVideoColor } from "@/data/videos";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import CoachModal from "@/components/CoachModal";
-import AmbientBackdrop from "@/components/AmbientBackdrop";
 import { useExpandNavigate } from "@/lib/useExpandNavigate";
 import RoutineSaveModal from "@/components/RoutineSaveModal";
 import { PlannedTask } from "@/lib/coach";
+import { Button } from "@/components/ff/Button";
+import { Modal } from "@/components/ff/Modal";
+import { IconPlay } from "@/components/ff/icons";
 
+// Chaque format se lit comme un CYCLE : longueur de travail puis longueur
+// de pause, à la même échelle. Pas d'icône décorative.
 const presetConfig = [
-  {
-    id: "classic" as TimerPreset,
-    label: "Classic",
-    sub: "25 min / 5 min",
-    desc: "Le format Pomodoro original. Idéal pour des tâches variées.",
-    icon: (
-      <svg className="w-5 h-5 text-orange-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-        <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    id: "deep" as TimerPreset,
-    label: "Deep Work",
-    sub: "50 min / 10 min",
-    desc: "Blocs longs pour entrer en concentration profonde.",
-    icon: (
-      <svg className="w-5 h-5 text-violet-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-        <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    id: "flowtime" as TimerPreset,
-    label: "Flowtime",
-    sub: "Chrono libre",
-    desc: "Travaille tant que tu es dans le flow. Pause méritée = temps ÷ 5.",
-    icon: (
-      <svg className="w-5 h-5 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-        <path d="M2 12c2-4 4-6 6-6s4 4 6 6 4 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M2 12c2 4 4 6 6 6s4-4 6-6 4-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    id: "custom" as TimerPreset,
-    label: "Personnalisé",
-    sub: "À toi de définir",
-    desc: "Choisis tes propres durées.",
-    icon: (
-      <svg className="w-5 h-5 text-sky-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-        <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
+  { id: "classic" as TimerPreset, label: "Classique", sub: "25 / 5", desc: "Le Pomodoro original. Bon pour des tâches variées.", work: 25, rest: 5 },
+  { id: "deep" as TimerPreset, label: "Deep Work", sub: "50 / 10", desc: "Des blocs longs pour entrer dans un sujet difficile.", work: 50, rest: 10 },
+  { id: "flowtime" as TimerPreset, label: "Flowtime", sub: "sans échéance", desc: "Tu travailles tant que ça tient. Pause = temps passé ÷ 5.", work: 0, rest: 0 },
+  { id: "custom" as TimerPreset, label: "Personnalisé", sub: "tes durées", desc: "Règle chaque durée ci-dessous.", work: -1, rest: -1 },
 ];
+
+/** Diagramme du cycle : travail puis pause, échelle 60 min. */
+function CycleShape({ work, rest, customWork, customRest }: { work: number; rest: number; customWork: number; customRest: number }) {
+  const w = work < 0 ? customWork : work;
+  const r = rest < 0 ? customRest : rest;
+  if (work === 0) {
+    return (
+      <span aria-hidden className="flex items-center h-2 w-full">
+        <span className="h-2 flex-1 rounded-l-[2px] bg-[linear-gradient(90deg,var(--water)_70%,transparent)]" />
+      </span>
+    );
+  }
+  const scale = 70;
+  return (
+    <span aria-hidden className="flex items-center gap-[3px] h-2 w-full">
+      <span className="h-2 rounded-[2px] bg-water" style={{ width: `${Math.min(100, (w / scale) * 100)}%` }} />
+      <span className="h-[2px] bg-sodium" style={{ width: `${Math.min(30, (r / scale) * 100)}%` }} />
+    </span>
+  );
+}
+
 
 function NumberInput({
   label,
@@ -71,20 +55,25 @@ function NumberInput({
   min,
   max,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: number;
   min: number;
   max: number;
   onChange: (v: number) => void;
+  /** Format imposé : la valeur reste lisible, les réglages disparaissent (clavier compris). */
+  disabled?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between py-3 border-b border-foreground/[0.06] last:border-0">
-      <span className="text-sm text-foreground/70">{label}</span>
+      <span className="text-sm text-ink-2">{label}</span>
       <div className="flex items-center gap-3">
         <button
           onClick={() => onChange(Math.max(min, value - (label.includes("Sessions") ? 1 : 5)))}
-          className="w-7 h-7 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground/70 flex items-center justify-center transition-colors text-sm font-medium"
+          disabled={disabled}
+          aria-label={`${label} : diminuer`}
+          className="disabled:invisible w-7 h-7 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-ink-2 flex items-center justify-center transition-colors text-sm font-medium"
         >
           −
         </button>
@@ -93,7 +82,9 @@ function NumberInput({
         </span>
         <button
           onClick={() => onChange(Math.min(max, value + (label.includes("Sessions") ? 1 : 5)))}
-          className="w-7 h-7 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground/70 flex items-center justify-center transition-colors text-sm font-medium"
+          disabled={disabled}
+          aria-label={`${label} : augmenter`}
+          className="disabled:invisible w-7 h-7 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-ink-2 flex items-center justify-center transition-colors text-sm font-medium"
         >
           +
         </button>
@@ -103,8 +94,8 @@ function NumberInput({
 }
 
 const PRIORITY_DOT: Record<TodoPriority, string> = {
-  urgent: "bg-red-500",
-  normal: "bg-amber-400",
+  urgent: "bg-danger",
+  normal: "bg-sodium",
   low:    "bg-foreground/20",
 };
 
@@ -128,10 +119,10 @@ function KanbanCard({
 
   const advance =
     todo.status === "todo"
-      ? { label: "Commencer →", target: "in-progress" as const, cls: "text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20" }
+      ? { label: "Commencer →", target: "in-progress" as const, cls: "text-sodium-text dark:text-sodium-text bg-sodium/10 hover:bg-sodium/20" }
       : todo.status === "in-progress"
-      ? { label: "Terminer →", target: "done" as const, cls: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20" }
-      : { label: "↺ À faire", target: "todo" as const, cls: "text-foreground/40 bg-foreground/5 hover:bg-foreground/10" };
+      ? { label: "Terminer →", target: "done" as const, cls: "text-sodium-text dark:text-sodium-text bg-sodium/10 hover:bg-sodium/20" }
+      : { label: "↺ À faire", target: "todo" as const, cls: "text-ink-3 bg-foreground/5 hover:bg-foreground/10" };
 
   return (
     <div
@@ -148,14 +139,14 @@ function KanbanCard({
       <div className="flex items-start gap-2">
         <span className={cn("w-2 h-2 rounded-full flex-shrink-0 mt-1.5", PRIORITY_DOT[todo.priority ?? "normal"])} />
         <span className={cn(
-          "flex-1 text-sm text-foreground/85 leading-snug min-w-0 break-words",
-          todo.status === "done" && "line-through text-foreground/45"
+          "flex-1 text-sm text-ink leading-snug min-w-0 break-words",
+          todo.status === "done" && "line-through text-ink-3"
         )}>
           {todo.text}
         </span>
         <button
           onClick={onDelete}
-          className="sm:opacity-0 sm:group-hover:opacity-100 text-foreground/40 sm:text-foreground/25 hover:text-red-400 transition-all flex-shrink-0 mt-0.5 p-1 -m-1"
+          className="sm:opacity-0 sm:group-hover:opacity-100 text-ink-3 sm:text-ink-3 hover:text-danger transition-all flex-shrink-0 mt-0.5 p-1 -m-1"
           title="Supprimer"
         >
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -165,7 +156,7 @@ function KanbanCard({
       </div>
       <div className="flex items-center gap-1.5">
         {(todo.pomodoroEstimate ?? 0) > 0 && (
-          <span className="text-[10px] text-foreground/35 tabular-nums flex items-center gap-1" title="Pomodoros">
+          <span className="text-[10px] text-ink-3 tabular-nums flex items-center gap-1" title="Pomodoros">
             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2M9 2h6" strokeLinecap="round" strokeLinejoin="round" /></svg>
             {(todo.pomodorosUsed ?? 0) > 0 ? `${todo.pomodorosUsed}/` : ""}{todo.pomodoroEstimate}
           </span>
@@ -175,7 +166,7 @@ function KanbanCard({
             <button
               onClick={() => onStatus(back.target)}
               title={back.title}
-              className="text-[11px] font-medium px-2 py-1 rounded-lg text-foreground/40 bg-foreground/5 hover:bg-foreground/10 hover:text-foreground/70 transition-all"
+              className="text-[11px] font-medium px-2 py-1 rounded-lg text-ink-3 bg-foreground/5 hover:bg-foreground/10 hover:text-ink-2 transition-all"
             >
               ←
             </button>
@@ -184,7 +175,7 @@ function KanbanCard({
             <button
               onClick={() => onStatus("done")}
               title="Marquer terminé directement"
-              className="text-[11px] font-medium px-2 py-1 rounded-lg text-emerald-600/70 dark:text-emerald-400/70 bg-emerald-500/5 hover:bg-emerald-500/15 transition-all"
+              className="text-[11px] font-medium px-2 py-1 rounded-lg text-sodium-text dark:text-sodium-text bg-sodium/5 hover:bg-sodium/15 transition-all"
             >
               ✓
             </button>
@@ -223,9 +214,9 @@ function KanbanColumn({
   const [dragOver, setDragOver] = useState(false);
 
   const styles = {
-    neutral: { panel: "bg-foreground/[0.03] border-foreground/[0.07]", dot: "bg-foreground/30", label: "text-foreground/50", over: "border-foreground/40 bg-foreground/[0.07]" },
-    amber:   { panel: "bg-amber-500/[0.05] border-amber-500/15",        dot: "bg-amber-400",     label: "text-amber-600 dark:text-amber-400", over: "border-amber-500/50 bg-amber-500/15" },
-    emerald: { panel: "bg-emerald-500/[0.05] border-emerald-500/15",    dot: "bg-emerald-500",   label: "text-emerald-600 dark:text-emerald-400", over: "border-emerald-500/50 bg-emerald-500/15" },
+    neutral: { panel: "bg-foreground/[0.03] border-foreground/[0.07]", dot: "bg-foreground/30", label: "text-ink-3", over: "border-foreground/40 bg-foreground/[0.07]" },
+    amber:   { panel: "bg-sodium/[0.05] border-sodium/15",        dot: "bg-sodium",     label: "text-sodium-text dark:text-sodium-text", over: "border-sodium/50 bg-sodium/15" },
+    emerald: { panel: "bg-sodium/[0.05] border-sodium/15",    dot: "bg-sodium",   label: "text-sodium-text dark:text-sodium-text", over: "border-sodium/50 bg-sodium/15" },
   }[tint];
 
   return (
@@ -243,11 +234,11 @@ function KanbanColumn({
       <div className="flex items-center gap-2 mb-2.5 px-1">
         <span className={cn("w-2 h-2 rounded-full flex-shrink-0", styles.dot)} />
         <span className={cn("text-xs font-semibold uppercase tracking-wider", styles.label)}>{title}</span>
-        <span className="ml-auto text-xs text-foreground/30 tabular-nums">{todos.length}</span>
+        <span className="ml-auto text-xs text-ink-3 tabular-nums">{todos.length}</span>
       </div>
       <div className="flex flex-col gap-2 overflow-y-auto max-h-80 min-h-[72px]">
         {todos.length === 0 ? (
-          <p className="text-[11px] text-foreground/25 text-center py-6 px-2 leading-relaxed">{empty}</p>
+          <p className="text-[11px] text-ink-3 text-center py-6 px-2 leading-relaxed">{empty}</p>
         ) : (
           todos.map((todo) => (
             <KanbanCard
@@ -360,7 +351,6 @@ export default function SettingsPage() {
 
   return (
     <div className="relative isolate min-h-screen bg-background flex flex-col">
-      <AmbientBackdrop />
 
       {/* ── Coach de planification (local, gratuit) ───────────────────── */}
       {showCoach && <CoachModal onClose={() => setShowCoach(false)} onAdd={handleCoachAdd} />}
@@ -369,105 +359,62 @@ export default function SettingsPage() {
       {showRoutineSave && <RoutineSaveModal onClose={() => setShowRoutineSave(false)} />}
 
       {/* ── Modal : reprendre les tâches en cours ──────────────────────── */}
-      {showResumeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-background/70 backdrop-blur-sm">
-          <div className="bg-background border border-foreground/10 rounded-2xl shadow-2xl shadow-black/20 w-full max-w-sm p-6 flex flex-col gap-5">
-            {/* Icon + title */}
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                <svg className="w-4.5 h-4.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path d="M12 8v4l3 3" strokeLinecap="round"/>
-                  <circle cx="12" cy="12" r="9"/>
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">Tâches en cours</h2>
-                <p className="text-xs text-foreground/45 mt-0.5 leading-relaxed">
-                  Tu as {activeTodos.length} tâche{activeTodos.length > 1 ? "s" : ""} active{activeTodos.length > 1 ? "s" : ""}. Comment veux-tu les gérer ?
-                </p>
-              </div>
-            </div>
-
-            {/* Task list */}
-            <div className="flex flex-col gap-1 max-h-36 overflow-y-auto -mx-1 px-1">
-              {activeTodos.map((t) => (
-                <div key={t.id} className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-lg border",
-                  t.status === "in-progress"
-                    ? "bg-amber-500/5 border-amber-500/10"
-                    : "bg-foreground/[0.03] border-foreground/[0.06]"
-                )}>
-                  <div className={cn(
-                    "w-1.5 h-1.5 rounded-full flex-shrink-0",
-                    t.status === "in-progress" ? "bg-amber-400" : "bg-foreground/30"
-                  )} />
-                  <span className="text-xs text-foreground/70 truncate">{t.text}</span>
-                  {t.status === "in-progress" && (
-                    <span className="ml-auto text-[10px] text-amber-500/70 flex-shrink-0">En cours</span>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={() => startSession("keep")}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-foreground/10 hover:bg-foreground/15 border border-foreground/10 text-foreground text-sm font-semibold transition-all"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path d="M5 4l15 8-15 8V4z" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                Continuer avec ces tâches
-              </button>
-              {inProgressTodos.length > 0 && (
-                <button
-                  onClick={() => startSession("reset-inprogress")}
-                  className="w-full py-2.5 rounded-xl bg-amber-500/8 hover:bg-amber-500/15 border border-amber-500/15 text-amber-600 dark:text-amber-400 text-sm font-medium transition-all"
-                >
-                  Remettre les En cours À faire
-                </button>
-              )}
-              <button
-                onClick={() => startSession("clear-all")}
-                className="w-full py-2.5 rounded-xl bg-foreground/5 hover:bg-foreground/10 text-foreground/40 hover:text-foreground/60 text-sm font-medium transition-all"
-              >
-                Démarrer sans tâches
-              </button>
-              <button
-                onClick={() => setShowResumeModal(false)}
-                className="w-full py-2 text-xs text-foreground/30 hover:text-foreground/50 transition-colors"
-              >
-                Annuler
-              </button>
-            </div>
-          </div>
+      <Modal
+        open={showResumeModal}
+        onClose={() => setShowResumeModal(false)}
+        title="Des tâches sont encore ouvertes"
+        meta={`${activeTodos.length} tâche${activeTodos.length > 1 ? "s" : ""} active${activeTodos.length > 1 ? "s" : ""}`}
+        size="sm"
+        footer={<Button variant="quiet" onClick={() => setShowResumeModal(false)}>Annuler</Button>}
+      >
+        <ul className="flex flex-col gap-1 max-h-40 overflow-y-auto">
+          {activeTodos.map((t) => (
+            <li key={t.id} className="flex items-center gap-2.5 py-1.5 text-[14px] text-ink-2">
+              <span aria-hidden className={cn("h-[2px] w-3 shrink-0", t.status === "in-progress" ? "bg-sodium" : "bg-line-strong")} />
+              <span className="truncate">{t.text}</span>
+              {t.status === "in-progress" && <span className="ml-auto shrink-0 text-[12px] text-sodium-text">en cours</span>}
+            </li>
+          ))}
+        </ul>
+        <div className="mt-5 flex flex-col gap-2">
+          <Button variant="signal" onClick={() => startSession("keep")} className="w-full">
+            <IconPlay size={14} />
+            Continuer avec ces tâches
+          </Button>
+          {inProgressTodos.length > 0 && (
+            <Button variant="line" onClick={() => startSession("reset-inprogress")} className="w-full">
+              Remettre les « en cours » à faire
+            </Button>
+          )}
+          <Button variant="line" onClick={() => startSession("clear-all")} className="w-full">
+            Démarrer sans tâches
+          </Button>
         </div>
-      )}
+      </Modal>
 
       {/* Header */}
-      <header className="h-14 flex items-center px-6 border-b border-foreground/[0.06]">
+      <header className="h-14 flex items-center px-4 sm:px-8 border-b border-line">
         <button
           onClick={() => router.push("/")}
-          className="flex items-center gap-1.5 text-sm text-foreground/40 hover:text-foreground/80 transition-colors"
+          className="flex items-center gap-1.5 text-sm text-ink-3 hover:text-ink transition-colors"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           Retour
         </button>
-        <span className="text-sm font-semibold text-foreground/80 tracking-tight mx-auto">Configuration</span>
+        <span className="font-display text-lg text-ink mx-auto">Avant de lancer</span>
         <div className="w-16" />
       </header>
 
-      <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-8 flex flex-col gap-8">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-8 py-10 flex flex-col gap-12">
         <div className="flex flex-col lg:flex-row gap-8">
         {/* Left: selected content */}
         <div className="w-full lg:w-64 flex-shrink-0">
-          <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-3">
+          <p className="text-[13px] text-ink-3 mb-3">
             {isTwitchMode ? "Stream Twitch" : isSpotifyMode ? "Playlist Spotify" : isPlaylistMode ? "Playlist choisie" : "Vidéo choisie"}
           </p>
-          <div ref={previewRef} className="rounded-xl overflow-hidden aspect-video relative">
+          <div ref={previewRef} className="rounded-[var(--r-media)] overflow-hidden aspect-video relative bg-water-deep">
             {isTwitchMode ? (
               <>
                 <div className="w-full h-full bg-gradient-to-br from-[#1a0a3a] to-[#0d0d1a] flex items-center justify-center">
@@ -485,7 +432,7 @@ export default function SettingsPage() {
                   </p>
                 </div>
                 <div className="absolute top-2 right-2">
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-[#9146ff]/20 text-[#9146ff]">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-[#9146ff]/20 text-[#9146ff]">
                     {selectedChannel ? "Live" : "VOD"}
                   </span>
                 </div>
@@ -515,7 +462,7 @@ export default function SettingsPage() {
                   )}
                 </div>
                 <div className="absolute top-2 right-2">
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-[#1db954]/20 text-[#1db954]">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-[#1db954]/20 text-[#1db954]">
                     Spotify
                   </span>
                 </div>
@@ -531,7 +478,7 @@ export default function SettingsPage() {
                     onError={() => setImgError(true)}
                   />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-violet-900/60 to-indigo-900/60 flex items-center justify-center">
+                  <div className="w-full h-full bg-gradient-to-br from-ink/60 to-ink/60 flex items-center justify-center">
                     <svg className="w-10 h-10 text-white/20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
                       <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" strokeLinecap="round" />
                       <path d="M9 12h6M9 16h4" strokeLinecap="round" />
@@ -546,7 +493,7 @@ export default function SettingsPage() {
                   )}
                 </div>
                 <div className="absolute top-2 right-2">
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-violet-500/30 text-violet-200">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-ink/30 text-ink-2">
                     Playlist
                   </span>
                 </div>
@@ -573,7 +520,7 @@ export default function SettingsPage() {
             )}
           </div>
           {isTwitchMode && selectedVodId && (
-            <p className="text-[10px] text-amber-400/60 mt-2 leading-snug">
+            <p className="text-[10px] text-sodium-text mt-2 leading-snug">
               Rediffusion abonné uniquement ? Utilise le bouton &quot;Ouvrir sur Twitch&quot; dans la session.
             </p>
           )}
@@ -587,7 +534,7 @@ export default function SettingsPage() {
                   "flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-xs font-medium transition-all",
                   !shuffle
                     ? "border-foreground/25 bg-foreground/10 text-foreground"
-                    : "border-foreground/[0.07] bg-transparent text-foreground/35 hover:text-foreground/55 hover:border-foreground/12"
+                    : "border-foreground/[0.07] bg-transparent text-ink-3 hover:text-ink-2 hover:border-foreground/12"
                 )}
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -601,7 +548,7 @@ export default function SettingsPage() {
                   "flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-xs font-medium transition-all",
                   shuffle
                     ? "border-[#1db954]/40 bg-[#1db954]/10 text-[#1db954]"
-                    : "border-foreground/[0.07] bg-transparent text-foreground/35 hover:text-foreground/55 hover:border-foreground/12"
+                    : "border-foreground/[0.07] bg-transparent text-ink-3 hover:text-ink-2 hover:border-foreground/12"
                 )}
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -620,48 +567,55 @@ export default function SettingsPage() {
         <div className="flex-1 flex flex-col gap-6">
           {/* Preset selector */}
           <div>
-            <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-3">Format Pomodoro</p>
+            <h2 className="font-display text-xl text-ink mb-4">Le rythme</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {presetConfig.map((p) => (
                 <button
                   key={p.id}
                   onClick={() => handlePresetSelect(p.id)}
+                  aria-pressed={preset === p.id}
                   className={cn(
-                    "flex flex-col gap-1 p-4 rounded-xl border text-left transition-all duration-200",
+                    "ff-press flex flex-col gap-2.5 p-4 rounded-[var(--r-surface)] border text-left transition-colors duration-[var(--d-ui)]",
+                    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sodium",
                     preset === p.id
-                      ? "border-foreground/30 bg-foreground/10"
-                      : "border-foreground/[0.08] bg-foreground/[0.02] hover:border-foreground/15 hover:bg-foreground/5"
+                      ? "border-sodium bg-surface"
+                      : "border-line hover:border-line-strong"
                   )}
                 >
-                  <span className="mb-0.5">{p.icon}</span>
-                  <span className="text-sm font-semibold text-foreground">{p.label}</span>
-                  <span className="text-xs font-medium text-foreground/50">{p.sub}</span>
-                  <span className="text-xs text-foreground/30 leading-relaxed">{p.desc}</span>
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className="font-display text-[17px] text-ink">{p.label}</span>
+                    <span className="font-mono text-[12px] tabular-nums text-ink-3">{p.sub}</span>
+                  </span>
+                  <CycleShape work={p.work} rest={p.rest} customWork={work} customRest={shortBreak} />
+                  <span className="text-[13px] text-ink-2 leading-relaxed">{p.desc}</span>
                 </button>
               ))}
             </div>
           </div>
 
           {/* Custom settings */}
-          <div className={cn("transition-all duration-300", preset !== "custom" && "opacity-40 pointer-events-none")}>
-            <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-3">Durées</p>
-            <div className="rounded-xl border border-foreground/[0.08] bg-foreground/[0.02] px-4">
-              <NumberInput label="Durée de focus" value={work} min={5} max={120} onChange={setWork} />
-              <NumberInput label="Pause courte" value={shortBreak} min={1} max={30} onChange={setShortBreak} />
-              <NumberInput label="Pause longue" value={longBreak} min={5} max={60} onChange={setLongBreak} />
-              <NumberInput label="Sessions avant pause longue" value={sessions} min={2} max={8} onChange={setSessions} />
+          {/* Hors « Personnalisé », les durées restent LISIBLES (contraste plein) :
+              elles décrivent le format choisi ; seuls les réglages sont inactifs. */}
+          <div className={cn("transition-all duration-300", preset !== "custom" && "pointer-events-none")} aria-disabled={preset !== "custom"}>
+            <h2 className="font-display text-xl text-ink mb-1">Durées</h2>
+            <p className="text-[13px] text-ink-3 mb-4">{preset === "custom" ? "Règle chaque durée." : "Celles du format choisi. Passe en Personnalisé pour les modifier."}</p>
+            <div className="rounded-[var(--r-surface)] border border-line px-4">
+              <NumberInput label="Durée de focus" value={work} min={5} max={120} onChange={setWork} disabled={preset !== "custom"} />
+              <NumberInput label="Pause courte" value={shortBreak} min={1} max={30} onChange={setShortBreak} disabled={preset !== "custom"} />
+              <NumberInput label="Pause longue" value={longBreak} min={5} max={60} onChange={setLongBreak} disabled={preset !== "custom"} />
+              <NumberInput label="Sessions avant pause longue" value={sessions} min={2} max={8} onChange={setSessions} disabled={preset !== "custom"} />
             </div>
           </div>
 
           {/* Summary */}
           {preset === "flowtime" ? (
-            <div className="flex items-center gap-2 text-xs text-foreground/30">
+            <div className="flex items-center gap-2 text-xs text-ink-3">
               <span>Chrono libre, sans limite</span>
               <span>·</span>
               <span>Pause méritée = temps travaillé ÷ 5 (2–25 min)</span>
             </div>
           ) : (
-            <div className="flex items-center gap-2 text-xs text-foreground/30">
+            <div className="flex items-center gap-2 text-xs text-ink-3">
               <span>{work} min focus</span>
               <span>·</span>
               <span>{shortBreak} min pause</span>
@@ -676,10 +630,10 @@ export default function SettingsPage() {
         {/* Tasks — Kanban (pleine largeur) */}
         <div>
             <div className="flex items-baseline gap-2 mb-1">
-              <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Tâches de la session</p>
+              <h2 className="font-display text-xl text-ink">Tâches de la session</h2>
               <button
                 onClick={() => setShowCoach(true)}
-                className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-violet-500 dark:text-violet-300 text-[11px] font-medium transition-all"
+                className="ml-auto flex items-center gap-1.5 h-8 px-3 rounded-[var(--r-control)] border border-line-strong/60 hover:border-ink text-ink-2 hover:text-ink text-[13px] transition-colors"
                 title="Découper un objectif en tâches (100 % local, gratuit)"
               >
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -688,9 +642,9 @@ export default function SettingsPage() {
                 Coach
               </button>
             </div>
-            <p className="text-xs text-foreground/35 mb-4 leading-relaxed">
+            <p className="text-xs text-ink-3 mb-4 leading-relaxed">
               Prépare ce que tu vas faire pendant cette session : une carte = une tâche.
-              Fais-les avancer de <span className="text-foreground/55">À faire</span> → <span className="text-amber-500/80">En cours</span> → <span className="text-emerald-500/80">Terminé</span> au fil de la session.
+              Fais-les avancer de <span className="text-ink-2">À faire</span> → <span className="text-sodium-text">En cours</span> → <span className="text-sodium-text">Terminé</span> au fil de la session.
             </p>
 
             {/* Add task */}
@@ -700,11 +654,12 @@ export default function SettingsPage() {
                 onChange={(e) => setTodoInput(e.target.value)}
                 onKeyDown={handleTodoKey}
                 placeholder="Ajouter une tâche…"
-                className="flex-1 bg-foreground/5 border-foreground/10 text-foreground placeholder:text-foreground/25 focus-visible:ring-foreground/20 rounded-xl text-sm h-9"
+                className="flex-1 bg-foreground/5 border-foreground/10 text-foreground placeholder:text-ink-3 focus-visible:ring-foreground/20 rounded-xl text-sm h-9"
               />
               <button
                 onClick={handleAddTodo}
                 disabled={!todoInput.trim()}
+                aria-label="Ajouter la tâche"
                 className="w-9 h-9 flex items-center justify-center rounded-xl bg-foreground/10 hover:bg-foreground/15 disabled:opacity-20 text-foreground transition-colors flex-shrink-0"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
@@ -715,7 +670,7 @@ export default function SettingsPage() {
 
             {/* Kanban columns */}
             {todos.length === 0 ? (
-              <p className="text-xs text-foreground/20 text-center py-5">Ajoute des tâches avant de démarrer</p>
+              <p className="text-xs text-ink-3 text-center py-5">Ajoute des tâches avant de démarrer</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <KanbanColumn
@@ -751,18 +706,13 @@ export default function SettingsPage() {
 
         {/* Start button */}
         <div className="flex flex-col gap-3">
-          <button
-            onClick={handleStart}
-            className="flex items-center justify-center gap-2 py-3.5 bg-foreground text-background font-semibold text-sm rounded-xl hover:bg-foreground/90 transition-all shadow-lg shadow-black/30 motion-safe:active:scale-[0.97]"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M8 5v14l11-7z"/>
-            </svg>
+          <Button variant="signal" size="lg" onClick={handleStart} className="w-full h-14 text-base">
+            <IconPlay size={16} />
             Démarrer la session
-          </button>
+          </Button>
           <button
             onClick={() => setShowRoutineSave(true)}
-            className="flex items-center justify-center gap-2 text-xs text-foreground/40 hover:text-foreground/70 transition-colors"
+            className="flex items-center justify-center gap-2 text-xs text-ink-3 hover:text-ink-2 transition-colors"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" strokeLinecap="round" strokeLinejoin="round" />

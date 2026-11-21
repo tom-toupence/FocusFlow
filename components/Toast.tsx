@@ -14,7 +14,7 @@ export interface ToastData {
   leaving?: boolean;
 }
 
-const LEAVE_MS = 250; // = durée de la keyframe toastOut
+const LEAVE_MS = 160; // = durée de ff-toast-out (--d-ui)
 
 interface ToastState {
   toasts: ToastData[];
@@ -50,19 +50,14 @@ export function toast(t: Omit<ToastData, "id">) {
   useToastStore.getState().push(t);
 }
 
-const ACCENTS = {
-  amber: "border-amber-500/30 from-amber-500/15",
-  emerald: "border-emerald-500/30 from-emerald-500/15",
-  violet: "border-violet-500/30 from-violet-500/15",
-  sky: "border-sky-500/30 from-sky-500/15",
-};
-
-// Petit repère d'accent (remplace l'ancien badge emoji).
-const DOTS = {
-  amber: "bg-amber-400/70",
-  emerald: "bg-emerald-400/70",
-  violet: "bg-violet-400/70",
-  sky: "bg-sky-400/70",
+// Clepsydre : la nuance d'accent héritée (amber/emerald/violet/sky) ne colore
+// plus rien ; elle ne fait que choisir le repère. Repère sodium = information,
+// repère encre = neutre, repère rouge = problème (amber historique = alerte).
+const MARK: Record<NonNullable<ToastData["accent"]>, string> = {
+  amber: "bg-danger",
+  emerald: "bg-sodium",
+  violet: "bg-ink-2",
+  sky: "bg-ink-2",
 };
 
 export default function ToastHost() {
@@ -72,24 +67,32 @@ export default function ToastHost() {
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
 
+  // Bas d'écran (au-dessus de la barre mobile) : un toast ne doit pas couvrir
+  // le minuteur, toujours en haut de la session.
   return createPortal(
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 items-center pointer-events-none">
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed bottom-[max(5.5rem,calc(env(safe-area-inset-bottom)+5rem))] md:bottom-6 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 items-center pointer-events-none w-[min(26rem,calc(100vw-2rem))]"
+    >
       {toasts.map((t) => (
-        <div
+        <button
+          type="button"
           key={t.id}
           onClick={() => dismiss(t.id)}
+          aria-label={`${t.title}${t.description ? `. ${t.description}` : ""}. Fermer`}
           className={cn(
-            "pointer-events-auto cursor-pointer flex items-center gap-3 pl-3 pr-5 py-3 rounded-2xl border bg-gradient-to-r to-black/85 bg-black/85 backdrop-blur-xl shadow-2xl shadow-black/60 min-w-0 max-w-[min(24rem,calc(100vw-2rem))] sm:min-w-[260px]",
-            t.leaving ? "anim-toast-out" : "anim-toast-in",
-            ACCENTS[t.accent ?? "amber"]
+            "pointer-events-auto w-full text-left flex items-stretch gap-3 pl-3 pr-4 py-3 rounded-[var(--r-surface)]",
+            "bg-ink text-on-ink shadow-[var(--shadow-float)]",
+            t.leaving ? "ff-toast-out" : "ff-toast-in",
           )}
         >
-          <span className={cn("flex-shrink-0 w-1 self-stretch rounded-full", DOTS[t.accent ?? "amber"])} />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-white leading-tight">{t.title}</p>
-            {t.description && <p className="text-xs text-white/55 mt-0.5 leading-snug">{t.description}</p>}
-          </div>
-        </div>
+          <span aria-hidden className={cn("shrink-0 w-[3px] rounded-full", MARK[t.accent ?? "emerald"])} />
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold leading-tight">{t.title}</span>
+            {t.description && <span className="block text-[13px] opacity-75 mt-0.5 leading-snug">{t.description}</span>}
+          </span>
+        </button>
       ))}
     </div>,
     document.body

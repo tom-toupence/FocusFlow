@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-// Écran d'arrivée : le wordmark « FocusFlow » repose sous une surface d'eau
+// Écran d'arrivée (identité « la ville qui ne dort pas », docs/redesign) :
+// l'effet goutte est CONSERVÉ à la demande de l'utilisateur ; seule la texture
+// change : une flaque sur l'asphalte qui reflète l'enseigne « FocusFlow ».
+// La flaque est une surface d'eau
 // (shader WebGL maison, zéro dépendance) — vagues ambiantes, la déformation
 // SUIT LA SOURIS (curseur système masqué), un clic déclenche une ONDE DE CHOC
 // puis une VAGUE DE RÉVÉLATION : le site apparaît à l'intérieur d'un cercle au
@@ -84,7 +88,7 @@ void main() {
   vec3 col = texture(u_tex, clamp(uv + disp, 0.0, 1.0)).rgb;
   // Reflets « caustiques » là où l'eau bouge
   float glint = min((abs(disp.x) + abs(disp.y)) * 5.5, 0.35);
-  col += vec3(0.30, 0.50, 0.72) * glint;
+  col += vec3(0.70, 0.42, 0.16) * glint; // reflets chauds : le lampadaire au sodium dans la flaque
   // Canvas alpha premultiplié
   outColor = vec4(col * alpha, alpha);
 }`;
@@ -96,28 +100,102 @@ void main() {
   gl_Position = vec4(pos * 2.0 - 1.0, 0.0, 1.0);
 }`;
 
-// Dessine le wordmark sur un canvas 2D aux dimensions de l'écran → texture.
+// Couleurs de la ville de nuit, en dur : le splash est une texture.
+const ASPHALT = "#0b1016";
+const NEON = "#e9f2ff";
+const SODIUM = "#ff9a3c";
+const KONBINI = "#53e0a1";
+
+// Dessine la texture du splash : une FLAQUE sur l'asphalte, la nuit. En haut,
+// l'enseigne « FocusFlow » allumée (néon blanc froid, Big Shoulders) ; en bas,
+// son reflet renversé, plus sombre et étiré par l'eau. Un lampadaire au sodium
+// et une enseigne de supérette éclairent la scène hors champ. L'effet goutte
+// du shader (gardé, demandé par l'utilisateur) agite cette flaque.
 function drawWordmark(width: number, height: number): HTMLCanvasElement | null {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
-  ctx.fillStyle = "#0a0a0c";
-  ctx.fillRect(0, 0, width, height);
   const base = Math.min(width, height);
+  const cs = getComputedStyle(document.documentElement);
+  const display = cs.getPropertyValue("--font-signage").trim() || "system-ui, sans-serif";
+  const sans = cs.getPropertyValue("--font-atkinson").trim() || "system-ui, sans-serif";
+  const cy = height * 0.47;
+
+  // Asphalte mouillé : bleu-noir, plus clair au loin (l'horizon de la rue).
+  const g = ctx.createLinearGradient(0, 0, 0, height);
+  g.addColorStop(0, "#111a24");
+  g.addColorStop(0.5, ASPHALT);
+  g.addColorStop(1, "#070a0e");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, width, height);
+
+  // Lumières hors champ : sodium en haut à gauche, supérette en bas à droite.
+  const halo = (x: number, y: number, r: number, col: string, a: number) => {
+    const rg = ctx.createRadialGradient(x, y, 0, x, y, r);
+    rg.addColorStop(0, col);
+    rg.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.globalAlpha = a;
+    ctx.fillStyle = rg;
+    ctx.fillRect(0, 0, width, height);
+    ctx.globalAlpha = 1;
+  };
+  halo(width * 0.08, -height * 0.05, base * 0.9, SODIUM, 0.22);
+  halo(width * 0.96, height * 1.02, base * 0.7, KONBINI, 0.12);
+
+  const size = Math.round(base * 0.19);
   ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = "#f3f4f6";
-  ctx.font = `600 ${Math.round(base * 0.16)}px Geist, 'Segoe UI', system-ui, sans-serif`;
-  ctx.fillText("FocusFlow", width / 2, height / 2 - base * 0.02);
-  ctx.fillStyle = "rgba(243,244,246,0.35)";
-  ctx.font = `400 ${Math.round(base * 0.035)}px Geist, 'Segoe UI', system-ui, sans-serif`;
-  ctx.fillText("Respire. Focus. Flow.", width / 2, height / 2 + base * 0.12);
+  ctx.font = `800 ${size}px ${display}`;
+
+  // L'enseigne : halo large puis tube net.
+  ctx.textBaseline = "alphabetic";
+  ctx.shadowColor = "rgba(190,215,255,0.85)";
+  ctx.shadowBlur = size * 0.35;
+  ctx.fillStyle = NEON;
+  ctx.fillText("FOCUSFLOW", width / 2, cy);
+  ctx.shadowBlur = size * 0.08;
+  ctx.fillText("FOCUSFLOW", width / 2, cy);
+  ctx.shadowBlur = 0;
+
+  // Le reflet : renversé sous la ligne du trottoir, assombri, étiré.
+  const edge = cy + size * 0.12;
+  ctx.save();
+  ctx.translate(0, edge * 2);
+  ctx.scale(1, -1.18);
+  ctx.translate(0, edge * 0.152);
+  ctx.globalAlpha = 0.32;
+  ctx.filter = `blur(${Math.max(1, base * 0.004)}px)`;
+  ctx.fillStyle = "#b9cdf0";
+  ctx.fillText("FOCUSFLOW", width / 2, cy);
+  ctx.restore();
+  ctx.filter = "none";
+  ctx.globalAlpha = 1;
+
+  // Bord du trottoir : un filet sodium, la lumière qui accroche la bordure.
+  const lineW = Math.min(width * 0.7, base * 1.15);
+  const lg = ctx.createLinearGradient(width / 2 - lineW / 2, 0, width / 2 + lineW / 2, 0);
+  lg.addColorStop(0, "rgba(255,154,60,0)");
+  lg.addColorStop(0.5, "rgba(255,154,60,0.9)");
+  lg.addColorStop(1, "rgba(255,154,60,0)");
+  ctx.fillStyle = lg;
+  ctx.fillRect(width / 2 - lineW / 2, edge, lineW, Math.max(2, base * 0.003));
+
+  // Consigne : ce qu'il faut faire, pas un slogan.
+  ctx.fillStyle = "rgba(233,242,255,0.6)";
+  ctx.font = `400 ${Math.round(base * 0.026)}px ${sans}`;
+  ctx.fillText("Touche la flaque pour entrer", width / 2, height * 0.86);
   return canvas;
 }
 
 export default function SplashIntro() {
+  // Pages internes (lab, système) : pas de splash.
+  const pathname = usePathname();
+  if (pathname?.startsWith("/lab") || pathname?.startsWith("/_design")) return null;
+  return <Splash />;
+}
+
+function Splash() {
   // show → revealing (vague qui découvre le site) → fading (résidu) → done.
   const [phase, setPhase] = useState<"show" | "revealing" | "fading" | "done">("show");
   // null = évaluation en cours (SSR + 1er paint : wordmark statique).
@@ -271,7 +349,9 @@ export default function SplashIntro() {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerdown", onClick);
       window.removeEventListener("keydown", onKey);
-      gl.getExtension("WEBGL_lose_context")?.loseContext();
+      // Pas de loseContext() : en StrictMode le même canvas est remonté et
+      // getContext() renverrait un contexte perdu (le splash tomberait en repli).
+      gl.deleteProgram(prog);
     };
   }, []);
 
@@ -295,8 +375,8 @@ export default function SplashIntro() {
         // cercle du shader), plus d'interception des clics, curseur rendu.
         // En repli statique (pas de shader) on garde le fond pour un fondu propre.
         interactive
-          ? "bg-[#0a0a0c] cursor-none"
-          : cn("pointer-events-none", canShader ? "bg-transparent" : "bg-[#0a0a0c]"),
+          ? "bg-[#0b1016] cursor-none"
+          : cn("pointer-events-none", canShader ? "bg-transparent" : "bg-[#0b1016]"),
         phase === "fading" ? "opacity-0 duration-[400ms]" : "opacity-100 duration-300"
       )}
     >
@@ -306,9 +386,10 @@ export default function SplashIntro() {
       />
       {canShader === false && (
         // Repli statique (reduced motion / pas de WebGL2 / compilation échouée)
-        <div className="flex flex-col items-center gap-4 anim-ambient-in">
-          <h1 className="text-5xl sm:text-7xl font-semibold text-white tracking-tight">FocusFlow</h1>
-          <p className="text-white/35 text-sm sm:text-base">Respire. Focus. Flow.</p>
+        <div className="flex flex-col items-center gap-5 ff-fade">
+          <p className="font-display font-extrabold uppercase text-6xl sm:text-8xl text-[#e9f2ff] [text-shadow:0_0_24px_rgba(190,215,255,0.6)]">FocusFlow</p>
+          <span aria-hidden className="h-[2px] w-[min(62vw,34rem)] bg-[#ff9a3c]" />
+          <p className="text-[#e9f2ff]/60 text-sm sm:text-base">Touche la flaque pour entrer</p>
         </div>
       )}
     </div>

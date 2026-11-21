@@ -21,10 +21,10 @@ export default function JournalReflection({ pomodoros }: { pomodoros: number }) 
   if (saved) {
     return (
       <section className="flex flex-col gap-3">
-        <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Réflexion</h2>
-        <div className="flex items-center gap-3 px-5 py-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/15">
+        <h2 className="text-[13px] font-semibold text-ink-3">Réflexion</h2>
+        <div className="flex items-center gap-3 px-5 py-4 rounded-2xl bg-sodium/5 border border-sodium/15">
           <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: MOODS.find((m) => m.value === mood)?.color }} />
-          <p className="text-sm text-foreground/70">Réflexion enregistrée. À retrouver dans ton journal.</p>
+          <p className="text-sm text-ink-2">Réflexion enregistrée. À retrouver dans ton journal.</p>
         </div>
       </section>
     );
@@ -32,7 +32,7 @@ export default function JournalReflection({ pomodoros }: { pomodoros: number }) 
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Comment s&apos;est passée cette session ?</h2>
+      <h2 className="text-[13px] font-semibold text-ink-3">Comment s&apos;est passée cette session ?</h2>
       <div className="px-5 py-4 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.08] flex flex-col gap-4">
         {/* Mood */}
         <div className="flex items-center justify-center gap-2">
@@ -50,17 +50,17 @@ export default function JournalReflection({ pomodoros }: { pomodoros: number }) 
         {/* Fields */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] text-foreground/40 uppercase tracking-wider">Ce qui a bien marché</label>
+            <label className="text-[10px] text-ink-3 uppercase tracking-wider">Ce qui a bien marché</label>
             <input value={wentWell} onChange={(e) => setWentWell(e.target.value)} placeholder="Une victoire, un focus profond…"
-              className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-foreground/25" />
+              className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:border-foreground/25" />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] text-foreground/40 uppercase tracking-wider">Ce qui t&apos;a bloqué</label>
+            <label className="text-[10px] text-ink-3 uppercase tracking-wider">Ce qui t&apos;a bloqué</label>
             <input value={blockers} onChange={(e) => setBlockers(e.target.value)} placeholder="Une distraction, une difficulté…"
-              className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-foreground/25" />
+              className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:border-foreground/25" />
           </div>
         </div>
-        <button onClick={save} disabled={mood === null} className="py-2.5 bg-foreground text-background font-semibold text-sm rounded-xl hover:bg-foreground/90 disabled:opacity-30 transition-all">
+        <button onClick={save} disabled={mood === null} className="py-2.5 bg-ink text-on-ink font-semibold text-sm rounded-xl hover:bg-foreground/90 disabled:opacity-30 transition-all">
           Enregistrer ma réflexion
         </button>
       </div>

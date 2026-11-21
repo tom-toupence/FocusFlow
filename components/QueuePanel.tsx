@@ -65,7 +65,7 @@ export default function QueuePanel() {
     rest.forEach((it) => addTrack(id, { youtubeId: it.youtubeId, title: it.title, channelName: it.channelName, thumbnailUrl: it.thumbnailUrl }));
     toast({
       title: "Playlist créée",
-      description: `« ${name} » — ${items.length} titre${items.length > 1 ? "s" : ""}`,
+      description: `« ${name} », ${items.length} titre${items.length > 1 ? "s" : ""}`,
       accent: "emerald",
     });
     setSavingName(null);
@@ -77,20 +77,20 @@ export default function QueuePanel() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <svg className="w-4 h-4 text-foreground/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4 text-ink-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <line x1="8" y1="6" x2="21" y2="6" strokeLinecap="round" /><line x1="8" y1="12" x2="21" y2="12" strokeLinecap="round" /><line x1="8" y1="18" x2="14" y2="18" strokeLinecap="round" />
               <circle cx="4" cy="6" r="1" fill="currentColor" stroke="none" /><circle cx="4" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="4" cy="18" r="1" fill="currentColor" stroke="none" />
             </svg>
             File d&apos;attente
-            {items.length > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-foreground/10 text-foreground/50 font-medium">{items.length}</span>}
+            {items.length > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-foreground/10 text-ink-3 font-medium">{items.length}</span>}
           </h3>
-          <p className="text-xs text-foreground/40 mt-1">Lue en session — remplacée quand tu lances une playlist.</p>
+          <p className="text-xs text-ink-3 mt-1">Lue en session, remplacée quand tu lances une playlist.</p>
         </div>
         {items.length > 0 && (
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={() => setSavingName((v) => (v === null ? "" : null))}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-foreground/5 hover:bg-foreground/10 text-foreground/50 hover:text-foreground font-medium text-xs transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-foreground/5 hover:bg-foreground/10 text-ink-3 hover:text-foreground font-medium text-xs transition-all"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" strokeLinecap="round" strokeLinejoin="round" />
@@ -100,7 +100,7 @@ export default function QueuePanel() {
             </button>
             <button
               onClick={handleStart}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-foreground text-background font-semibold text-xs hover:bg-foreground/90 transition-all"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-ink text-on-ink font-semibold text-xs hover:bg-foreground/90 transition-all"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
               Démarrer
@@ -117,16 +117,16 @@ export default function QueuePanel() {
             onChange={(e) => setSavingName(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") handleSaveAsPlaylist(); if (e.key === "Escape") setSavingName(null); }}
             placeholder="Nom de la playlist…"
-            className="flex-1 bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-foreground/25 transition-colors"
+            className="flex-1 bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:border-foreground/25 transition-colors"
           />
           <button
             onClick={handleSaveAsPlaylist}
             disabled={!savingName.trim()}
-            className="px-4 py-2 rounded-xl bg-foreground text-background text-xs font-semibold disabled:opacity-30 transition-all"
+            className="px-4 py-2 rounded-xl bg-ink text-on-ink text-xs font-semibold disabled:opacity-30 transition-all"
           >
             Créer
           </button>
-          <button onClick={() => setSavingName(null)} className="text-xs text-foreground/40 hover:text-foreground transition-colors">
+          <button onClick={() => setSavingName(null)} className="text-xs text-ink-3 hover:text-foreground transition-colors">
             Annuler
           </button>
         </div>
@@ -140,12 +140,12 @@ export default function QueuePanel() {
             onChange={(e) => { setInput(e.target.value); setError(""); }}
             onKeyDown={(e) => { if (e.key === "Enter" && !loading) handleAdd(); }}
             placeholder="Colle un lien de vidéo YouTube…"
-            className="flex-1 bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-foreground/25 transition-colors"
+            className="flex-1 bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:border-foreground/25 transition-colors"
           />
           <button
             onClick={handleAdd}
             disabled={!input.trim() || loading}
-            className="px-4 py-2 rounded-xl bg-foreground/10 hover:bg-foreground/15 text-sm font-medium text-foreground/80 disabled:opacity-30 transition-all flex items-center gap-1.5"
+            className="px-4 py-2 rounded-xl bg-foreground/10 hover:bg-foreground/15 text-sm font-medium text-ink disabled:opacity-30 transition-all flex items-center gap-1.5"
           >
             {loading ? (
               <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -154,19 +154,19 @@ export default function QueuePanel() {
             ) : "Ajouter"}
           </button>
         </div>
-        {error && <p className="text-red-400 text-xs">{error}</p>}
+        {error && <p className="text-danger text-xs">{error}</p>}
       </div>
 
       {/* List */}
       {items.length === 0 ? (
-        <p className="text-sm text-foreground/30 py-2">
-          File vide. Ajoute des vidéos YouTube une par une pour composer ta session — l&apos;ordre est respecté à la lecture.
+        <p className="text-sm text-ink-3 py-2">
+          File vide. Ajoute des vidéos YouTube une par une pour composer ta session, l&apos;ordre est respecté à la lecture.
         </p>
       ) : (
         <div className="flex flex-col gap-1.5">
           {items.map((item, idx) => (
             <div key={item.id} className="group flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-foreground/[0.04] transition-colors">
-              <span className="text-[11px] text-foreground/30 tabular-nums w-5 text-center flex-shrink-0">{idx + 1}</span>
+              <span className="text-[11px] text-ink-3 tabular-nums w-5 text-center flex-shrink-0">{idx + 1}</span>
               <div className="w-14 h-9 rounded-md overflow-hidden bg-foreground/10 flex-shrink-0">
                 {item.thumbnailUrl && (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -174,14 +174,14 @@ export default function QueuePanel() {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-foreground/85 truncate">{item.title}</p>
-                {item.channelName && <p className="text-[11px] text-foreground/35 truncate">{item.channelName}</p>}
+                <p className="text-sm text-ink truncate">{item.title}</p>
+                {item.channelName && <p className="text-[11px] text-ink-3 truncate">{item.channelName}</p>}
               </div>
               <div className="flex items-center gap-0.5 flex-shrink-0">
                 <button
                   onClick={() => moveItem(item.id, "up")}
                   disabled={idx === 0}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg text-foreground/40 hover:text-foreground hover:bg-foreground/10 disabled:opacity-20 transition-all"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-ink-3 hover:text-foreground hover:bg-foreground/10 disabled:opacity-20 transition-all"
                   title="Monter"
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 15l-6-6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -189,7 +189,7 @@ export default function QueuePanel() {
                 <button
                   onClick={() => moveItem(item.id, "down")}
                   disabled={idx === items.length - 1}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg text-foreground/40 hover:text-foreground hover:bg-foreground/10 disabled:opacity-20 transition-all"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-ink-3 hover:text-foreground hover:bg-foreground/10 disabled:opacity-20 transition-all"
                   title="Descendre"
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -197,7 +197,7 @@ export default function QueuePanel() {
                 <button
                   onClick={() => removeItem(item.id)}
                   className={cn(
-                    "w-7 h-7 flex items-center justify-center rounded-lg text-foreground/40 hover:text-red-400 hover:bg-red-500/10 transition-all",
+                    "w-7 h-7 flex items-center justify-center rounded-lg text-ink-3 hover:text-danger hover:bg-danger/10 transition-all",
                     "sm:opacity-0 sm:group-hover:opacity-100"
                   )}
                   title="Retirer"
@@ -207,7 +207,7 @@ export default function QueuePanel() {
               </div>
             </div>
           ))}
-          <button onClick={clear} className="self-start mt-1 text-xs text-foreground/40 hover:text-red-400 transition-colors">
+          <button onClick={clear} className="self-start mt-1 text-xs text-ink-3 hover:text-danger transition-colors">
             Vider la file
           </button>
         </div>

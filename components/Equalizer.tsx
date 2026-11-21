@@ -22,7 +22,7 @@ export default function Equalizer({ playing, mood }: { playing: boolean; mood?: 
       {durations.map((d, i) => (
         <span
           key={i}
-          className="anim-eq w-[3px] h-full rounded-full bg-emerald-400"
+          className="anim-eq w-[3px] h-full rounded-full bg-sodium"
           style={{
             animationDuration: `${d}s`,
             animationDelay: `${-i * 0.45}s`,

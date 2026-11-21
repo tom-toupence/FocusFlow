@@ -12,15 +12,15 @@ export const STATUS_CONFIG: Record<TodoStatus, {
   text: string;
 }> = {
   todo:          { label: "À faire",  dot: "bg-white/30",    bg: "bg-white/5",        text: "text-white/50"   },
-  "in-progress": { label: "En cours", dot: "bg-amber-400",   bg: "bg-amber-500/15",   text: "text-amber-300"  },
-  done:          { label: "Terminé",  dot: "bg-emerald-400", bg: "bg-emerald-500/15", text: "text-emerald-300"},
+  "in-progress": { label: "En cours", dot: "bg-sodium",   bg: "bg-sodium/15",   text: "text-sodium-text"  },
+  done:          { label: "Terminé",  dot: "bg-sodium", bg: "bg-sodium/15", text: "text-sodium-text"},
 };
 
 // Light-mode overrides (settings page)
 const STATUS_CONFIG_LIGHT: Record<TodoStatus, { bg: string; text: string }> = {
-  todo:          { bg: "bg-foreground/[0.05]",   text: "text-foreground/40"  },
-  "in-progress": { bg: "bg-amber-500/10",        text: "text-amber-600"      },
-  done:          { bg: "bg-emerald-500/10",      text: "text-emerald-600"    },
+  todo:          { bg: "bg-foreground/[0.05]",   text: "text-ink-3"  },
+  "in-progress": { bg: "bg-sodium/10",        text: "text-sodium-text"      },
+  done:          { bg: "bg-sodium/10",      text: "text-sodium-text"    },
 };
 
 const ORDER: TodoStatus[] = ["todo", "in-progress", "done"];
@@ -113,7 +113,7 @@ export default function TodoStatusDropdown({ status, onChange, dark = false }: P
                       : cn(lc.bg, lc.text)
                     : dark
                     ? "text-white/40 hover:bg-white/5 hover:text-white/70"
-                    : "text-foreground/40 hover:bg-foreground/5 hover:text-foreground/70"
+                    : "text-ink-3 hover:bg-foreground/5 hover:text-ink-2"
                 )}
               >
                 <div className={cn("w-2 h-2 rounded-full flex-shrink-0", c.dot, !active && "opacity-50")} />
