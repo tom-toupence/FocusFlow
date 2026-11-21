@@ -382,3 +382,78 @@ rue de nuit apparaît, ou si l'utilisateur en fournit une.
 existante. La landing, la halte, le mode Spotify et le résumé n'ont pas à
 changer. Les fenêtres vertes des amis n'existent pas dans une photo : les amis
 en focus restent affichés par l'interface (tiroir Amis).
+
+---
+
+# LAB 4 · la fenêtre (2026-11-21)
+
+## Correction d'une erreur d'audit
+
+L'utilisateur avait déposé sur `master` une capture photogrammétrique
+**« TOKYO NIGHT »** (`public/tokyo_night.glb`, Sketchfab, Nikitos & 3130,
+CC BY 4.0) pour servir de base à la 3D et au motion design. L'audit (phase 0)
+l'avait classée « non utilisée, à retirer ». C'était une erreur : c'est
+exactement la matière réelle que les labs 2 et 3 cherchaient. Leçon retenue :
+vérifier la branche principale et ce que l'utilisateur y a mis avant de
+concevoir.
+
+## La capture
+
+1,13 M triangles, trois textures 1024 cuites (matériau non éclairé), 37,9 Mo.
+C'est une vue AÉRIENNE de la ville la nuit (un quartier entier, la tour
+radio), pas une rue : de haut ou à mi-distance elle est très crédible ; au ras
+du sol, elle fond (géométrie molle, textures étirées). Planche de six vues :
+les deux vues hautes sont bonnes, les trois basses sont inutilisables.
+
+Allègement (`gltf-transform optimize`, simplification meshopt) : 249 k
+triangles et 2,2 Mo pour l'ordinateur, 79 k et 1,1 Mo pour le mobile.
+Comparées à l'original dans le même cadre : indiscernables.
+
+## Le concept qui en découle
+
+**On travaille tard à sa fenêtre, en haut d'une tour.** La ville est en
+contrebas, la pluie perle sur la vitre. C'est la seule manière honnête
+d'utiliser une capture aérienne (on ne la montre que de là où elle tient), et
+c'est le décor exact du thème : la nuit d'une mégapole vue par quelqu'un qui
+travaille.
+
+## Rendu (`lib/city/TokyoRenderer.ts`)
+
+- Cadrage : focale ~50 mm, surplomb, la tour au tiers gauche (repérée par
+  lancer de rayon), montant de fenêtre et appui en premier plan.
+- Matériau de la ville : les lumières sont extraites des textures cuites ; on
+  peut les éteindre en vague du fond vers nous (halte), faire grésiller un
+  quartier (distraction), allumer un pâté de maisons (playlist prolongée),
+  lancer une onde chaude depuis la tour (objectif atteint). Brume en hauteur,
+  étalonnage heure bleue pour le thème clair.
+- Ciel fait main : halo de pollution lumineuse, nuages bas éclairés par
+  dessous, dérive très lente.
+- Écran géant sur un toit (le panneau : temps restant), posé par lancer de
+  rayon.
+- Post : profondeur de champ pilotée, bloom, pluie sur la vitre (effet écran
+  fait main : gouttes posées, gouttes qui glissent par à-coups, buée),
+  reflet de la lampe de la pièce, grain, vignette, ACES.
+- Mouvement : travelling avant de 9 s et bascule de point vitre vers ville à
+  l'arrivée ; pendant la halte, la mise au point revient sur la vitre et la
+  ville se brouille (on lève les yeux de l'écran) ; à la reprise, retour.
+
+## Itérations
+
+1. Gouttes trop nombreuses et trop claires : on aurait dit de la neige.
+   Densité divisée par trois, gouttes sombres au bord avec l'image renversée
+   au centre.
+2. Toute la ville floue : plage de netteté trop courte pour une ville de 100
+   unités de profondeur.
+3. La tour cachée derrière le montant : repérée par lancer de rayon, cadre
+   tourné de 11,5 degrés.
+4. Écran trop grand, collé face caméra, puis à demi caché par un immeuble :
+   réduit, légèrement tourné, déplacé sur un toit dégagé.
+5. Premier plan mou (limite de la capture) : caméra relevée, plage de
+   netteté resserrée pour qu'il tombe dans le flou.
+
+Planches et vidéo : `shots/lab4/`.
+
+## Décision
+
+« La fenêtre » remplace la ruelle 2.5D derrière l'interface `CityScene` :
+landing, halte, mode Spotify, résumé. La ruelle reste dans le lab.

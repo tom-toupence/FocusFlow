@@ -1,9 +1,9 @@
 "use client";
 
-// La ruelle dans la session : décor de la halte (pause) et fond du mode
+// La ville dans la session : décor de la halte (pause) et fond du mode
 // Spotify (aucune vidéo ne joue). Jamais par-dessus une vidéo YouTube/Twitch.
 //
-// La halte se JOUE à l'entrée : la scène monte allumée, puis les enseignes
+// La halte se JOUE à l'entrée : la scène monte allumée, puis les lumières
 // s'éteignent du fond vers nous (au lieu d'apparaître déjà éteintes).
 import { forwardRef, useEffect, useState } from "react";
 import dynamic from "next/dynamic";

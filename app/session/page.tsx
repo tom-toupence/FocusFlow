@@ -134,7 +134,7 @@ export default function SessionPage() {
   // d'IDs arbitraires de façon fiable → on gère nous-mêmes la progression).
   const queueRef = useRef<{ ids: string[]; index: number }>({ ids: [], index: 0 });
   const isBreakRef = useRef(mode !== "work");
-  // Ruelle (halte + mode Spotify) : événements de ville déclenchés par la session.
+  // La ville (halte + mode Spotify) : événements de ville déclenchés par la session.
   const city = useRef<CityHandle>(null);
   const isRunningRef = useRef(isRunning);
   const [showTodos, setShowTodos] = useState(true);
@@ -538,8 +538,8 @@ export default function SessionPage() {
       if (progress.reached) {
         goalCelebratedRef.current = true;
         playWorkChime();
-        toast({ title: "Objectif du jour atteint", description: "Des phares passent au bout de la ruelle.", accent: "emerald" });
-        // Événement de ville : des phares passent, une fois la halte installée.
+        toast({ title: "Objectif du jour atteint", description: "Une vague de lumière traverse la ville.", accent: "emerald" });
+        // Événement de ville : une vague de lumière part de la tour, une fois la halte installée.
         setTimeout(() => city.current?.goal(), 3200);
       }
     }
@@ -610,7 +610,7 @@ export default function SessionPage() {
     if (isBreakRef.current) return; // only count during focus
     markDistraction();
     setDistractionFlash((n) => n + 1); // trigger a brief visual feedback
-    city.current?.flicker(); // Spotify : une enseigne grésille dans la ruelle
+    city.current?.flicker(); // Spotify : un quartier grésille
   }, [markDistraction]);
 
   // Keyboard shortcuts (ignored while typing in a field):
@@ -752,7 +752,7 @@ export default function SessionPage() {
       {/* Audio/video source — YouTube, Spotify, or Twitch */}
       {isSpotifyMode ? (
         <>
-          {/* Aucune vidéo avec Spotify : la ruelle sert de décor, le panneau
+          {/* Aucune vidéo avec Spotify : la ville sert de décor, le panneau
               à LED décompte les minutes. Démontée pendant la halte (qui a la
               sienne) pour ne jamais faire tourner deux scènes. */}
           {!isBreak && (
@@ -761,7 +761,7 @@ export default function SessionPage() {
               phase="work"
               board={isFlowtime ? "FLOW" : `${Math.max(1, Math.ceil(secondsLeft / 60))} MIN`}
               className="absolute inset-0"
-              label="La ruelle sous la pluie, décor de la session Spotify."
+              label="La ville la nuit derrière une vitre mouillée, décor de la session Spotify."
             />
           )}
           <SpotifyPlayer
@@ -850,7 +850,7 @@ export default function SessionPage() {
         </div>
       )}
 
-      {/* ── La halte (pause) : la ruelle, enseignes éteintes ──────────────── */}
+      {/* ── La halte (pause) : la ville s'éteint, la vue se brouille ───────── */}
       {isBreak && (
         <div className="absolute inset-0 z-20 bg-[#0b1016]">
           <SessionCity
@@ -858,7 +858,7 @@ export default function SessionPage() {
             phase="break"
             board={`${Math.max(1, Math.ceil(secondsLeft / 60))} MIN`}
             className="absolute inset-0"
-            label={`La halte : les enseignes de la ruelle sont éteintes, il reste ${formatTime(secondsLeft)} de pause.`}
+            label={`La halte : la ville s'est éteinte au loin, il reste ${formatTime(secondsLeft)} de pause.`}
           />
           {/* Voile de lecture : à gauche sur grand écran, en bas sur mobile. */}
           <div aria-hidden className="absolute inset-0 pointer-events-none bg-[linear-gradient(90deg,#0b1016_0%,rgba(11,16,22,0.86)_32%,rgba(11,16,22,0.15)_62%,transparent_80%)] max-md:bg-[linear-gradient(0deg,#0b1016_0%,rgba(11,16,22,0.9)_45%,rgba(11,16,22,0.2)_70%,transparent_85%)]" />
@@ -868,7 +868,7 @@ export default function SessionPage() {
                 <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#53e0a1]">{breakLabel[mode]}</p>
                 <h1 className="mt-2 font-display font-extrabold uppercase text-[clamp(3rem,8vw,5.5rem)] leading-[0.88]">La halte</h1>
                 <p className="mt-3 text-[15px] text-[#e9f2ff]/75">
-                  {sessionsCompleted > 0 ? `Pomodoro ${sessionsCompleted} terminé. ` : ""}La rue s&apos;éteint, seuls les lampadaires veillent.
+                  {sessionsCompleted > 0 ? `Pomodoro ${sessionsCompleted} terminé. ` : ""}La ville s&apos;éteint au loin. Lève les yeux de l&apos;écran.
                 </p>
               </div>
               <div>

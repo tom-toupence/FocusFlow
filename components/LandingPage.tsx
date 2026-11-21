@@ -3,18 +3,20 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // LANDING · la ville qui ne dort pas (docs/redesign/02-CONCEPTS.md, LAB.md)
 //
-// Une seule scène fixe pour toute la page : la ruelle sous la pluie
+// Une seule scène fixe pour toute la page : « la fenêtre », la ville la nuit vue
+// d'en haut, derrière une vitre mouillée (capture TOKYO NIGHT, CC BY 4.0)
 // (components/CityScene : une vraie photo en 2.5D, pluie et lumières en shader). Le scroll est une nuit qui
 // avance (l'horloge du bandeau va de 22:00 au petit matin) et chaque section
-// déclenche un vrai événement de FocusFlow sur la ruelle :
+// déclenche un vrai événement de FocusFlow sur la ville :
 //   1. vingt-cinq minutes  → le panneau à LED décompte avec le scroll
-//   2. distraction (D)     → une enseigne grésille
-//   3. fin de pomodoro     → la halte : les enseignes s'éteignent
-//   4. Flowtime            → la rue se rallume, sans échéance au panneau
-//   5. la file se prolonge → une enseigne neuve s'allume
+//   2. distraction (D)     → un quartier grésille
+//   3. fin de pomodoro     → la halte : la ville s'éteint du fond vers nous,
+//                            la mise au point revient sur la vitre
+//   4. Flowtime            → la ville se rallume, sans échéance au panneau
+//   5. la file se prolonge → un pâté de maisons s'allume
 //   6. la trace            → le petit matin (le thème clair de l'app)
-//   7. les amis            → la ruelle veille, le texte dit qui est en focus
-//   8. fin                 → objectif atteint, des phares passent au bout
+//   7. les amis            → la ville veille, le texte dit qui est en focus
+//   8. fin                 → objectif atteint, une vague de lumière part de la tour
 //
 // Moteur : motion/react (useScroll, useInView), défilement natif (pas de
 // scroll-jacking). Le texte ne s'anime pas : seule la ville bouge, et
@@ -138,6 +140,10 @@ export default function LandingPage() {
   const [minutes, setMinutes] = useState(25);
   const [friends, setFriends] = useState(0);
   const [dawn, setDawn] = useState(false);
+  // Écran étroit : le texte passe en bas, la caméra garde son cadrage d'origine.
+  // Lu une fois (la scène ne lit son cadrage qu'au montage) ; n'affecte que la
+  // scène, rendue côté client uniquement : pas d'écart d'hydratation.
+  const [narrow] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches);
   const [flickers, setFlickers] = useState(0);
   const [breath, setBreath] = useState<string | null>(null);
   const [clock, setClock] = useState("22:00");
@@ -201,15 +207,15 @@ export default function LandingPage() {
   }, [act, flicker]);
 
   const sceneLabel =
-    act === "halt" ? "La ruelle pendant la halte : les enseignes sont éteintes, seuls les lampadaires restent allumés."
-    : act === "trace" ? "La même ruelle au petit matin."
-    : `Une ruelle la nuit sous la pluie. Le panneau à LED affiche ${board.toLowerCase()}.`;
+    act === "halt" ? "La ville pendant la halte : les lumières se sont éteintes au loin, la vue est floue derrière la vitre."
+    : act === "trace" ? "La même ville au petit matin."
+    : `La ville la nuit, vue d'en haut derrière une vitre mouillée. L'écran sur un toit affiche ${board.toLowerCase()}.`;
 
   return (
     <div className="relative bg-[#0b1016] text-[#e9f2ff] font-sans selection:bg-[#ff9a3c] selection:text-[#1c0e02]">
-      {/* La scène : une seule ruelle, fixe, pour toute la page. */}
+      {/* La scène : une seule vue sur la ville, fixe, pour toute la page. */}
       <div className="fixed inset-0 z-0">
-        <CityScene ref={city} phase={phase} board={board} friends={friends} time={dawn ? "dawn" : "night"} label={sceneLabel} credit={false} className="absolute inset-0" />
+        <CityScene ref={city} phase={phase} board={board} friends={friends} time={dawn ? "dawn" : "night"} label={sceneLabel} credit={false} yaw={narrow ? 0 : 0.36} className="absolute inset-0" />
         {/* Voile de lecture : fort à gauche (texte), nul à droite (la rue). */}
         <div
           aria-hidden
@@ -252,7 +258,7 @@ export default function LandingPage() {
             </h1>
             <P className="mt-8">
               FocusFlow met dans le même écran un minuteur Pomodoro et ce que tu veux entendre : une vidéo filmée la nuit, ta
-              playlist, un live. Tu lances vingt-cinq minutes. Quand le panneau arrive à zéro, la rue s&apos;éteint : c&apos;est la pause.
+              playlist, un live. Tu lances vingt-cinq minutes. Quand le panneau arrive à zéro, la ville s&apos;éteint : c&apos;est la pause.
             </P>
             <div className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-3">
               <Cta onClick={signIn}>Commencer</Cta>
@@ -284,7 +290,7 @@ export default function LandingPage() {
           <Panel>
             <H2>Tu as regardé ton téléphone. Appuie sur D.</H2>
             <P>
-              Rien n&apos;est détecté à ta place. Tu marques, une enseigne grésille, la session s&apos;en souvient. Moins
+              Rien n&apos;est détecté à ta place. Tu marques, un quartier grésille, la session s&apos;en souvient. Moins
               d&apos;interruptions, meilleur score de focus en fin de session.
             </P>
             <div className="mt-8 flex items-center gap-5">
@@ -306,10 +312,10 @@ export default function LandingPage() {
         {/* 3 · La halte */}
         <Scene act="halt" onAct={onAct}>
           <Panel>
-            <H2>À zéro, la rue s&apos;éteint.</H2>
+            <H2>À zéro, la ville s&apos;éteint.</H2>
             <P>
-              Les enseignes s&apos;éteignent une à une, du fond vers toi. Restent les lampadaires, qui veillent toute
-              la nuit. Cinq minutes de pause, une longue toutes les quatre sessions. Si tu veux, respire au rythme quatre, quatre,
+              Les lumières s&apos;éteignent du fond vers toi et la vue se brouille derrière la vitre, comme quand on lève
+              enfin les yeux de l&apos;écran. Cinq minutes de pause, une longue toutes les quatre sessions. Si tu veux, respire au rythme quatre, quatre,
               quatre, quatre.
             </P>
             <p className="mt-8 h-9 font-display font-bold uppercase text-3xl text-[#53e0a1]" aria-live="polite">
@@ -334,7 +340,7 @@ export default function LandingPage() {
           <Panel className="max-w-2xl">
             <H2>Ta musique, pas celle d&apos;un inconnu.</H2>
             <P>
-              Quand ta playlist se termine avant la session, une enseigne de plus s&apos;allume : la file se prolonge avec des titres
+              Quand ta playlist se termine avant la session, un pâté de maisons s&apos;allume : la file se prolonge avec des titres
               proches de toute ta playlist, pas seulement du dernier morceau.
             </P>
             <ul className="mt-8 grid grid-cols-3 gap-x-3 gap-y-5" aria-label="Quelques vidéos du catalogue">
@@ -375,7 +381,7 @@ export default function LandingPage() {
           <Panel>
             <p className="font-display font-extrabold uppercase text-[clamp(2.8rem,7vw,5.4rem)] leading-[0.9]">
               Objectif atteint,
-              <span className="block text-[#ffc21a]">des phares passent.</span>
+              <span className="block text-[#ffc21a]">la ville s&apos;illumine.</span>
             </p>
             <P>Chaque grand moment de la session a son événement dans la ville. Le reste du temps, elle te laisse travailler.</P>
             <div className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -391,7 +397,7 @@ export default function LandingPage() {
         <span>Les vidéos appartiennent à leurs auteurs et se lisent sur YouTube.</span>
         <span>Polices Big Shoulders, Doto, Atkinson Hyperlegible Next (OFL).</span>
         <a href={CITY_CREDIT.href} target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:underline">
-          Ruelle : {CITY_CREDIT.text}. Profondeur, pluie et lumières ajoutées.
+          {CITY_CREDIT.text}. Lumière, pluie et caméra ajoutées.
         </a>
       </footer>
     </div>

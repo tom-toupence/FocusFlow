@@ -17,7 +17,7 @@
 //     vraie enseigne de la photo ;
 //   . étalonnage nuit / heure bleue (thème clair), grain, vignette, aberration.
 // Même interface que la scène 3D (CityRenderer) : CityScene ne change pas.
-import { animate } from "motion";
+import { tween as clockTween } from "@/lib/city/tween";
 import type { CityOptions, CityPhase, CityRenderer } from "@/lib/city/types";
 
 export interface PhotoSceneDef {
@@ -386,9 +386,8 @@ export async function createPhotoCity(canvas: HTMLCanvasElement, def: PhotoScene
 
   let animating = 0;
   const run = (a: unknown) => {
-    const p = a as { finished: Promise<unknown> };
     animating++;
-    p.finished.finally(() => { animating--; dirty = true; });
+    (a as Promise<unknown>).finally(() => { animating--; dirty = true; });
   };
   const tween = <T extends object>(target: T, to: Record<string, number | number[]>, o: Record<string, unknown> = {}) => {
     if (reduce) {
@@ -396,7 +395,7 @@ export async function createPhotoCity(canvas: HTMLCanvasElement, def: PhotoScene
       dirty = true;
       return;
     }
-    run(animate(target, to as never, o as never));
+    run(clockTween(target, to as never, o as never));
   };
 
   const t0 = performance.now();

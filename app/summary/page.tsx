@@ -122,7 +122,7 @@ export default function SummaryPage() {
     router.push("/");
   };
 
-  // Le panneau de la ruelle affiche le bilan ; objectif du jour tenu = des phares passent.
+  // L'écran sur le toit affiche le bilan ; objectif du jour tenu = une vague de lumière.
   const board = sessionsCompleted > 0 ? `${sessionsCompleted} POMODORO${sessionsCompleted > 1 ? "S" : ""}` : "FIN";
   const headline =
     sessionsCompleted > 0
@@ -139,8 +139,8 @@ export default function SummaryPage() {
         <span className="w-16" />
       </header>
 
-      {/* La ruelle en bandeau : halte de fin de session, le panneau affiche le bilan. */}
-      <SummaryCity board={board} goalReached={goalProgress.reached} label={`La ruelle à la fin de la session : ${board.toLowerCase()}`} />
+      {/* La ville en bandeau : halte de fin de session, l'écran affiche le bilan. */}
+      <SummaryCity board={board} goalReached={goalProgress.reached} label={`La ville à la fin de la session : ${board.toLowerCase()}`} />
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-8 py-12 flex flex-col gap-14">
         <div className="flex flex-col gap-2">
@@ -270,7 +270,7 @@ export default function SummaryPage() {
   );
 }
 
-/** Bandeau de la ruelle ; si l'objectif du jour est tenu, des phares passent une fois. */
+/** Bandeau de la ville ; si l'objectif du jour est tenu, une vague de lumière passe une fois. */
 function SummaryCity({ board, goalReached, label }: { board: string; goalReached: boolean; label: string }) {
   const city = useRef<CityHandle>(null);
   useEffect(() => {

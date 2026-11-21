@@ -1,29 +1,18 @@
 "use client";
 
-// La ruelle (scène de production) en React. À charger en `next/dynamic`
+// La ville (scène de production) en React. À charger en `next/dynamic`
 // là où elle sert : landing, overlay de pause, session Spotify, résumé.
 // JAMAIS par-dessus une vidéo qui joue (règle produit).
 //
 // Pilotage déclaratif (phase, panneau, amis, heure) + impératif via ref pour
 // les événements de ville ponctuels (flicker, extend, goal).
-// La scène est une vraie photo de ruelle en 2.5D (lib/city/PhotoRenderer,
-// lab 3). Replis : sans WebGL2, ou effets coupés, la photo fixe. Reduced
+// La scène est « la fenêtre » : la capture TOKYO NIGHT vue d'en haut
+// (lib/city/TokyoRenderer, lab 4). Replis : sans WebGL2, ou effets coupés,
+// une image fixe de la même scène. Reduced
 // motion : la scène est rendue mais rien ne bouge (une image par changement).
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore } from "react";
 import { useReducedMotion } from "motion/react";
 import { CITY_CREDIT, type CityPhase, type CityRenderer } from "@/lib/city/types";
-import type { PhotoSceneDef } from "@/lib/city/PhotoRenderer";
-
-/** La ruelle de production (photo CC BY 4.0, voir docs/redesign/ASSETS.md). */
-const ALLEY: PhotoSceneDef = {
-  base: "/city/alley",
-  board: [[0.690, 0.081], [0.783, 0.078], [0.783, 0.262], [0.690, 0.266]],
-  focus: 0.3,
-  vanish: [0.5, 0.56],
-  frameX: 0.72, // en portrait : le point de fuite à gauche, le panneau LED entier à droite
-  rain: 0.85,
-  wet: 1,
-};
 import { cn } from "@/lib/utils";
 import { usePrefsStore } from "@/store/prefsStore";
 
@@ -47,6 +36,8 @@ interface Props {
   className?: string;
   /** Texte alternatif : ce que la scène signifie. */
   label?: string;
+  /** Lacet de la caméra (radians) : une page avec texte à gauche tourne à gauche. */
+  yaw?: number;
   /** Crédit de la photo (CC BY) en bas à droite ; false si la page le donne ailleurs. */
   credit?: boolean;
 }
@@ -65,7 +56,7 @@ function useIsDark() {
 }
 
 const CityScene = forwardRef<CityHandle, Props>(function CityScene(
-  { phase = "work", board = "", friends = 0, time = "auto", className, label, credit = true },
+  { phase = "work", board = "", friends = 0, time = "auto", className, label, credit = true, yaw = 0 },
   ref,
 ) {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -77,19 +68,19 @@ const CityScene = forwardRef<CityHandle, Props>(function CityScene(
   const [failed, setFailed] = useState(false);
   const off = WEBGL_DISABLED || !effects;
   // Valeurs initiales figées au montage (les mises à jour passent par les effets).
-  const init = useRef({ phase, board, friends, dawn });
+  const init = useRef({ phase, board, friends, dawn, yaw });
 
   useEffect(() => {
     if (off || failed || !canvas.current) return;
     let disposed = false;
-    import("@/lib/city/PhotoRenderer")
-      .then(async ({ createPhotoCity, supportsPhotoCity }) => {
+    import("@/lib/city/TokyoRenderer")
+      .then(async ({ createTokyoCity, supportsTokyoCity }) => {
         if (disposed || !canvas.current) return;
-        if (!supportsPhotoCity()) { setFailed(true); return; }
+        if (!supportsTokyoCity()) { setFailed(true); return; }
         // Le panneau LED est dessiné avec Doto : on attend la police.
         const doto = getComputedStyle(document.documentElement).getPropertyValue("--font-doto").trim();
         if (doto) await document.fonts?.load(`800 48px ${doto}`).catch(() => {});
-        const c = await createPhotoCity(canvas.current, ALLEY, { ...init.current, reducedMotion: !!reduce });
+        const c = await createTokyoCity(canvas.current, { ...init.current, reducedMotion: !!reduce });
         if (disposed) c.dispose(); else r.current = c;
       })
       .catch((e) => {
@@ -110,7 +101,7 @@ const CityScene = forwardRef<CityHandle, Props>(function CityScene(
     goal: () => r.current?.goal(),
   }), []);
 
-  // Repli : la photo elle-même ; au petit matin, désaturée et éclaircie.
+  // Repli : une image fixe rendue par la scène elle-même (nuit et petit matin).
   return (
     <div className={cn("relative overflow-hidden", dawn ? "bg-[#9fadba]" : "bg-[#0b1016]", className)}>
       <div
@@ -122,10 +113,9 @@ const CityScene = forwardRef<CityHandle, Props>(function CityScene(
         {failed || off ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src="/city/alley/photo-m.jpg"
+            src={dawn ? "/city/tokyo/still-dawn.jpg" : "/city/tokyo/still.jpg"}
             alt=""
-            className="absolute inset-0 w-full h-full object-cover object-[72%_50%]"
-            style={dawn ? { filter: "saturate(0.45) brightness(1.35) hue-rotate(-8deg)" } : undefined}
+            className="absolute inset-0 w-full h-full object-cover"
             draggable={false}
           />
         ) : (

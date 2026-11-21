@@ -8,6 +8,8 @@ export interface CityOptions {
   phase?: CityPhase;
   board?: string;
   friends?: number;
+  /** Lacet de la caméra en radians (positif = tourne à gauche). */
+  yaw?: number;
 }
 
 export interface CityRenderer {
@@ -24,8 +26,8 @@ export interface CityRenderer {
   dispose: () => void;
 }
 
-/** Crédit de la photo (CC BY 4.0) : à afficher partout où la ruelle apparaît. */
+/** Crédit de la capture (CC BY 4.0) : à afficher partout où la ville apparaît. */
 export const CITY_CREDIT = {
-  text: "Photo : Alexkom000, CC BY 4.0",
-  href: "https://commons.wikimedia.org/wiki/File:2024-10-20_Shinjuku_Golden_Gai_at_night.jpg",
+  text: "Ville : « Tokyo Night », Nikitos & 3130, CC BY 4.0",
+  href: "https://sketchfab.com/3d-models/tokyo-night-9a50456b41ec4b17b870883d75c6b184",
 };

@@ -9,21 +9,19 @@ page d'origine. Un crédit visible est donné pour toute licence CC BY.
 
 | Asset | Où | Source | Licence | Crédit exigé | Usage |
 |---|---|---|---|---|---|
-| Ruelle de nuit (photo) | `public/city/alley/` (dérivés : photo, profondeur, masques) | Wikimedia Commons, « 2024-10-20 Shinjuku Golden Gai at night.jpg », par Alexkom000 | CC BY 4.0 | oui : auteur + licence + lien, dans le pied de la landing et ici | décor de la landing, de la halte, du mode Spotify, du résumé |
-| Big Shoulders | `next/font/google` + sous-ensemble `public/fonts/city-signage.woff` | Google Fonts (City of Chicago, Patric King) | SIL OFL 1.1 | non | titres, enseignes |
-| Doto | `next/font/google` + sous-ensemble `public/fonts/city-led.woff` | Google Fonts (Óliver Lalan) | SIL OFL 1.1 | non | minuteur, panneau LED |
+| « TOKYO NIGHT » (capture photogrammétrique) | original `public/tokyo_night.glb` (fourni par l'utilisateur, 37,9 Mo, non chargé par l'app) ; versions allégées `public/city/tokyo/tokyo-desk.glb` (249 k triangles, 2,2 Mo) et `tokyo-mob.glb` (79 k, 1,1 Mo) ; images fixes `still*.jpg` rendues par la scène | Sketchfab, Nikitos & 3130 (vrcityphoto) | CC BY 4.0 | oui : auteurs + licence + lien, affiché sur chaque scène (`CITY_CREDIT`) et dans le pied de la landing | « la fenêtre » : landing, halte, mode Spotify, résumé |
+| Big Shoulders | `next/font/google` | Google Fonts (City of Chicago, Patric King) | SIL OFL 1.1 | non | titres, enseignes |
+| Doto | `next/font/google` (aussi dessinée sur l écran de toit via canvas) | Google Fonts (Óliver Lalan) | SIL OFL 1.1 | non | minuteur, panneau LED |
 | Atkinson Hyperlegible Next | `next/font/google` | Google Fonts (Braille Institute) | SIL OFL 1.1 | non | texte courant |
 
-Données calculées par nous à partir de la photo (même licence que la photo,
-CC BY 4.0, mêmes crédits) : carte de profondeur (modèle Depth Anything V2
-Small, Apache 2.0, exécuté hors ligne avec onnxruntime ; le modèle n'est pas
-distribué), masques sol et émissif, carte de débord lumineux, liste des
-enseignes (`scripts/city/prep_photo.py`).
+Versions allégées produites par nous (même licence, mêmes crédits) :
+`gltf-transform optimize` (simplification meshopt, quantification, WebP 1024).
 
 ## Lab uniquement (route `/lab`, exclue de la production)
 
 | Asset | Où | Source | Licence | Usage |
 |---|---|---|---|---|
+| Ruelle de nuit (photo) + dérivés (profondeur Depth Anything V2 Small, Apache 2.0, calculée hors ligne ; masques) | `public/lab/city/alley/` | Wikimedia Commons, « 2024-10-20 Shinjuku Golden Gai at night.jpg », Alexkom000 | CC BY 4.0 | lab 3, piste A (2.5D photographique), remplacée par la capture TOKYO NIGHT |
 | Supérette sous la pluie (photo) | `public/lab/city/konbini/` | Wikimedia Commons, « DFC 6246 Late-night rain… », PattayaPatrol | CC BY-SA 4.0 | piste A, scène de halte. Écartée de la production : logo d'enseigne réelle très lisible, et partage à l'identique sur les dérivés |
 | Kit « hidden alley » : façade modulaire, rideaux métalliques, climatiseurs, escalier de secours, gouttières, boîtiers, applique, gaine, plaque d'égout, poubelles | `public/lab/city/assets/*.glb` | Poly Haven | CC0 | piste C (3D temps réel) |
 | Asphalte « asphalt_02 » (albedo, normal, rugosité, AO) | `public/lab/city/assets/asphalt_*.webp` | Poly Haven | CC0 | piste C |
@@ -36,5 +34,5 @@ enseignes (`scripts/city/prep_photo.py`).
 
 | Asset | Raison |
 |---|---|
-| `public/tokyo_night.glb` (Sketchfab, CC BY 4.0, 37,9 Mo) | jamais utilisé, trop lourd |
+| `public/tokyo_night.glb` | à garder comme source (fourni par l'utilisateur) ; seules les versions allégées sont chargées |
 | `public/seoul/*` (Pexels) | landing précédente ; plus utilisés par la landing actuelle, à confirmer avant suppression |
