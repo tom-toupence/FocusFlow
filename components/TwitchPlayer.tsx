@@ -1,10 +1,36 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { Observable, type PlaybackState, type PlayerAdapter } from "@/lib/playback/types";
 
 interface TwitchEmbedPlayer {
   setQuality: (quality: string) => void;
   setVolume: (volume: number) => void;
+  play: () => void;
+  pause: () => void;
+}
+
+/** Adaptateur Twitch (live ou rediffusion) : lecture, pause, volume. Pas de
+ *  piste suivante, d'aléatoire ni de boucle : déclaré dans `caps`. */
+class TwitchAdapter extends Observable<PlaybackState> implements PlayerAdapter {
+  readonly kind = "twitch" as const;
+  constructor(private getPlayer: () => TwitchEmbedPlayer | null, label: { id: string; title: string; subtitle: string }) {
+    super({
+      kind: "twitch", ready: false, playing: false, track: label,
+      caps: { skip: false, shuffle: false, loop: false, volume: true },
+      shuffle: false, loop: false, extending: false, error: null,
+    });
+  }
+  markReady() { this.set({ ready: true }); }
+  private call(f: (p: TwitchEmbedPlayer) => void) { try { const p = this.getPlayer(); if (p) f(p); } catch { /* lecteur pas prêt */ } }
+  play() { this.call((p) => p.play()); this.set({ playing: true }); }
+  pause() { this.call((p) => p.pause()); this.set({ playing: false }); }
+  next() {}
+  previous() {}
+  setVolume(v: number) { this.call((p) => p.setVolume(v)); }
+  setShuffle() {}
+  setLoop() {}
+  destroy() {}
 }
 
 interface TwitchEmbedInstance {
@@ -41,13 +67,17 @@ interface Props {
   vodId?: string;
   token?: string;
   volume?: number; // 0–1
+  /** Reçoit l'adaptateur de lecture (interface unique de la session). */
+  onAdapter?: (a: PlayerAdapter | null) => void;
 }
 
-export default function TwitchPlayer({ channel, vodId, token, volume = 0.8 }: Props) {
+export default function TwitchPlayer({ channel, vodId, token, volume = 0.8, onAdapter }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const embedRef = useRef<TwitchEmbedInstance | null>(null);
   const volumeRef = useRef(volume);
   useEffect(() => { volumeRef.current = volume; }, [volume]);
+  const onAdapterRef = useRef(onAdapter);
+  useEffect(() => { onAdapterRef.current = onAdapter; }, [onAdapter]);
 
   useEffect(() => {
     const initEmbed = () => {
@@ -81,6 +111,13 @@ export default function TwitchPlayer({ channel, vodId, token, volume = 0.8 }: Pr
       if (token) options.oauth_token = token;
 
       const embed = new window.Twitch.Embed("twitch-embed-container", options);
+      const adapter = new TwitchAdapter(
+        () => (embedRef.current === embed ? embed.getPlayer() : null),
+        vodId
+          ? { id: `vod:${vodId}`, title: `Rediffusion ${vodId}`, subtitle: "Twitch" }
+          : { id: `live:${channel}`, title: channel ?? "Twitch", subtitle: "Live Twitch" },
+      );
+      onAdapterRef.current?.(adapter);
 
       embed.addEventListener(window.Twitch.Embed.VIDEO_READY, () => {
         try {
@@ -90,6 +127,7 @@ export default function TwitchPlayer({ channel, vodId, token, volume = 0.8 }: Pr
           try { embed.getPlayer().setQuality("720p"); } catch { /* ignore */ }
         }
         try { embed.getPlayer().setVolume(volumeRef.current); } catch { /* ignore */ }
+        adapter.markReady();
       });
 
       embedRef.current = embed;
@@ -118,6 +156,7 @@ export default function TwitchPlayer({ channel, vodId, token, volume = 0.8 }: Pr
     return () => {
       embedRef.current?.destroy();
       embedRef.current = null;
+      onAdapterRef.current?.(null);
     };
   }, [channel, vodId, token]); // eslint-disable-line react-hooks/exhaustive-deps
 

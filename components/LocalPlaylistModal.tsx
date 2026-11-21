@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocalPlaylistStore } from "@/store/localPlaylistStore";
-import { playLocalPlaylist } from "@/lib/playback";
+import { playLocalPlaylist } from "@/lib/playback/local";
 import { fetchRadioRecommendations } from "@/lib/recommendations";
 import AddToMenu from "@/components/AddToMenu";
 import { cn } from "@/lib/utils";

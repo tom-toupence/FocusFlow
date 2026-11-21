@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSpotifyStore } from "@/store/spotifyStore";
-import { startPlayback, setRepeat, setShuffle as apiSetShuffle, refreshAccessToken } from "@/lib/spotify";
+import { startPlayback, setRepeat, setShuffle as apiSetShuffle, refreshAccessToken, fetchPlaylistTracks, fetchArtistTopTracks, addToQueue, type PlaylistTrackLite } from "@/lib/spotify";
+import { Observable, type ExtendedEvent, type PlaybackState, type PlayerAdapter } from "@/lib/playback/types";
+import { continuePlaylist } from "@/lib/playback/continuation";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -35,18 +37,59 @@ declare global {
   }
 }
 
+// ─── Adaptateur (interface de lecture unique) ──────────────────────────────────
+
+interface SpotifyBridge {
+  play: () => void;
+  pause: () => void;
+  next: () => void;
+  previous: () => void;
+  volume: (v: number) => void;
+  shuffle: (on: boolean) => void;
+  repeat: (on: boolean) => void;
+}
+
+class SpotifyAdapter extends Observable<PlaybackState> implements PlayerAdapter {
+  readonly kind = "spotify" as const;
+  constructor(private b: SpotifyBridge, init: { shuffle: boolean; loop: boolean }) {
+    super({
+      kind: "spotify", ready: false, playing: false, track: null,
+      caps: { skip: true, shuffle: true, loop: true, volume: true },
+      shuffle: init.shuffle, loop: init.loop, extending: false, error: null,
+    });
+  }
+  /** Mises à jour venant du SDK (piste, statut, erreurs). */
+  patch(p: Partial<PlaybackState>) { this.set(p); }
+  play() { this.b.play(); this.set({ playing: true }); }
+  pause() { this.b.pause(); this.set({ playing: false }); }
+  next() { this.b.next(); }
+  previous() { this.b.previous(); }
+  setVolume(v: number) { this.b.volume(v); }
+  setShuffle(on: boolean) { if (on === this.state.shuffle) return; this.set({ shuffle: on }); this.b.shuffle(on); }
+  setLoop(on: boolean) { if (on === this.state.loop) return; this.set({ loop: on }); this.b.repeat(on); }
+  destroy() {}
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
   shouldPlay: boolean;
   playlistUri: string;
-  /** false : pas de pochette floutée plein écran (la ruelle sert de décor derrière). */
+  /** false : pas de pochette floutée plein écran (la ville sert de décor derrière). */
   backdrop?: boolean;
+  /** Reçoit l'adaptateur de lecture (interface unique de la session). */
+  onAdapter?: (a: PlayerAdapter | null) => void;
+  /** Préférences communes au démarrage. */
+  initialLoop?: boolean;
+  /** La playlist a été prolongée (toast, ville). */
+  onExtended?: (e: ExtendedEvent) => void;
+  /** false : pas de titre ni de commandes intégrés (la session a les siens). */
+  controls?: boolean;
 }
 
 type Status = "loading" | "connecting" | "ready" | "error";
 
-export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true }: Props) {
+export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true, onAdapter, initialLoop = true, onExtended, controls = true }: Props) {
   const {
     accessToken, refreshToken, expiresAt,
     currentTrack, shuffle,
@@ -54,7 +97,8 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
   } = useSpotifyStore();
 
   const [status, setStatus] = useState<Status>("loading");
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsgState] = useState<string | null>(null);
+  const setErrorMsg = (m: string | null) => { setErrorMsgState(m); adapterRef.current?.patch({ error: m }); };
   const [volume, setVolumeState] = useState(0.8);
   const [showVolume, setShowVolume] = useState(false);
   // Le SDK Spotify n'est officiellement supporté que sur Chrome/Edge/Safari ;
@@ -74,6 +118,14 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
   const shuffleRef = useRef(shuffle);
   const playlistUriRef = useRef(playlistUri);
   const initCalledRef = useRef(false);
+  const loopRef = useRef(initialLoop);
+  const adapterRef = useRef<SpotifyAdapter | null>(null);
+  const onExtendedRef = useRef(onExtended);
+  useEffect(() => { onExtendedRef.current = onExtended; }, [onExtended]);
+  // Lecture continue : pistes de la playlist (chargées une fois) et garde.
+  const playlistTracksRef = useRef<PlaylistTrackLite[] | null>(null);
+  const extendingRef = useRef(false);
+  const extendedAfterRef = useRef<string | null>(null);
   const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
   // Tracks which playlistUri was last successfully started — prevents double-start
   const playlistStartedRef = useRef<string | null>(null);
@@ -130,7 +182,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
           setStatus("ready");
           // Best effort une fois le device actif ; ne bloque pas la lecture.
           apiSetShuffle(token, device_id, shuffleRef.current)
-            .then(() => setRepeat(token!, device_id, "context"))
+            .then(() => setRepeat(token!, device_id, loopRef.current ? "context" : "off"))
             .catch(() => {});
           return true;
         }
@@ -156,6 +208,40 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
       return false;
     } finally {
       playInFlightRef.current = false;
+    }
+  };
+
+  /** Prolonge la lecture avec des titres proches de toute la playlist. */
+  const extendQueue = async (currentId: string, currentUri: string) => {
+    if (extendingRef.current || extendedAfterRef.current === currentUri) return;
+    extendingRef.current = true;
+    adapterRef.current?.patch({ extending: true });
+    try {
+      const token = await getValidToken();
+      const device = deviceIdRef.current;
+      if (!token || !device || !playlistUriRef.current) return;
+      if (!playlistTracksRef.current) playlistTracksRef.current = await fetchPlaylistTracks(token, playlistUriRef.current);
+      const tracks = playlistTracksRef.current;
+      const byId = new Map(tracks.map((t) => [t.id, t]));
+      const res = await continuePlaylist(
+        tracks.map((t) => t.id),
+        currentId,
+        async (seed) => {
+          const artist = byId.get(seed)?.artistIds[0];
+          if (!artist) return [];
+          const top = await fetchArtistTopTracks(token, artist);
+          return top.map((t) => ({ id: t.id, title: t.name, subtitle: t.artists }));
+        },
+        { limit: 10 },
+      );
+      if (res.kind !== "extend") return; // repli : la boucle Spotify reprend la main
+      let added = 0;
+      for (const t of res.tracks) if (await addToQueue(token, device, `spotify:track:${t.id}`)) added++;
+      extendedAfterRef.current = currentUri;
+      if (added > 0) onExtendedRef.current?.({ added, titles: Object.fromEntries(res.tracks.map((t) => [t.id, t.title])) });
+    } finally {
+      extendingRef.current = false;
+      adapterRef.current?.patch({ extending: false });
     }
   };
 
@@ -195,16 +281,28 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
     player.addListener("player_state_changed", (state: unknown) => {
       if (!state) return;
       const s = state as {
+        paused?: boolean;
         track_window?: {
           current_track?: {
+            id?: string;
+            uri?: string;
             name: string;
             artists: Array<{ name: string }>;
             album: { name: string; images: Array<{ url: string }> };
           };
+          next_tracks?: unknown[];
         };
       };
       const track = s.track_window?.current_track;
       if (track) {
+        adapterRef.current?.patch({
+          ready: true,
+          playing: !s.paused,
+          track: { id: track.uri ?? track.name, title: track.name, subtitle: track.artists.map((a) => a.name).join(", "), artwork: track.album.images[0]?.url },
+        });
+        // Dernier titre de la playlist, boucle coupée : on prolonge AVANT la fin
+        // pour que la lecture enchaîne sans silence.
+        if (!loopRef.current && (s.track_window?.next_tracks?.length ?? 1) === 0 && track.id) void extendQueue(track.id, track.uri ?? "");
         setCurrentTrack({
           name: track.name,
           artist: track.artists.map((a) => a.name).join(", "),
@@ -244,6 +342,31 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
     player.connect();
     playerRef.current = player;
   };
+
+  // ── Adaptateur exposé à la session ───────────────────────────────────────
+  useEffect(() => {
+    const a = new SpotifyAdapter({
+      play: () => {
+        if (!playlistStartedRef.current && deviceIdRef.current && playlistUriRef.current) void doPlay(deviceIdRef.current, playlistUriRef.current);
+        else playerRef.current?.resume().catch(() => {});
+      },
+      pause: () => { playerRef.current?.pause().catch(() => {}); },
+      next: () => { playerRef.current?.nextTrack().catch(() => {}); },
+      previous: () => { playerRef.current?.previousTrack().catch(() => {}); },
+      volume: (v) => { setVolumeState(v); playerRef.current?.setVolume(v).catch(() => {}); },
+      shuffle: (on) => {
+        shuffleRef.current = on;
+        void getValidToken().then((t) => { if (t && deviceIdRef.current) void apiSetShuffle(t, deviceIdRef.current, on); });
+      },
+      repeat: (on) => {
+        loopRef.current = on;
+        void getValidToken().then((t) => { if (t && deviceIdRef.current) void setRepeat(t, deviceIdRef.current, on ? "context" : "off"); });
+      },
+    }, { shuffle: shuffleRef.current, loop: loopRef.current });
+    adapterRef.current = a;
+    onAdapter?.(a);
+    return () => { adapterRef.current = null; onAdapter?.(null); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── SDK init ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -411,7 +534,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
         </div>
       )}
 
-      {currentTrack && (
+      {controls && currentTrack && (
         <div className="absolute bottom-20 left-6 flex items-end gap-4 z-10">
           {currentTrack.albumArt && (
             <img

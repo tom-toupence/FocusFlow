@@ -33,7 +33,7 @@ import PlaylistTracksModal from "@/components/PlaylistTracksModal";
 import DiscoverPanel from "@/components/DiscoverPanel";
 import LocalPlaylistModal from "@/components/LocalPlaylistModal";
 import { useLocalPlaylistStore, LocalPlaylist } from "@/store/localPlaylistStore";
-import { playLocalPlaylist } from "@/lib/playback";
+import { playLocalPlaylist } from "@/lib/playback/local";
 import { useProfileStore, resolvedProfile } from "@/store/profileStore";
 import SubTabs from "@/components/SubTabs";
 import CreateMenu from "@/components/CreateMenu";
