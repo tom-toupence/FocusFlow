@@ -88,11 +88,16 @@ performance). Planches avant / après dans `shots/crit1/`, `shots/crit2/`.
 ## 5. À décider par l'utilisateur
 
 - Fusionner la branche (aucune PR ouverte, comme demandé).
-- Supprimer `public/seoul/` (plus utilisé) et les dépendances des labs
-  (pixi.js, gpu-curtains, manifold-3d, troika, @thi.ng, tweakpane) si les
-  labs ne doivent pas rester dans le dépôt.
-- CSP : `'wasm-unsafe-eval'` et `blob:` ajoutés (modèles, WASM des labs) ; à
-  restreindre si les labs partent.
+- Retirer les labs (`app/lab`, `lib/lab`, `public/lab`) et leurs dépendances de
+  développement (pixi.js, gpu-curtains, manifold-3d, troika, @thi.ng, tweakpane)
+  si l'historique de la recherche ne doit pas rester dans le dépôt. Ils sont
+  exclus de la production.
+- CSP : `'wasm-unsafe-eval'` (décodeur meshopt des modèles) et `blob:`
+  (textures des modèles) sont nécessaires en production.
+
+Déjà fait : `public/seoul/`, la photo Pexels historique, les SVG par défaut et
+les composants morts (`VideoPlayer`, `PomodoroTimer`, `VideoCatalog`) sont
+supprimés.
 - Environnement cloud « focusflow (assets libres) » créé pour accéder aux
   banques d'assets (hôtes ajoutés : Poly Haven, ambientCG, Wikimedia, Hugging
   Face, jsDelivr) ; il peut être supprimé dans les réglages Claude Code.

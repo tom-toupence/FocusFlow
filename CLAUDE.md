@@ -128,10 +128,10 @@ choisir le média, qui enchaîne sur `/settings`. Les **routines** appliquent le
   login + `SUPABASE_SERVICE_ROLE_KEY` (serveur) ; sinon repli **téléchargement `.ics`** —
   `lib/ics.ts`, `components/CalendarSync.tsx`, table `calendar_feeds`
 - **Mode Deadline/Sprint** : objectif + date limite → le coach (IA ou local `lib/sprint.ts`)
-  génère blocs jour-par-jour (préfixés 🏃, donc poussés au calendrier) + tâches Kanban + mood
+  génère blocs jour-par-jour (poussés au calendrier) + tâches Kanban + mood
   musical ; bouton **« Go »** (dashboard) qui applique média du mood + preset et lance `/session` ;
   recalcul si blocs manqués — `store/sprintStore.ts`, `components/SprintWizard.tsx`
-- **Journal & humeur** : réflexion post-session (😞→😄 + réussites/blocages), corrélation humeur ↔ focus —
+- **Journal & humeur** : réflexion post-session (humeur sur 5 pastilles + réussites/blocages), corrélation humeur ↔ focus —
   `store/journalStore.ts`, `components/JournalReflection.tsx` (résumé) + `JournalTimeline.tsx`
 
 **Coach de planification**
@@ -757,5 +757,7 @@ Points à retenir pour la suite :
    géométrie tapée à la main (labs 2 et 3 écartés pour cette raison).
 3. Les labs (`/lab/*`, exclus de la production) gardent les pistes écartées
    pour mémoire ; ne pas les importer depuis le code de production.
-4. ⚠️ CSP : `'wasm-unsafe-eval'` et `blob:` (connect-src) ont été ajoutés
-   (chargement des modèles, WASM des labs).
+4. ⚠️ CSP : `'wasm-unsafe-eval'` (décodeur meshopt WASM des modèles) et `blob:`
+   (connect-src, textures intégrées des glb) sont nécessaires en production.
+5. Nettoyage : `public/seoul/`, composants morts (`VideoPlayer`, `PomodoroTimer`,
+   `VideoCatalog`) et SVG par défaut supprimés.

@@ -96,7 +96,7 @@ const PLANS = [
   { name: "notfound", path: "/nope-404", profile: "full", steps: [] },
 ];
 
-const PLACEHOLDERS = fs.readdirSync("public/seoul").map((f) => fs.readFileSync(path.join("public/seoul", f)));
+const PLACEHOLDERS = ["still.jpg", "still-dawn.jpg"].map((f) => fs.readFileSync(path.join("public/city/tokyo", f)));
 const browser = await chromium.launch();
 let n = 0;
 for (const theme of themes) {

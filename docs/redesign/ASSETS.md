@@ -30,9 +30,10 @@ Versions allégées produites par nous (même licence, mêmes crédits) :
 | Polices du lab 2 (TTF) | `public/lab/fonts/` | Google Fonts | SIL OFL 1.1 | prototypes du lab 2 |
 | manifold-3d (WASM) | `public/lab/manifold.wasm` | npm `manifold-3d` | Apache 2.0 (`manifold-LICENSE.txt`) | lab 2·2 |
 
-## À retirer
+## Nettoyage effectué (2026-11-21)
 
-| Asset | Raison |
-|---|---|
-| `public/tokyo_night.glb` | à garder comme source (fourni par l'utilisateur) ; seules les versions allégées sont chargées |
-| `public/seoul/*` (Pexels) | landing précédente ; plus utilisés par la landing actuelle, à confirmer avant suppression |
+- Retirés : `public/seoul/` (photos de l'ancienne landing), la photo Pexels
+  historique, les SVG par défaut de Next.js ; composants morts `VideoPlayer`,
+  `PomodoroTimer`, `VideoCatalog` (relevés à l'audit, aucun import).
+- Gardé : `public/tokyo_night.glb`, la source fournie par l'utilisateur ;
+  l'application ne charge que ses versions allégées.

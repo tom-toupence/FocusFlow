@@ -10,7 +10,6 @@ import { cleanTitle } from "@/lib/text";
 
 const sign = Big_Shoulders({ subsets: ["latin"], axes: ["opsz"] });
 const text = Atkinson_Hyperlegible_Next({ subsets: ["latin"] });
-const PHOTOS = ["01-skyline-aerien", "02-skyline-nuit", "03-lotte-han", "04-pont-illumine", "05-rue-enseignes", "06-pont-skyline"];
 const ITEMS = defaultVideos.slice(0, 24);
 const FRIENDS = [3, 10, 17];
 
@@ -53,7 +52,7 @@ export default function TourLab() {
             <a key={v.id} href="#" data-window tabIndex={0} className="block group focus-visible:outline-2 focus-visible:outline-[#ff9a3c]">
               <span className="block aspect-[3/4] relative bg-[#0c0e11]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/seoul/${PHOTOS[i % PHOTOS.length]}.jpg`} alt="" data-texture-name="windowTexture" className="absolute inset-0 w-full h-full object-cover opacity-0" crossOrigin="anonymous" />
+                <img src={i % 2 ? "/city/tokyo/still-dawn.jpg" : "/city/tokyo/still.jpg"} alt="" data-texture-name="windowTexture" className="absolute inset-0 w-full h-full object-cover opacity-0" crossOrigin="anonymous" />
               </span>
               <span className="block mt-2 text-[13px] leading-snug text-[#e9f2ff]/85 line-clamp-2">{cleanTitle(v.title)}</span>
             </a>
