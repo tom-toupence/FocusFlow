@@ -68,7 +68,11 @@ function Figure({ label, value, sub, signal }: { label: string; value: string; s
   );
 }
 
-const CityScene = dynamic(() => import("@/components/CityScene"), { ssr: false });
+// Emplacement réservé à la hauteur du bandeau : pas de saut de mise en page.
+const CityScene = dynamic(() => import("@/components/CityScene"), {
+  ssr: false,
+  loading: () => <div aria-hidden className="h-44 sm:h-60 bg-[#0b1016]" />,
+});
 
 // ─── Summary Page ─────────────────────────────────────────────────────────────
 

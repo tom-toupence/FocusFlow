@@ -1,5 +1,6 @@
 "use client";
 
+import { isSoftwareRenderer } from "@/lib/gpu";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -26,16 +27,19 @@ const FRAG = `#version 300 es
 precision highp float;
 uniform sampler2D u_tex;
 uniform vec2 u_res;
+uniform float u_scale;          // pixels du canvas par pixel CSS
 uniform float u_time;
 uniform vec2 u_mouse;
 uniform float u_reveal;       // temps de départ de la révélation (<0 = inactif)
-uniform vec2 u_revealCenter;  // centre de la révélation (px)
-uniform vec4 u_ripples[${MAX_RIPPLES}]; // xy = centre (px), z = temps de départ (<0 = inactif)
+uniform vec2 u_revealCenter;  // centre de la révélation (px CSS)
+uniform vec4 u_ripples[${MAX_RIPPLES}]; // xy = centre (px CSS), z = temps de départ (<0 = inactif)
 out vec4 outColor;
 
 void main() {
-  vec2 p = gl_FragCoord.xy;
-  vec2 uv = p / u_res;
+  // Tout est compté en pixels CSS : la résolution du canvas peut être
+  // plafonnée sans changer la taille ni la vitesse des ondes.
+  vec2 p = gl_FragCoord.xy / u_scale;
+  vec2 uv = gl_FragCoord.xy / u_res;
   vec2 disp = vec2(0.0);
 
   // Vagues ambiantes douces
@@ -47,7 +51,7 @@ void main() {
   // La vague suit la souris : bosse radiale ondulante autour du curseur (qui est
   // masqué — c'est cette déformation qui matérialise la position du pointeur).
   float md = distance(p, u_mouse);
-  float sigma = u_res.y * 0.17;
+  float sigma = (u_res.y / u_scale) * 0.17;
   float infl = exp(-md * md / (2.0 * sigma * sigma));
   vec2 mdir = md > 0.5 ? (p - u_mouse) / md : vec2(0.0);
   disp += mdir * infl * 0.020 * sin(md * 0.042 - u_time * 3.0);
@@ -208,8 +212,10 @@ function Splash() {
   const rippleCursorRef = useRef(0);
   // Position lissée du pointeur (x/y suivent tx/ty avec un léger retard).
   const mouseRef = useRef({ x: -9999, y: -9999, tx: -9999, ty: -9999 });
-  // Révélation en attente d'envoi au shader : { time (s shader), x, y (px canvas) }.
+  // Révélation en attente d'envoi au shader : { time (s shader), x, y (px CSS) }.
   const revealRef = useRef<{ time: number; x: number; y: number } | null>(null);
+  // Signale une activité (souris, clic) : la boucle repasse à pleine cadence.
+  const activeRef = useRef<() => void>(() => {});
   // Piloté par l'effet WebGL : déclenche la révélation (repli = fondu simple).
   const startRevealRef = useRef<((cx: number, cy: number) => void) | null>(null);
 
@@ -217,9 +223,12 @@ function Splash() {
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const canvas = canvasRef.current;
-    const gl = !reduced && canvas
+    const ctx = !reduced && canvas
       ? canvas.getContext("webgl2", { alpha: true, premultipliedAlpha: true })
       : null;
+    // Rendu logiciel (pas d'accélération) : chaque image gèlerait l'interface,
+    // on prend le repli fixe (lib/gpu).
+    const gl = ctx && !isSoftwareRenderer(ctx) ? ctx : null;
     setCanShader(!!gl);
     if (!gl || !canvas) {
       // Repli statique (pas de shader) : le site se découvre AU CLIC/touche,
@@ -233,9 +242,12 @@ function Splash() {
       };
     }
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.round(window.innerWidth * dpr);
-    const h = Math.round(window.innerHeight * dpr);
+    // Résolution plafonnée à 1 pixel CSS : un écran plein cadre en eau tolère
+    // l'agrandissement, et c'est le poste le plus coûteux du splash (x4 sur
+    // un écran haute densité). Les uniformes sont en pixels CSS.
+    const scale = Math.min(window.devicePixelRatio || 1, 1);
+    const w = Math.round(window.innerWidth * scale);
+    const h = Math.round(window.innerHeight * scale);
     canvas.width = w;
     canvas.height = h;
 
@@ -257,12 +269,14 @@ function Splash() {
     gl.useProgram(prog);
 
     const uRes = gl.getUniformLocation(prog, "u_res");
+    const uScale = gl.getUniformLocation(prog, "u_scale");
     const uTime = gl.getUniformLocation(prog, "u_time");
     const uMouse = gl.getUniformLocation(prog, "u_mouse");
     const uReveal = gl.getUniformLocation(prog, "u_reveal");
     const uRevealCenter = gl.getUniformLocation(prog, "u_revealCenter");
     const uRipples = gl.getUniformLocation(prog, "u_ripples");
     gl.uniform2f(uRes, w, h);
+    gl.uniform1f(uScale, w / window.innerWidth);
     gl.uniform1f(uReveal, -1);
 
     // Texture du wordmark (redessinée après chargement des polices)
@@ -278,21 +292,38 @@ function Splash() {
       if (source) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
     };
     upload();
-    document.fonts?.ready.then(() => { try { upload(); } catch { /* contexte perdu */ } });
+    // Polices chargées : nouvelle texture, et une image pour l'afficher même si l'eau est figée.
+    document.fonts?.ready.then(() => { try { upload(); activeRef.current(); } catch { /* contexte perdu */ } });
 
     gl.viewport(0, 0, w, h);
 
     const start = performance.now();
     const shaderNow = () => (performance.now() - start) / 1000;
     let raf = 0;
+    // Au repos (souris immobile, aucune onde), les vagues ambiantes sont lentes :
+    // ~20 images/s suffisent. Pleine cadence dès qu'il se passe quelque chose.
+    // Après 5 s sans rien, l'eau se fige (aucune boucle décorative) : la boucle
+    // s'arrête et repart au premier mouvement.
+    let lastDraw = 0;
+    let lastActive = performance.now();
+    let stopped = false;
+    activeRef.current = () => {
+      lastActive = performance.now();
+      if (stopped) { stopped = false; raf = requestAnimationFrame(frame); }
+    };
     const frame = (now: number) => {
+      const idle = now - lastActive;
+      const busy = idle < 2500 || revealRef.current !== null;
+      if (!busy && idle > 5000) { stopped = true; return; }
+      if (!busy && now - lastDraw < 50) { raf = requestAnimationFrame(frame); return; }
+      lastDraw = now;
       const t = (now - start) / 1000;
       // La vague suit la souris avec un léger retard (lerp) → elle « traîne ».
       const m = mouseRef.current;
       m.x += (m.tx - m.x) * 0.12;
       m.y += (m.ty - m.y) * 0.12;
       gl.uniform1f(uTime, t);
-      gl.uniform2f(uMouse, m.x * dpr, (window.innerHeight - m.y) * dpr);
+      gl.uniform2f(uMouse, m.x, window.innerHeight - m.y);
       const rv = revealRef.current;
       gl.uniform1f(uReveal, rv ? rv.time : -1);
       if (rv) gl.uniform2f(uRevealCenter, rv.x, rv.y);
@@ -305,7 +336,7 @@ function Splash() {
     // Déclenche la vague de révélation depuis (cx, cy) en pixels CSS.
     startRevealRef.current = (cx: number, cy: number) => {
       if (phaseRef.current !== "show") return;
-      revealRef.current = { time: shaderNow(), x: cx * dpr, y: (window.innerHeight - cy) * dpr };
+      revealRef.current = { time: shaderNow(), x: cx, y: window.innerHeight - cy };
       setPhase("revealing");
       // Durée = temps pour que le front couvre le coin le plus lointain.
       const maxDist = Math.max(
@@ -314,7 +345,7 @@ function Splash() {
         Math.hypot(cx, window.innerHeight - cy),
         Math.hypot(window.innerWidth - cx, window.innerHeight - cy)
       );
-      const durMs = (maxDist * dpr / REVEAL_SPEED) * 1000 + 180;
+      const durMs = (maxDist / REVEAL_SPEED) * 1000 + 180;
       setTimeout(() => { if (phaseRef.current === "revealing") setPhase("fading"); }, durMs);
     };
 
@@ -324,13 +355,15 @@ function Splash() {
       if (m.tx < -999) { m.x = e.clientX; m.y = e.clientY; } // 1er mouvement : pas de saut
       m.tx = e.clientX;
       m.ty = e.clientY;
+      activeRef.current();
     };
     const onClick = (e: PointerEvent) => {
       if (phaseRef.current !== "show") return;
       // 1. Onde de choc immédiate au point du clic…
       const i = rippleCursorRef.current % MAX_RIPPLES;
-      ripplesRef.current[i * 4] = e.clientX * dpr;
-      ripplesRef.current[i * 4 + 1] = (window.innerHeight - e.clientY) * dpr;
+      activeRef.current();
+      ripplesRef.current[i * 4] = e.clientX;
+      ripplesRef.current[i * 4 + 1] = window.innerHeight - e.clientY;
       ripplesRef.current[i * 4 + 2] = shaderNow();
       ripplesRef.current[i * 4 + 3] = 0;
       rippleCursorRef.current++;
@@ -344,6 +377,7 @@ function Splash() {
     window.addEventListener("keydown", onKey);
 
     return () => {
+      activeRef.current = () => {};
       cancelAnimationFrame(raf);
       startRevealRef.current = null;
       window.removeEventListener("pointermove", onMove);

@@ -50,7 +50,8 @@ export function useExpandNavigate() {
     // survit à la navigation et se nettoie tout seul — pas de cleanup React.
     overlay.style.cssText =
       "position:fixed;inset:0;background:#05070a;z-index:9999;pointer-events:none;" +
-      "display:flex;align-items:center;justify-content:center;" +
+      // Desktop : la rangée se pose où sera la jauge du minuteur (haut, centre).
+      `display:flex;justify-content:center;${vw >= 768 ? "align-items:flex-start;padding-top:66px;" : "align-items:center;"}` +
       "transform-origin:center;will-change:transform;" +
       `transform:translate(${tx}px,${ty}px) scale(${sx},${sy});` +
       `transition:transform ${EXPAND_MS}ms cubic-bezier(0.4,0,0.2,1),opacity 0.3s ease;`;

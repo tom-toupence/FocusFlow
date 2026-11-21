@@ -23,6 +23,7 @@
 // vitre vers la ville) ; pendant la halte la mise au point revient sur la vitre
 // et la ville se brouille ; à la reprise elle revient sur la ville.
 // Même interface que les autres scènes (lib/city/types).
+import { hasHardwareWebGL2 } from "@/lib/gpu";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
@@ -136,8 +137,9 @@ function loadGltf(url: string): Promise<THREE.Group> {
   return new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url).then((g) => g.scene);
 }
 
+/** WebGL2 matériel seulement : rendu logiciel = image fixe (lib/gpu). */
 export function supportsTokyoCity(): boolean {
-  try { return !!document.createElement("canvas").getContext("webgl2"); } catch { return false; }
+  return hasHardwareWebGL2();
 }
 
 export async function createTokyoCity(canvas: HTMLCanvasElement, opts: CityOptions = {}): Promise<CityRenderer> {

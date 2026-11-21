@@ -38,11 +38,46 @@ ne l'a pas été.
   (dont un rose fuchsia interdit) remplacées, titres du catalogue sans noms de
   lieux, pays jamais affiché.
 
-### Critique (3 tours)
+### Critique (4 tours)
 
 `07-CRITIQUE-1.md` (jauges, minuteur, palette, vocabulaire), `07-CRITIQUE-2.md`
 (graphiques, gamification, mobile), `07-CRITIQUE-3.md` (accessibilité,
-performance). Planches avant / après dans `shots/crit1/`, `shots/crit2/`.
+performance), `07-CRITIQUE-4.md` (écrans jamais revus : 404, carte et page
+Wrapped, heatmap du relevé, projets, rail horaire, `/_design` ; transition
+réglages vers session ; Lighthouse). Planches dans `shots/crit1/`,
+`shots/crit2/`, `shots/crit4/`.
+
+### Avant / après, écran par écran
+
+Planches côte à côte (avant à gauche, après à droite, nuit, 1440 px) dans
+`shots/compare/`. Captures brutes : `shots/before/` (audit, phase 0) et
+`shots/after/` (fin de refonte), produites par `scripts/shoot.mjs` avec les
+mêmes données de démonstration.
+
+| Écran | Ce qui a changé |
+|---|---|
+| Landing | page marketing générique remplacée par la nuit qui avance devant la fenêtre ; chaque section déclenche un événement de la ville |
+| Splash | effet goutte conservé ; flaque sur l'asphalte qui reflète l'enseigne |
+| Aujourd'hui | façades à la place des anneaux et barres, rail horaire, couleurs par rôle |
+| Écouter (catalogue, découvrir, bibliothèque, Spotify, Twitch) | titres sans noms de lieux, cartes de média sobres, « Titres proches » sur les playlists Spotify |
+| Organisation (projets, planning, sprint, routines, journal) | rangées de fenêtres, statuts aux bonnes couleurs |
+| Activité, insights | barres en tours (`.ff-floors`), plus de fuchsia ni d'arc-en-ciel |
+| Wrapped (page et carte PNG) | panneau à points, soirs allumés, taxi pour le meilleur soir |
+| Réglages | durées lisibles hors « Personnalisé », cycle en sodium, transition vers la session |
+| Session | minuteur en panneau LED, halte dans la ville, « À venir », contrôles selon les capacités de la source |
+| Relevé | bandeau de ville, heatmap visible, chiffres en relevés sous filet |
+| 404 | page à l'identité (était celle de Next, en anglais) |
+
+### Désactiver la 3D
+
+- **Pour soi** : profil, « Affichage », décocher « Ville animée en 3D » (une
+  image fixe la remplace partout).
+- **Automatique** : `prefers-reduced-motion`, absence de WebGL2, ou rendu
+  logiciel détecté (`lib/gpu.ts` : SwiftShader, llvmpipe), car ce rendu
+  gèlerait l'interface ; le splash passe aussi à sa version fixe.
+- **Pour tout le déploiement** : variable `NEXT_PUBLIC_DISABLE_WEBGL=1`.
+- **Forcer l'animation** (démo sur machine sans GPU) :
+  `localStorage["focusflow-force-webgl"] = "1"`.
 
 ## 2. Partie B : lecture
 
@@ -54,6 +89,22 @@ performance). Planches avant / après dans `shots/crit1/`, `shots/crit2/`.
   shuffle et boucle n'existaient que pour YouTube (désormais aussi Spotify) ;
   volume commun ; « en cours de lecture » unifié pour les trois sources ; une
   vidéo illisible ne bloque plus la file.
+- **Interface complète** : `seek`, `getSuggestions`, `enqueue`,
+  `removeUpcoming`, file à venir, piste normalisée (`Track`, avec
+  `suggested`). La page de session ne distingue plus les sources :
+  `useSessionMedia` (résolution des mixes RD et playlists PL, historique) et
+  `SessionMedia` (lecteur, habillage) ; adaptateurs dans
+  `lib/playback/{youtube,spotify,twitch}.ts`. Page passée de 1 055 à 880 lignes.
+- **« À venir »** en session : prochains titres, suggestions marquées,
+  retirer (YouTube) ou écouter maintenant (Spotify, qui n'a pas de retrait),
+  titres proches à la demande. **Hors session**, « Titres proches » sur les
+  cartes Spotify (ouverture dans Spotify : les autorisations demandées
+  n'incluent pas la modification de playlist, choix voulu).
+- **Cas limites** : playlist PL non résolue = lecteur natif ; mix RD non
+  résolu = vidéo de départ en boucle ; vidéo illisible = titre suivant ;
+  prolongation bornée à 10 s ; YouTube muet 15 s = message ; jeton Spotify
+  rafraîchi, Premium manquant = message ; suggestions vides (réseau, quota) =
+  message ; titre retiré jamais réintroduit.
 - **Lecture continue** (`lib/playback/continuation.ts`) : graines réparties sur
   toute la playlist plus la dernière jouée, fusion en alternance, dédoublonnage,
   repli en boucle si rien de neuf ; boucle activée = reprise en tête.
@@ -70,11 +121,12 @@ performance). Planches avant / après dans `shots/crit1/`, `shots/crit2/`.
 | `npx tsc --noEmit` | 0 erreur |
 | `npm run lint` | 4 erreurs, 8 avertissements, toutes antérieures à la refonte (base : 4 et 9) |
 | `npm run build` | vert |
-| `npm test` (Vitest) | 21 tests : file, continuation, adaptateur YouTube (fin de file, boucle, fins redondantes, rien de neuf, saut manuel, pause) |
-| `npm run test:e2e` (Playwright) | 7 tests : lecture continue sur toute la file, boucle, contrôles unifiés, navigation, thème petit matin, réglages, zéro emoji et tiret cadratin |
+| `npm test` (Vitest) | 33 tests : file (dont retrait), continuation, adaptateurs YouTube (file à venir, suggestions, ajout), Spotify (capacités, relais, pas de retrait) et Twitch (live, VOD, pause avant prêt) |
+| `npm run test:e2e` (Playwright) | 13 tests : lecture continue, boucle, contrôles unifiés, mix RD, playlist PL et repli natif, playlist locale, Twitch (pause pendant la halte), « À venir » (retrait, suggestion marquée), navigation, thème petit matin, réglages, zéro emoji et tiret cadratin |
+| Lighthouse (production, sans GPU) | accessibilité 100, SEO 100, bonnes pratiques 96 à 100 ; performance 79 à 90 (45 à 51 avant le correctif du splash), TBT 81 à 246 ms (146 s avant) ; voir `07-CRITIQUE-4.md` |
 | `npm run test:a11y` (axe-core) | 0 défaut WCAG 2.1 AA sur 7 pages, deux thèmes |
 | `node scripts/contrast.mjs` | toutes les paires AA |
-| Relecture `code-reviewer` | GO conditionnel ; les 4 points « à corriger » et la plupart des suggestions ont été traités (commit « relecture A ») |
+| Relecture `code-reviewer` | A : GO conditionnel, 4 points corrigés ; B (interface de lecture complète) : GO, 2 points corrigés (« Passer » trompeur sur Spotify, titre retiré réintroduit) et 4 suggestions appliquées |
 
 ## 4. Non vérifié (limites de l'environnement)
 
@@ -87,7 +139,7 @@ performance). Planches avant / après dans `shots/crit1/`, `shots/crit2/`.
 
 ## 5. À décider par l'utilisateur
 
-- Fusionner la branche (aucune PR ouverte, comme demandé).
+- Fusionner la PR (ouverte à ta demande sur la branche).
 - Retirer les labs (`app/lab`, `lib/lab`, `public/lab`) et leurs dépendances de
   développement (pixi.js, gpu-curtains, manifold-3d, troika, @thi.ng, tweakpane)
   si l'historique de la recherche ne doit pas rester dans le dépôt. Ils sont
