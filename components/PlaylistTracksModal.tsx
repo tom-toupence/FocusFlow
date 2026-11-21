@@ -60,7 +60,7 @@ export default function PlaylistTracksModal({
   }, [playlist.playlistId, playlist.startVideoId, playlist.title]);
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4" onClick={onClose}>
       <div
         className="w-full max-w-lg max-h-[85vh] flex flex-col bg-card border border-foreground/10 rounded-3xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -68,13 +68,13 @@ export default function PlaylistTracksModal({
         <div className="flex items-center justify-between px-5 py-4 border-b border-foreground/10">
           <div className="min-w-0">
             <h3 className="text-sm font-semibold text-foreground truncate">{live.title}</h3>
-            <p className="text-xs text-ink-3 mt-0.5">
+            <p className="text-xs text-foreground/40 mt-0.5">
               {tracks === null
                 ? "Chargement des titres…"
                 : `${tracks.length} titre${tracks.length > 1 ? "s" : ""}${extras.length > 0 ? ` + ${extras.length} ajouté${extras.length > 1 ? "s" : ""}` : ""}`}
             </p>
           </div>
-          <button onClick={onClose} className="text-ink-3 hover:text-foreground transition-colors flex-shrink-0 ml-3">
+          <button onClick={onClose} className="text-foreground/40 hover:text-foreground transition-colors flex-shrink-0 ml-3">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
             </svg>
@@ -90,8 +90,8 @@ export default function PlaylistTracksModal({
               ))}
             </div>
           ) : tracks.length === 0 ? (
-            <p className="text-sm text-ink-3 text-center py-6">
-              Impossible de récupérer les titres de cette playlist, elle sera quand même jouée normalement en session.
+            <p className="text-sm text-foreground/35 text-center py-6">
+              Impossible de récupérer les titres de cette playlist — elle sera quand même jouée normalement en session.
             </p>
           ) : (
             <div className="flex flex-col gap-1">
@@ -106,15 +106,15 @@ export default function PlaylistTracksModal({
           {/* ── Titres ajoutés par l'utilisateur ──────────────────────────── */}
           {extras.length > 0 && (
             <div>
-              <p className="text-[13px] font-semibold text-ink-3 px-2 mb-2">
-                Ajoutés par toi, joués à la suite
+              <p className="text-[11px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] px-2 mb-2">
+                Ajoutés par toi — joués à la suite
               </p>
               <div className="flex flex-col gap-1">
                 {extras.map((t, idx) => (
                   <TrackRow key={t.id} track={t} index={(tracks?.length ?? 0) + idx + 1}>
                     <button
                       onClick={() => removeExtraVideo(live.id, t.id)}
-                      className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-ink-3 hover:text-danger hover:bg-danger/10 transition-all"
+                      className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-foreground/40 hover:text-red-400 hover:bg-red-500/10 transition-all"
                       title="Retirer de la playlist"
                     >
                       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
@@ -128,7 +128,7 @@ export default function PlaylistTracksModal({
           {/* ── Recommandations liées ─────────────────────────────────────── */}
           {recs !== null && recs.length > 0 && (
             <div>
-              <p className="text-[13px] font-semibold text-ink-3 px-2 mb-2">
+              <p className="text-[11px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] px-2 mb-2">
                 Recommandations liées
               </p>
               <div className="flex flex-col gap-1">
@@ -156,13 +156,13 @@ export function TrackRow({ track, index, children }: { track: Track; index?: num
   return (
     <div className="group flex items-center gap-3 px-2 py-1.5 rounded-xl hover:bg-foreground/[0.04] transition-colors">
       {index !== undefined && (
-        <span className="text-[11px] text-ink-3 tabular-nums w-5 text-center flex-shrink-0">{index}</span>
+        <span className="text-[11px] text-foreground/30 tabular-nums w-5 text-center flex-shrink-0">{index}</span>
       )}
       <div className="w-14 h-9 rounded-md overflow-hidden bg-foreground/10 flex-shrink-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`https://img.youtube.com/vi/${track.id}/mqdefault.jpg`} alt="" className="w-full h-full object-cover" loading="lazy" />
       </div>
-      <p className="flex-1 min-w-0 text-sm text-ink truncate">{track.title}</p>
+      <p className="flex-1 min-w-0 text-sm text-foreground/85 truncate">{track.title}</p>
       <div className="flex items-center gap-1 flex-shrink-0">{children}</div>
     </div>
   );

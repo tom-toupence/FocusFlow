@@ -37,7 +37,7 @@ export interface IcsBlock {
   done: boolean;
 }
 
-export function blocksToICS(blocks: IcsBlock[], calendarName = "FocusFlow · Planning"): string {
+export function blocksToICS(blocks: IcsBlock[], calendarName = "FocusFlow — Planning"): string {
   const now = new Date();
   const dtstamp =
     `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}${String(now.getUTCDate()).padStart(2, "0")}` +

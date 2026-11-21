@@ -48,16 +48,16 @@ function TwitchCallbackInner() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-center px-6">
-          <div className="w-12 h-12 rounded-full bg-danger/10 border border-danger/20 flex items-center justify-center">
-            <svg className="w-6 h-6 text-danger" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+            <svg className="w-6 h-6 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <circle cx="12" cy="12" r="10" />
               <line x1="15" y1="9" x2="9" y2="15" strokeLinecap="round" />
               <line x1="9" y1="9" x2="15" y2="15" strokeLinecap="round" />
             </svg>
           </div>
           <div>
-            <p className="text-ink text-sm font-medium">Connexion Twitch échouée</p>
-            <p className="text-ink-3 text-xs mt-1">Redirection dans 3 secondes…</p>
+            <p className="text-foreground/80 text-sm font-medium">Connexion Twitch échouée</p>
+            <p className="text-foreground/40 text-xs mt-1">Redirection dans 3 secondes…</p>
           </div>
         </div>
       </div>
@@ -68,7 +68,7 @@ function TwitchCallbackInner() {
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
         <div className="w-8 h-8 border-2 border-foreground/10 border-t-[#9146ff] rounded-full animate-spin" />
-        <p className="text-ink-3 text-sm">Connexion Twitch…</p>
+        <p className="text-foreground/40 text-sm">Connexion Twitch…</p>
       </div>
     </div>
   );

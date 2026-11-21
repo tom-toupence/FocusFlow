@@ -23,8 +23,6 @@ export interface WrappedData {
   badges: Achievement[];
   avgMood: number | null;
   distractions: number;
-  /** Minutes par jour, du lundi au dimanche (les soirs allumés de la carte). */
-  perDay: number[];
 }
 
 const DAY_LABELS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
@@ -92,7 +90,6 @@ export function computeWrapped(
   for (const d of dates) distractions += distractionsByDate[d] ?? 0;
 
   return {
-    perDay: dates.map((d) => days[d]?.minutesWorked ?? 0),
     weekStart: dates[0],
     weekEnd: dates[6],
     minutes: cur.minutes,

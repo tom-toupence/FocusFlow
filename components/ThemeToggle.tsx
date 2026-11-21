@@ -36,7 +36,7 @@ export default function ThemeToggle() {
       onClick={toggle}
       className={cn(
         "w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
-        "text-ink-3 hover:text-ink hover:bg-foreground/10"
+        "text-foreground/40 hover:text-foreground/80 hover:bg-foreground/10"
       )}
       title={theme === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
     >

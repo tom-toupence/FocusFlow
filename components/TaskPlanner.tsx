@@ -35,9 +35,9 @@ function formatDueDate(date: string): { label: string; overdue: boolean; today: 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 const PRIORITY_CONFIG = {
-  urgent: { label: "Urgent", color: "bg-danger", text: "text-danger", ring: "ring-danger/30" },
-  normal: { label: "Normal", color: "bg-sodium", text: "text-sodium-text", ring: "ring-sodium/30" },
-  low:    { label: "Faible", color: "bg-foreground/20", text: "text-ink-3", ring: "ring-foreground/20" },
+  urgent: { label: "Urgent", color: "bg-red-500", text: "text-red-400", ring: "ring-red-500/30" },
+  normal: { label: "Normal", color: "bg-amber-400", text: "text-amber-400", ring: "ring-amber-400/30" },
+  low:    { label: "Faible", color: "bg-foreground/20", text: "text-foreground/35", ring: "ring-foreground/20" },
 } as const;
 
 function PriorityDot({ priority }: { priority?: TodoPriority }) {
@@ -51,9 +51,9 @@ function DueDateChip({ dueDate }: { dueDate?: string }) {
   return (
     <span className={cn(
       "text-[10px] px-1.5 py-0.5 rounded-md font-medium flex-shrink-0",
-      overdue ? "bg-danger/15 text-danger" :
-      today   ? "bg-ink/15 text-ink-2" :
-                "bg-foreground/8 text-ink-3"
+      overdue ? "bg-red-500/15 text-red-400" :
+      today   ? "bg-blue-500/15 text-blue-400" :
+                "bg-foreground/8 text-foreground/40"
     )}>
       {label}
     </span>
@@ -64,9 +64,9 @@ function PomodoroChip({ estimate, used }: { estimate?: number; used?: number }) 
   const est = estimate ?? 1;
   const u = used ?? 0;
   return (
-    <span className="text-[10px] text-ink-3 flex items-center gap-1 flex-shrink-0" title="Pomodoros">
+    <span className="text-[10px] text-foreground/30 flex items-center gap-1 flex-shrink-0" title="Pomodoros">
       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2M9 2h6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-      <span className={cn(u > 0 && "text-ink-2")}>{u > 0 ? `${u}/` : ""}{est}</span>
+      <span className={cn(u > 0 && "text-foreground/60")}>{u > 0 ? `${u}/` : ""}{est}</span>
     </span>
   );
 }
@@ -107,12 +107,12 @@ function CreateTodoForm({ onCreated }: { onCreated?: () => void }) {
           onFocus={() => setExpanded(true)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) handleSubmit(); if (e.key === "Escape") { setExpanded(false); setText(""); } }}
           placeholder="Nouvelle tâche…"
-          className="flex-1 bg-transparent text-sm text-foreground placeholder:text-ink-3 focus:outline-none"
+          className="flex-1 bg-transparent text-sm text-foreground placeholder:text-foreground/25 focus:outline-none"
         />
         {text.trim() && (
           <button
             onClick={handleSubmit}
-            className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-ink-2 hover:text-foreground transition-all flex-shrink-0"
+            className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground/60 hover:text-foreground transition-all flex-shrink-0"
           >
             Ajouter
           </button>
@@ -131,7 +131,7 @@ function CreateTodoForm({ onCreated }: { onCreated?: () => void }) {
                   "flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-lg transition-all border",
                   priority === p
                     ? cn("border-foreground/20 bg-foreground/10", PRIORITY_CONFIG[p].text)
-                    : "border-transparent text-ink-3 hover:text-ink-2 hover:bg-foreground/5"
+                    : "border-transparent text-foreground/30 hover:text-foreground/60 hover:bg-foreground/5"
                 )}
               >
                 <span className={cn("w-1.5 h-1.5 rounded-full", PRIORITY_CONFIG[p].color)} />
@@ -147,8 +147,8 @@ function CreateTodoForm({ onCreated }: { onCreated?: () => void }) {
               className={cn(
                 "text-[11px] px-2 py-1 rounded-lg border transition-all",
                 dueDate === localDate()
-                  ? "border-line-strong/30 bg-ink/10 text-ink-2"
-                  : "border-transparent text-ink-3 hover:text-ink-2 hover:bg-foreground/5"
+                  ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
+                  : "border-transparent text-foreground/30 hover:text-foreground/60 hover:bg-foreground/5"
               )}
             >
               Aujourd&apos;hui
@@ -158,8 +158,8 @@ function CreateTodoForm({ onCreated }: { onCreated?: () => void }) {
               className={cn(
                 "text-[11px] px-2 py-1 rounded-lg border transition-all",
                 dueDate === tomorrow()
-                  ? "border-line-strong/30 bg-ink/10 text-ink-2"
-                  : "border-transparent text-ink-3 hover:text-ink-2 hover:bg-foreground/5"
+                  ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
+                  : "border-transparent text-foreground/30 hover:text-foreground/60 hover:bg-foreground/5"
               )}
             >
               Demain
@@ -169,13 +169,13 @@ function CreateTodoForm({ onCreated }: { onCreated?: () => void }) {
               value={dueDate}
               min={localDate()}
               onChange={(e) => setDueDate(e.target.value)}
-              className="text-[11px] px-2 py-1 rounded-lg border border-transparent bg-foreground/5 text-ink-3 focus:outline-none focus:border-foreground/20 w-[110px]"
+              className="text-[11px] px-2 py-1 rounded-lg border border-transparent bg-foreground/5 text-foreground/40 focus:outline-none focus:border-foreground/20 w-[110px]"
             />
           </div>
 
           {/* Estimate */}
           <div className="flex items-center gap-1.5 ml-auto">
-            <svg className="w-3 h-3 text-ink-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-label="Pomodoros"><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2M9 2h6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <svg className="w-3 h-3 text-foreground/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-label="Pomodoros"><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2M9 2h6" strokeLinecap="round" strokeLinejoin="round" /></svg>
             {[1, 2, 3, 4, 6, 8].map((n) => (
               <button
                 key={n}
@@ -184,7 +184,7 @@ function CreateTodoForm({ onCreated }: { onCreated?: () => void }) {
                   "w-6 h-6 rounded-md text-[11px] font-medium transition-all",
                   estimate === n
                     ? "bg-foreground/15 text-foreground"
-                    : "text-ink-3 hover:bg-foreground/8 hover:text-ink-2"
+                    : "text-foreground/30 hover:bg-foreground/8 hover:text-foreground/60"
                 )}
               >
                 {n}
@@ -231,7 +231,7 @@ function TaskRow({ todo }: { todo: Todo }) {
           />
         ) : (
           <p
-            className={cn("text-sm text-foreground cursor-pointer", todo.status === "done" && "line-through text-ink-3")}
+            className={cn("text-sm text-foreground cursor-pointer", todo.status === "done" && "line-through text-foreground/40")}
             onDoubleClick={() => { setEditText(todo.text); setEditing(true); }}
           >
             {todo.text}
@@ -246,7 +246,7 @@ function TaskRow({ todo }: { todo: Todo }) {
 
       <button
         onClick={() => deleteTodo(todo.id)}
-        className="sm:opacity-0 sm:group-hover:opacity-100 text-ink-3 sm:text-ink-3 hover:text-danger transition-all flex-shrink-0 mt-0.5 p-1 -m-1"
+        className="sm:opacity-0 sm:group-hover:opacity-100 text-foreground/40 sm:text-foreground/25 hover:text-red-400 transition-all flex-shrink-0 mt-0.5 p-1 -m-1"
       >
         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
           <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
@@ -261,8 +261,8 @@ function TaskRow({ todo }: { todo: Todo }) {
 function SectionHeader({ label, count, action }: { label: string; count: number; action?: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 mb-1 px-1">
-      <span className="text-[10px] font-semibold text-ink-3 uppercase tracking-wider">{label}</span>
-      <span className="text-[10px] text-ink-3">{count}</span>
+      <span className="text-[10px] font-semibold text-foreground/35 uppercase tracking-wider">{label}</span>
+      <span className="text-[10px] text-foreground/25">{count}</span>
       {action && <span className="ml-auto">{action}</span>}
     </div>
   );
@@ -280,11 +280,11 @@ function StatsBar({ todos }: { todos: Todo[] }) {
   if (todos.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-3 text-[11px] text-ink-3 px-1 mb-6">
+    <div className="flex items-center gap-3 text-[11px] text-foreground/30 px-1 mb-6">
       <span>{active.length} tâche{active.length !== 1 ? "s" : ""} actives</span>
-      {urgent > 0 && <span className="text-danger">· {urgent} urgente{urgent !== 1 ? "s" : ""}</span>}
-      {overdue > 0 && <span className="text-danger">· {overdue} en retard</span>}
-      {dueToday > 0 && <span className="text-ink-2">· {dueToday} aujourd&apos;hui</span>}
+      {urgent > 0 && <span className="text-red-400">· {urgent} urgente{urgent !== 1 ? "s" : ""}</span>}
+      {overdue > 0 && <span className="text-red-400">· {overdue} en retard</span>}
+      {dueToday > 0 && <span className="text-blue-400">· {dueToday} aujourd&apos;hui</span>}
     </div>
   );
 }
@@ -310,7 +310,7 @@ function FilterBar({ filter, setFilter }: { filter: Filter; setFilter: (f: Filte
             "px-3 py-1 rounded-lg text-xs font-medium transition-all",
             filter === o.value
               ? "bg-foreground/15 text-foreground"
-              : "bg-foreground/5 text-ink-3 hover:text-ink-2 hover:bg-foreground/8"
+              : "bg-foreground/5 text-foreground/35 hover:text-foreground/60 hover:bg-foreground/8"
           )}
         >
           {o.label}
@@ -363,7 +363,7 @@ export default function TaskPlanner() {
     <div>
       <div className="mb-8">
         <h1 className="text-3xl font-semibold text-foreground tracking-tight">Planifier</h1>
-        <p className="text-ink-3 mt-1 text-sm">Organise tes tâches, définis les priorités et suis ta progression.</p>
+        <p className="text-foreground/40 mt-1 text-sm">Organise tes tâches, définis les priorités et suis ta progression.</p>
       </div>
 
       <StatsBar todos={todos} />
@@ -400,13 +400,13 @@ export default function TaskPlanner() {
       )}
 
       {activeTodos.length === 0 && filter !== "all" && (
-        <p className="text-ink-3 text-sm text-center py-12">Aucune tâche dans ce filtre.</p>
+        <p className="text-foreground/25 text-sm text-center py-12">Aucune tâche dans ce filtre.</p>
       )}
 
       {todos.length === 0 && (
         <div className="text-center py-16">
-          <p className="text-ink-3 text-sm">Aucune tâche pour l&apos;instant.</p>
-          <p className="text-ink-3 text-xs mt-1">Commence par créer ta première tâche ci-dessus.</p>
+          <p className="text-foreground/25 text-sm">Aucune tâche pour l&apos;instant.</p>
+          <p className="text-foreground/15 text-xs mt-1">Commence par créer ta première tâche ci-dessus.</p>
         </div>
       )}
 
@@ -420,7 +420,7 @@ export default function TaskPlanner() {
             action={
               <button
                 onClick={clearDone}
-                className="text-[11px] text-ink-3 hover:text-ink-3 transition-colors"
+                className="text-[11px] text-foreground/25 hover:text-foreground/50 transition-colors"
               >
                 Effacer tout
               </button>
@@ -431,7 +431,7 @@ export default function TaskPlanner() {
               <TaskRow key={t.id} todo={t} />
             ))}
             {doneTodos.length > 10 && (
-              <p className="text-[11px] text-ink-3 px-3 py-1">
+              <p className="text-[11px] text-foreground/25 px-3 py-1">
                 +{doneTodos.length - 10} tâches terminées masquées
               </p>
             )}
