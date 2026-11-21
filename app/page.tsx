@@ -1018,9 +1018,15 @@ export default function LandingPage() {
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Header */}
         <header className="sticky top-0 z-20 bg-bg/95 border-b border-line px-4 sm:px-8 h-14 flex items-center justify-between">
-          <span className="relative font-display font-light text-lg text-ink tracking-tight md:hidden pb-0.5">
-            FocusFlow
-            <span aria-hidden className="absolute left-0 right-0 bottom-0 h-[2px] bg-sodium" />
+          {/* Mobile : la marque (une petite tour à fenêtres) et le nom en enseigne. */}
+          <span className="flex items-center gap-2 md:hidden">
+            <svg width="10" height="20" viewBox="0 0 10 20" aria-hidden>
+              {[0, 1, 2, 3].map((f) => [0, 1].map((c) => (
+                <rect key={`${f}${c}`} x={c * 5.2} y={20 - (f + 1) * 5} width={4.4} height={4} rx={0.5}
+                  fill={f < 2 ? "var(--konbini)" : f === 2 && c === 0 ? "var(--sodium)" : "var(--surface-2)"} />
+              )))}
+            </svg>
+            <span className="font-display font-extrabold uppercase text-lg text-ink tracking-[0.04em] leading-none">FocusFlow</span>
           </span>
           <span className="hidden md:block font-display text-lg text-ink">{sectionTitle}</span>
           <div className="flex items-center gap-2">

@@ -70,10 +70,11 @@
   --sidebar-accent-foreground: var(--text);
   --sidebar-border: var(--line);
   --sidebar-ring: var(--sodium);
-  /* L'ancien accent « focus » devient le sodium : même rôle (« ce qui compte
-     maintenant »), nouvelle couleur. */
-  --focus: var(--sodium);
-  --focus-contrast: var(--on-sodium);
+  /* « focus » ne sert plus qu'à la progression, aux succès et à la carte de
+     chaleur : c'est le rôle « fait » de la ville, le vert supérette. Les
+     actions qui lancent le temps restent en sodium (tokens dédiés). */
+  --focus: var(--konbini);
+  --focus-contrast: var(--on-konbini);
 
   /* Rayons : instrument (fin), contrôle, surface, média. Jamais de pilule
      hors gouttes et pastilles. */
@@ -391,6 +392,14 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes ffToastOut { to { opacity: 0; transform: translateY(4px); } }
+
+/* Étages : transforme n'importe quelle barre de graphique en tour dont les
+   étages sont séparés (la même façade que la jauge, quelle que soit la couleur). */
+.ff-floors {
+  -webkit-mask-image: repeating-linear-gradient(to top, #000 0 6px, transparent 6px 8px);
+  mask-image: repeating-linear-gradient(to top, #000 0 6px, transparent 6px 8px);
+  border-radius: 1px;
+}
 
 /* Façade : une fenêtre clignote (piste suivante), un étage grésille (distraction). */
 @keyframes ffBlink { 0%, 100% { opacity: 1; } 20% { opacity: 0.2; } 40% { opacity: 1; } 60% { opacity: 0.35; } }

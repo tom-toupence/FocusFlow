@@ -229,9 +229,9 @@ export default function StatsSection({ embedded }: { embedded?: boolean }) {
                   <div
                     title={day.minutes > 0 ? formatMinutes(day.minutes) : "Aucune session"}
                     className={cn(
-                      "w-full rounded-md transition-all",
+                      "w-full ff-floors transition-all",
                       day.minutes > 0
-                        ? isToday ? "bg-focus" : "bg-foreground/25"
+                        ? isToday ? "bg-sodium" : "bg-konbini/75"
                         : "bg-foreground/[0.05]"
                     )}
                     style={{ height: `${Math.max(pct * 100, day.minutes > 0 ? 8 : 4)}%` }}

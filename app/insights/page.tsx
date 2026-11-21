@@ -179,7 +179,7 @@ export function InsightsContent() {
               <div key={h} className="flex-1 flex flex-col items-center justify-end gap-1 group relative h-full">
                 <div
                   title={`${h}h, ${fmtMin(m)}`}
-                  className={cn("w-full rounded-sm transition-all", m > 0 ? (h === peakHour ? "bg-ink/10" : "bg-ink/40") : "bg-foreground/[0.05]")}
+                  className={cn("w-full ff-floors transition-all", m > 0 ? (h === peakHour ? "bg-sodium" : "bg-konbini/70") : "bg-foreground/[0.06]")}
                   style={{ height: `${Math.max((m / maxHour) * 100, m > 0 ? 6 : 2)}%` }}
                 />
                 {h % 6 === 0 && <span className="text-[8px] text-ink-3">{h}h</span>}
@@ -197,7 +197,7 @@ export function InsightsContent() {
                 <div className="w-full flex flex-col justify-end" style={{ height: "84px" }}>
                   <div
                     title={fmtMin(m)}
-                    className={cn("w-full rounded-md transition-all", m > 0 ? "bg-ink/60" : "bg-foreground/[0.05]")}
+                    className={cn("w-full ff-floors transition-all", m > 0 ? "bg-konbini/80" : "bg-foreground/[0.06]")}
                     style={{ height: `${Math.max((m / maxWeekday) * 100, m > 0 ? 8 : 4)}%` }}
                   />
                 </div>
@@ -219,9 +219,9 @@ export function InsightsContent() {
                   <div
                     title={`${t.date}, score ${t.score} (${t.distractions} distraction${t.distractions !== 1 ? "s" : ""})`}
                     className={cn(
-                      "w-full rounded-sm transition-all",
+                      "w-full ff-floors transition-all",
                       !t.active ? "bg-foreground/[0.04]"
-                        : t.score >= 80 ? "bg-sodium"
+                        : t.score >= 80 ? "bg-konbini"
                         : t.score >= 50 ? "bg-sodium" : "bg-danger"
                     )}
                     style={{ height: `${t.active ? Math.max(t.score, 6) : 3}%` }}
@@ -247,7 +247,7 @@ export function InsightsContent() {
                     <div className="w-full flex flex-col justify-end flex-1">
                       <div
                         title={`${r.label}, ${fmtMin(r.avg)} de focus en moyenne (${r.count} jour${r.count !== 1 ? "s" : ""})`}
-                        className={cn("w-full rounded-md transition-all", r.count > 0 ? "bg-sodium/70" : "bg-foreground/[0.05]")}
+                        className={cn("w-full ff-floors transition-all", r.count > 0 ? "bg-konbini/80" : "bg-foreground/[0.06]")}
                         style={{ height: `${r.count > 0 ? Math.max((r.avg / maxMoodAvg) * 100, 6) : 3}%` }}
                       />
                     </div>

@@ -7,21 +7,16 @@ import { cn } from "@/lib/utils";
 
 // ── Plant glyph ────────────────────────────────────────────────────────────────
 
+/** Un soir = un petit immeuble : un étage allumé par palier (25 min, 1 h, 2 h).
+ *  (Les données restent les « plantes » de lib/progression ; seule l'image change
+ *  pour la ville la nuit.) */
 function PlantGlyph({ plant }: { plant: Plant | null }) {
-  if (!plant) {
-    return (
-      <div className="flex flex-col items-center justify-end h-12">
-        <div className="w-6 h-1.5 rounded-full bg-foreground/[0.06]" />
-      </div>
-    );
-  }
-  // Croissance figurée par un point vert qui grossit et fonce selon le palier.
-  const size = plant.stage === 3 ? "w-5 h-5" : plant.stage === 2 ? "w-3.5 h-3.5" : "w-2 h-2";
-  const shade = plant.stage === 3 ? "bg-focus" : plant.stage === 2 ? "bg-focus/75" : "bg-focus/50";
+  const lit = plant?.stage ?? 0;
   return (
-    <div className="flex flex-col items-center justify-end h-12">
-      <span className={cn(size, shade, "rounded-full")} />
-      <div className="w-6 h-1.5 rounded-full bg-focus/20 mt-1" />
+    <div className="flex flex-col items-center justify-end h-12 gap-[2px]" aria-hidden>
+      {[3, 2, 1].map((f) => (
+        <span key={f} className={cn("w-5 h-2.5 rounded-[1px]", f <= lit ? "bg-konbini" : "bg-foreground/[0.07] border border-line")} />
+      ))}
     </div>
   );
 }
@@ -68,7 +63,7 @@ export default function ProgressionPanel() {
       {/* ── Focus garden ──────────────────────────────────────────────────── */}
       <div className="bg-foreground/[0.03] border border-foreground/[0.06] rounded-2xl p-5 flex flex-col gap-3">
         <div className="flex items-baseline justify-between">
-          <p className="text-sm font-semibold text-foreground">Jardin de focus</p>
+          <p className="text-sm font-semibold text-foreground">Les soirs allumés</p>
           <span className="text-[10px] text-ink-3">cette semaine</span>
         </div>
         <div className="flex items-end justify-between gap-1 flex-1">
@@ -80,7 +75,7 @@ export default function ProgressionPanel() {
           ))}
         </div>
         <p className="text-[10px] text-ink-3 leading-relaxed">
-          Chaque jour de focus fait pousser une plante : un palier dès 25 min, un deuxième dès 1 h, un troisième dès 2 h.
+          Chaque soir de focus allume un immeuble : un étage dès 25 min, un deuxième dès 1 h, un troisième dès 2 h.
         </p>
       </div>
 
