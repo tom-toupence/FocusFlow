@@ -2,23 +2,27 @@
 
 import { useEffect, useState, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { useReducedMotion } from "@/lib/useReducedMotion";
 
 // Box breathing: 4s inhale · 4s hold · 4s exhale · 4s hold.
 const PHASES = [
   { key: "inhale",  label: "Inspire",  seconds: 4, scale: 1 },
   { key: "hold1",   label: "Retiens",  seconds: 4, scale: 1 },
-  { key: "exhale",  label: "Expire",   seconds: 4, scale: 0.55 },
-  { key: "hold2",   label: "Retiens",  seconds: 4, scale: 0.55 },
+  { key: "exhale",  label: "Expire",   seconds: 4, scale: 0.12 },
+  { key: "hold2",   label: "Retiens",  seconds: 4, scale: 0.12 },
 ] as const;
 
 /**
- * Animated guided-breathing bubble shown during breaks. Pure CSS/JS, no assets.
- * `accent` matches the break overlay color (emerald for short, sky for long).
+ * Respiration guidée pendant la halte : un TUBE NÉON vert supérette qui
+ * s'allume en s'allongeant à l'inspiration, tient, se rétracte à
+ * l'expiration, tient. Pas de bulle : un geste de la ville.
+ * Reduced motion : le tube ne bouge pas, seuls le mot et le décompte changent.
  */
-export default function BreathingExercise({ accent = "emerald" }: { accent?: "emerald" | "sky" }) {
+export default function BreathingExercise({ className }: { className?: string }) {
   const [phaseIndex, setPhaseIndex] = useState(0);
   const [countdown, setCountdown] = useState<number>(PHASES[0].seconds);
   const phaseRef = useRef(0);
+  const reduce = useReducedMotion();
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -34,28 +38,25 @@ export default function BreathingExercise({ accent = "emerald" }: { accent?: "em
   }, []);
 
   const phase = PHASES[phaseIndex];
-  const ring = accent === "sky" ? "ring-sky-400/40" : "ring-emerald-400/40";
-  const glow = accent === "sky"
-    ? "bg-[radial-gradient(circle,_rgba(56,189,248,0.35)_0%,_rgba(56,189,248,0.05)_70%)]"
-    : "bg-[radial-gradient(circle,_rgba(52,211,153,0.35)_0%,_rgba(52,211,153,0.05)_70%)]";
-  const text = accent === "sky" ? "text-sky-300" : "text-emerald-300";
+  const scale = reduce ? 1 : phase.scale;
 
   return (
-    <div className="flex flex-col items-center gap-5 z-10">
-      <div className="relative w-40 h-40 flex items-center justify-center">
+    <div className={cn("flex flex-col gap-3 w-full max-w-[18rem]", className)}>
+      <div className="flex items-baseline justify-between">
+        <span className="font-display font-bold uppercase text-2xl tracking-[0.02em] text-[#53e0a1]" aria-live="polite">{phase.label}</span>
+        <span className="font-led text-2xl text-[#e9f2ff]/80" aria-hidden>{countdown}</span>
+      </div>
+      <div className="relative h-[6px] rounded-[1px] bg-[#e9f2ff]/10">
         <div
-          className={cn("absolute inset-0 rounded-full ring-1", ring, glow)}
+          className="absolute inset-y-0 left-0 w-full rounded-[1px] bg-[#53e0a1] origin-left"
           style={{
-            transform: `scale(${phase.scale})`,
-            transition: `transform ${phase.seconds}s cubic-bezier(0.4, 0, 0.2, 1)`,
+            transform: `scaleX(${scale})`,
+            boxShadow: "0 0 14px rgba(83,224,161,0.6)",
+            transition: reduce ? undefined : `transform ${phase.seconds}s cubic-bezier(0.45, 0, 0.55, 1)`,
           }}
         />
-        <div className="relative flex flex-col items-center">
-          <span className={cn("text-sm font-semibold uppercase tracking-[0.2em]", text)}>{phase.label}</span>
-          <span className="text-3xl font-extralight text-white/80 tabular-nums mt-1">{countdown}</span>
-        </div>
       </div>
-      <p className="text-white/30 text-xs">Respiration guidée · 4-4-4-4</p>
+      <p className="text-[#e9f2ff]/60 text-xs">Respiration guidée, quatre temps de quatre secondes</p>
     </div>
   );
 }

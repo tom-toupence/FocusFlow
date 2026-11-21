@@ -1,6 +1,13 @@
 import type { NextConfig } from "next";
 
+// En développement seulement, React reconstruit ses piles d'appels avec eval().
+// Jamais en production.
+const DEV_EVAL = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
+
 const nextConfig: NextConfig = {
+  // Pas de badge flottant en dev : il masquait des contrôles sur les captures
+  // de critique. Les erreurs de build et d'exécution s'affichent toujours.
+  devIndicators: false,
   async headers() {
     return [
       {
@@ -10,8 +17,9 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              // Scripts : app + YouTube IFrame API + Spotify Web Playback SDK
-              "script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com https://sdk.scdn.co https://embed.twitch.tv",
+              // Scripts : app + YouTube IFrame API + Spotify Web Playback SDK.
+              // 'wasm-unsafe-eval' : WebAssembly du décodeur meshopt (modèles de la ville, lib/city), sans autoriser eval() JS.
+              `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${DEV_EVAL} https://www.youtube.com https://s.ytimg.com https://sdk.scdn.co https://embed.twitch.tv`,
               // Iframes : YouTube embed + Spotify SDK + Twitch player
               "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://sdk.scdn.co https://player.twitch.tv https://embed.twitch.tv",
               // Images : YouTube thumbnails + Spotify artwork + oEmbed
@@ -19,7 +27,7 @@ const nextConfig: NextConfig = {
               // Styles
               "style-src 'self' 'unsafe-inline'",
               // Connexions API : Supabase + Spotify API + YouTube oEmbed
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.spotify.com https://accounts.spotify.com https://www.youtube.com https://*.spotify.com wss://*.spotify.com https://apresolve.spotify.com https://*.apresolve.spotify.com https://*.twitch.tv wss://*.twitch.tv",
+              "connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co https://api.spotify.com https://accounts.spotify.com https://www.youtube.com https://*.spotify.com wss://*.spotify.com https://apresolve.spotify.com https://*.apresolve.spotify.com https://*.twitch.tv wss://*.twitch.tv",
               // Médias (audio Spotify SDK)
               "media-src 'self' blob: https://*.scdn.co https://*.spotifycdn.com",
               // Workers Spotify SDK

@@ -3,6 +3,7 @@
 // custom). 100% local par défaut ; le coach IA (route /api/coach, type "music")
 // peut affiner les requêtes si une clé serveur est configurée — sinon repli ici.
 
+import { pickSeeds } from "@/lib/playback/continuation";
 import { fetchMixVideos } from "@/store/playlistStore";
 
 export interface RecQuery {
@@ -187,7 +188,9 @@ export async function fetchRadioRecommendations(
   exclude: Set<string> = new Set(),
   limit = 10,
 ): Promise<RecTrack[]> {
-  const seeds = [...new Set(seedIds.filter(Boolean))].slice(0, 3);
+  // Même échantillonnage que la lecture continue : graines réparties sur TOUTE
+  // la liste (début, milieu, fin), pas seulement les trois premières.
+  const seeds = pickSeeds(seedIds, null, 3);
   if (seeds.length === 0) return [];
   const mixes = await Promise.all(seeds.map((id) => fetchMixVideos(`RD${id}`, id)));
   const lists = mixes.map(({ ids, titles }) =>

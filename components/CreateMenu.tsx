@@ -106,7 +106,7 @@ export default function CreateMenu() {
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-foreground/5 hover:bg-foreground/10 text-foreground/40 hover:text-foreground/70 text-xs font-medium transition-all"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-foreground/5 hover:bg-foreground/10 text-ink-3 hover:text-ink-2 text-xs font-medium transition-all"
         title="Créer"
       >
         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
@@ -148,12 +148,12 @@ function CreateItem({ entry }: { entry: CreateEntry }) {
         "flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-foreground/[0.06]"
       )}
     >
-      <span className="w-8 h-8 flex items-center justify-center rounded-lg bg-foreground/5 text-foreground/60 flex-shrink-0">
+      <span className="w-8 h-8 flex items-center justify-center rounded-lg bg-foreground/5 text-ink-2 flex-shrink-0">
         {entry.icon}
       </span>
       <span className="min-w-0">
         <span className="block text-sm font-medium text-foreground">{entry.label}</span>
-        <span className="block text-[11px] text-foreground/40 leading-snug truncate">{entry.sub}</span>
+        <span className="block text-[11px] text-ink-3 leading-snug truncate">{entry.sub}</span>
       </span>
     </button>
   );

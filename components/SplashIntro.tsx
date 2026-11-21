@@ -1,9 +1,14 @@
 "use client";
 
+import { isSoftwareRenderer } from "@/lib/gpu";
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-// Écran d'arrivée : le wordmark « FocusFlow » repose sous une surface d'eau
+// Écran d'arrivée (identité « la ville qui ne dort pas », docs/redesign) :
+// l'effet goutte est CONSERVÉ à la demande de l'utilisateur ; seule la texture
+// change : une flaque sur l'asphalte qui reflète l'enseigne « FocusFlow ».
+// La flaque est une surface d'eau
 // (shader WebGL maison, zéro dépendance) — vagues ambiantes, la déformation
 // SUIT LA SOURIS (curseur système masqué), un clic déclenche une ONDE DE CHOC
 // puis une VAGUE DE RÉVÉLATION : le site apparaît à l'intérieur d'un cercle au
@@ -22,16 +27,19 @@ const FRAG = `#version 300 es
 precision highp float;
 uniform sampler2D u_tex;
 uniform vec2 u_res;
+uniform float u_scale;          // pixels du canvas par pixel CSS
 uniform float u_time;
 uniform vec2 u_mouse;
 uniform float u_reveal;       // temps de départ de la révélation (<0 = inactif)
-uniform vec2 u_revealCenter;  // centre de la révélation (px)
-uniform vec4 u_ripples[${MAX_RIPPLES}]; // xy = centre (px), z = temps de départ (<0 = inactif)
+uniform vec2 u_revealCenter;  // centre de la révélation (px CSS)
+uniform vec4 u_ripples[${MAX_RIPPLES}]; // xy = centre (px CSS), z = temps de départ (<0 = inactif)
 out vec4 outColor;
 
 void main() {
-  vec2 p = gl_FragCoord.xy;
-  vec2 uv = p / u_res;
+  // Tout est compté en pixels CSS : la résolution du canvas peut être
+  // plafonnée sans changer la taille ni la vitesse des ondes.
+  vec2 p = gl_FragCoord.xy / u_scale;
+  vec2 uv = gl_FragCoord.xy / u_res;
   vec2 disp = vec2(0.0);
 
   // Vagues ambiantes douces
@@ -43,7 +51,7 @@ void main() {
   // La vague suit la souris : bosse radiale ondulante autour du curseur (qui est
   // masqué — c'est cette déformation qui matérialise la position du pointeur).
   float md = distance(p, u_mouse);
-  float sigma = u_res.y * 0.17;
+  float sigma = (u_res.y / u_scale) * 0.17;
   float infl = exp(-md * md / (2.0 * sigma * sigma));
   vec2 mdir = md > 0.5 ? (p - u_mouse) / md : vec2(0.0);
   disp += mdir * infl * 0.020 * sin(md * 0.042 - u_time * 3.0);
@@ -84,7 +92,7 @@ void main() {
   vec3 col = texture(u_tex, clamp(uv + disp, 0.0, 1.0)).rgb;
   // Reflets « caustiques » là où l'eau bouge
   float glint = min((abs(disp.x) + abs(disp.y)) * 5.5, 0.35);
-  col += vec3(0.30, 0.50, 0.72) * glint;
+  col += vec3(0.70, 0.42, 0.16) * glint; // reflets chauds : le lampadaire au sodium dans la flaque
   // Canvas alpha premultiplié
   outColor = vec4(col * alpha, alpha);
 }`;
@@ -96,28 +104,102 @@ void main() {
   gl_Position = vec4(pos * 2.0 - 1.0, 0.0, 1.0);
 }`;
 
-// Dessine le wordmark sur un canvas 2D aux dimensions de l'écran → texture.
+// Couleurs de la ville de nuit, en dur : le splash est une texture.
+const ASPHALT = "#0b1016";
+const NEON = "#e9f2ff";
+const SODIUM = "#ff9a3c";
+const KONBINI = "#53e0a1";
+
+// Dessine la texture du splash : une FLAQUE sur l'asphalte, la nuit. En haut,
+// l'enseigne « FocusFlow » allumée (néon blanc froid, Big Shoulders) ; en bas,
+// son reflet renversé, plus sombre et étiré par l'eau. Un lampadaire au sodium
+// et une enseigne de supérette éclairent la scène hors champ. L'effet goutte
+// du shader (gardé, demandé par l'utilisateur) agite cette flaque.
 function drawWordmark(width: number, height: number): HTMLCanvasElement | null {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
-  ctx.fillStyle = "#0a0a0c";
-  ctx.fillRect(0, 0, width, height);
   const base = Math.min(width, height);
+  const cs = getComputedStyle(document.documentElement);
+  const display = cs.getPropertyValue("--font-signage").trim() || "system-ui, sans-serif";
+  const sans = cs.getPropertyValue("--font-atkinson").trim() || "system-ui, sans-serif";
+  const cy = height * 0.47;
+
+  // Asphalte mouillé : bleu-noir, plus clair au loin (l'horizon de la rue).
+  const g = ctx.createLinearGradient(0, 0, 0, height);
+  g.addColorStop(0, "#111a24");
+  g.addColorStop(0.5, ASPHALT);
+  g.addColorStop(1, "#070a0e");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, width, height);
+
+  // Lumières hors champ : sodium en haut à gauche, supérette en bas à droite.
+  const halo = (x: number, y: number, r: number, col: string, a: number) => {
+    const rg = ctx.createRadialGradient(x, y, 0, x, y, r);
+    rg.addColorStop(0, col);
+    rg.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.globalAlpha = a;
+    ctx.fillStyle = rg;
+    ctx.fillRect(0, 0, width, height);
+    ctx.globalAlpha = 1;
+  };
+  halo(width * 0.08, -height * 0.05, base * 0.9, SODIUM, 0.22);
+  halo(width * 0.96, height * 1.02, base * 0.7, KONBINI, 0.12);
+
+  const size = Math.round(base * 0.19);
   ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = "#f3f4f6";
-  ctx.font = `600 ${Math.round(base * 0.16)}px Geist, 'Segoe UI', system-ui, sans-serif`;
-  ctx.fillText("FocusFlow", width / 2, height / 2 - base * 0.02);
-  ctx.fillStyle = "rgba(243,244,246,0.35)";
-  ctx.font = `400 ${Math.round(base * 0.035)}px Geist, 'Segoe UI', system-ui, sans-serif`;
-  ctx.fillText("Respire. Focus. Flow.", width / 2, height / 2 + base * 0.12);
+  ctx.font = `800 ${size}px ${display}`;
+
+  // L'enseigne : halo large puis tube net.
+  ctx.textBaseline = "alphabetic";
+  ctx.shadowColor = "rgba(190,215,255,0.85)";
+  ctx.shadowBlur = size * 0.35;
+  ctx.fillStyle = NEON;
+  ctx.fillText("FOCUSFLOW", width / 2, cy);
+  ctx.shadowBlur = size * 0.08;
+  ctx.fillText("FOCUSFLOW", width / 2, cy);
+  ctx.shadowBlur = 0;
+
+  // Le reflet : renversé sous la ligne du trottoir, assombri, étiré.
+  const edge = cy + size * 0.12;
+  ctx.save();
+  ctx.translate(0, edge * 2);
+  ctx.scale(1, -1.18);
+  ctx.translate(0, edge * 0.152);
+  ctx.globalAlpha = 0.32;
+  ctx.filter = `blur(${Math.max(1, base * 0.004)}px)`;
+  ctx.fillStyle = "#b9cdf0";
+  ctx.fillText("FOCUSFLOW", width / 2, cy);
+  ctx.restore();
+  ctx.filter = "none";
+  ctx.globalAlpha = 1;
+
+  // Bord du trottoir : un filet sodium, la lumière qui accroche la bordure.
+  const lineW = Math.min(width * 0.7, base * 1.15);
+  const lg = ctx.createLinearGradient(width / 2 - lineW / 2, 0, width / 2 + lineW / 2, 0);
+  lg.addColorStop(0, "rgba(255,154,60,0)");
+  lg.addColorStop(0.5, "rgba(255,154,60,0.9)");
+  lg.addColorStop(1, "rgba(255,154,60,0)");
+  ctx.fillStyle = lg;
+  ctx.fillRect(width / 2 - lineW / 2, edge, lineW, Math.max(2, base * 0.003));
+
+  // Consigne : ce qu'il faut faire, pas un slogan.
+  ctx.fillStyle = "rgba(233,242,255,0.6)";
+  ctx.font = `400 ${Math.round(base * 0.026)}px ${sans}`;
+  ctx.fillText("Touche la flaque pour entrer", width / 2, height * 0.86);
   return canvas;
 }
 
 export default function SplashIntro() {
+  // Pages internes (lab, système) : pas de splash.
+  const pathname = usePathname();
+  if (pathname?.startsWith("/lab") || pathname?.startsWith("/_design")) return null;
+  return <Splash />;
+}
+
+function Splash() {
   // show → revealing (vague qui découvre le site) → fading (résidu) → done.
   const [phase, setPhase] = useState<"show" | "revealing" | "fading" | "done">("show");
   // null = évaluation en cours (SSR + 1er paint : wordmark statique).
@@ -130,8 +212,10 @@ export default function SplashIntro() {
   const rippleCursorRef = useRef(0);
   // Position lissée du pointeur (x/y suivent tx/ty avec un léger retard).
   const mouseRef = useRef({ x: -9999, y: -9999, tx: -9999, ty: -9999 });
-  // Révélation en attente d'envoi au shader : { time (s shader), x, y (px canvas) }.
+  // Révélation en attente d'envoi au shader : { time (s shader), x, y (px CSS) }.
   const revealRef = useRef<{ time: number; x: number; y: number } | null>(null);
+  // Signale une activité (souris, clic) : la boucle repasse à pleine cadence.
+  const activeRef = useRef<() => void>(() => {});
   // Piloté par l'effet WebGL : déclenche la révélation (repli = fondu simple).
   const startRevealRef = useRef<((cx: number, cy: number) => void) | null>(null);
 
@@ -139,9 +223,12 @@ export default function SplashIntro() {
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const canvas = canvasRef.current;
-    const gl = !reduced && canvas
+    const ctx = !reduced && canvas
       ? canvas.getContext("webgl2", { alpha: true, premultipliedAlpha: true })
       : null;
+    // Rendu logiciel (pas d'accélération) : chaque image gèlerait l'interface,
+    // on prend le repli fixe (lib/gpu).
+    const gl = ctx && !isSoftwareRenderer(ctx) ? ctx : null;
     setCanShader(!!gl);
     if (!gl || !canvas) {
       // Repli statique (pas de shader) : le site se découvre AU CLIC/touche,
@@ -155,9 +242,12 @@ export default function SplashIntro() {
       };
     }
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.round(window.innerWidth * dpr);
-    const h = Math.round(window.innerHeight * dpr);
+    // Résolution plafonnée à 1 pixel CSS : un écran plein cadre en eau tolère
+    // l'agrandissement, et c'est le poste le plus coûteux du splash (x4 sur
+    // un écran haute densité). Les uniformes sont en pixels CSS.
+    const scale = Math.min(window.devicePixelRatio || 1, 1);
+    const w = Math.round(window.innerWidth * scale);
+    const h = Math.round(window.innerHeight * scale);
     canvas.width = w;
     canvas.height = h;
 
@@ -179,12 +269,14 @@ export default function SplashIntro() {
     gl.useProgram(prog);
 
     const uRes = gl.getUniformLocation(prog, "u_res");
+    const uScale = gl.getUniformLocation(prog, "u_scale");
     const uTime = gl.getUniformLocation(prog, "u_time");
     const uMouse = gl.getUniformLocation(prog, "u_mouse");
     const uReveal = gl.getUniformLocation(prog, "u_reveal");
     const uRevealCenter = gl.getUniformLocation(prog, "u_revealCenter");
     const uRipples = gl.getUniformLocation(prog, "u_ripples");
     gl.uniform2f(uRes, w, h);
+    gl.uniform1f(uScale, w / window.innerWidth);
     gl.uniform1f(uReveal, -1);
 
     // Texture du wordmark (redessinée après chargement des polices)
@@ -200,21 +292,38 @@ export default function SplashIntro() {
       if (source) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
     };
     upload();
-    document.fonts?.ready.then(() => { try { upload(); } catch { /* contexte perdu */ } });
+    // Polices chargées : nouvelle texture, et une image pour l'afficher même si l'eau est figée.
+    document.fonts?.ready.then(() => { try { upload(); activeRef.current(); } catch { /* contexte perdu */ } });
 
     gl.viewport(0, 0, w, h);
 
     const start = performance.now();
     const shaderNow = () => (performance.now() - start) / 1000;
     let raf = 0;
+    // Au repos (souris immobile, aucune onde), les vagues ambiantes sont lentes :
+    // ~20 images/s suffisent. Pleine cadence dès qu'il se passe quelque chose.
+    // Après 5 s sans rien, l'eau se fige (aucune boucle décorative) : la boucle
+    // s'arrête et repart au premier mouvement.
+    let lastDraw = 0;
+    let lastActive = performance.now();
+    let stopped = false;
+    activeRef.current = () => {
+      lastActive = performance.now();
+      if (stopped) { stopped = false; raf = requestAnimationFrame(frame); }
+    };
     const frame = (now: number) => {
+      const idle = now - lastActive;
+      const busy = idle < 2500 || revealRef.current !== null;
+      if (!busy && idle > 5000) { stopped = true; return; }
+      if (!busy && now - lastDraw < 50) { raf = requestAnimationFrame(frame); return; }
+      lastDraw = now;
       const t = (now - start) / 1000;
       // La vague suit la souris avec un léger retard (lerp) → elle « traîne ».
       const m = mouseRef.current;
       m.x += (m.tx - m.x) * 0.12;
       m.y += (m.ty - m.y) * 0.12;
       gl.uniform1f(uTime, t);
-      gl.uniform2f(uMouse, m.x * dpr, (window.innerHeight - m.y) * dpr);
+      gl.uniform2f(uMouse, m.x, window.innerHeight - m.y);
       const rv = revealRef.current;
       gl.uniform1f(uReveal, rv ? rv.time : -1);
       if (rv) gl.uniform2f(uRevealCenter, rv.x, rv.y);
@@ -227,7 +336,7 @@ export default function SplashIntro() {
     // Déclenche la vague de révélation depuis (cx, cy) en pixels CSS.
     startRevealRef.current = (cx: number, cy: number) => {
       if (phaseRef.current !== "show") return;
-      revealRef.current = { time: shaderNow(), x: cx * dpr, y: (window.innerHeight - cy) * dpr };
+      revealRef.current = { time: shaderNow(), x: cx, y: window.innerHeight - cy };
       setPhase("revealing");
       // Durée = temps pour que le front couvre le coin le plus lointain.
       const maxDist = Math.max(
@@ -236,7 +345,7 @@ export default function SplashIntro() {
         Math.hypot(cx, window.innerHeight - cy),
         Math.hypot(window.innerWidth - cx, window.innerHeight - cy)
       );
-      const durMs = (maxDist * dpr / REVEAL_SPEED) * 1000 + 180;
+      const durMs = (maxDist / REVEAL_SPEED) * 1000 + 180;
       setTimeout(() => { if (phaseRef.current === "revealing") setPhase("fading"); }, durMs);
     };
 
@@ -246,13 +355,15 @@ export default function SplashIntro() {
       if (m.tx < -999) { m.x = e.clientX; m.y = e.clientY; } // 1er mouvement : pas de saut
       m.tx = e.clientX;
       m.ty = e.clientY;
+      activeRef.current();
     };
     const onClick = (e: PointerEvent) => {
       if (phaseRef.current !== "show") return;
       // 1. Onde de choc immédiate au point du clic…
       const i = rippleCursorRef.current % MAX_RIPPLES;
-      ripplesRef.current[i * 4] = e.clientX * dpr;
-      ripplesRef.current[i * 4 + 1] = (window.innerHeight - e.clientY) * dpr;
+      activeRef.current();
+      ripplesRef.current[i * 4] = e.clientX;
+      ripplesRef.current[i * 4 + 1] = window.innerHeight - e.clientY;
       ripplesRef.current[i * 4 + 2] = shaderNow();
       ripplesRef.current[i * 4 + 3] = 0;
       rippleCursorRef.current++;
@@ -266,12 +377,15 @@ export default function SplashIntro() {
     window.addEventListener("keydown", onKey);
 
     return () => {
+      activeRef.current = () => {};
       cancelAnimationFrame(raf);
       startRevealRef.current = null;
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerdown", onClick);
       window.removeEventListener("keydown", onKey);
-      gl.getExtension("WEBGL_lose_context")?.loseContext();
+      // Pas de loseContext() : en StrictMode le même canvas est remonté et
+      // getContext() renverrait un contexte perdu (le splash tomberait en repli).
+      gl.deleteProgram(prog);
     };
   }, []);
 
@@ -295,8 +409,8 @@ export default function SplashIntro() {
         // cercle du shader), plus d'interception des clics, curseur rendu.
         // En repli statique (pas de shader) on garde le fond pour un fondu propre.
         interactive
-          ? "bg-[#0a0a0c] cursor-none"
-          : cn("pointer-events-none", canShader ? "bg-transparent" : "bg-[#0a0a0c]"),
+          ? "bg-[#0b1016] cursor-none"
+          : cn("pointer-events-none", canShader ? "bg-transparent" : "bg-[#0b1016]"),
         phase === "fading" ? "opacity-0 duration-[400ms]" : "opacity-100 duration-300"
       )}
     >
@@ -306,9 +420,10 @@ export default function SplashIntro() {
       />
       {canShader === false && (
         // Repli statique (reduced motion / pas de WebGL2 / compilation échouée)
-        <div className="flex flex-col items-center gap-4 anim-ambient-in">
-          <h1 className="text-5xl sm:text-7xl font-semibold text-white tracking-tight">FocusFlow</h1>
-          <p className="text-white/35 text-sm sm:text-base">Respire. Focus. Flow.</p>
+        <div className="flex flex-col items-center gap-5 ff-fade">
+          <p className="font-display font-extrabold uppercase text-6xl sm:text-8xl text-[#e9f2ff] [text-shadow:0_0_24px_rgba(190,215,255,0.6)]">FocusFlow</p>
+          <span aria-hidden className="h-[2px] w-[min(62vw,34rem)] bg-[#ff9a3c]" />
+          <p className="text-[#e9f2ff]/60 text-sm sm:text-base">Touche la flaque pour entrer</p>
         </div>
       )}
     </div>

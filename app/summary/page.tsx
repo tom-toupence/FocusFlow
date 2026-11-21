@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTimerStore } from "@/store/timerStore";
 import { useSessionStore } from "@/store/sessionStore";
@@ -10,7 +11,11 @@ import { useDistractionStore, getFocusScore } from "@/store/distractionStore";
 import GoalRing from "@/components/GoalRing";
 import JournalReflection from "@/components/JournalReflection";
 import { cn } from "@/lib/utils";
-import { useCountUp } from "@/lib/useCountUp";
+import dynamic from "next/dynamic";
+import type { CityHandle } from "@/components/CityScene";
+import { Button } from "@/components/ff/Button";
+import { Gauge } from "@/components/ff/Gauge";
+import { IconCheck, IconPlay } from "@/components/ff/icons";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,12 +37,13 @@ function formatMinutes(min: number): string {
   return `${m} min`;
 }
 
+// Heatmap = profondeur d'eau : plus le jour a été travaillé, plus l'eau est profonde.
 const HEAT_LEVELS = [
-  "bg-foreground/5",
-  "bg-emerald-900/60",
-  "bg-emerald-700/60",
-  "bg-emerald-500/70",
-  "bg-emerald-400",
+  "bg-surface-2",
+  "bg-konbini/30",
+  "bg-konbini/55",
+  "bg-konbini/80",
+  "bg-konbini",
 ];
 
 function heatLevel(minutes: number): number {
@@ -48,36 +54,25 @@ function heatLevel(minutes: number): number {
   return 4;
 }
 
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-// (count-up via useCountUp quand une valeur numérique est fournie)
+// ─── Figure de relevé ─────────────────────────────────────────────────────────
+// Un chiffre posé sur un filet, sans boîte (liste noire B11), sans compteur qui
+// défile (E28). La couleur sodium ne marque que ce qui a atteint son repère.
 
-function StatCard({
-  label,
-  value,
-  num,
-  format,
-  sub,
-  accent,
-}: {
-  label: string;
-  /** Valeur statique (chaînes composites). Ignorée si `num` est fourni. */
-  value?: string;
-  /** Valeur numérique : affichée avec un count-up au montage. */
-  num?: number;
-  format?: (v: number) => string;
-  sub?: string;
-  accent?: string;
-}) {
-  const animated = useCountUp(num ?? 0);
-  const display = num != null ? (format ?? String)(Math.round(animated)) : value;
+function Figure({ label, value, sub, signal }: { label: string; value: string; sub?: string; signal?: boolean }) {
   return (
-    <div className="flex flex-col gap-1 px-5 py-4 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.08]">
-      <span className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">{label}</span>
-      <span className={cn("text-3xl font-light tabular-nums tracking-tight", accent ?? "text-foreground")}>{display}</span>
-      {sub && <span className="text-[11px] text-foreground/30 leading-tight">{sub}</span>}
+    <div className="flex flex-col gap-1.5 border-t border-line pt-3">
+      <dt className="text-[13px] text-ink-3">{label}</dt>
+      <dd className={cn("font-mono text-[28px] leading-none tabular-nums tracking-tight", signal ? "text-sodium-text" : "text-ink")}>{value}</dd>
+      {sub && <dd className="text-[12px] text-ink-3 leading-tight">{sub}</dd>}
     </div>
   );
 }
+
+// Emplacement réservé à la hauteur du bandeau : pas de saut de mise en page.
+const CityScene = dynamic(() => import("@/components/CityScene"), {
+  ssr: false,
+  loading: () => <div aria-hidden className="h-44 sm:h-60 bg-[#0b1016]" />,
+});
 
 // ─── Summary Page ─────────────────────────────────────────────────────────────
 
@@ -113,7 +108,9 @@ export default function SummaryPage() {
   heatmapData.forEach((d, i) => {
     const col = Math.floor(i / 7);
     const month = new Date(d.date).getMonth();
-    if (month !== lastMonth) {
+    // Un mois entamé en fin de grille ne doit pas chevaucher le suivant.
+    const prev = monthLabels[monthLabels.length - 1];
+    if (month !== lastMonth && (!prev || col - prev.col >= 3)) {
       monthLabels.push({ label: new Date(d.date).toLocaleString("fr", { month: "short" }), col });
       lastMonth = month;
     }
@@ -131,240 +128,161 @@ export default function SummaryPage() {
     router.push("/");
   };
 
+  // L'écran sur le toit affiche le bilan ; objectif du jour tenu = une vague de lumière.
+  const board = sessionsCompleted > 0 ? `${sessionsCompleted} POMODORO${sessionsCompleted > 1 ? "S" : ""}` : "FIN";
+  const headline =
+    sessionsCompleted > 0
+      ? `${sessionsCompleted} pomodoro${sessionsCompleted > 1 ? "s" : ""}, ${formatMinutes(focusMinutesThisSession)} de focus.`
+      : focusMinutesThisSession > 0
+        ? `${formatMinutes(focusMinutesThisSession)} de focus.`
+        : "Session terminée.";
+
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="h-14 flex items-center px-6 border-b border-foreground/[0.06]">
-        <button
-          onClick={handleHome}
-          className="flex items-center gap-1.5 text-sm text-foreground/40 hover:text-foreground/80 transition-colors"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Accueil
-        </button>
-        <span className="text-sm font-semibold text-foreground/80 tracking-tight mx-auto">Résumé de session</span>
-        <div className="w-16" />
+    <div className="min-h-screen bg-bg flex flex-col">
+      <header className="h-14 flex items-center px-4 sm:px-8 border-b border-line">
+        <Button variant="quiet" onClick={handleHome}>Accueil</Button>
+        <span className="font-display text-lg text-ink mx-auto">Relevé de session</span>
+        <span className="w-16" />
       </header>
 
-      <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-10 flex flex-col gap-10">
+      {/* La ville en bandeau : halte de fin de session, l'écran affiche le bilan. */}
+      <SummaryCity board={board} goalReached={goalProgress.reached} label={`La ville à la fin de la session : ${board.toLowerCase()}`} />
 
-        {/* Hero */}
-        <div className="flex flex-col gap-1">
-          <h1 className="text-4xl font-semibold text-foreground tracking-tight">
-            {sessionsCompleted > 0 ? "Belle session." : "Session terminée."}
-          </h1>
-          <p className="text-foreground/40 text-sm">
-            {sessionDurationMs > 0
-              ? `Tu as travaillé pendant ${formatDuration(sessionDurationMs)}.`
-              : "Voici un résumé de ta session."}
+      <main className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-8 py-12 flex flex-col gap-14">
+        <div className="flex flex-col gap-2">
+          <h1 className="font-display font-light text-[clamp(2rem,4.5vw,2.9rem)] leading-tight text-ink">{headline}</h1>
+          <p className="text-ink-2 text-[15px]">
+            {sessionDurationMs > 0 ? `Session ouverte pendant ${formatDuration(sessionDurationMs)}.` : "Voici le relevé de ta session."}
           </p>
         </div>
 
-        {/* ── Session stats ─────────────────────────────────────────────────── */}
-        <section className="flex flex-col gap-3">
-          <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Cette session</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatCard
-              label="Durée totale"
-              value={formatDuration(sessionDurationMs)}
-              sub="temps écoulé"
-            />
-            <StatCard
-              label="Pomodoros"
-              num={sessionsCompleted}
-              sub={`× ${focusMinutesPerSession} min`}
-              accent="text-orange-300"
-            />
-            <StatCard
-              label="Temps de focus"
-              num={focusMinutesThisSession}
-              format={formatMinutes}
-              sub="concentration pure"
-              accent="text-emerald-300"
-            />
-            <StatCard
-              label="Tâches faites"
+        <section aria-label="Cette session">
+          <h2 className="font-display text-xl text-ink mb-5">Cette session</h2>
+          <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-7">
+            <Figure label="Durée" value={formatDuration(sessionDurationMs)} sub="temps écoulé" />
+            <Figure label="Pomodoros" value={String(sessionsCompleted)} sub={`de ${focusMinutesPerSession} min`} />
+            <Figure label="Focus" value={formatMinutes(focusMinutesThisSession)} sub="temps compté" />
+            <Figure
+              label="Tâches"
               value={`${todosCompletedThisSession.length}${totalTodos > 0 ? ` / ${totalTodos}` : ""}`}
-              sub={todosCompletedThisSession.length === 0 ? "aucune cochée" : "cette session"}
-              accent={todosCompletedThisSession.length > 0 ? "text-sky-300" : "text-foreground"}
+              sub={todosCompletedThisSession.length === 0 ? "aucune cochée" : "terminées pendant la session"}
             />
-          </div>
-          {/* Focus quality — faithful to the Pomodoro interruption count */}
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard
-              label="Focus Score"
-              num={focusScore}
-              sub={focusScore >= 80 ? "concentration solide" : focusScore >= 50 ? "peut mieux faire" : "beaucoup d'interruptions"}
-              accent={focusScore >= 80 ? "text-emerald-300" : focusScore >= 50 ? "text-amber-300" : "text-red-300"}
+            <Figure
+              label="Score de focus"
+              value={String(focusScore)}
+              sub={focusScore >= 80 ? "rue calme" : focusScore >= 50 ? "quelques coupures" : "beaucoup d'interruptions"}
+              signal={focusScore >= 80 && sessionsCompleted > 0}
             />
-            <StatCard
-              label="Distractions"
-              num={distractionCount}
-              sub={distractionCount === 0 ? "aucune — impeccable !" : "interruptions notées"}
-              accent={distractionCount === 0 ? "text-emerald-300" : "text-foreground"}
-            />
-          </div>
+            <Figure label="Distractions" value={String(distractionCount)} sub={distractionCount === 0 ? "aucune notée" : "notées avec D"} />
+          </dl>
+          {sessionsCompleted > 0 && (
+            <div className="mt-8 flex items-end gap-3" aria-label={`${sessionsCompleted} pomodoros terminés`}>
+              {Array.from({ length: Math.min(sessionsCompleted, 12) }).map((_, i) => (
+                <Gauge
+                  key={i}
+                  label={`Pomodoro ${i + 1}`}
+                  valueText={`${focusMinutesPerSession} minutes`}
+                  value={1}
+                  length={56}
+                  thickness={10}
+                  ticks={5}
+                  majorEvery={5}
+                  reflet
+                />
+              ))}
+              {sessionsCompleted > 12 && <span className="font-mono text-[12px] text-ink-3">+{sessionsCompleted - 12}</span>}
+            </div>
+          )}
         </section>
 
-        {/* Reflection / journal */}
         <JournalReflection pomodoros={sessionsCompleted} />
 
-        {/* Pomodoro dots */}
-        {sessionsCompleted > 0 && (
-          <section className="flex flex-col gap-3">
-            <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Pomodoros complétés</h2>
-            <div className="flex gap-2 flex-wrap">
-              {Array.from({ length: sessionsCompleted }).map((_, i) => (
-                <div
-                  key={i}
-                  className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/25 flex items-center justify-center"
-                  title={`Session ${i + 1} — ${focusMinutesPerSession} min`}
-                >
-                  <svg className="w-3.5 h-3.5 text-orange-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                    <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Todos completed this session */}
         {todosCompletedThisSession.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">
-              Accomplissements de la session
-            </h2>
-            <div className="flex flex-col gap-1.5">
+          <section aria-label="Accomplissements">
+            <h2 className="font-display text-xl text-ink mb-4">Ce qui est fait</h2>
+            <ul className="flex flex-col">
               {todosCompletedThisSession.map((todo) => (
-                <div key={todo.id} className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-emerald-500/5 border border-emerald-500/15">
-                  <div className="w-4 h-4 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
-                    <svg className="w-2 h-2 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-                      <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
-                  <span className="text-sm text-foreground/70">{todo.text}</span>
-                </div>
+                <li key={todo.id} className="flex items-center gap-3 py-2.5 border-b border-line text-[15px] text-ink-2">
+                  <IconCheck size={16} className="text-sodium-text shrink-0" />
+                  {todo.text}
+                </li>
               ))}
-            </div>
+            </ul>
           </section>
         )}
 
-        {/* ── Daily goal ────────────────────────────────────────────────────── */}
-        <section className="flex flex-col gap-3">
-          <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Objectif du jour</h2>
-          <div className="flex items-center gap-5 px-5 py-4 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.08]">
-            <GoalRing progress={goalProgress} size={104} />
-            <div className="flex flex-col gap-1">
-              <p className="text-sm font-semibold text-foreground">
-                {goalProgress.reached ? "Objectif atteint" : "En route vers ton objectif"}
-              </p>
-              <p className="text-xs text-foreground/40 leading-relaxed">
-                {goalProgress.reached
-                  ? "Tu as rempli ton objectif quotidien. Continue ou repose-toi, tu l'as mérité."
-                  : `Encore ${goalUnit === "minutes"
-                      ? `${Math.max(0, goalTarget - goalProgress.value)} min`
-                      : `${Math.max(0, goalTarget - goalProgress.value)} pomodoro${goalTarget - goalProgress.value !== 1 ? "s" : ""}`} pour atteindre ta cible du jour.`}
-              </p>
-            </div>
+        <section aria-label="Objectif du jour" className="grid sm:grid-cols-[auto_1fr] gap-8 items-end">
+          <GoalRing progress={goalProgress} size={150} />
+          <div>
+            <h2 className="font-display text-xl text-ink">
+              {goalProgress.reached ? "Objectif du jour atteint." : "L'objectif du jour n'est pas encore atteint."}
+            </h2>
+            <p className="mt-2 text-[15px] text-ink-2 leading-relaxed">
+              {goalProgress.reached
+                ? "Ton objectif quotidien est tenu. Ce qui vient en plus compte quand même."
+                : `Encore ${goalUnit === "minutes"
+                    ? `${Math.max(0, goalTarget - goalProgress.value)} min`
+                    : `${Math.max(0, goalTarget - goalProgress.value)} pomodoro${goalTarget - goalProgress.value !== 1 ? "s" : ""}`} pour l'atteindre.`}
+            </p>
           </div>
         </section>
 
-        {/* ── Historical stats ──────────────────────────────────────────────── */}
-        <section className="flex flex-col gap-3">
-          <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Stats globales</h2>
-          <div className="grid grid-cols-3 gap-3">
-            <StatCard
-              label="Aujourd'hui"
-              value={String(todayStats.sessions)}
-              sub={`${formatMinutes(todayStats.minutesWorked)} de focus`}
-              accent="text-violet-300"
-            />
-            <StatCard
-              label="Cette semaine"
-              value={String(weekStats.sessions)}
-              sub={`${formatMinutes(weekStats.minutesWorked)} au total`}
-              accent="text-blue-300"
-            />
-            <StatCard
-              label="Streak"
-              value={`${streak} jour${streak !== 1 ? "s" : ""}`}
-              sub={streak > 1 ? "consécutifs" : "continue demain !"}
-              accent={streak >= 3 ? "text-orange-300" : "text-foreground"}
-            />
-          </div>
+        <section aria-label="Sur la durée">
+          <h2 className="font-display text-xl text-ink mb-5">Sur la durée</h2>
+          <dl className="grid grid-cols-3 gap-x-8">
+            <Figure label="Aujourd'hui" value={formatMinutes(todayStats.minutesWorked)} sub={`${todayStats.sessions} session${todayStats.sessions !== 1 ? "s" : ""}`} />
+            <Figure label="Cette semaine" value={formatMinutes(weekStats.minutesWorked)} sub={`${weekStats.sessions} sessions`} />
+            <Figure label="Série" value={`${streak} j`} sub={streak > 1 ? "consécutifs" : "reviens demain pour l'allonger"} />
+          </dl>
         </section>
 
-        {/* ── Heatmap ───────────────────────────────────────────────────────── */}
-        <section className="flex flex-col gap-3">
-          <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Activité — 17 semaines</h2>
+        <section aria-label="Dix-sept semaines" className="flex flex-col gap-3">
+          <h2 className="font-display text-xl text-ink">Dix-sept semaines</h2>
           <div className="overflow-x-auto">
             <div className="inline-flex flex-col gap-1 min-w-0">
-              {/* Month labels */}
               <div className="relative h-4 mb-0.5" style={{ width: `${Math.ceil(heatmapData.length / 7) * 18}px` }}>
                 {monthLabels.map(({ label, col }) => (
-                  <span
-                    key={`${label}-${col}`}
-                    className="absolute text-[10px] text-foreground/25"
-                    style={{ left: `${col * 18}px` }}
-                  >
+                  <span key={`${label}-${col}`} className="absolute font-mono text-[11px] text-ink-3" style={{ left: `${col * 18}px` }}>
                     {label}
                   </span>
                 ))}
               </div>
-              {/* Grid: 7 rows × N cols */}
               <div
                 className="grid gap-1"
-                style={{
-                  gridTemplateRows: "repeat(7, 14px)",
-                  gridTemplateColumns: `repeat(${Math.ceil(heatmapData.length / 7)}, 14px)`,
-                  gridAutoFlow: "column",
-                }}
+                style={{ gridTemplateRows: "repeat(7, 14px)", gridTemplateColumns: `repeat(${Math.ceil(heatmapData.length / 7)}, 14px)`, gridAutoFlow: "column" }}
               >
                 {heatmapData.map((d) => (
-                  <div
-                    key={d.date}
-                    className={cn("w-3.5 h-3.5 rounded-sm transition-colors", HEAT_LEVELS[heatLevel(d.minutes)])}
-                    title={`${d.date} — ${d.minutes} min`}
-                  />
+                  <div key={d.date} className={cn("w-3.5 h-3.5 rounded-[2px]", HEAT_LEVELS[heatLevel(d.minutes)])} title={`${d.date}, ${d.minutes} min`} />
                 ))}
               </div>
             </div>
           </div>
-          {/* Legend */}
-          <div className="flex items-center gap-1.5 text-[10px] text-foreground/25">
-            <span>Moins</span>
-            {HEAT_LEVELS.map((cls, i) => (
-              <div key={i} className={cn("w-3 h-3 rounded-sm", cls)} />
-            ))}
-            <span>Plus</span>
+          <div className="flex items-center gap-1.5 text-[12px] text-ink-3">
+            <span>Éteint</span>
+            {HEAT_LEVELS.map((cls, i) => <div key={i} className={cn("w-3 h-3 rounded-[2px]", cls)} />)}
+            <span>Allumé</span>
           </div>
         </section>
 
-        {/* ── Actions ───────────────────────────────────────────────────────── */}
-        <div className="flex gap-3 pt-2">
-          <button
-            onClick={handleNewSession}
-            className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-foreground text-background font-semibold text-sm rounded-xl hover:bg-foreground/90 transition-all shadow-lg shadow-black/30"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M8 5v14l11-7z" />
-            </svg>
+        <div className="flex flex-wrap gap-3 pt-2">
+          <Button variant="signal" size="lg" onClick={handleNewSession} className="flex-1 min-w-48">
+            <IconPlay size={15} />
             Nouvelle session
-          </button>
-          <button
-            onClick={handleHome}
-            className="flex items-center justify-center gap-2 px-6 py-3.5 bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 text-foreground/70 font-medium text-sm rounded-xl transition-all"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Accueil
-          </button>
+          </Button>
+          <Button variant="line" size="lg" onClick={handleHome}>Accueil</Button>
         </div>
       </main>
     </div>
   );
+}
+
+/** Bandeau de la ville ; si l'objectif du jour est tenu, une vague de lumière passe une fois. */
+function SummaryCity({ board, goalReached, label }: { board: string; goalReached: boolean; label: string }) {
+  const city = useRef<CityHandle>(null);
+  useEffect(() => {
+    if (!goalReached) return;
+    const id = setTimeout(() => city.current?.goal(), 1800);
+    return () => clearTimeout(id);
+  }, [goalReached]);
+  return <CityScene ref={city} phase="break" board={board} className="h-44 sm:h-60" label={label} />;
 }

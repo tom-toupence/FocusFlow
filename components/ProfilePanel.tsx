@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useProfileStore, resolvedProfile } from "@/store/profileStore";
 import { useSpotifyStore } from "@/store/spotifyStore";
 import { useTwitchStore } from "@/store/twitchStore";
+import { usePrefsStore } from "@/store/prefsStore";
 import { loginWithSpotify } from "@/lib/spotify";
 import { loginWithTwitch } from "@/lib/twitch";
 import { signOut } from "@/lib/supabase";
@@ -52,7 +53,7 @@ function Avatar({ url, name, size = 10 }: { url: string | null; name: string; si
   }
   return (
     <div className={`${cls} bg-foreground/10 flex items-center justify-center`}>
-      <span className="text-foreground/60 font-semibold" style={{ fontSize: size * 3.5 }}>
+      <span className="text-ink-2 font-semibold" style={{ fontSize: size * 3.5 }}>
         {name[0]?.toUpperCase() ?? "?"}
       </span>
     </div>
@@ -142,7 +143,7 @@ export default function ProfilePanel({ open, onClose }: Props) {
     try {
       const text = await file.text();
       const count = importBackup(text);
-      setImportStatus(`✓ ${count} données restaurées — rechargement…`);
+      setImportStatus(`✓ ${count} données restaurées, rechargement…`);
       // Recharge pour que tous les stores Zustand relisent le localStorage importé
       setTimeout(() => window.location.reload(), 1200);
     } catch (err) {
@@ -164,7 +165,7 @@ export default function ProfilePanel({ open, onClose }: Props) {
   // et reste pleinement cliquable, quel que soit l'état du drawer.
   return createPortal(
     <div
-      className="fixed inset-0 z-[120] flex items-start sm:items-center justify-center p-4 pt-16 sm:pt-4 bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[120] flex items-start sm:items-center justify-center p-4 pt-16 sm:pt-4 bg-black/60"
       onClick={onClose}
     >
       <div
@@ -210,7 +211,7 @@ export default function ProfilePanel({ open, onClose }: Props) {
                   <button
                     onClick={handleSaveName}
                     disabled={savingName}
-                    className="text-foreground/50 hover:text-foreground/90 transition-colors flex-shrink-0"
+                    className="text-ink-3 hover:text-ink transition-colors flex-shrink-0"
                   >
                     {savingName ? (
                       <div className="w-3.5 h-3.5 border border-foreground/30 border-t-foreground/70 rounded-full animate-spin" />
@@ -224,16 +225,16 @@ export default function ProfilePanel({ open, onClose }: Props) {
               ) : (
                 <button
                   onClick={handleStartEdit}
-                  className="text-sm font-semibold text-foreground hover:text-foreground/70 transition-colors text-left truncate w-full flex items-center gap-1 group/name"
+                  className="text-sm font-semibold text-foreground hover:text-ink-2 transition-colors text-left truncate w-full flex items-center gap-1 group/name"
                 >
                   <span className="truncate">{displayName}</span>
-                  <svg className="w-3 h-3 text-foreground/25 opacity-0 group-hover/name:opacity-100 transition-opacity flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <svg className="w-3 h-3 text-ink-3 opacity-0 group-hover/name:opacity-100 transition-opacity flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round" />
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
               )}
-              <p className="text-[11px] text-foreground/35 truncate mt-0.5">{profile.googleEmail ?? ""}</p>
+              <p className="text-[11px] text-ink-3 truncate mt-0.5">{profile.googleEmail ?? ""}</p>
             </div>
           </div>
 
@@ -241,7 +242,7 @@ export default function ProfilePanel({ open, onClose }: Props) {
           {profile.customAvatarData && (
             <button
               onClick={handleRemoveAvatar}
-              className="mt-2 text-[11px] text-foreground/30 hover:text-foreground/60 transition-colors"
+              className="mt-2 text-[11px] text-ink-3 hover:text-ink-2 transition-colors"
             >
               Retirer la photo personnalisée
             </button>
@@ -250,7 +251,7 @@ export default function ProfilePanel({ open, onClose }: Props) {
 
         {/* ── Connected services ───────────────────────────────────────────── */}
         <div className="p-3 space-y-2">
-          <p className="text-[10px] font-semibold text-foreground/30 uppercase tracking-wider px-1">Services connectés</p>
+          <p className="text-[10px] font-semibold text-ink-3 uppercase tracking-wider px-1">Services connectés</p>
 
           {/* Spotify */}
           <div className="rounded-xl p-3 bg-foreground/[0.03] border border-foreground/[0.06]">
@@ -258,7 +259,7 @@ export default function ProfilePanel({ open, onClose }: Props) {
               <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-[#1db954] flex-shrink-0" fill="currentColor">
                 <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
               </svg>
-              <span className="text-xs font-medium text-foreground/50 flex-1">Spotify</span>
+              <span className="text-xs font-medium text-ink-3 flex-1">Spotify</span>
               <div className={cn("w-1.5 h-1.5 rounded-full", isSpotifyConnected ? "bg-[#1db954]" : "bg-foreground/15")} />
             </div>
 
@@ -273,17 +274,17 @@ export default function ProfilePanel({ open, onClose }: Props) {
                         <span className="text-[9px] px-1 py-0.5 rounded-md bg-[#1db954]/15 text-[#1db954] font-bold">PREMIUM</span>
                       )}
                       {spotify.isPremium === false && (
-                        <span className="text-[9px] px-1 py-0.5 rounded-md bg-orange-500/15 text-orange-400 font-bold">FREE</span>
+                        <span className="text-[9px] px-1 py-0.5 rounded-md bg-sodium/15 text-sodium-text font-bold">FREE</span>
                       )}
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 mt-2 pt-2 border-t border-foreground/[0.05]">
-                  <button onClick={() => { spotify.clearAuth(); loginWithSpotify(); }} className="text-[11px] text-foreground/40 hover:text-foreground/80 transition-colors">
+                  <button onClick={() => { spotify.clearAuth(); loginWithSpotify(); }} className="text-[11px] text-ink-3 hover:text-ink transition-colors">
                     Changer
                   </button>
-                  <span className="text-foreground/15 text-xs">·</span>
-                  <button onClick={() => { spotify.clearAuth(); onClose(); }} className="text-[11px] text-foreground/35 hover:text-red-400 transition-colors">
+                  <span className="text-ink-3 text-xs">·</span>
+                  <button onClick={() => { spotify.clearAuth(); onClose(); }} className="text-[11px] text-ink-3 hover:text-danger transition-colors">
                     Déconnecter
                   </button>
                 </div>
@@ -304,7 +305,7 @@ export default function ProfilePanel({ open, onClose }: Props) {
               <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-[#9146ff] flex-shrink-0" fill="currentColor">
                 <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
               </svg>
-              <span className="text-xs font-medium text-foreground/50 flex-1">Twitch</span>
+              <span className="text-xs font-medium text-ink-3 flex-1">Twitch</span>
               <div className={cn("w-1.5 h-1.5 rounded-full", isTwitchConnected ? "bg-[#9146ff]" : "bg-foreground/15")} />
             </div>
 
@@ -315,16 +316,16 @@ export default function ProfilePanel({ open, onClose }: Props) {
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-foreground truncate">{twitch.userDisplayName ?? twitch.userLogin ?? "Twitch"}</p>
                     {twitch.userLogin && twitch.userDisplayName && twitch.userDisplayName !== twitch.userLogin && (
-                      <p className="text-[10px] text-foreground/30">@{twitch.userLogin}</p>
+                      <p className="text-[10px] text-ink-3">@{twitch.userLogin}</p>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3 mt-2 pt-2 border-t border-foreground/[0.05]">
-                  <button onClick={() => { twitch.clearAuth(); loginWithTwitch(true); }} className="text-[11px] text-foreground/40 hover:text-foreground/80 transition-colors">
+                  <button onClick={() => { twitch.clearAuth(); loginWithTwitch(true); }} className="text-[11px] text-ink-3 hover:text-ink transition-colors">
                     Changer
                   </button>
-                  <span className="text-foreground/15 text-xs">·</span>
-                  <button onClick={() => { twitch.clearAuth(); onClose(); }} className="text-[11px] text-foreground/35 hover:text-red-400 transition-colors">
+                  <span className="text-ink-3 text-xs">·</span>
+                  <button onClick={() => { twitch.clearAuth(); onClose(); }} className="text-[11px] text-ink-3 hover:text-danger transition-colors">
                     Déconnecter
                   </button>
                 </div>
@@ -340,24 +341,27 @@ export default function ProfilePanel({ open, onClose }: Props) {
           </div>
         </div>
 
+        {/* ── Affichage : la scène 3D de la ville peut être coupée ─────────── */}
+        <SceneToggle />
+
         {/* ── Mes données (export / import localStorage) ───────────────────── */}
         <div className="p-3 pt-0 space-y-2">
-          <p className="text-[10px] font-semibold text-foreground/30 uppercase tracking-wider px-1">Mes données</p>
+          <p className="text-[10px] font-semibold text-ink-3 uppercase tracking-wider px-1">Mes données</p>
           <div className="rounded-xl p-3 bg-foreground/[0.03] border border-foreground/[0.06]">
-            <p className="text-[11px] text-foreground/40 leading-relaxed mb-2">
+            <p className="text-[11px] text-ink-3 leading-relaxed mb-2">
               Sprint, routines, journal, stats… vivent dans ce navigateur.
               Exporte-les pour les transférer ailleurs.
             </p>
             <div className="flex gap-2">
               <button
                 onClick={exportBackup}
-                className="flex-1 py-1.5 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground/70 hover:text-foreground text-xs font-medium transition-all"
+                className="flex-1 py-1.5 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-ink-2 hover:text-foreground text-xs font-medium transition-all"
               >
                 Exporter
               </button>
               <button
                 onClick={() => backupFileRef.current?.click()}
-                className="flex-1 py-1.5 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground/70 hover:text-foreground text-xs font-medium transition-all"
+                className="flex-1 py-1.5 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-ink-2 hover:text-foreground text-xs font-medium transition-all"
               >
                 Importer
               </button>
@@ -372,7 +376,7 @@ export default function ProfilePanel({ open, onClose }: Props) {
             {importStatus && (
               <p className={cn(
                 "text-[11px] mt-2 leading-relaxed",
-                importStatus.startsWith("✓") ? "text-emerald-500" : "text-red-400"
+                importStatus.startsWith("✓") ? "text-konbini" : "text-danger"
               )}>
                 {importStatus}
               </p>
@@ -385,7 +389,7 @@ export default function ProfilePanel({ open, onClose }: Props) {
           <button
             onClick={handleSignOut}
             disabled={signingOut}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-foreground/[0.08] text-xs text-foreground/40 hover:text-red-400 hover:border-red-400/30 transition-all disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-foreground/[0.08] text-xs text-ink-3 hover:text-danger hover:border-danger/30 transition-all disabled:opacity-50"
           >
             {signingOut ? (
               <div className="w-3.5 h-3.5 border border-foreground/20 border-t-foreground/60 rounded-full animate-spin" />
@@ -402,5 +406,25 @@ export default function ProfilePanel({ open, onClose }: Props) {
       </div>
     </div>,
     document.body
+  );
+}
+
+/** Scène 3D de la ville : coupée = image fixe (machines modestes, batterie). */
+function SceneToggle() {
+  const on = usePrefsStore((st) => st.sceneEffects);
+  const set = usePrefsStore((st) => st.setSceneEffects);
+  return (
+    <div className="p-3 pt-0 space-y-2">
+      <p className="text-[10px] font-semibold text-ink-3 uppercase tracking-wider px-1">Affichage</p>
+      <label className="flex items-start gap-3 rounded-[6px] p-3 bg-foreground/[0.03] border border-foreground/[0.06] cursor-pointer">
+        <input type="checkbox" role="switch" checked={on} onChange={(e) => set(e.target.checked)} className="mt-0.5 accent-[var(--sodium)]" />
+        <span>
+          <span className="block text-xs font-medium text-foreground">Ville animée en 3D</span>
+          <span className="block text-[11px] text-ink-3 leading-relaxed mt-0.5">
+            Coupée, une image fixe la remplace (utile sur une machine modeste ou sur batterie).
+          </span>
+        </span>
+      </label>
+    </div>
   );
 }

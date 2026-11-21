@@ -111,7 +111,7 @@ choisir le média, qui enchaîne sur `/settings`. Les **routines** appliquent le
 
 **Gamification**
 - **Succès / Badges** dérivés des stats — `lib/achievements.ts`, `store/achievementsStore.ts`
-- **Gamification 2.0** : XP & niveaux, **jardin de focus** hebdo, **défis hebdomadaires** —
+- **Gamification 2.0** : XP & niveaux, **soirs allumés** hebdo (ex-« jardin de focus » : un immeuble par soir, un étage par palier), **défis hebdomadaires** —
   `lib/progression.ts`, `components/ProgressionPanel.tsx` (onglet Activité)
 - **Toasts** partagés (montés dans `app/layout.tsx`) — `components/Toast.tsx`
 
@@ -128,10 +128,10 @@ choisir le média, qui enchaîne sur `/settings`. Les **routines** appliquent le
   login + `SUPABASE_SERVICE_ROLE_KEY` (serveur) ; sinon repli **téléchargement `.ics`** —
   `lib/ics.ts`, `components/CalendarSync.tsx`, table `calendar_feeds`
 - **Mode Deadline/Sprint** : objectif + date limite → le coach (IA ou local `lib/sprint.ts`)
-  génère blocs jour-par-jour (préfixés 🏃, donc poussés au calendrier) + tâches Kanban + mood
+  génère blocs jour-par-jour (poussés au calendrier) + tâches Kanban + mood
   musical ; bouton **« Go »** (dashboard) qui applique média du mood + preset et lance `/session` ;
   recalcul si blocs manqués — `store/sprintStore.ts`, `components/SprintWizard.tsx`
-- **Journal & humeur** : réflexion post-session (😞→😄 + réussites/blocages), corrélation humeur ↔ focus —
+- **Journal & humeur** : réflexion post-session (humeur sur 5 pastilles + réussites/blocages), corrélation humeur ↔ focus —
   `store/journalStore.ts`, `components/JournalReflection.tsx` (résumé) + `JournalTimeline.tsx`
 
 **Coach de planification**
@@ -182,36 +182,45 @@ Flux type d'une feature : `product-lead` (spec) → `state-architect`/`backend-e
 - Icônes **SVG inline** (pas d'images), styles via tokens Tailwind + `cn()`.
 - Dates locales : helper `localToday()` / `localDate()` (format `YYYY-MM-DD`).
 
-### Langage visuel (refonte 2026-08-22)
+### Identité « la ville qui ne dort pas » (refonte 2026-11, docs/redesign/)
 
-- **Deux surfaces, deux langages assumés.** La **landing** (`LandingPage.tsx`) est sombre et
-  cinématique (Séoul la nuit, blancs/noirs écrits en dur) : elle n'utilise **jamais** les tokens
-  `foreground`/`background`, et a son propre système de formes. Le **site connecté** vit
-  entièrement sur les tokens et suit le thème. Voir « La landing » en fin de fichier.
-- **Un seul accent dans l'app** : token `--focus` (utilitaires `text-focus` / `bg-focus` /
-  `border-focus`), défini clair et sombre dans `globals.css`. Tout le reste s'exprime en niveaux de
-  `foreground`. Restent légitimes car **sémantiques** : couleurs de marque (Spotify/Twitch), couleur
-  choisie par l'utilisateur (projets, routines), pastilles d'humeur, rouge destructif.
-- **Échelle de rayons** : panneaux/tuiles `rounded-2xl`, cartes média `rounded-xl`, contrôles
-  `rounded-lg`/`rounded-xl`. Ne pas mélanger.
-- **Micro-labels** : `font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/35` (unifié
-  partout). Les **chiffres** sont en `font-mono tabular-nums`.
-- **Sous-navigations** = contrôle segmenté avec indicateur qui glisse (`motion` `layoutId`) :
-  `SubTabs`, `MediaTab`, rail `AppNav`. Un `layoutId` par instance (cf. `useId()` dans `SubTabs`).
-- **Mouvement motivé uniquement** : cascade d'entrée (hiérarchie), barres/jauges qui poussent (le
-  chiffre devient forme), pression tactile au clic. Toujours dégradé via `useReducedMotion()` ou
-  `motion-safe:`. Pas d'animation en boucle décorative dans l'app (la landing, elle, est
-  volontairement très animée).
-- **Un seul moteur d'animation PAR SURFACE.** Le **site connecté** est en `motion/react` :
-  ne pas y introduire GSAP. La **landing** est en **GSAP + ScrollTrigger** et n'importe
-  jamais `motion/react`. La règle « un seul moteur de scroll par page » est donc
-  respectée des deux côtés ; c'est juste que ce n'est pas le même moteur.
-- **Position du pointeur : MotionValue dans l'app, `gsap.quickTo` sur la landing. Jamais un
-  `useState`** (sinon re-render de l'arbre à chaque pixel parcouru).
-- **Densité du dashboard : basse (3/10)** — voir l'en-tête de `TodayDashboard.tsx`. Avant d'ajouter
-  une tuile, se demander laquelle retirer.
-- **Zéro em-dash (`—`) dans les textes visibles** (et toujours zéro emoji) : virgule, point, ou
-  passage à la ligne.
+> Détail : `docs/redesign/03-SYSTEM.md` (tokens, polices), `LAB.md` (pourquoi
+> ces choix), `ASSETS.md` (licences), `REPORT.md` (bilan). Le code fait foi.
+
+- **Thème** : la vie nocturne d'une mégapole, décor du travail concentré la
+  nuit. Sombre par défaut = **la nuit** ; clair = **le petit matin** (même
+  ville, heure bleue). Jamais de rose ni de magenta, aucun nom de ville ou de
+  pays dans l'interface (le champ `country` du catalogue n'est jamais affiché),
+  aucune écriture asiatique décorative, aucun cliché (lanternes, cerisiers…).
+- **Couleurs par rôle** (`globals.css`, AA vérifié par `node scripts/contrast.mjs`) :
+  sodium `--sodium` = **maintenant** (minuteur, action qui lance le temps) ;
+  vert supérette `--konbini` (= `--focus`) = **fait** (progression, objectif,
+  succès) ; néon blanc = texte ; feu arrière `--danger`/`--tail` = alerte,
+  distraction ; taxi `--taxi` = événement rare. Fonds = asphalte / béton.
+- **Polices** : Big Shoulders (titres, enseignes, poids 650 à 800, taille
+  optique auto) ; **Doto** (`font-led`) = afficheur à points, minuteur et grands
+  chiffres SEULEMENT ; Atkinson Hyperlegible Next = texte et petits chiffres
+  (`font-mono` = Atkinson en chiffres tabulaires).
+- **La façade** (`components/ff/Gauge.tsx`) : toute jauge est une tour dont les
+  étages s'allument (vert = fait, sodium = l'étage en cours, uniquement
+  `live`). `.ff-floors` transforme n'importe quelle barre de graphique en tour.
+  La marque est une petite tour à fenêtres.
+- **La ville** (`components/CityScene.tsx`, interface `lib/city/types.ts`) :
+  la capture **TOKYO NIGHT** fournie par l'utilisateur (`public/tokyo_night.glb`,
+  CC BY 4.0, crédit `CITY_CREDIT` affiché partout), vue d'une fenêtre en haut
+  d'une tour (`lib/city/TokyoRenderer.ts`). Événements : `phase` break = les
+  lumières s'éteignent du fond vers nous et la mise au point revient sur la
+  vitre ; `flicker` = un quartier grésille ; `extend` = un pâté s'allume ;
+  `goal` = une vague de lumière part de la tour ; `board` = écran sur un toit.
+  Utilisée par la landing, la halte, le mode Spotify, le résumé. **Jamais
+  par-dessus une vidéo qui joue.** Chargée en dynamic ssr:false, boucle coupée
+  hors écran, repli image fixe (`public/city/tokyo/still*.jpg`),
+  `prefs.sceneEffects` pour la couper. Animateur des scènes : `lib/city/tween.ts`
+  (horloge, pas images).
+- **Mouvement** : `motion/react` dans l'app ET la landing (GSAP/Lenis retirés).
+  Easings nommés, aucune boucle décorative ; reduced-motion respecté partout.
+- **Formes** : rayons petits (signalétique), contrôles 4 à 6 px.
+- **Zéro emoji, zéro tiret cadratin** dans le texte visible (vérifié en e2e).
 
 ## Structure des fichiers clés
 
@@ -700,70 +709,84 @@ visuel reste à valider à l'œil.
 
 ## La landing
 
-> Section unique et à jour. Les journaux de refonte successifs ont été retirés :
-> ils se contredisaient et décrivaient des versions mortes. Ce qui suit décrit
-> `components/LandingPage.tsx` tel qu'il est.
+`components/LandingPage.tsx` (montée par AuthGate sans session ; aperçu hors
+connexion : `/lab/landing` en dev). Une seule scène fixe pour toute la page,
+la ville vue de la fenêtre ; le défilement est une nuit qui avance (horloge du
+bandeau de 22:00 à 06:30) et chaque section déclenche un vrai événement de
+FocusFlow : panneau qui décompte, distraction (touche D), halte, Flowtime,
+playlist prolongée, petit matin (la section « trace » passe la scène en heure
+bleue), amis, objectif atteint. Moteur `motion/react` (useScroll, useInView),
+défilement natif. « Commencer » apparaît deux fois. Sur grand écran la caméra
+tourne (`yaw`) pour laisser la colonne de texte à gauche.
 
-### L'idée : « Une nuit, quatre pomodoros »
+## Lecture (interface unique, phases 8-9)
 
-La page EST une nuit à Séoul, de **21:00 à 01:00**, et le scroll fait avancer
-l'heure. Elle est découpée au rythme du pomodoro : des cycles de travail
-séparés par de **vraies pauses**, où la page respire au lieu d'enchaîner.
+- `lib/playback/types.ts` : `PlayerAdapter` (play, pause, next, previous,
+  volume, shuffle, loop, état observable + `caps`) et `usePlayback(adapter)`.
+  La session ne connaît QUE ça : contrôles affichés selon `caps`, une seule
+  règle de lecture (joue pendant le travail minuteur en marche, pause sinon,
+  Twitch compris).
+- `lib/playback/youtube.ts` : `YouTubeAdapter` (vidéo seule, file maison,
+  repli natif). Il crée son propre élément dans `#yt-player` (l'IFrame API le
+  remplace). `onError` = titre suivant.
+- `components/SpotifyPlayer.tsx` / `TwitchPlayer.tsx` exposent leur adaptateur
+  via `onAdapter`.
+- `lib/playback/queue.ts` (`TrackQueue`, pur) et `lib/playback/continuation.ts` :
+  **lecture continue** quand la boucle est coupée : graines réparties sur TOUTE
+  la playlist (`pickSeeds` : début, milieu, fin + la dernière jouée),
+  recommandations par graine fusionnées en alternance, dédoublonnées ; rien de
+  neuf = on reboucle. YouTube : mix radio par graine, prolongation bornée à
+  10 s. Spotify : `recommendations` est fermé aux nouvelles apps depuis
+  11/2024, donc titres phares des artistes échantillonnés, mis en file
+  (`/me/player/queue`) au début du dernier titre, une tentative par fin.
+  Les suggestions des modals de playlist utilisent le même échantillonnage.
+- **Interface complète** : `seek`, `getSuggestions(seeds)`, `enqueue(track)`,
+  `removeUpcoming(id)`, état `upcoming` (piste normalisée `Track` : source,
+  durée, `suggested`). Capacités : Spotify ne peut PAS retirer un titre de sa
+  file (aucun endpoint) : on propose « Écouter maintenant » ; Twitch : seek en
+  VOD seulement, ni file ni suggestions. Un titre retiré n'est jamais
+  réintroduit par une prolongation (`TrackQueue.excluded`).
+- **La page de session ne distingue plus les sources** :
+  `lib/playback/useSessionMedia.ts` (lit les stores, résout mixes RD et
+  playlists PL, entrée d'historique) + `components/session/SessionMedia.tsx`
+  (monte le bon lecteur, l'habillage, le lien « ouvrir chez la source »).
+  Adaptateurs dans `lib/playback/{youtube,spotify,twitch}.ts`.
+- **« À venir »** (`components/session/UpNext.tsx`) : prochains titres,
+  suggestions marquées, retirer, « Trouver des titres proches » + ajouter à
+  la suite (vidéo seule : part dans la File d'attente).
+- **Spotify hors session** : bouton « Titres proches » sur les cartes de
+  playlist (`SpotifyRelatedModal`, `lib/playback/spotifySuggest.ts`, cache
+  10 min) ; chaque titre s'ouvre dans Spotify (les scopes n'incluent pas la
+  modification de playlist, voulu).
+- Tests : `npm test` (Vitest, 33 : file, continuation, adaptateurs YouTube,
+  Spotify, Twitch) ; `npm run test:e2e` (Playwright, 13 : lecture continue,
+  mix RD, PL et repli natif, playlist locale, Twitch, « À venir », écrans) ;
+  `npm run test:a11y` (axe-core).
 
-Ce n'est pas une métaphore posée après coup, c'est la structure du document :
-les sections SONT les cycles, l'horloge du bandeau SUIT le scroll, et les quatre
-marques de pomodoro se remplissent à mesure qu'on descend.
+## Journal de session — 2026-11-21 (refonte d'identité complète, docs/redesign/)
 
-Le propos, qui est la raison d'être d'une app de focus nocturne : **la nuit,
-tout le monde travaille.** La supérette, le taxi, la cuisine. Tu n'es pas seul.
+Splash (`SplashIntro.tsx`) : effet goutte CONSERVÉ (demande utilisateur),
+texture devenue une flaque sur l'asphalte qui reflète l'enseigne FOCUSFLOW.
 
-### Les trois gestes
 
-1. **`Neon`** — le titre ne monte pas et ne se fond pas, il **s'allume** :
-   quelques ratés d'amorçage aux durées irrégulières (un clignotement régulier
-   se lit comme une animation, pas comme un tube qui peine), puis la lueur
-   s'installe. ⚠️ Le halo passe par une **variable CSS animée** (`--glow`) et un
-   `calc()`, jamais par une interpolation de `text-shadow` : GSAP ne sait
-   interpoler une ombre que si les deux états ont exactement la même structure.
-2. **`Collapse`** — on ouvre sur Séoul en plein écran ; au scroll la photo **se
-   referme par les quatre côtés** jusqu'à n'être qu'une fenêtre éclairée.
-   `clip-path: inset()` animé, jamais `width`/`top`. Le filet est un élément
-   SÉPARÉ aux mêmes pourcentages (un `border` sur la photo serait coupé avec
-   elle). ⚠️ **Le voile s'efface, il ne s'épaissit pas** : il couvre tout,
-   fenêtre comprise, et l'épaissir éteignait ce qui devait rester allumé.
-3. **`Breath`** — entre deux cycles, la section **inspire puis expire** (une
-   timeline scrubée en deux temps). Une page qui enchaîne ses sections ne peut
-   pas parler de pauses de façon crédible ; celle-ci en impose une au lecteur.
-
-Plus : le **travelling horizontal** du catalogue, où le nom du pays s'écrit en
-très grand derrière et change quand la carte suivante prend le centre
-(`containerAnimation`, bornes en MOTS-CLÉS car les pourcentages y sont mesurés
-dans l'espace de la piste).
-
-### Le système
-
-- **Moteur : GSAP + ScrollTrigger + SplitText**, jamais `motion/react` ici.
-  **Lenis** pour le défilement amorti (et non `ScrollSmoother`, qui enveloppe la
-  page dans un conteneur transformé et déporte tout sur le fil principal).
-- **Tout le texte arrive par `Lines`** : découpage en lignes (SplitText,
-  `mask: "lines"`, `autoSplit`), chaque ligne montant derrière un masque.
-  `EASE = "power4.out"`, `DUR = 1.2`. Les blocs, eux, se dévoilent en `clip-path`.
-- **Formes : tout est à angle droit.** Aucun `rounded-*` sur la landing, hormis
-  points et anneaux. Boutons rectangulaires à filet, jamais de pilules.
-- **Police : Geist partout** (une serif a été essayée puis écartée).
-- **Imagerie, deux registres à ne pas mélanger** : les six photos de Séoul
-  (`public/seoul/`, Pexels, licence libre) portent l'atmosphère ; les vignettes
-  du catalogue portent le produit. Détail dans `docs/ASSETS_LANDING.md`.
-- **« Commencer » n'apparaît qu'à TROIS endroits** : bandeau, hero, fin de nuit.
-- ⚠️ **`refreshPriority` : une valeur PLUS ÉLEVÉE se rafraîchit EN PREMIER.**
-  Les sections épinglées allongent le document et doivent donc être mesurées
-  avant tout ce qui est plus bas. Échelle `PRIO` décroissante, `below: 0`
-  (défaut) parce que `ScrollTrigger.batch()` n'expose pas la propriété.
-
-### Outillage : ce qu'on ne peut PAS vérifier ici
-
-L'onglet piloté par l'extension Chrome est en arrière-plan : `requestAnimationFrame`
-y est bridé **et les captures d'écran sont en retard sur le DOM** (un `clip-path`
-appliqué et confirmé en style calculé s'affichait encore non découpé à la capture
-suivante). **Les mesures JS sont fiables, les captures ne le sont pas** pour du
-contenu animé ou photographique. Valider le rendu avec `npm run dev`.
+Mission `docs/redesign/PROMPT.md`, phases 0 à 10, voir `docs/redesign/REPORT.md`.
+Points à retenir pour la suite :
+1. **Vérifier `master` avant de concevoir** : la capture TOKYO NIGHT y avait été
+   déposée par l'utilisateur pour la 3D ; l'audit l'avait d'abord écartée à tort.
+2. Le réalisme vient des assets, de la lumière et du post-traitement, pas de
+   géométrie tapée à la main (labs 2 et 3 écartés pour cette raison).
+3. Les labs (`/lab/*`, exclus de la production) gardent les pistes écartées
+   pour mémoire ; ne pas les importer depuis le code de production.
+4. ⚠️ CSP : `'wasm-unsafe-eval'` (décodeur meshopt WASM des modèles) et `blob:`
+   (connect-src, textures intégrées des glb) sont nécessaires en production.
+5. Nettoyage : `public/seoul/`, composants morts (`VideoPlayer`, `PomodoroTimer`,
+   `VideoCatalog`) et SVG par défaut supprimés.
+6. Jetons `--water*` supprimés (ils survivaient en alias et rendaient la
+   heatmap du relevé invisible). `.ff-row` = façade couchée (barres
+   horizontales). 404 (`app/not-found.tsx`), carte Wrapped PNG et page Wrapped
+   repris dans l'identité. Transition réglages vers session : la vignette
+   devient la plaque de l'afficheur, 25 points sodium s'allument
+   (`lib/useExpandNavigate.ts`).
+7. CSP : `'unsafe-eval'` ajouté en DÉVELOPPEMENT seulement (React dev).
+8. Désactiver la 3D : réglage `prefs.sceneEffects` (image fixe à la place),
+   automatique avec `prefers-reduced-motion` ou sans WebGL.

@@ -63,10 +63,10 @@ export default function CoachModal({
       } else {
         const err = await res.json().catch(() => ({}));
         if (err?.status === 429) {
-          setNotice("Limite de l'IA atteinte (quota gratuit). Plan local utilisé — réessaie dans ~1 min pour l'IA.");
+          setNotice("Limite de l'IA atteinte (quota gratuit). Plan local utilisé, réessaie dans ~1 min pour l'IA.");
         }
       }
-    } catch { /* ignore — fall through to local */ }
+    } catch { /* ignore, fall through to local */ }
     applyTasks(planTasks(obj), "local");
     setLoading(false);
   };
@@ -84,7 +84,7 @@ export default function CoachModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
         className="w-full max-w-lg bg-card border border-foreground/10 rounded-2xl shadow-2xl p-5 flex flex-col gap-4 max-h-[85vh]"
         onClick={(e) => e.stopPropagation()}
@@ -93,14 +93,14 @@ export default function CoachModal({
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <svg className="w-4 h-4 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-4 h-4 text-ink-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path d="M12 3l1.9 4.8L19 9.6l-4 3.4 1.2 5L12 15.8 7.8 18l1.2-5-4-3.4 5.1-1.8z" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               Coach de planification
             </h2>
-            <p className="text-[11px] text-foreground/40 mt-0.5">Décris ton objectif, je le découpe en tâches Pomodoro. IA gratuite, avec repli local si indisponible.</p>
+            <p className="text-[11px] text-ink-3 mt-0.5">Décris ton objectif, je le découpe en tâches Pomodoro. IA gratuite, avec repli local si indisponible.</p>
           </div>
-          <button onClick={onClose} className="text-foreground/40 hover:text-foreground transition-colors flex-shrink-0">
+          <button onClick={onClose} className="text-ink-3 hover:text-foreground transition-colors flex-shrink-0">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
             </svg>
@@ -116,7 +116,7 @@ export default function CoachModal({
             placeholder="Ex : Réviser le chapitre 4 de maths pour le contrôle…"
             rows={2}
             maxLength={500}
-            className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-foreground/25 transition-colors resize-none"
+            className="bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:border-foreground/25 transition-colors resize-none"
           />
           {!planned && (
             <div className="flex flex-wrap gap-1.5">
@@ -124,7 +124,7 @@ export default function CoachModal({
                 <button
                   key={ex}
                   onClick={() => handlePlan(ex)}
-                  className="text-[10px] px-2 py-1 rounded-lg bg-foreground/5 text-foreground/45 hover:text-foreground/70 hover:bg-foreground/10 transition-all"
+                  className="text-[10px] px-2 py-1 rounded-lg bg-foreground/5 text-ink-3 hover:text-ink-2 hover:bg-foreground/10 transition-all"
                 >
                   {ex}
                 </button>
@@ -134,7 +134,7 @@ export default function CoachModal({
           <button
             onClick={() => handlePlan()}
             disabled={!objective.trim() || loading}
-            className="flex items-center justify-center gap-2 py-2.5 bg-violet-500/90 hover:bg-violet-500 disabled:opacity-30 text-white font-semibold text-sm rounded-xl transition-all"
+            className="flex items-center justify-center gap-2 py-2.5 bg-ink/90 hover:bg-ink/10 disabled:opacity-30 text-white font-semibold text-sm rounded-xl transition-all"
           >
             {loading ? (
               <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -148,7 +148,7 @@ export default function CoachModal({
             {loading ? "Génération…" : planned ? "Re-générer" : "Découper en tâches"}
           </button>
           {notice && (
-            <p className="flex items-start gap-1.5 text-[11px] text-amber-500 dark:text-amber-300/90 bg-amber-500/10 border border-amber-500/15 rounded-lg px-2.5 py-2">
+            <p className="flex items-start gap-1.5 text-[11px] text-sodium-text dark:text-sodium-text bg-sodium/10 border border-sodium/15 rounded-lg px-2.5 py-2">
               <svg className="w-3.5 h-3.5 flex-shrink-0 mt-px" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path d="M12 9v4M12 17h.01" strokeLinecap="round" />
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
@@ -163,17 +163,17 @@ export default function CoachModal({
           <>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <p className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">
+                <p className="text-[13px] font-semibold text-ink-3">
                   {tasks.length} tâche{tasks.length > 1 ? "s" : ""} proposée{tasks.length > 1 ? "s" : ""}
                 </p>
                 <span className={cn(
                   "text-[9px] px-1.5 py-0.5 rounded-md font-medium",
-                  source === "ai" ? "bg-violet-500/15 text-violet-500 dark:text-violet-300" : "bg-foreground/10 text-foreground/40"
+                  source === "ai" ? "bg-ink/15 text-ink-2 dark:text-ink-2" : "bg-foreground/10 text-ink-3"
                 )}>
                   {source === "ai" ? "IA" : "Plan local"}
                 </span>
               </div>
-              <p className="text-[10px] text-foreground/40">
+              <p className="text-[10px] text-ink-3">
                 {selected.length} sélectionnée{selected.length > 1 ? "s" : ""} · {totalPomodoros(selected)} pomodoro{totalPomodoros(selected) > 1 ? "s" : ""}
               </p>
             </div>
@@ -191,7 +191,7 @@ export default function CoachModal({
                     onClick={() => toggle(t.id)}
                     className={cn(
                       "w-4 h-4 rounded-md border flex items-center justify-center flex-shrink-0 transition-all",
-                      t.include ? "bg-violet-500 border-violet-500" : "border-foreground/25"
+                      t.include ? "bg-ink/10 border-line-strong" : "border-foreground/25"
                     )}
                   >
                     {t.include && (
@@ -200,14 +200,14 @@ export default function CoachModal({
                       </svg>
                     )}
                   </button>
-                  <span className="flex-1 text-xs text-foreground/80 leading-snug min-w-0">{t.text}</span>
+                  <span className="flex-1 text-xs text-ink leading-snug min-w-0">{t.text}</span>
                   {/* Estimate stepper */}
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <button onClick={() => bump(t.id, -1)} className="w-5 h-5 rounded bg-foreground/8 hover:bg-foreground/15 text-foreground/60 flex items-center justify-center text-xs">−</button>
-                    <span className="text-[11px] text-foreground/60 tabular-nums w-10 text-center" title="Pomodoros estimés">
+                    <button onClick={() => bump(t.id, -1)} className="w-5 h-5 rounded bg-foreground/8 hover:bg-foreground/15 text-ink-2 flex items-center justify-center text-xs">−</button>
+                    <span className="text-[11px] text-ink-2 tabular-nums w-10 text-center" title="Pomodoros estimés">
                       {t.pomodoroEstimate}
                     </span>
-                    <button onClick={() => bump(t.id, 1)} className="w-5 h-5 rounded bg-foreground/8 hover:bg-foreground/15 text-foreground/60 flex items-center justify-center text-xs">+</button>
+                    <button onClick={() => bump(t.id, 1)} className="w-5 h-5 rounded bg-foreground/8 hover:bg-foreground/15 text-ink-2 flex items-center justify-center text-xs">+</button>
                   </div>
                 </div>
               ))}
@@ -216,7 +216,7 @@ export default function CoachModal({
             <button
               onClick={handleAdd}
               disabled={selected.length === 0}
-              className="flex items-center justify-center gap-2 py-3 bg-foreground text-background font-semibold text-sm rounded-xl hover:bg-foreground/90 disabled:opacity-30 transition-all"
+              className="flex items-center justify-center gap-2 py-3 bg-ink text-on-ink font-semibold text-sm rounded-xl hover:bg-foreground/90 disabled:opacity-30 transition-all"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                 <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />

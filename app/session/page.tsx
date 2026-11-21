@@ -5,24 +5,24 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useTimerStore, TimerMode } from "@/store/timerStore";
 import { useSessionStore } from "@/store/sessionStore";
-import { usePlaylistStore, isRadioMix, fetchMixVideos, fetchPlaylistVideos } from "@/store/playlistStore";
-import { useQueueStore } from "@/store/queueStore";
 import { usePlaybackPrefsStore } from "@/store/playbackPrefsStore";
 import { useSessionSummaryStore } from "@/store/sessionSummaryStore";
 import { cn } from "@/lib/utils";
 import TodoList from "@/components/TodoList";
 import { useStatsStore } from "@/store/statsStore";
 import { useNotesStore } from "@/store/notesStore";
-import { useSpotifyStore } from "@/store/spotifyStore";
-import { useTwitchStore } from "@/store/twitchStore";
 import { usePlayHistoryStore } from "@/store/playHistoryStore";
 import StickyNote from "@/components/StickyNote";
-import SpotifyPlayer from "@/components/SpotifyPlayer";
-import TwitchPlayer from "@/components/TwitchPlayer";
+import SessionMedia, { TwitchGlyph } from "@/components/session/SessionMedia";
+import UpNext from "@/components/session/UpNext";
 import PipTimer from "@/components/PipTimer";
 import BreathingExercise from "@/components/BreathingExercise";
+import SessionCity from "@/components/SessionCity";
+import { usePlayback, type PlayerAdapter } from "@/lib/playback/types";
+import { useSessionMedia } from "@/lib/playback/useSessionMedia";
+import type { ExtendedEvent, SourceKind } from "@/lib/playback/types";
+import type { CityHandle } from "@/components/CityScene";
 import Equalizer from "@/components/Equalizer";
-import TimerDigits from "@/components/TimerDigits";
 import { useIdleHide } from "@/lib/useIdleHide";
 import { usePrefsStore } from "@/store/prefsStore";
 import { useDistractionStore } from "@/store/distractionStore";
@@ -34,53 +34,15 @@ import { toast } from "@/components/Toast";
 import { playBreakChime, playWorkChime } from "@/lib/sounds";
 import { upsertMyFriendStats } from "@/lib/friends";
 
-// ─── YouTube IFrame API types ─────────────────────────────────────────────────
-
-interface YTPlayer {
-  playVideo: () => void;
-  pauseVideo: () => void;
-  destroy: () => void;
-  setPlaybackQuality: (q: string) => void;
-  setVolume: (v: number) => void;
-  nextVideo: () => void;
-  previousVideo: () => void;
-  loadVideoById: (id: string) => void;
-  loadPlaylist: (
-    opts:
-      | string[]
-      | {
-          list: string;
-          listType: string;
-          index?: number;
-          startSeconds?: number;
-        }
-  ) => void;
-  setLoop: (loop: boolean) => void;
-}
-
-declare global {
-  interface Window {
-    YT: { Player: new (id: string, cfg: object) => YTPlayer };
-    onYouTubeIframeAPIReady?: () => void;
-  }
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Nom de la source affiché aux amis (YouTube : rien, le titre suffit). */
+const SOURCE_NAME: Record<SourceKind, string> = { youtube: "", spotify: "Spotify", twitch: "Twitch" };
 
 function formatTime(s: number) {
   const m = Math.floor(s / 60).toString().padStart(2, "0");
   const sec = (s % 60).toString().padStart(2, "0");
   return `${m}:${sec}`;
-}
-
-// Fisher-Yates en gardant la 1ʳᵉ piste en tête (celle en cours de lecture).
-function shuffleKeepFirst(ids: string[]): string[] {
-  const [first, ...rest] = ids;
-  for (let i = rest.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [rest[i], rest[j]] = [rest[j], rest[i]];
-  }
-  return [first, ...rest];
 }
 
 const breakLabel: Record<TimerMode, string> = {
@@ -99,39 +61,24 @@ export default function SessionPage() {
     tick, start, pause, nextSession, finishFlow, accumulateFlow,
   } = useTimerStore();
   const isFlowtime = settings.preset === "flowtime";
-  const { selectedVideoId, selectedPlaylistId, playQueue, todos, getAllVideos } = useSessionStore();
-  const { playlists } = usePlaylistStore();
-  const { items: queueItems } = useQueueStore();
+  const { todos } = useSessionStore();
   const { recordSession } = useStatsStore();
   const { startSession } = useSessionSummaryStore();
   const { notes, addNote } = useNotesStore();
-  const { selectedPlaylistUri, accessToken, playlists: spotifyPlaylists } = useSpotifyStore();
-  const { selectedChannel, selectedVodId, accessToken: twitchToken } = useTwitchStore();
-  const { record: recordPlay } = usePlayHistoryStore();
+  const recordPlay = usePlayHistoryStore((st) => st.record);
   const { breathingEnabled } = usePrefsStore();
   const { sessionCount: distractionCount, markDistraction, resetSession: resetDistractions } = useDistractionStore();
 
-  const allVideos = getAllVideos();
-  const video = allVideos.find((v) => v.id === selectedVideoId) ?? allVideos[0];
-  const selectedPlaylist = playlists.find((p) => p.id === selectedPlaylistId) ?? null;
-  const isQueueMode = playQueue && queueItems.length > 0;
-  const queueIds = isQueueMode ? queueItems.map((i) => i.youtubeId) : [];
-  const queueKey = queueIds.join(","); // dep stable (évite la ré-init à chaque render)
-  const isPlaylistMode = !isQueueMode && !!selectedPlaylistId && !!selectedPlaylist;
-  const isMix = isPlaylistMode && !!selectedPlaylist && isRadioMix(selectedPlaylist.playlistId);
-  const isSpotifyMode = !!selectedPlaylistUri && !!accessToken;
-  const isTwitchMode = !!selectedChannel || !!selectedVodId;
+  // Ce qui joue, décrit sans que la page connaisse les sources.
+  const media = useSessionMedia();
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevSecondsRef = useRef(secondsLeft);
   const sessionEndedRef = useRef(false);
   const goalCelebratedRef = useRef(false);
-  const playerRef = useRef<YTPlayer | null>(null);
-  const playerReadyRef = useRef(false);
-  // File de lecture maison pour les mixes radio (YouTube n'enchaîne pas une liste
-  // d'IDs arbitraires de façon fiable → on gère nous-mêmes la progression).
-  const queueRef = useRef<{ ids: string[]; index: number }>({ ids: [], index: 0 });
   const isBreakRef = useRef(mode !== "work");
+  // La ville (halte + mode Spotify) : événements de ville déclenchés par la session.
+  const city = useRef<CityHandle>(null);
   const isRunningRef = useRef(isRunning);
   const [showTodos, setShowTodos] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -141,84 +88,19 @@ export default function SessionPage() {
   // Mode ultra-zen : chrome masqué manuellement (touche H)
   const [zenHidden, setZenHidden] = useState(false);
   const [distractionFlash, setDistractionFlash] = useState(0);
-  // Mix radio YouTube résolu en liste de videoIds (null = résolution en cours).
-  const [mixIds, setMixIds] = useState<string[] | null>(null);
-  // Vraie playlist PL… résolue en pistes { id, title } (null = résolution en
-  // cours ; [] = échec → repli lecteur natif YouTube).
-  const [playlistTracks, setPlaylistTracks] = useState<{ id: string; title: string }[] | null>(null);
-  // Index réactif de la piste en cours (file maison) → affichage « Now Playing ».
-  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
-  // Id de la piste courante + taille de la file (miroirs réactifs de queueRef,
-  // qui peut être réordonnée par le shuffle ou étendue par les recos de fin).
-  const [currentTrackId, setCurrentTrackId] = useState<string | null>(null);
-  const [queueTotal, setQueueTotal] = useState(0);
-  const volumeRef = useRef(0.8);
-  // Titres connus des pistes de la file maison (videoId → titre).
-  const [trackTitles, setTrackTitles] = useState<Record<string, string>>({});
-  // Ordre d'origine de la file (pour désactiver le shuffle proprement).
-  const originalOrderRef = useRef<string[]>([]);
-  // Préférences de lecture (shuffle / boucle) — refs pour les callbacks IFrame.
+  // Préférences de lecture (shuffle / boucle), communes à toutes les sources.
   const { shuffle, loop } = usePlaybackPrefsStore();
-  const shuffleRef = useRef(shuffle);
-  const loopRef = useRef(loop);
-  useEffect(() => { loopRef.current = loop; }, [loop]);
-  // Garde anti-doublon : une seule résolution de « titres similaires » en vol.
-  const fetchingMoreRef = useRef(false);
+  // L'adaptateur de la source en cours (interface de lecture unique, phase 8).
+  const [adapter, setAdapter] = useState<PlayerAdapter | null>(null);
+  const pb = usePlayback(adapter);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
   const isBreak = mode !== "work";
-  const isLong = mode === "long-break";
 
   // Keep refs in sync for use inside IFrame API callbacks
   useEffect(() => { isBreakRef.current = isBreak; }, [isBreak]);
   useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
-
-  // ── Résolution des mixes radio YouTube (RD…) ──────────────────────────────
-  // Les radios ne sont pas embarquables : on les résout en liste de videoIds via
-  // /api/youtube/mix, puis on les joue comme une file contrôlable (skip + loop).
-  // Repli sur la vidéo de départ en boucle si la résolution échoue.
-  useEffect(() => {
-    if (!isMix || !selectedPlaylist) return;
-    let cancelled = false;
-    (async () => {
-      const { ids, titles } = await fetchMixVideos(selectedPlaylist.playlistId, selectedPlaylist.startVideoId);
-      if (cancelled) return;
-      if (ids.length > 0) {
-        setTrackTitles((prev) => ({ ...prev, ...titles }));
-        setMixIds(ids);
-      } else {
-        setMixIds(selectedPlaylist.startVideoId ? [selectedPlaylist.startVideoId] : []);
-        toast({
-          title: "Mix YouTube indisponible",
-          description: "Lecture de la vidéo de départ en boucle.",
-          accent: "amber",
-        });
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [isMix, selectedPlaylist?.playlistId, selectedPlaylist?.startVideoId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Résolution des vraies playlists (PL/OL/UU/FL/…) ───────────────────────
-  // On récupère la liste ordonnée { id, title } côté serveur pour jouer via la
-  // file maison (shuffle, titre exact, recos de fin). [] = échec → repli natif.
-  useEffect(() => {
-    if (!isPlaylistMode || isMix || !selectedPlaylist) return;
-    let cancelled = false;
-    (async () => {
-      const videos = await fetchPlaylistVideos(selectedPlaylist.playlistId, selectedPlaylist.startVideoId);
-      if (cancelled) return;
-      // Titres ajoutés par l'utilisateur (« + Playlist » dans Découvrir/modal),
-      // joués à la suite de la playlist (dédupliqués).
-      const extras = (selectedPlaylist.extraVideos ?? []).filter(
-        (e) => !videos.some((v) => v.id === e.id)
-      );
-      const all = videos.length > 0 ? [...videos, ...extras] : extras;
-      setTrackTitles((prev) => ({ ...prev, ...Object.fromEntries(all.map((v) => [v.id, v.title])) }));
-      setPlaylistTracks(all);
-    })();
-    return () => { cancelled = true; };
-  }, [isPlaylistMode, isMix, selectedPlaylist?.playlistId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Chime sounds on mode transitions ─────────────────────────────────────
   // Fin de pomodoro : bloom doux plein écran de la teinte d'ambiance (une
@@ -278,216 +160,15 @@ export default function SessionPage() {
     return () => window.removeEventListener("pointerdown", ask);
   }, []);
 
-  // ── YouTube IFrame API ────────────────────────────────────────────────────
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
-  const initPlayer = useCallback(() => {
-    if (!window.YT?.Player || playerRef.current) return;
-
-    // File de lecture maison (mix radio résolu OU file FocusFlow). YouTube
-    // n'enchaîne PAS de façon fiable une liste d'IDs arbitraires en embed (ni
-    // `loadPlaylist([ids])`, ni le playerVar `playlist` : après la 1ʳᵉ, l'autoplay
-    // « vidéos liées » reprend la main = hors liste). On gère donc la progression
-    // NOUS-MÊMES : à la fin d'un titre (état ENDED=0) on charge le suivant.
-    const advance = (target: YTPlayer) => {
-      const q = queueRef.current;
-      q.index = (q.index + 1) % q.ids.length;
-      setCurrentTrackIndex(q.index);
-      setCurrentTrackId(q.ids[q.index] ?? null);
-      setQueueTotal(q.ids.length);
-      target.loadVideoById(q.ids[q.index]);
-    };
-
-    const buildManualQueue = (ids: string[]) => {
-      originalOrderRef.current = [...ids];
-      const order = shuffleRef.current ? shuffleKeepFirst(ids) : [...ids];
-      queueRef.current = { ids: order, index: 0 };
-      setCurrentTrackIndex(0);
-      setCurrentTrackId(order[0] ?? null);
-      setQueueTotal(order.length);
-      playerRef.current = new window.YT.Player("yt-player", {
-        videoId: order[0],
-        playerVars: { autoplay: 1, mute: 0, controls: 0, rel: 0, modestbranding: 1 },
-        events: {
-          onReady: (e: { target: YTPlayer }) => {
-            playerReadyRef.current = true;
-            e.target.setPlaybackQuality("hd1080");
-            e.target.setVolume(Math.round(volumeRef.current * 100));
-            if (isBreakRef.current || !isRunningRef.current) e.target.pauseVideo();
-          },
-          onStateChange: (e: { data: number; target: YTPlayer }) => {
-            if (e.data !== 0) return;
-            const q = queueRef.current;
-            if (q.ids.length === 0) return;
-            // Fin de file sans boucle : on enchaîne sur des titres similaires
-            // (mix RD du dernier titre) au lieu de reboucler. Échec → boucle.
-            if (q.index >= q.ids.length - 1 && !loopRef.current) {
-              // Résolution déjà en vol → ENDED redondant, on l'ignore (sinon
-              // double avancement quand la requête se termine).
-              if (fetchingMoreRef.current) return;
-              fetchingMoreRef.current = true;
-              const lastId = q.ids[q.index];
-              fetchMixVideos(`RD${lastId}`, lastId).then(({ ids: recIds, titles }) => {
-                fetchingMoreRef.current = false;
-                const fresh = recIds.filter((id) => id !== lastId && !q.ids.includes(id));
-                if (fresh.length > 0) {
-                  setTrackTitles((prev) => ({ ...prev, ...titles }));
-                  q.ids.push(...fresh);
-                  originalOrderRef.current.push(...fresh);
-                  toast({
-                    title: "Fin de la liste",
-                    description: "La lecture continue avec des titres similaires.",
-                    accent: "emerald",
-                  });
-                }
-                advance(e.target);
-              });
-              return;
-            }
-            advance(e.target);
-          },
-        },
-      });
-    };
-
-    if (isQueueMode) {
-      // File FocusFlow : titres exacts choisis par l'utilisateur, dans l'ordre.
-      if (queueIds.length === 0) return;
-      buildManualQueue(queueIds);
-    } else if (isPlaylistMode && selectedPlaylist) {
-      const playlistId = selectedPlaylist.playlistId;
-      const mix = isRadioMix(playlistId);
-      // Mix radio : on attend la résolution serveur (mixIds) avant de créer le player.
-      if (mix && mixIds === null) return;
-
-      if (mix) {
-        const ids = mixIds && mixIds.length > 0
-          ? mixIds
-          : (selectedPlaylist.startVideoId ? [selectedPlaylist.startVideoId] : []);
-        if (ids.length === 0) return; // rien à jouer
-        buildManualQueue(ids);
-      } else if (playlistTracks === null) {
-        // Vraie playlist : on attend la résolution serveur avant de créer le player.
-        return;
-      } else if (playlistTracks.length > 0) {
-        // Playlist résolue → file maison (shuffle, titre exact, recos de fin).
-        buildManualQueue(playlistTracks.map((t) => t.id));
-      } else {
-        // Repli : résolution échouée → lecteur natif YouTube (PL/OL/UU/FL/LL/RDCLAK).
-        const onReadyPlaylist = (e: { target: YTPlayer }) => {
-          playerReadyRef.current = true;
-          e.target.setPlaybackQuality("hd1080");
-          e.target.setVolume(Math.round(volumeRef.current * 100));
-          e.target.loadPlaylist({ list: playlistId, listType: "playlist", index: 0 });
-          e.target.setLoop(true);
-          if (isBreakRef.current || !isRunningRef.current) e.target.pauseVideo();
-        };
-        playerRef.current = new window.YT.Player("yt-player", {
-          playerVars: { autoplay: 1, mute: 0, controls: 0, rel: 0, modestbranding: 1 },
-          events: { onReady: onReadyPlaylist },
-        });
-      }
-    } else {
-      const onReady = (e: { target: YTPlayer }) => {
-        playerReadyRef.current = true;
-        e.target.setPlaybackQuality("hd1080");
-        e.target.setVolume(Math.round(volumeRef.current * 100));
-        if (!isBreakRef.current && isRunningRef.current) {
-          e.target.playVideo();
-        } else {
-          e.target.pauseVideo();
-        }
-      };
-      // Mode vidéo unique : loop sur la même vidéo
-      playerRef.current = new window.YT.Player("yt-player", {
-        videoId: video.youtubeId,
-        playerVars: {
-          autoplay: 1,
-          mute: 0,
-          controls: 0,
-          rel: 0,
-          modestbranding: 1,
-          showinfo: 0,
-          loop: 1,
-          playlist: video.youtubeId,
-          suggestedQuality: "hd1080",
-        },
-        events: { onReady },
-      });
-    }
-  }, [video?.youtubeId, isPlaylistMode, selectedPlaylist?.playlistId, mixIds, playlistTracks, isQueueMode, queueKey]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Shuffle togglable en cours de lecture ─────────────────────────────────
-  // ON : mélange les pistes restantes (piste courante en tête). OFF : retour à
-  // l'ordre d'origine, en repositionnant l'index sur la piste courante.
+  // ── Pilotage commun à toutes les sources ──────────────────────────────────
+  // Une seule règle : la musique joue pendant le travail minuteur en marche,
+  // s'arrête en pause et pendant la halte (Twitch compris, ce qui manquait).
   useEffect(() => {
-    if (shuffleRef.current === shuffle) return;
-    shuffleRef.current = shuffle;
-    const q = queueRef.current;
-    if (q.ids.length <= 1) return;
-    const currentId = q.ids[q.index];
-    if (shuffle) {
-      const rest = q.ids.filter((id) => id !== currentId);
-      for (let i = rest.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [rest[i], rest[j]] = [rest[j], rest[i]];
-      }
-      q.ids = [currentId, ...rest];
-      q.index = 0;
-    } else {
-      q.ids = [...originalOrderRef.current];
-      q.index = Math.max(0, q.ids.indexOf(currentId));
-    }
-    setCurrentTrackIndex(q.index);
-    setCurrentTrackId(q.ids[q.index] ?? null);
-    setQueueTotal(q.ids.length);
-  }, [shuffle]);
-
-  useEffect(() => {
-    if (isSpotifyMode || isTwitchMode) return;
-
-    let pollInterval: ReturnType<typeof setInterval> | null = null;
-
-    if (window.YT?.Player) {
-      initPlayer();
-    } else {
-      if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
-        const tag = document.createElement("script");
-        tag.src = "https://www.youtube.com/iframe_api";
-        document.head.appendChild(tag);
-      }
-      const prev = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = () => {
-        prev?.();
-        initPlayer();
-      };
-      // Fallback poll in case callback was already fired before we set it
-      pollInterval = setInterval(() => {
-        if (window.YT?.Player) {
-          clearInterval(pollInterval!);
-          pollInterval = null;
-          initPlayer();
-        }
-      }, 100);
-    }
-
-    return () => {
-      if (pollInterval) clearInterval(pollInterval);
-      playerRef.current?.destroy();
-      playerRef.current = null;
-      playerReadyRef.current = false;
-    };
-  }, [initPlayer, isSpotifyMode, isTwitchMode]);
-
-  // ── Control video playback ────────────────────────────────────────────────
-  useEffect(() => {
-    if (isSpotifyMode || isTwitchMode) return;
-    if (!playerReadyRef.current || !playerRef.current) return;
-    if (!isBreak && isRunning) {
-      playerRef.current.playVideo();
-    } else {
-      playerRef.current.pauseVideo();
-    }
-  }, [isBreak, isRunning, isSpotifyMode, isTwitchMode]);
+    if (!adapter) return;
+    if (!isBreak && isRunning) adapter.play(); else adapter.pause();
+  }, [adapter, isBreak, isRunning]);
+  useEffect(() => { adapter?.setShuffle(shuffle); }, [adapter, shuffle]);
+  useEffect(() => { adapter?.setLoop(loop); }, [adapter, loop]);
 
   // ── Timer tick ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -499,26 +180,10 @@ export default function SessionPage() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [isRunning, tick]);
 
-  // ── Build play history entry ──────────────────────────────────────────────
-  const buildPlayEntry = (minutes: number) => {
-    const today = new Date();
-    const date = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, "0"), String(today.getDate()).padStart(2, "0")].join("-");
-    if (isSpotifyMode) {
-      const pl = spotifyPlaylists.find((p) => p.uri === selectedPlaylistUri);
-      return { type: "spotify" as const, title: pl?.name ?? "Playlist Spotify", subtitle: `${pl?.trackCount ?? 0} titres`, thumbnailUrl: pl?.imageUrl, mediaKey: selectedPlaylistUri ?? "spotify", date, timestamp: Date.now(), minutes };
-    }
-    if (isTwitchMode) {
-      if (selectedVodId) return { type: "twitch-vod" as const, title: `VOD ${selectedVodId}`, subtitle: "Twitch VOD", mediaKey: `vod:${selectedVodId}`, date, timestamp: Date.now(), minutes };
-      return { type: "twitch-live" as const, title: selectedChannel ?? "Twitch", subtitle: "Live Twitch", mediaKey: `live:${selectedChannel}`, date, timestamp: Date.now(), minutes };
-    }
-    if (isQueueMode) {
-      return { type: "playlist" as const, title: "File FocusFlow", subtitle: `${queueItems.length} titre${queueItems.length > 1 ? "s" : ""}`, thumbnailUrl: queueItems[0]?.thumbnailUrl, mediaKey: "queue", date, timestamp: Date.now(), minutes };
-    }
-    if (isPlaylistMode && selectedPlaylist) {
-      return { type: "playlist" as const, title: selectedPlaylist.title, subtitle: selectedPlaylist.channelName ?? "YouTube Playlist", thumbnailUrl: selectedPlaylist.thumbnailUrl, mediaKey: `pl:${selectedPlaylist.playlistId}`, date, timestamp: Date.now(), minutes };
-    }
-    return { type: "youtube" as const, title: video.title, subtitle: video.channel, thumbnailUrl: `https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`, mediaKey: video.youtubeId, date, timestamp: Date.now(), minutes };
-  };
+  // Lu dans des callbacks mémorisés : toujours la description courante.
+  const playEntryRef = useRef(media.playEntry);
+  useEffect(() => { playEntryRef.current = media.playEntry; });
+  const buildPlayEntry = (minutes: number) => playEntryRef.current(minutes);
 
   // ── Celebrations: achievements unlocked + daily goal reached ──────────────
   const celebrateProgress = () => {
@@ -535,13 +200,14 @@ export default function SessionPage() {
       if (progress.reached) {
         goalCelebratedRef.current = true;
         playWorkChime();
-        toast({ title: "Objectif du jour atteint", description: "Bravo, continue sur ta lancée.", accent: "emerald" });
+        toast({ title: "Objectif du jour atteint", description: "Une vague de lumière traverse la ville.", accent: "emerald" });
+        // Événement de ville : une vague de lumière part de la tour, une fois la halte installée.
+        setTimeout(() => city.current?.goal(), 3200);
       }
     }
   };
 
   // ── Session end ───────────────────────────────────────────────────────────
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleSessionEnd = useCallback(() => {
     if (typeof window !== "undefined" && Notification.permission === "granted") {
       new Notification("FocusFlow", {
@@ -561,7 +227,7 @@ export default function SessionPage() {
       sessionEndedRef.current = false;
     }
     nextSession(true);
-  }, [mode, nextSession, recordSession, settings.workDuration]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, nextSession, recordSession, recordPlay, settings.workDuration]);
 
   useEffect(() => {
     if (prevSecondsRef.current > 0 && secondsLeft === 0) handleSessionEnd();
@@ -605,6 +271,7 @@ export default function SessionPage() {
     if (isBreakRef.current) return; // only count during focus
     markDistraction();
     setDistractionFlash((n) => n + 1); // trigger a brief visual feedback
+    city.current?.flicker(); // Spotify : un quartier grésille
   }, [markDistraction]);
 
   // Keyboard shortcuts (ignored while typing in a field):
@@ -642,62 +309,39 @@ export default function SessionPage() {
 
   const handleVolumeChange = (v: number) => {
     setVolumeState(v);
-    volumeRef.current = v;
     armVolumeHide();
-    if (!isSpotifyMode && !isTwitchMode && playerRef.current && playerReadyRef.current) {
-      playerRef.current.setVolume(Math.round(v * 100));
-    }
+    adapter?.setVolume(v);
   };
 
-  // File maison active (mix radio, File FocusFlow, ou playlist résolue).
-  const usesManualQueue = isQueueMode || isMix || (isPlaylistMode && (playlistTracks?.length ?? 0) > 0);
-
-  const skipTrack = (dir: "next" | "prev") => {
-    if (!playerRef.current || !playerReadyRef.current) return;
-    if (usesManualQueue) {
-      // File maison : on déplace l'index et on charge le titre correspondant.
-      const q = queueRef.current;
-      if (q.ids.length === 0) return;
-      q.index = dir === "next"
-        ? (q.index + 1) % q.ids.length
-        : (q.index - 1 + q.ids.length) % q.ids.length;
-      setCurrentTrackIndex(q.index);
-      setCurrentTrackId(q.ids[q.index] ?? null);
-      setQueueTotal(q.ids.length);
-      playerRef.current.loadVideoById(q.ids[q.index]);
-    } else if (dir === "next") {
-      playerRef.current.nextVideo();
-    } else {
-      playerRef.current.previousVideo();
-    }
+  // Fin de liste prolongée par des titres proches : toast et ville.
+  const handleExtended = ({ added }: ExtendedEvent, kind: SourceKind) => {
+    if (added === 0) return;
+    toast({
+      title: kind === "spotify" ? "Fin de la playlist" : "Fin de la liste",
+      description: kind === "spotify"
+        ? `${added} titre${added > 1 ? "s" : ""} proche${added > 1 ? "s" : ""} de toute ta playlist ajouté${added > 1 ? "s" : ""} à la suite.`
+        : "La lecture continue avec des titres proches de toute ta playlist.",
+      accent: "emerald",
+    });
+    city.current?.extend();
   };
 
-  // « Now Playing » unifié (sources YouTube). Spotify/Twitch gardent leur propre UI.
-  const nowPlaying: { title: string; sub: string } | null = (() => {
-    if (isSpotifyMode || isTwitchMode) return null;
-    // La file maison peut avoir été réordonnée (shuffle) ou étendue (recos de
-    // fin) : currentTrackId / queueTotal sont les miroirs réactifs de queueRef.
-    if (isQueueMode) {
-      const it = queueItems.find((i) => i.youtubeId === currentTrackId) ?? queueItems[currentTrackIndex];
-      const title = it?.title ?? (currentTrackId ? trackTitles[currentTrackId] : undefined);
-      return title ? { title, sub: `File · ${currentTrackIndex + 1}/${Math.max(queueTotal, queueItems.length)}` } : null;
-    }
-    if (isMix) {
-      const title = (currentTrackId && trackTitles[currentTrackId]) || selectedPlaylist?.title || "Mix radio";
-      return { title, sub: queueTotal ? `Mix · ${currentTrackIndex + 1}/${queueTotal}` : "Mix radio" };
-    }
-    if (isPlaylistMode && selectedPlaylist) {
-      const title = (currentTrackId && trackTitles[currentTrackId]) || selectedPlaylist.title;
-      return { title, sub: queueTotal ? `${selectedPlaylist.title} · ${currentTrackIndex + 1}/${queueTotal}` : "Playlist" };
-    }
-    return { title: video.title, sub: video.channel };
-  })();
+  const skipTrack = (dir: "next" | "prev") => { if (dir === "next") adapter?.next(); else adapter?.previous(); };
+
+  // « Now Playing » unifié : la piste que l'adaptateur déclare, quelle que soit la source.
+  const nowPlaying: { title: string; sub: string } | null = pb.track
+    ? {
+        title: pb.track.title,
+        sub: [pb.track.subtitle, pb.track.total ? `${(pb.track.index ?? 0) + 1}/${pb.track.total}` : ""].filter(Boolean).join(" · "),
+      }
+    : null;
 
   // ── Activité en clair pour les amis (rich presence) ───────────────────────
   // « En focus · <titre écouté> » / « En pause » / « Flowtime · … ». Éphémère,
   // publiée dans friend_stats.activity ; effacée à la sortie de session.
   const activityKind = mode !== "work" ? "En pause" : isFlowtime ? "Flowtime" : "En focus";
-  const activityMedia = isSpotifyMode ? "Spotify" : isTwitchMode ? "Twitch" : nowPlaying?.title ?? "";
+  const sourceName = SOURCE_NAME[media.kind];
+  const activityMedia = nowPlaying ? [nowPlaying.title, sourceName].filter(Boolean).join(" · ") : sourceName;
   const activityLabel = activityMedia ? `${activityKind} · ${activityMedia}` : activityKind;
   useEffect(() => {
     upsertMyFriendStats({ activity: activityLabel });
@@ -743,44 +387,25 @@ export default function SessionPage() {
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
-      {/* Audio/video source — YouTube, Spotify, or Twitch */}
-      {isSpotifyMode ? (
-        <SpotifyPlayer
-          shouldPlay={!isBreak && isRunning}
-          playlistUri={selectedPlaylistUri!}
-        />
-      ) : isTwitchMode ? (
-        <TwitchPlayer
-          channel={selectedChannel ?? undefined}
-          vodId={selectedVodId ?? undefined}
-          token={twitchToken ?? undefined}
-          volume={volume}
-        />
-      ) : (
-        <div
-          id="yt-player"
-          className="absolute inset-0 w-full h-full"
-          style={{ pointerEvents: "none" }}
-        />
-      )}
-
-      {/* Vignette (work only, not on Twitch to keep natural brightness) */}
-      {!isBreak && !isTwitchMode && (
-        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(0,0,0,0.45)_100%)]" />
-      )}
-
-      {/* Halo d'ambiance discret autour du lecteur (teinte du média) ; le
-          changement de `key` sur skip/fin de titre déclenche une pulsation unique */}
-      {!isBreak && !isTwitchMode && (
-        <div
-          key={`halo-${currentTrackIndex}`}
-          className="absolute inset-0 pointer-events-none anim-halo-pulse"
-          style={{
-            boxShadow: "inset 0 0 160px 20px color-mix(in oklab, var(--ambient) 55%, transparent)",
-            opacity: 0.35,
-          }}
-        />
-      )}
+      {/* Le lecteur, quelle que soit la source (seul endroit qui les distingue). */}
+      <SessionMedia
+        media={media}
+        playing={!isBreak && isRunning}
+        isBreak={isBreak}
+        volume={volume}
+        trackId={pb.track?.id}
+        onAdapter={setAdapter}
+        onExtended={handleExtended}
+        backdrop={
+          <SessionCity
+            ref={city}
+            phase="work"
+            board={isFlowtime ? "FLOW" : `${Math.max(1, Math.ceil(secondsLeft / 60))} MIN`}
+            className="absolute inset-0"
+            label="La ville la nuit derrière une vitre mouillée, décor de la session."
+          />
+        }
+      />
 
       {/* Bloom doux plein écran à la fin d'un pomodoro (opacité gérée par .anim-bloom) */}
       {bloomKey > 0 && (
@@ -805,97 +430,66 @@ export default function SessionPage() {
         </div>
       )}
 
-      {/* Twitch sub-only fallback banner */}
-      {isTwitchMode && !isBreak && (
-        <div className="absolute bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-10 px-3 max-w-full">
-          <a
-            href={
-              selectedVodId
-                ? `https://www.twitch.tv/videos/${selectedVodId}`
-                : `https://www.twitch.tv/${selectedChannel}`
-            }
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-black/70 backdrop-blur-md border border-[#9146ff]/30 text-white/70 hover:text-white hover:border-[#9146ff]/60 text-xs font-medium transition-all"
-          >
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-[#9146ff]" fill="currentColor">
-              <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
-            </svg>
-            Contenu réservé aux abonnés ? Ouvrir sur Twitch
-            <svg className="w-3 h-3 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </a>
-        </div>
-      )}
-
-      {/* ── Break overlay ──────────────────────────────────────────────────── */}
+      {/* ── La halte (pause) : la ville s'éteint, la vue se brouille ───────── */}
       {isBreak && (
-        <div className="absolute inset-0 z-20 bg-[#0a0a0c]/95 flex flex-col items-center justify-center gap-5 sm:gap-8 px-4 py-6 overflow-y-auto">
-          {/* Teinte d'ambiance en variante froide (data-ambient-phase="break"
-              posé par AmbientProvider décale --ambient vers le bleu) */}
-          <div
-            className="absolute inset-0 opacity-20 pointer-events-none"
-            style={{ background: "radial-gradient(ellipse at center, var(--ambient) 0%, transparent 70%)" }}
+        <div className="absolute inset-0 z-20 bg-[#0b1016]">
+          <SessionCity
+            ref={city}
+            phase="break"
+            board={`${Math.max(1, Math.ceil(secondsLeft / 60))} MIN`}
+            className="absolute inset-0"
+            label={`La halte : la ville s'est éteinte au loin, il reste ${formatTime(secondsLeft)} de pause.`}
           />
-          {/* Aurore douce : moment de repos (transform-only via .anim-aurora →
-              neutralisé en reduced-motion, mis en pause si l'onglet est caché) */}
-          <div aria-hidden className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="anim-aurora absolute -top-1/4 left-1/5 w-[70vmin] h-[70vmin] rounded-full opacity-25 blur-3xl" style={{ background: "radial-gradient(circle, var(--ambient) 0%, transparent 65%)" }} />
-            <div className="anim-aurora-slow absolute -bottom-1/4 right-1/5 w-[60vmin] h-[60vmin] rounded-full opacity-20 blur-3xl" style={{ background: "radial-gradient(circle, var(--ambient-2) 0%, transparent 65%)" }} />
-          </div>
-          {/* Label */}
-          <div className="flex flex-col items-center gap-2 z-10">
-            <div className={cn("text-xs font-semibold uppercase tracking-[0.2em]", isLong ? "text-sky-400" : "text-emerald-400")}>
-              {breakLabel[mode]}
+          {/* Voile de lecture : à gauche sur grand écran, en bas sur mobile. */}
+          <div aria-hidden className="absolute inset-0 pointer-events-none bg-[linear-gradient(90deg,#0b1016_0%,rgba(11,16,22,0.86)_32%,rgba(11,16,22,0.15)_62%,transparent_80%)] max-md:bg-[linear-gradient(0deg,#0b1016_0%,rgba(11,16,22,0.9)_45%,rgba(11,16,22,0.2)_70%,transparent_85%)]" />
+          <div className="relative z-10 h-full overflow-y-auto flex items-end md:items-center px-5 sm:px-10 lg:px-16 py-8">
+            <div className="flex flex-col gap-6 max-w-md text-[#e9f2ff]">
+              <div>
+                <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#53e0a1]">{breakLabel[mode]}</p>
+                <h1 className="mt-2 font-display font-extrabold uppercase text-[clamp(3rem,8vw,5.5rem)] leading-[0.88]">La halte</h1>
+                <p className="mt-3 text-[15px] text-[#e9f2ff]/75">
+                  {sessionsCompleted > 0 ? `Pomodoro ${sessionsCompleted} terminé. ` : ""}La ville s&apos;éteint au loin. Lève les yeux de l&apos;écran.
+                </p>
+              </div>
+              <div>
+                <p className="font-led text-[clamp(4.5rem,12vw,7.5rem)] leading-none text-[#53e0a1]" role="timer" aria-label={`Pause : ${formatTime(secondsLeft)}`}>
+                  {formatTime(secondsLeft)}
+                </p>
+                <div className="mt-4 h-[3px] w-full max-w-[18rem] bg-[#e9f2ff]/10 rounded-[1px] overflow-hidden">
+                  <div
+                    className="h-full bg-[#53e0a1] origin-left"
+                    style={{ transform: `scaleX(${breakTotal > 0 ? secondsLeft / breakTotal : 0})`, transition: "transform 1s linear" }}
+                  />
+                </div>
+              </div>
+              {breathingEnabled && <BreathingExercise />}
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => nextSession(true)}
+                  className="ff-press inline-flex items-center gap-2 h-10 px-4 rounded-[4px] border border-[#e9f2ff]/30 hover:border-[#e9f2ff]/70 text-[#e9f2ff]/85 hover:text-[#e9f2ff] text-sm transition-colors"
+                >
+                  Passer la pause
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                    <path d="M5 4l15 8-15 8V4z" strokeLinecap="round" strokeLinejoin="round" />
+                    <line x1="19" y1="4" x2="19" y2="20" strokeLinecap="round" />
+                  </svg>
+                </button>
+                <button
+                  onClick={handleStop}
+                  className="ff-press inline-flex items-center gap-2 h-10 px-4 rounded-[4px] border border-[#ff6b5c]/40 hover:border-[#ff6b5c] text-[#ff8a7d] hover:text-[#ffb0a6] text-sm transition-colors"
+                >
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden><rect x="6" y="6" width="12" height="12" rx="1" /></svg>
+                  Terminer la session
+                </button>
+              </div>
+              <button
+                onClick={() => usePrefsStore.getState().setBreathingEnabled(!breathingEnabled)}
+                className="self-start text-[12px] text-[#e9f2ff]/55 hover:text-[#e9f2ff]/85 underline-offset-4 hover:underline transition-colors"
+              >
+                {breathingEnabled ? "Masquer la respiration guidée" : "Afficher la respiration guidée"}
+              </button>
             </div>
-            <h1 className="text-4xl sm:text-5xl font-thin text-white/90 tracking-tight">Repose-toi</h1>
-            <p className="text-white/30 text-sm mt-1 text-center">
-              Session {sessionsCompleted} terminée — bien joué.
-            </p>
           </div>
-          {/* Countdown */}
-          <div className={cn("text-6xl sm:text-8xl font-extralight tabular-nums tracking-tighter z-10", isLong ? "text-sky-300" : "text-emerald-300")}>
-            {formatTime(secondsLeft)}
-          </div>
-          {/* Progress bar */}
-          <div className="w-48 h-0.5 bg-white/10 rounded-full z-10 overflow-hidden">
-            <div
-              className={cn("h-full rounded-full", isLong ? "bg-sky-400" : "bg-emerald-400")}
-              style={{ width: `${breakTotal > 0 ? (secondsLeft / breakTotal) * 100 : 0}%`, transition: "width 1s linear" }}
-            />
-          </div>
-          {/* Guided breathing */}
-          {breathingEnabled && <BreathingExercise accent={isLong ? "sky" : "emerald"} />}
-          {/* Buttons */}
-          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 z-10">
-            <button
-              onClick={() => nextSession(true)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/50 hover:text-white text-xs font-medium transition-all"
-            >
-              Passer la pause
-              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path d="M5 4l15 8-15 8V4z" strokeLinecap="round" strokeLinejoin="round" />
-                <line x1="19" y1="4" x2="19" y2="20" strokeLinecap="round" />
-              </svg>
-            </button>
-            <button
-              onClick={handleStop}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400/70 hover:text-red-400 text-xs font-medium transition-all"
-            >
-              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="6" width="12" height="12" rx="1.5" />
-              </svg>
-              Terminer la session
-            </button>
-          </div>
-          {/* Breathing toggle */}
-          <button
-            onClick={() => usePrefsStore.getState().setBreathingEnabled(!breathingEnabled)}
-            className="z-10 text-[11px] text-white/30 hover:text-white/60 transition-colors"
-          >
-            {breathingEnabled ? "Masquer la respiration guidée" : "Afficher la respiration guidée"}
-          </button>
         </div>
       )}
 
@@ -906,7 +500,7 @@ export default function SessionPage() {
           <button
             onClick={addNote}
             title="Ajouter un post-it"
-            className="fixed bottom-20 md:bottom-6 left-3 md:left-6 z-[100] flex items-center gap-2 px-3 py-2 rounded-xl bg-black/70 backdrop-blur-sm border border-white/25 text-white/75 hover:text-white hover:bg-black/80 text-xs font-medium transition-all"
+            className="fixed bottom-20 md:bottom-6 left-3 md:left-6 z-[100] flex items-center gap-2 px-3 py-2 rounded-[6px] bg-black/70 backdrop-blur-sm border border-white/25 text-white/75 hover:text-white hover:bg-black/80 text-xs font-medium transition-all"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round" />
@@ -929,7 +523,7 @@ export default function SessionPage() {
             <div className={cn("flex flex-col items-start gap-2 max-w-[calc(100%-9rem)] md:max-w-[42%] anim-cascade", chromeHideCls)}>
               <button
                 onClick={handleStop}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/75 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/10 text-xs font-medium transition-all"
+                className="flex items-center gap-2 px-4 py-2 rounded-[6px] bg-black/60 backdrop-blur-sm border border-white/20 text-white/75 hover:text-[#ff8a7d] hover:border-[#ff6b5c]/50 hover:bg-[#ff6b5c]/10 text-xs font-medium transition-all"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
                   <rect x="6" y="6" width="12" height="12" rx="1.5" />
@@ -937,53 +531,47 @@ export default function SessionPage() {
                 Terminer
               </button>
               {nowPlaying && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/50 backdrop-blur-sm border border-white/10 max-w-full">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-black/50 backdrop-blur-sm border border-white/10 max-w-full">
                   <Equalizer
                     playing={isRunning}
-                    mood={!isQueueMode && !isPlaylistMode ? video.mood : undefined}
+                    mood={media.mood}
                   />
                   {/* key = index de piste → le titre glisse à chaque changement */}
-                  <div key={currentTrackIndex} className="min-w-0 anim-track-in">
+                  <div key={pb.track?.id ?? ""} className="min-w-0 anim-track-in">
                     <p className="text-white/85 text-xs font-medium truncate">{nowPlaying.title}</p>
-                    <p className="text-white/35 text-[10px] truncate">{nowPlaying.sub}</p>
+                    <p className="text-white/60 text-[10px] truncate">{pb.extending ? "Recherche de titres proches de ta playlist…" : nowPlaying.sub}</p>
+                    {pb.error && <p role="status" className="text-[#ff8a7d] text-[10px] mt-0.5">{pb.error}</p>}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Timer — centré en absolu sur desktop, en flux à droite sur mobile */}
-            <div className="flex-shrink-0 md:absolute md:left-1/2 md:-translate-x-1/2 flex flex-col items-center gap-1.5 anim-cascade [animation-delay:80ms]">
-              {/* Halo d'ambiance discret derrière le timer */}
-              <div
-                className="absolute -inset-x-16 -inset-y-6 -z-10 pointer-events-none rounded-full"
-                style={{
-                  background: "radial-gradient(ellipse at center, color-mix(in oklab, var(--ambient) 60%, transparent) 0%, transparent 70%)",
-                  opacity: 0.45,
-                }}
-              />
-              <div className="w-24 md:w-36 h-[2px] bg-white/10 rounded-full overflow-hidden">
-                {isFlowtime ? (
-                  <div className="h-full w-full bg-white/25 rounded-full animate-pulse" />
-                ) : (
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      background: "color-mix(in oklab, var(--ambient-2) 45%, white)",
-                      width: `${progress * 100}%`,
-                      transition: "width 1s linear",
-                    }}
-                  />
+            {/* Minuteur : un panneau d'affichage de quai (plaque sombre, chiffres
+                à points Doto en sodium), centré sur desktop, à droite sur mobile.
+                Lisible sur n'importe quelle vidéo grâce à la plaque. */}
+            <div className="flex-shrink-0 md:absolute md:left-1/2 md:-translate-x-1/2 anim-cascade [animation-delay:80ms]">
+              <div className="flex flex-col items-center gap-1 rounded-[4px] bg-[#05070a]/80 backdrop-blur-sm border border-white/10 px-3 md:px-4 pt-1.5 pb-1.5 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.8)]">
+                <span
+                  role="timer"
+                  aria-label={`${isFlowtime ? "Flowtime" : "Temps restant"} : ${formatTime(isFlowtime ? flowSeconds : secondsLeft)}`}
+                  className="font-led text-[26px] md:text-[34px] leading-none text-[#ff9a3c] [text-shadow:0_0_12px_rgba(255,154,60,0.45)]"
+                >
+                  {formatTime(isFlowtime ? flowSeconds : secondsLeft)}
+                </span>
+                {/* Jauge : une rangée de 25 points qui s'allument, comme le panneau. */}
+                {!isFlowtime && (
+                  <span aria-hidden className="flex gap-[3px]">
+                    {Array.from({ length: 25 }, (_, i) => (
+                      <span key={i} className={cn("w-[3px] h-[3px] rounded-[1px]", i < Math.round(progress * 25) ? "bg-[#ff9a3c]" : "bg-white/15")} />
+                    ))}
+                  </span>
                 )}
+                <span className="text-white/60 text-[10px] font-mono uppercase tracking-[0.14em] whitespace-nowrap">
+                  {isFlowtime
+                    ? `Flow · pause méritée ${earnedBreakMin} min`
+                    : `Pomodoro ${sessionsCompleted + 1}`}
+                </span>
               </div>
-              <TimerDigits
-                text={formatTime(isFlowtime ? flowSeconds : secondsLeft)}
-                className="text-2xl md:text-3xl font-light text-white tabular-nums tracking-tight drop-shadow-lg"
-              />
-              <span className="text-white/30 text-[10px] font-mono uppercase tracking-[0.14em]">
-                {isFlowtime
-                  ? `Flow · pause méritée ≈ ${earnedBreakMin} min`
-                  : `Focus · ${sessionsCompleted} session${sessionsCompleted !== 1 ? "s" : ""}`}
-              </span>
             </div>
 
             {/* Contrôles — à droite de la top bar sur desktop, barre fixe en bas
@@ -1000,11 +588,11 @@ export default function SessionPage() {
                   pour que Pause/Tâches restent toujours accessibles. */}
               <div className="flex-1 min-w-0 overflow-x-auto md:flex-none md:overflow-visible flex items-center gap-1 p-1 rounded-2xl bg-black/50 backdrop-blur-sm border border-white/15">
                 {/* Playlist skip controls (YouTube playlists, mixes & file FocusFlow) */}
-                {(isPlaylistMode || isQueueMode) && (
+                {pb.caps.skip && (
                   <>
                     <button
                       onClick={() => skipTrack("prev")}
-                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
+                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-[6px] text-white/75 hover:text-white hover:bg-white/10 transition-all"
                       title="Titre précédent"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -1013,7 +601,7 @@ export default function SessionPage() {
                     </button>
                     <button
                       onClick={() => skipTrack("next")}
-                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
+                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-[6px] text-white/75 hover:text-white hover:bg-white/10 transition-all"
                       title="Titre suivant"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -1022,11 +610,11 @@ export default function SessionPage() {
                     </button>
                     {/* Lecture aléatoire (file maison uniquement ; `mounted`
                         évite le flash avant réhydratation du store persisté) */}
-                    {mounted && usesManualQueue && (
+                    {mounted && pb.caps.shuffle && (
                       <button
                         onClick={() => usePlaybackPrefsStore.getState().toggleShuffle()}
                         className={cn(
-                          "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl transition-all",
+                          "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-[6px] transition-all",
                           shuffle ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
                         )}
                         title={shuffle ? "Lecture aléatoire activée" : "Activer la lecture aléatoire"}
@@ -1038,14 +626,14 @@ export default function SessionPage() {
                     )}
                     {/* Boucle : off = fin de liste → titres similaires. Masqué en
                         repli lecteur natif (setLoop(true) câblé, non pilotable). */}
-                    {mounted && usesManualQueue && (
+                    {mounted && pb.caps.loop && (
                     <button
                       onClick={() => usePlaybackPrefsStore.getState().toggleLoop()}
                       className={cn(
-                        "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl transition-all",
+                        "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-[6px] transition-all",
                         loop ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
                       )}
-                      title={loop ? "Boucle activée" : "Boucle désactivée — la fin de liste enchaîne sur des titres similaires"}
+                      title={loop ? "Boucle activée" : "Boucle désactivée : la fin de liste continue avec des titres proches de toute la playlist"}
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                         <path d="M17 1l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
@@ -1059,7 +647,7 @@ export default function SessionPage() {
                 {/* Distraction marker (shortcut: D) */}
                 <button
                   onClick={handleDistraction}
-                  className="relative w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-amber-400 hover:bg-amber-500/10 transition-all"
+                  className="relative w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-[6px] text-white/75 hover:text-[#ff8a7d] hover:bg-[#ff6b5c]/10 transition-all"
                   title="Marquer une distraction · touche D"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -1067,7 +655,7 @@ export default function SessionPage() {
                     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   {distractionCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-black text-[10px] font-bold flex items-center justify-center tabular-nums">
+                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-[#ff6b5c] text-[#1c0604] text-[10px] font-bold flex items-center justify-center tabular-nums">
                       {distractionCount}
                     </span>
                   )}
@@ -1075,7 +663,7 @@ export default function SessionPage() {
                   {distractionFlash > 0 && (
                     <span
                       key={distractionFlash}
-                      className="absolute inset-0 flex items-center justify-center pointer-events-none text-amber-300 text-xs font-bold animate-[distractionPop_0.7s_ease-out_forwards]"
+                      className="absolute inset-0 flex items-center justify-center pointer-events-none text-[#ff8a7d] text-xs font-bold animate-[distractionPop_0.7s_ease-out_forwards]"
                     >
                       +1
                     </span>
@@ -1085,8 +673,8 @@ export default function SessionPage() {
                 {/* Floating always-on-top mini timer (Document PiP) */}
                 <PipTimer onDistraction={handleDistraction} onFlowBreak={handleFlowBreak} />
 
-                {/* Volume (YouTube & Twitch only — Spotify has its own) */}
-                {!isSpotifyMode && (
+                {/* Volume : toutes les sources qui le déclarent (Spotify compris). */}
+                {pb.caps.volume && (
                   <div className="relative flex items-center flex-shrink-0">
                     {/* Panneau vertical — toujours monté pour une vraie transition
                         CSS, auto-masqué après 2,5 s. S'ouvre VERS LE HAUT sur
@@ -1094,7 +682,7 @@ export default function SessionPage() {
                     <div
                       onPointerMove={armVolumeHide}
                       className={cn(
-                        "absolute bottom-full mb-2 md:bottom-auto md:top-full md:mb-0 md:mt-2 right-0 w-9 h-28 flex items-center justify-center rounded-xl bg-black/70 backdrop-blur-sm border border-white/15 shadow-lg shadow-black/40 transition-[opacity,transform] duration-300",
+                        "absolute bottom-full mb-2 md:bottom-auto md:top-full md:mb-0 md:mt-2 right-0 w-9 h-28 flex items-center justify-center rounded-[6px] bg-black/70 backdrop-blur-sm border border-white/15 shadow-lg shadow-black/40 transition-[opacity,transform] duration-300",
                         showVolume
                           ? "opacity-100 translate-y-0"
                           : "opacity-0 translate-y-1 md:-translate-y-1 pointer-events-none"
@@ -1113,7 +701,7 @@ export default function SessionPage() {
                     </div>
                     <button
                       onClick={() => setShowVolume((v) => { const next = !v; if (next) armVolumeHide(); return next; })}
-                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
+                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-[6px] text-white/75 hover:text-white hover:bg-white/10 transition-all"
                       title="Volume de la vidéo"
                     >
                       {volume === 0 ? (
@@ -1132,18 +720,20 @@ export default function SessionPage() {
                   </div>
                 )}
 
-                {/* Twitch shortcut */}
-                {isTwitchMode && (
+                {/* À venir : file, suggestions marquées, titres proches. */}
+                <UpNext adapter={adapter} pb={pb} />
+
+                {/* Ouvrir chez la source (Twitch). */}
+                {media.external && (
                   <a
-                    href={selectedVodId ? `https://www.twitch.tv/videos/${selectedVodId}` : `https://www.twitch.tv/${selectedChannel}`}
+                    href={media.external.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-[#9146ff] hover:bg-[#9146ff]/10 transition-all"
-                    title="Ouvrir sur Twitch"
+                    className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-[6px] text-white/75 hover:text-[#9146ff] hover:bg-[#9146ff]/10 transition-all"
+                    title={media.external.label}
+                    aria-label={media.external.label}
                   >
-                    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
-                      <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
-                    </svg>
+                    <TwitchGlyph className="w-4 h-4" />
                   </a>
                 )}
 
@@ -1151,7 +741,7 @@ export default function SessionPage() {
                 <button
                   onClick={() => setShowHelp((v) => !v)}
                   className={cn(
-                    "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl transition-all",
+                    "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-[6px] transition-all",
                     showHelp ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
                   )}
                   title="Aide & raccourcis"
@@ -1167,7 +757,7 @@ export default function SessionPage() {
               {isFlowtime && (
                 <button
                   onClick={handleFlowBreak}
-                  className="flex-shrink-0 flex items-center gap-2 px-3 md:px-4 py-2 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-400/40 text-emerald-200 text-xs font-semibold transition-all hover:bg-emerald-500/30 shadow-lg shadow-black/30"
+                  className="flex-shrink-0 flex items-center gap-2 px-3 md:px-4 py-2 rounded-[4px] bg-[#53e0a1]/15 backdrop-blur-md border border-[#53e0a1]/45 text-[#bff5dc] text-xs font-semibold transition-all hover:bg-[#53e0a1]/25 shadow-lg shadow-black/30"
                   title={`Terminer ce flow et prendre ${earnedBreakMin} min de pause`}
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -1238,13 +828,13 @@ export default function SessionPage() {
               </div>
               <div className="p-4 flex flex-col gap-3.5 text-xs">
                 <HelpRow icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" strokeLinecap="round" strokeLinejoin="round" /></svg>} title="Distraction (touche D)">
-                  À chaque fois que tu décroches, clique ou appuie sur <b className="text-white/80">D</b> pour la noter. Rien n&apos;est détecté tout seul — c&apos;est toi qui marques. Moins tu en as, meilleur est ton <b className="text-white/80">Focus Score</b> en fin de session.
+                  À chaque fois que tu décroches, clique ou appuie sur <b className="text-white/80">D</b> pour la noter. Rien n&apos;est détecté tout seul : c&apos;est toi qui marques. Moins tu en as, meilleur est ton <b className="text-white/80">Focus Score</b> en fin de session.
                 </HelpRow>
                 <HelpRow icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M6 4v16M18 4v16" strokeLinecap="round" strokeLinejoin="round" /></svg>} title="Pause / Reprise (Espace)">
                   Met en pause le timer et la vidéo. Le raccourci <b className="text-white/80">Espace</b> fait pareil.
                 </HelpRow>
                 <HelpRow icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M1 1l22 22" strokeLinecap="round" strokeLinejoin="round" /></svg>} title="Mode zen (touche H)">
-                  Les contrôles s&apos;effacent après 4 s sans bouger la souris — il ne reste que la vidéo et le timer. <b className="text-white/80">H</b> les masque manuellement (re-appuie ou clique pour les réafficher).
+                  Les contrôles s&apos;effacent après 4 s sans bouger la souris ; il ne reste que la vidéo et le minuteur. <b className="text-white/80">H</b> les masque manuellement (re-appuie ou clique pour les réafficher).
                 </HelpRow>
                 <HelpRow icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18" strokeLinecap="round" /></svg>} title="Timer flottant">
                   Détache le timer dans une mini-fenêtre toujours au premier plan, même par-dessus tes autres applis (Chrome/Edge).

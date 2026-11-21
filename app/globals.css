@@ -4,47 +4,97 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ═══════════════════════════════════════════════════════════════════════
+   LA VILLE QUI NE DORT PAS : tokens (docs/redesign/03-SYSTEM.md)
+   Deux heures de la même ville (pas une inversion) :
+   . sombre (défaut) = LA NUIT : asphalte mouillé, plusieurs sources de
+     lumière (sodium = maintenant, supérette = fait, néon blanc = texte,
+     feu arrière = alerte, taxi = événement rare)
+   . clair = LE PETIT MATIN : béton humide, ciel lavé, mêmes rôles, teintes
+     assombries pour le contraste.
+   Aucun rose, aucun magenta. Contrastes : `node scripts/contrast.mjs`.
+   ═══════════════════════════════════════════════════════════════════════ */
 :root {
-  --font-sans: var(--font-geist);
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --font-sans: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
 
-  /* Accent UNIQUE du site connecté (« focus »). Tout ce qui doit ressortir
-     dans l'app — anneau d'objectif, barre du jour, indicateur de nav actif —
-     passe par lui. Pas de second accent : le reste vit en niveaux de
-     foreground. */
-  --focus: oklch(0.52 0.11 172);
-  --focus-contrast: oklch(0.99 0 0);
+  /* Petit matin */
+  --bg: oklch(0.924 0.007 97.4);
+  --surface: oklch(0.958 0.005 95.1);
+  --surface-2: oklch(0.894 0.008 98.9);
+  --line: oklch(0.842 0.010 93.6);
+  --line-strong: oklch(0.611 0.014 255.5);
+  --text: oklch(0.254 0.018 255.7);
+  --text-2: oklch(0.376 0.022 256.4);
+  --text-3: oklch(0.465 0.021 256.4);
+  --on-text: oklch(0.958 0.005 95.1);
+  --sodium: oklch(0.560 0.144 49.1);
+  --sodium-text: oklch(0.508 0.130 49.5);
+  --on-sodium: oklch(0.987 0.010 72.7);
+  --danger: oklch(0.499 0.180 29.7);
+  --konbini: oklch(0.492 0.108 159.0);
+  --on-konbini: oklch(0.990 0.014 162.5);
+  --taxi: oklch(0.524 0.108 80.6);
+  --tail: oklch(0.532 0.190 29.9);
+
+  /* Compatibilité : anciens noms consommés par les composants existants */
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --card-foreground: var(--text);
+  --popover: var(--surface);
+  --popover-foreground: var(--text);
+  --primary: var(--text);
+  --primary-foreground: var(--on-text);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--text);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--text-3);
+  --accent: var(--surface-2);
+  --accent-foreground: var(--text);
+  --destructive: var(--danger);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--sodium);
+  --chart-1: var(--sodium);
+  --chart-2: var(--text-2);
+  --chart-3: var(--text-3);
+  --chart-4: var(--line-strong);
+  --chart-5: var(--line);
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--text);
+  --sidebar-primary: var(--text);
+  --sidebar-primary-foreground: var(--on-text);
+  --sidebar-accent: var(--surface-2);
+  --sidebar-accent-foreground: var(--text);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--sodium);
+  /* « focus » ne sert plus qu'à la progression, aux succès et à la carte de
+     chaleur : c'est le rôle « fait » de la ville, le vert supérette. Les
+     actions qui lancent le temps restent en sodium (tokens dédiés). */
+  --focus: var(--konbini);
+  --focus-contrast: var(--on-konbini);
+
+  /* Rayons : instrument (fin), contrôle, surface, média. Jamais de pilule
+     hors gouttes et pastilles. */
+  --radius: 0.375rem;
+  --r-hair: 2px;
+  --r-control: 6px;
+  --r-surface: 10px;
+  --r-media: 4px;
+
+  /* Élévation : la plupart des surfaces n'en ont pas. */
+  --shadow-float: 0 1px 0 oklch(0 0 0 / 0.04), 0 14px 32px -16px oklch(0.2 0.03 250 / 0.28);
+  --shadow-modal: 0 30px 80px -24px oklch(0.15 0.03 250 / 0.45);
+
+  /* Mouvement (miroir de lib/motion.ts) */
+  --ease-ui: cubic-bezier(0.25, 0.8, 0.3, 1);
+  --ease-fall: cubic-bezier(0.55, 0, 0.9, 0.4);
+  --ease-settle: cubic-bezier(0.18, 0.9, 0.22, 1.04);
+  --ease-tide: cubic-bezier(0.45, 0, 0.55, 1);
+  --d-instant: 90ms;
+  --d-ui: 160ms;
+  --d-panel: 240ms;
+  --d-slow: 900ms;
 }
 
 * {
@@ -67,9 +117,10 @@
 }
 
 @theme inline {
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-signage), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+  --font-mono: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
+  --font-led: var(--font-doto), ui-monospace, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -102,6 +153,29 @@
   --color-foreground: var(--foreground);
   --color-background: var(--background);
   --color-focus: var(--focus);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--text);
+  --color-ink-2: var(--text-2);
+  --color-ink-3: var(--text-3);
+  --color-on-ink: var(--on-text);
+  --color-sodium: var(--sodium);
+  --color-sodium-text: var(--sodium-text);
+  --color-on-sodium: var(--on-sodium);
+  --color-danger: var(--danger);
+  --color-reflet: var(--ambient-raw);
+  --font-display: var(--font-signage), ui-sans-serif, system-ui, sans-serif;
+  --color-konbini: var(--konbini);
+  --color-on-konbini: var(--on-konbini);
+  --color-taxi: var(--taxi);
+  --color-tail: var(--tail);
+  --ease-ui: var(--ease-ui);
+  --ease-fall: var(--ease-fall);
+  --ease-settle: var(--ease-settle);
+  --ease-tide: var(--ease-tide);
   --color-focus-contrast: var(--focus-contrast);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -113,40 +187,26 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-
-  --focus: oklch(0.82 0.13 172);
-  --focus-contrast: oklch(0.16 0.02 172);
+  /* La nuit : asphalte bleu-noir mouillé, jamais de noir pur. */
+  --bg: oklch(0.171 0.015 253.2);
+  --surface: oklch(0.206 0.021 254.9);
+  --surface-2: oklch(0.244 0.025 253.8);
+  --line: oklch(0.297 0.028 252.9);
+  --line-strong: oklch(0.507 0.038 252.7);
+  --text: oklch(0.958 0.020 257.5);
+  --text-2: oklch(0.819 0.025 254.0);
+  --text-3: oklch(0.701 0.030 256.5);
+  --on-text: oklch(0.171 0.015 253.2);
+  --sodium: oklch(0.776 0.159 59.2);
+  --sodium-text: oklch(0.805 0.137 60.7);
+  --on-sodium: oklch(0.180 0.035 64.9);
+  --danger: oklch(0.709 0.184 28.4);
+  --konbini: oklch(0.814 0.152 160.6);
+  --on-konbini: oklch(0.170 0.027 163.4);
+  --taxi: oklch(0.846 0.169 84.9);
+  --tail: oklch(0.654 0.233 29.5);
+  --shadow-float: 0 18px 40px -18px oklch(0 0 0 / 0.7);
+  --shadow-modal: 0 40px 90px -20px oklch(0 0 0 / 0.75);
 }
 
 /* ── Teinte d'ambiance (refonte UX) ──────────────────────────────────────
@@ -299,6 +359,55 @@
   100% { opacity: 0; transform: translateY(-18px) scale(1); }
 }
 
+/* ── Clepsydre : animations du système (docs/redesign/03-SYSTEM.md) ─────
+   Toutes neutralisées en reduced-motion plus bas. Uniquement transform /
+   opacity (compositeur). Aucune boucle sauf ff-wait (chargement réel long). */
+.ff-press:active { transform: translateY(1px); }
+
+@keyframes ffEaseDemo { from { left: 0; } to { left: calc(100% - 10px); } }
+@keyframes ffFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ffRise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes ffWait { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@keyframes ffToastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes ffToastOut { to { opacity: 0; transform: translateY(4px); } }
+
+/* Étages : transforme n'importe quelle barre de graphique en tour dont les
+   étages sont séparés (la même façade que la jauge, quelle que soit la couleur). */
+.ff-floors {
+  -webkit-mask-image: repeating-linear-gradient(to top, #000 0 6px, transparent 6px 8px);
+  mask-image: repeating-linear-gradient(to top, #000 0 6px, transparent 6px 8px);
+  border-radius: 1px;
+}
+/* Même façade couchée : une rangée de fenêtres (barres de progression horizontales). */
+.ff-row {
+  -webkit-mask-image: repeating-linear-gradient(to right, #000 0 10px, transparent 10px 13px);
+  mask-image: repeating-linear-gradient(to right, #000 0 10px, transparent 10px 13px);
+}
+
+/* Façade : une fenêtre clignote (piste suivante), un étage grésille (distraction). */
+@keyframes ffBlink { 0%, 100% { opacity: 1; } 20% { opacity: 0.2; } 40% { opacity: 1; } 60% { opacity: 0.35; } }
+@keyframes ffBuzz { 0%, 100% { opacity: 1; } 10% { opacity: 0.15; } 18% { opacity: 0.9; } 32% { opacity: 0.1; } 50% { opacity: 0.8; } 62% { opacity: 0.25; } }
+.ff-blink { animation: ffBlink 700ms var(--ease-ui) both; }
+.ff-buzz  { animation: ffBuzz 1100ms var(--ease-ui) both; }
+.ff-fade  { animation: ffFade var(--d-panel) var(--ease-ui) both; }
+.ff-rise  { animation: ffRise var(--d-panel) var(--ease-ui) both; }
+.ff-wait  { animation: ffWait 1.6s var(--ease-tide) 600ms infinite; }
+.ff-toast-in  { animation: ffToastIn var(--d-panel) var(--ease-ui) both; }
+.ff-toast-out { animation: ffToastOut var(--d-ui) var(--ease-ui) forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ff-press:active { transform: none; }
+  .ff-blink, .ff-buzz, .ff-fade, .ff-rise, .ff-wait, .ff-toast-in, .ff-toast-out {
+    animation: none !important;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -309,6 +418,25 @@
   html {
     @apply font-sans;
   }
+  /* Titres en Big Shoulders partout (signalétique de ville, condensée,
+     lisible de loin). Taille optique automatique : plus c'est grand, plus
+     le dessin se resserre comme une enseigne. */
+  h1, h2, h3 {
+    font-family: var(--font-signage), ui-sans-serif, system-ui, sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 700;
+    letter-spacing: 0.005em;
+  }
+  h1.font-semibold, h2.font-semibold, h3.font-semibold { font-weight: 650; }
+  h1.font-medium, h2.font-medium, h3.font-medium,
+  h1.font-normal, h2.font-normal, h3.font-normal,
+  h1.font-light, h2.font-light, h3.font-light,
+  p.font-display.font-light, span.font-display.font-light { font-weight: 650; }
+  /* font-mono = chiffres et micro-labels : Atkinson en chiffres tabulaires. */
+  .font-mono { font-variant-numeric: tabular-nums; }
+  /* font-led = l'afficheur à points du quai (Doto) : grands chiffres seulement. */
+  .font-led { font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: 0.02em; }
+  :focus-visible { outline-color: var(--sodium); }
   /* Transition GLOBALE : ne couvre volontairement que les couleurs.
      Les animations custom doivent rester sur opacity/transform/background-image
      pour ne pas entrer en conflit avec cette règle. */

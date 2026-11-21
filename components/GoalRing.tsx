@@ -1,68 +1,50 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+// Objectif du jour, version Clepsydre : la COLONNE d'eau du jour face à sa
+// marque gravée. Le nom « GoalRing » est conservé pour ne pas toucher aux
+// appelants (résumé, statistiques, accueil) ; ce n'est plus un anneau.
+// La colonne est graduée pour que l'objectif tombe aux 4/5 : on voit le
+// dépassement (« bonus ») sans que l'eau sorte du tube.
+import { Gauge } from "@/components/ff/Gauge";
 import { GoalProgress, goalUnitLabel } from "@/store/goalStore";
-import { useCountUp } from "@/lib/useCountUp";
+import { cn } from "@/lib/utils";
 
-/** SVG progress ring for the daily focus goal. */
 export default function GoalRing({
   progress,
   size = 120,
-  stroke = 9,
+  className,
 }: {
   progress: GoalProgress;
   size?: number;
+  /** Conservé pour compatibilité, ignoré (la colonne a son épaisseur). */
   stroke?: number;
+  className?: string;
 }) {
-  const r = (size - stroke) / 2;
-  const circ = 2 * Math.PI * r;
-  // Remplissage animé avec léger overshoot élastique au montage (reduced-motion
-  // → valeur finale directe). Le % au centre suit la même animation.
-  const animatedRatio = useCountUp(progress.ratio, 900, true);
-  const clamped = Math.max(0, Math.min(1, animatedRatio));
-  const offset = circ * (1 - clamped);
-  const pct = Math.round(Math.min(clamped, progress.ratio) * 100);
-
+  const capacity = Math.max(progress.target * 1.25, progress.value, 1);
+  const value = progress.value / capacity;
+  const mark = progress.target / capacity;
+  const pct = Math.round(progress.ratio * 100);
+  const unit = goalUnitLabel(progress.unit, progress.value);
   return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle
-          cx={size / 2} cy={size / 2} r={r}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={stroke}
-          className="text-foreground/[0.08]"
-        />
-        <circle
-          cx={size / 2} cy={size / 2} r={r}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={circ}
-          strokeDashoffset={offset}
-          className={cn(
-            // transition-colors seulement : le dashoffset est déjà animé en JS
-            // (useCountUp) — une transition CSS par-dessus le ferait traîner.
-            "transition-colors duration-700 text-focus",
-            !progress.reached && "opacity-80"
-          )}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        {progress.reached ? (
-          <>
-            <svg className="w-4 h-4 text-focus" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            <span className="text-[10px] font-semibold text-focus uppercase tracking-wider">Atteint</span>
-          </>
-        ) : (
-          <>
-            <span className="text-2xl font-light text-foreground tabular-nums leading-none">{pct}%</span>
-            <span className="text-[10px] text-foreground/40 mt-1 tabular-nums">
-              {goalUnitLabel(progress.unit, progress.value)} / {progress.target}
-            </span>
-          </>
-        )}
+    <div className={cn("inline-flex items-end gap-4", className)}>
+      <Gauge
+        label="Objectif du jour"
+        valueText={`${unit} sur ${progress.target}${progress.reached ? ", objectif atteint" : ""}`}
+        value={value}
+        mark={mark}
+        length={size}
+        thickness={14}
+        ticks={20}
+        majorEvery={4}
+        reflet
+      />
+      <div className="pb-0.5">
+        <p className={cn("font-mono text-[28px] leading-none tabular-nums tracking-tight", progress.reached ? "text-sodium-text" : "text-ink")}>
+          {progress.reached ? "Atteint" : `${pct} %`}
+        </p>
+        <p className="mt-2 font-mono text-[12px] tabular-nums text-ink-3">
+          {unit} / {progress.target}
+        </p>
       </div>
     </div>
   );
