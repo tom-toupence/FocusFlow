@@ -548,3 +548,27 @@ utilisées ; la direction sera choisie à partir de lui.
 - Liste noire § H : pas de magenta + cyan, pas de néon rose, pas de glitch ni
   de scanlines, pas de faux idéogrammes, pas de carte postale, aucun nom de
   pays ou de ville dans l'interface.
+
+---
+
+## CONCEPT FINAL : « La fenêtre » (2026-11-21)
+
+Après le lab 2 (ruelle modélisée en code, jugée « prototype de jeu vidéo » par
+l'utilisateur), le lab 3 (photo 2.5D, crédible mais pas de la 3D) et la
+correction de l'audit (la capture TOKYO NIGHT déposée sur `master`) :
+
+**On travaille tard à sa fenêtre, en haut d'une tour. La ville est en
+contrebas, la pluie perle sur la vitre.**
+
+| Mécanique de FocusFlow | Dans la ville |
+|---|---|
+| Minuteur | écran géant sur un toit (Doto), plaque LED en session |
+| Fin de pomodoro, halte | les lumières s'éteignent du fond vers nous, la mise au point revient sur la vitre : on lève les yeux |
+| Distraction | un quartier grésille |
+| Playlist prolongée | un pâté de maisons s'allume |
+| Objectif atteint | une vague de lumière part de la tour |
+| Progression, jauges | des façades dont les étages s'allument |
+| Thème clair | la même ville au petit matin |
+
+Pourquoi c'est juste : on ne montre la capture que de là où elle tient (vue
+haute), et c'est littéralement le décor du thème. Détail : `LAB.md` (lab 4).
