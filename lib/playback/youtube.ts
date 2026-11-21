@@ -89,6 +89,7 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
   private destroyed = false;
   private watchdog: ReturnType<typeof setTimeout> | null = null;
   private host: HTMLElement | null = null;
+  private raceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private elementId: string, private source: YouTubeSource, private opts: YouTubeOptions) {
     const queued = source.type === "queue";
@@ -213,8 +214,9 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     // de titre et « suivant » sont ignorés pendant une prolongation).
     const res = await Promise.race([
       continuePlaylist(q.order, q.current, this.opts.recommend ?? defaultRecommend, { exclude: q.all }),
-      new Promise<{ kind: "loop" }>((r) => setTimeout(() => r({ kind: "loop" }), 10_000)),
+      new Promise<{ kind: "loop" }>((r) => { this.raceTimer = setTimeout(() => r({ kind: "loop" }), 10_000); }),
     ]);
+    if (this.raceTimer) { clearTimeout(this.raceTimer); this.raceTimer = null; }
     this.fetchingMore = false;
     if (this.destroyed) return;
     if (res.kind === "extend") {
@@ -269,6 +271,7 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
   destroy() {
     this.destroyed = true;
     if (this.watchdog) clearTimeout(this.watchdog);
+    if (this.raceTimer) clearTimeout(this.raceTimer);
     try { this.player?.destroy(); } catch { /* déjà détruit */ }
     if (this.host) this.host.replaceChildren();
     this.player = null;
