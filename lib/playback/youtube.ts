@@ -27,7 +27,7 @@ interface YTPlayer {
 
 declare global {
   interface Window {
-    YT: { Player: new (id: string, cfg: object) => YTPlayer };
+    YT: { Player: new (el: string | HTMLElement, cfg: object) => YTPlayer };
     onYouTubeIframeAPIReady?: () => void;
   }
 }
@@ -88,6 +88,7 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
   private volume: number;
   private destroyed = false;
   private watchdog: ReturnType<typeof setTimeout> | null = null;
+  private host: HTMLElement | null = null;
 
   constructor(private elementId: string, private source: YouTubeSource, private opts: YouTubeOptions) {
     const queued = source.type === "queue";
@@ -132,18 +133,36 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     this.set({ ready: true, playing: this.wantPlay, track: this.trackInfo(), error: null });
   };
 
+  /**
+   * L'IFrame API REMPLACE l'élément qu'on lui donne par son iframe. On ne lui
+   * confie donc jamais le conteneur géré par React (`elementId`) : on crée un
+   * enfant à nous, retiré au `destroy()`. Le lecteur peut ainsi être recréé
+   * autant de fois que la source change.
+   */
+  private mount(): HTMLElement | string {
+    const host = typeof document !== "undefined" ? document.getElementById(this.elementId) : null;
+    if (!host) return this.elementId; // environnement de test : identifiant brut
+    const el = document.createElement("div");
+    el.style.width = "100%";
+    el.style.height = "100%";
+    host.appendChild(el);
+    this.host = host;
+    return el;
+  }
+
   private create() {
+    const target = this.mount();
     const vars = { autoplay: 1, mute: 0, controls: 0, rel: 0, modestbranding: 1 };
     const s = this.source;
     if (s.type === "video") {
       // Vidéo unique en boucle : `playlist` = elle-même (et JAMAIS `list`).
-      this.player = new window.YT.Player(this.elementId, {
+      this.player = new window.YT.Player(target, {
         videoId: s.id,
         playerVars: { ...vars, showinfo: 0, loop: 1, playlist: s.id, suggestedQuality: "hd1080" },
         events: { onReady: (e: { target: YTPlayer }) => this.onReady(e.target) },
       });
     } else if (s.type === "native") {
-      this.player = new window.YT.Player(this.elementId, {
+      this.player = new window.YT.Player(target, {
         playerVars: vars,
         events: {
           onReady: (e: { target: YTPlayer }) => {
@@ -156,12 +175,15 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     } else {
       const first = this.queue!.current;
       if (!first) { this.set({ error: "Aucun titre à lire." }); return; }
-      this.player = new window.YT.Player(this.elementId, {
+      this.player = new window.YT.Player(target, {
         videoId: first,
         playerVars: vars,
         events: {
           onReady: (e: { target: YTPlayer }) => this.onReady(e.target),
           onStateChange: (e: { data: number }) => { if (e.data === 0) this.onEnded(); },
+          // Vidéo supprimée, privée ou non embarquable (100, 101, 150) : pas de
+          // ENDED, la file resterait bloquée ; on passe au titre suivant.
+          onError: () => this.onEnded(),
         },
       });
     }
@@ -187,7 +209,12 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     const q = this.queue!;
     this.fetchingMore = true;
     this.set({ extending: true });
-    const res = await continuePlaylist(q.order, q.current, this.opts.recommend ?? defaultRecommend, { exclude: q.all });
+    // Au plus 10 s : une requête qui pend ne doit pas geler la file (les fins
+    // de titre et « suivant » sont ignorés pendant une prolongation).
+    const res = await Promise.race([
+      continuePlaylist(q.order, q.current, this.opts.recommend ?? defaultRecommend, { exclude: q.all }),
+      new Promise<{ kind: "loop" }>((r) => setTimeout(() => r({ kind: "loop" }), 10_000)),
+    ]);
     this.fetchingMore = false;
     if (this.destroyed) return;
     if (res.kind === "extend") {
@@ -243,6 +270,7 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     this.destroyed = true;
     if (this.watchdog) clearTimeout(this.watchdog);
     try { this.player?.destroy(); } catch { /* déjà détruit */ }
+    if (this.host) this.host.replaceChildren();
     this.player = null;
     this.ready = false;
   }

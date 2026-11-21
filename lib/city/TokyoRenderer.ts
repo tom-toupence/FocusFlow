@@ -423,6 +423,10 @@ float ch(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }`
       composer.dispose();
       city.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { m.geometry.dispose(); (m.material as THREE.MeshBasicMaterial).map?.dispose(); (m.material as THREE.Material).dispose(); } });
       boardTex.dispose();
+      // Ciel et écran du toit : géométries et matériaux libérés aussi (la scène
+      // est recréée à chaque halte). Pas de forceContextLoss : un remontage
+      // StrictMode récupérerait un contexte perdu sur le même canvas.
+      for (const o of [sky, screen]) o.traverse((n) => { const m = n as THREE.Mesh; if (m.isMesh) { m.geometry.dispose(); (m.material as THREE.Material).dispose(); } });
       renderer.dispose();
     },
   };

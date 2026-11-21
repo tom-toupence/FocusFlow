@@ -3,8 +3,8 @@
 // La ville dans la session : décor de la halte (pause) et fond du mode
 // Spotify (aucune vidéo ne joue). Jamais par-dessus une vidéo YouTube/Twitch.
 //
-// La halte se JOUE à l'entrée : la scène monte allumée, puis les lumières
-// s'éteignent du fond vers nous (au lieu d'apparaître déjà éteintes).
+// La halte se JOUE à l'entrée : la scène part allumée, puis les lumières
+// s'éteignent du fond vers nous (CityScene s'en charge à la création).
 import { forwardRef, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import type { CityHandle } from "@/components/CityScene";
@@ -36,13 +36,9 @@ interface Props {
 
 const SessionCity = forwardRef<CityHandle, Props>(function SessionCity({ phase, board, className, label }, ref) {
   const friends = useFriendsInFocus();
-  // Entrée en halte : on monte en « travail » puis on bascule, pour jouer l'extinction.
-  const [shown, setShown] = useState<CityPhase>(phase === "break" ? "work" : phase);
-  useEffect(() => {
-    const id = setTimeout(() => setShown(phase), phase === "break" ? 700 : 0);
-    return () => clearTimeout(id);
-  }, [phase]);
-  return <CityScene ref={ref} phase={shown} board={board} friends={friends} className={className} label={label} />;
+  // L'extinction de la halte est jouée par CityScene lui-même à la création
+  // (il part de « travail » puis applique la phase courante).
+  return <CityScene ref={ref} phase={phase} board={board} friends={friends} className={className} label={label} />;
 });
 
 export default SessionCity;

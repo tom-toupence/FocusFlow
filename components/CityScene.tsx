@@ -67,8 +67,12 @@ const CityScene = forwardRef<CityHandle, Props>(function CityScene(
   const dawn = time === "dawn" || (time === "auto" && !dark) ? 1 : 0;
   const [failed, setFailed] = useState(false);
   const off = WEBGL_DISABLED || !effects;
-  // Valeurs initiales figées au montage (les mises à jour passent par les effets).
-  const init = useRef({ phase, board, friends, dawn, yaw });
+  // Dernières valeurs voulues : la scène se crée de façon asynchrone (modèle de
+  // 1 à 2 Mo, police), elle doit repartir de l'état COURANT, pas de celui du
+  // montage. Idem pour les événements demandés avant qu'elle soit prête.
+  const latest = useRef({ phase, board, friends, dawn, yaw });
+  useEffect(() => { latest.current = { phase, board, friends, dawn, yaw }; });
+  const pending = useRef<("flicker" | "extend" | "goal")[]>([]);
 
   useEffect(() => {
     if (off || failed || !canvas.current) return;
@@ -80,8 +84,18 @@ const CityScene = forwardRef<CityHandle, Props>(function CityScene(
         // Le panneau LED est dessiné avec Doto : on attend la police.
         const doto = getComputedStyle(document.documentElement).getPropertyValue("--font-doto").trim();
         if (doto) await document.fonts?.load(`800 48px ${doto}`).catch(() => {});
-        const c = await createTokyoCity(canvas.current, { ...init.current, reducedMotion: !!reduce });
-        if (disposed) c.dispose(); else r.current = c;
+        // On crée en « travail » puis on applique l'état courant : une halte
+        // demandée pendant le chargement est ainsi JOUÉE (extinction), pas sautée.
+        const v = latest.current;
+        const c = await createTokyoCity(canvas.current, { ...v, phase: v.phase === "break" ? "work" : v.phase, reducedMotion: !!reduce });
+        if (disposed) { c.dispose(); return; }
+        r.current = c;
+        const now = latest.current;
+        c.setBoard(now.board);
+        c.setFriends(now.friends);
+        c.setDawn(now.dawn);
+        c.setPhase(now.phase);
+        for (const e of pending.current.splice(0)) c[e]();
       })
       .catch((e) => {
         console.warn("[CityScene] repli statique :", e instanceof Error ? e.message : e);
@@ -95,11 +109,15 @@ const CityScene = forwardRef<CityHandle, Props>(function CityScene(
   useEffect(() => { r.current?.setFriends(friends); }, [friends]);
   useEffect(() => { r.current?.setDawn(dawn); }, [dawn]);
 
-  useImperativeHandle(ref, () => ({
-    flicker: () => r.current?.flicker(),
-    extend: () => r.current?.extend(),
-    goal: () => r.current?.goal(),
-  }), []);
+  useImperativeHandle(ref, () => {
+    // Pas encore prête : l'événement est rejoué dès sa création (sauf le
+    // grésillement, qui n'a de sens que sur le moment).
+    const fire = (e: "flicker" | "extend" | "goal") => {
+      if (r.current) r.current[e]();
+      else if (e !== "flicker" && !pending.current.includes(e)) pending.current.push(e);
+    };
+    return { flicker: () => fire("flicker"), extend: () => fire("extend"), goal: () => fire("goal") };
+  }, []);
 
   // Repli : une image fixe rendue par la scène elle-même (nuit et petit matin).
   return (

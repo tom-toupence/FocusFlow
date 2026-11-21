@@ -21,10 +21,16 @@ class TwitchAdapter extends Observable<PlaybackState> implements PlayerAdapter {
       shuffle: false, loop: false, extending: false, error: null,
     });
   }
-  markReady() { this.set({ ready: true }); }
+  /** Dernière intention (lecture ou pause), réappliquée quand le flux est prêt :
+   *  une pause demandée avant VIDEO_READY n'est pas perdue (l'embed démarre en autoplay). */
+  private wantPlay = true;
+  markReady() {
+    this.set({ ready: true });
+    this.call((p) => (this.wantPlay ? p.play() : p.pause()));
+  }
   private call(f: (p: TwitchEmbedPlayer) => void) { try { const p = this.getPlayer(); if (p) f(p); } catch { /* lecteur pas prêt */ } }
-  play() { this.call((p) => p.play()); this.set({ playing: true }); }
-  pause() { this.call((p) => p.pause()); this.set({ playing: false }); }
+  play() { this.wantPlay = true; this.call((p) => p.play()); this.set({ playing: true }); }
+  pause() { this.wantPlay = false; this.call((p) => p.pause()); this.set({ playing: false }); }
   next() {}
   previous() {}
   setVolume(v: number) { this.call((p) => p.setVolume(v)); }
@@ -158,7 +164,7 @@ export default function TwitchPlayer({ channel, vodId, token, volume = 0.8, onAd
       embedRef.current = null;
       onAdapterRef.current?.(null);
     };
-  }, [channel, vodId, token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [channel, vodId, token]);
 
   useEffect(() => {
     if (!embedRef.current) return;

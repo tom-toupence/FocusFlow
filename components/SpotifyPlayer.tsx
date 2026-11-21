@@ -126,6 +126,8 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
   const playlistTracksRef = useRef<PlaylistTrackLite[] | null>(null);
   const extendingRef = useRef(false);
   const extendedAfterRef = useRef<string | null>(null);
+  // Titres déjà ajoutés par une prolongation : jamais reproposés.
+  const addedIdsRef = useRef(new Set<string>());
   const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
   // Tracks which playlistUri was last successfully started — prevents double-start
   const playlistStartedRef = useRef<string | null>(null);
@@ -171,7 +173,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
     playInFlightRef.current = true;
     try {
       let token = await getValidToken();
-      if (!token) { setStatus("error"); setErrorMsg("Session Spotify expirée — reconnecte-toi."); return false; }
+      if (!token) { setStatus("error"); setErrorMsg("Session Spotify expirée : reconnecte-toi."); return false; }
 
       let lastStatus = 0;
       for (let attempt = 0; attempt < 6; attempt++) {
@@ -190,7 +192,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
         if (res.status === 401) {
           // Token révoqué/expiré côté Spotify : refresh forcé puis on retente.
           token = await getValidToken(true);
-          if (!token) { setStatus("error"); setErrorMsg("Session Spotify expirée — reconnecte-toi."); return false; }
+          if (!token) { setStatus("error"); setErrorMsg("Session Spotify expirée : reconnecte-toi."); return false; }
           continue;
         }
         if (res.status === 403) {
@@ -214,6 +216,9 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
   /** Prolonge la lecture avec des titres proches de toute la playlist. */
   const extendQueue = async (currentId: string, currentUri: string) => {
     if (extendingRef.current || extendedAfterRef.current === currentUri) return;
+    // Une seule tentative par fin de playlist, réussie ou non : sinon chaque
+    // pause, reprise ou recherche du SDK relancerait les requêtes.
+    extendedAfterRef.current = currentUri;
     extendingRef.current = true;
     adapterRef.current?.patch({ extending: true });
     try {
@@ -232,12 +237,11 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
           const top = await fetchArtistTopTracks(token, artist);
           return top.map((t) => ({ id: t.id, title: t.name, subtitle: t.artists }));
         },
-        { limit: 10 },
+        { limit: 10, exclude: addedIdsRef.current },
       );
       if (res.kind !== "extend") return; // repli : la boucle Spotify reprend la main
       let added = 0;
-      for (const t of res.tracks) if (await addToQueue(token, device, `spotify:track:${t.id}`)) added++;
-      extendedAfterRef.current = currentUri;
+      for (const t of res.tracks) if (await addToQueue(token, device, `spotify:track:${t.id}`)) { added++; addedIdsRef.current.add(t.id); }
       if (added > 0) onExtendedRef.current?.({ added, titles: Object.fromEntries(res.tracks.map((t) => [t.id, t.title])) });
     } finally {
       extendingRef.current = false;
