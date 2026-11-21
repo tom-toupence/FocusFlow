@@ -8,7 +8,7 @@ interface PrefsState {
   setBreathingEnabled: (v: boolean) => void;
   onboarded: boolean;
   setOnboarded: (v: boolean) => void;
-  /** Scène 3D de la ruelle (landing, pauses, Spotify, résumé). false = image fixe. */
+  /** Scène 3D de la ville (landing, halte, Spotify, résumé). false = image fixe. */
   sceneEffects: boolean;
   setSceneEffects: (v: boolean) => void;
 }

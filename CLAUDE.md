@@ -740,8 +740,28 @@ tourne (`yaw`) pour laisser la colonne de texte à gauche.
   11/2024, donc titres phares des artistes échantillonnés, mis en file
   (`/me/player/queue`) au début du dernier titre, une tentative par fin.
   Les suggestions des modals de playlist utilisent le même échantillonnage.
-- Tests : `npm test` (Vitest, 21) ; `npm run test:e2e` (Playwright, serveur
-  de dev lancé, YouTube simulé) ; `npm run test:a11y` (axe-core).
+- **Interface complète** : `seek`, `getSuggestions(seeds)`, `enqueue(track)`,
+  `removeUpcoming(id)`, état `upcoming` (piste normalisée `Track` : source,
+  durée, `suggested`). Capacités : Spotify ne peut PAS retirer un titre de sa
+  file (aucun endpoint) : on propose « Écouter maintenant » ; Twitch : seek en
+  VOD seulement, ni file ni suggestions. Un titre retiré n'est jamais
+  réintroduit par une prolongation (`TrackQueue.excluded`).
+- **La page de session ne distingue plus les sources** :
+  `lib/playback/useSessionMedia.ts` (lit les stores, résout mixes RD et
+  playlists PL, entrée d'historique) + `components/session/SessionMedia.tsx`
+  (monte le bon lecteur, l'habillage, le lien « ouvrir chez la source »).
+  Adaptateurs dans `lib/playback/{youtube,spotify,twitch}.ts`.
+- **« À venir »** (`components/session/UpNext.tsx`) : prochains titres,
+  suggestions marquées, retirer, « Trouver des titres proches » + ajouter à
+  la suite (vidéo seule : part dans la File d'attente).
+- **Spotify hors session** : bouton « Titres proches » sur les cartes de
+  playlist (`SpotifyRelatedModal`, `lib/playback/spotifySuggest.ts`, cache
+  10 min) ; chaque titre s'ouvre dans Spotify (les scopes n'incluent pas la
+  modification de playlist, voulu).
+- Tests : `npm test` (Vitest, 33 : file, continuation, adaptateurs YouTube,
+  Spotify, Twitch) ; `npm run test:e2e` (Playwright, 13 : lecture continue,
+  mix RD, PL et repli natif, playlist locale, Twitch, « À venir », écrans) ;
+  `npm run test:a11y` (axe-core).
 
 ## Journal de session — 2026-11-21 (refonte d'identité complète, docs/redesign/)
 
@@ -761,3 +781,12 @@ Points à retenir pour la suite :
    (connect-src, textures intégrées des glb) sont nécessaires en production.
 5. Nettoyage : `public/seoul/`, composants morts (`VideoPlayer`, `PomodoroTimer`,
    `VideoCatalog`) et SVG par défaut supprimés.
+6. Jetons `--water*` supprimés (ils survivaient en alias et rendaient la
+   heatmap du relevé invisible). `.ff-row` = façade couchée (barres
+   horizontales). 404 (`app/not-found.tsx`), carte Wrapped PNG et page Wrapped
+   repris dans l'identité. Transition réglages vers session : la vignette
+   devient la plaque de l'afficheur, 25 points sodium s'allument
+   (`lib/useExpandNavigate.ts`).
+7. CSP : `'unsafe-eval'` ajouté en DÉVELOPPEMENT seulement (React dev).
+8. Désactiver la 3D : réglage `prefs.sceneEffects` (image fixe à la place),
+   automatique avec `prefers-reduced-motion` ou sans WebGL.

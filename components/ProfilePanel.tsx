@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useProfileStore, resolvedProfile } from "@/store/profileStore";
 import { useSpotifyStore } from "@/store/spotifyStore";
 import { useTwitchStore } from "@/store/twitchStore";
+import { usePrefsStore } from "@/store/prefsStore";
 import { loginWithSpotify } from "@/lib/spotify";
 import { loginWithTwitch } from "@/lib/twitch";
 import { signOut } from "@/lib/supabase";
@@ -340,6 +341,9 @@ export default function ProfilePanel({ open, onClose }: Props) {
           </div>
         </div>
 
+        {/* ── Affichage : la scène 3D de la ville peut être coupée ─────────── */}
+        <SceneToggle />
+
         {/* ── Mes données (export / import localStorage) ───────────────────── */}
         <div className="p-3 pt-0 space-y-2">
           <p className="text-[10px] font-semibold text-ink-3 uppercase tracking-wider px-1">Mes données</p>
@@ -372,7 +376,7 @@ export default function ProfilePanel({ open, onClose }: Props) {
             {importStatus && (
               <p className={cn(
                 "text-[11px] mt-2 leading-relaxed",
-                importStatus.startsWith("✓") ? "text-sodium-text" : "text-danger"
+                importStatus.startsWith("✓") ? "text-konbini" : "text-danger"
               )}>
                 {importStatus}
               </p>
@@ -402,5 +406,25 @@ export default function ProfilePanel({ open, onClose }: Props) {
       </div>
     </div>,
     document.body
+  );
+}
+
+/** Scène 3D de la ville : coupée = image fixe (machines modestes, batterie). */
+function SceneToggle() {
+  const on = usePrefsStore((st) => st.sceneEffects);
+  const set = usePrefsStore((st) => st.setSceneEffects);
+  return (
+    <div className="p-3 pt-0 space-y-2">
+      <p className="text-[10px] font-semibold text-ink-3 uppercase tracking-wider px-1">Affichage</p>
+      <label className="flex items-start gap-3 rounded-[6px] p-3 bg-foreground/[0.03] border border-foreground/[0.06] cursor-pointer">
+        <input type="checkbox" role="switch" checked={on} onChange={(e) => set(e.target.checked)} className="mt-0.5 accent-[var(--sodium)]" />
+        <span>
+          <span className="block text-xs font-medium text-foreground">Ville animée en 3D</span>
+          <span className="block text-[11px] text-ink-3 leading-relaxed mt-0.5">
+            Coupée, une image fixe la remplace (utile sur une machine modeste ou sur batterie).
+          </span>
+        </span>
+      </label>
+    </div>
   );
 }
