@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
               // Styles
               "style-src 'self' 'unsafe-inline'",
               // Connexions API : Supabase + Spotify API + YouTube oEmbed
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.spotify.com https://accounts.spotify.com https://www.youtube.com https://*.spotify.com wss://*.spotify.com https://apresolve.spotify.com https://*.apresolve.spotify.com https://*.twitch.tv wss://*.twitch.tv",
+              "connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co https://api.spotify.com https://accounts.spotify.com https://www.youtube.com https://*.spotify.com wss://*.spotify.com https://apresolve.spotify.com https://*.apresolve.spotify.com https://*.twitch.tv wss://*.twitch.tv",
               // Médias (audio Spotify SDK)
               "media-src 'self' blob: https://*.scdn.co https://*.spotifycdn.com",
               // Workers Spotify SDK

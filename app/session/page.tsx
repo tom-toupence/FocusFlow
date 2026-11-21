@@ -538,8 +538,8 @@ export default function SessionPage() {
       if (progress.reached) {
         goalCelebratedRef.current = true;
         playWorkChime();
-        toast({ title: "Objectif du jour atteint", description: "Un taxi traverse la ruelle.", accent: "emerald" });
-        // Événement de ville : le taxi passe, une fois la halte installée.
+        toast({ title: "Objectif du jour atteint", description: "Des phares passent au bout de la ruelle.", accent: "emerald" });
+        // Événement de ville : des phares passent, une fois la halte installée.
         setTimeout(() => city.current?.goal(), 3200);
       }
     }
@@ -868,7 +868,7 @@ export default function SessionPage() {
                 <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#53e0a1]">{breakLabel[mode]}</p>
                 <h1 className="mt-2 font-display font-extrabold uppercase text-[clamp(3rem,8vw,5.5rem)] leading-[0.88]">La halte</h1>
                 <p className="mt-3 text-[15px] text-[#e9f2ff]/75">
-                  {sessionsCompleted > 0 ? `Pomodoro ${sessionsCompleted} terminé. ` : ""}La rue s&apos;éteint, la supérette reste ouverte.
+                  {sessionsCompleted > 0 ? `Pomodoro ${sessionsCompleted} terminé. ` : ""}La rue s&apos;éteint, seuls les lampadaires veillent.
                 </p>
               </div>
               <div>

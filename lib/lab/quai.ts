@@ -85,7 +85,7 @@ export async function createQuai(host: HTMLElement): Promise<QuaiScene> {
     // Piliers
     for (let i = 0; i < 7; i++) {
       const k = Math.pow(0.72, i);
-      const [x0, y0] = P(W * 0.44, 0, k), [x1, y1] = P(W * 0.44, H, k);
+      const [x0, y0] = P(W * 0.44, 0, k), [, y1] = P(W * 0.44, H, k);
       g.rect(x0 - 10 * k, y0, 22 * k, y1 - y0).fill({ color: 0x15181d });
     }
     // Tubes au plafond (néon blanc froid) : lueurs additives

@@ -122,7 +122,7 @@ export default function SummaryPage() {
     router.push("/");
   };
 
-  // Le panneau de la ruelle affiche le bilan ; objectif du jour tenu = un taxi passe.
+  // Le panneau de la ruelle affiche le bilan ; objectif du jour tenu = des phares passent.
   const board = sessionsCompleted > 0 ? `${sessionsCompleted} POMODORO${sessionsCompleted > 1 ? "S" : ""}` : "FIN";
   const headline =
     sessionsCompleted > 0
@@ -270,7 +270,7 @@ export default function SummaryPage() {
   );
 }
 
-/** Bandeau de la ruelle ; si l'objectif du jour est tenu, le taxi passe une fois. */
+/** Bandeau de la ruelle ; si l'objectif du jour est tenu, des phares passent une fois. */
 function SummaryCity({ board, goalReached, label }: { board: string; goalReached: boolean; label: string }) {
   const city = useRef<CityHandle>(null);
   useEffect(() => {

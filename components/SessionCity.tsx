@@ -8,13 +8,13 @@
 import { forwardRef, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import type { CityHandle } from "@/components/CityScene";
-import type { CityPhase } from "@/lib/city/CityRenderer";
+import type { CityPhase } from "@/lib/city/types";
 import { useFriendsStore } from "@/store/friendsStore";
 import { isActivelyFocusing } from "@/lib/friends";
 
 const CityScene = dynamic(() => import("@/components/CityScene"), { ssr: false });
 
-/** Nombre d'amis en focus en ce moment (fenêtres vertes de la ruelle). */
+/** Nombre d'amis en focus en ce moment. */
 export function useFriendsInFocus(): number {
   const friends = useFriendsStore((s) => s.friends);
   const [now, setNow] = useState(0);

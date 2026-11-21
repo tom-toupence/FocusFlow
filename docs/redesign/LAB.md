@@ -285,3 +285,100 @@ Pourquoi : c'est le plus audacieux qui reste lisible et performant, et ce
 n'est pas ce que j'aurais fait sans le lab : une nuit à **plusieurs sources
 colorées** (pas un fond et un accent), dense en objets modélisés, une
 typographie de signalétique réelle, et un thème clair qui a sa propre heure.
+
+---
+
+# LAB 3 · le réalisme (2026-11-21)
+
+## Pourquoi un lab 3
+
+Retour utilisateur sur le lab 2 : « murs en aplats sans texture, enseignes
+réduites à des carrés colorés, climatiseurs en cubes, sol sans matière, pluie
+en traits blancs, aucun éclairage dirigé, aucun post-traitement. Ça ressemble à
+un prototype de jeu vidéo, pas à une nuit en ville. » Il a raison : la
+consigne « tout modéliser en code » produisait des boîtes. Nouvelle règle : le
+réalisme vient des assets, de la matière, de la lumière et du post-traitement.
+Le rendu procédural de la ruelle (`lib/city/CityRenderer.ts`) est abandonné ;
+seule son INTERFACE (phase, panneau, événements) est conservée.
+
+Barre de qualité imposée : chaque piste est comparée côte à côte avec trois
+vraies photos de rues asiatiques de nuit sous la pluie. Si un œil non averti
+voit tout de suite de la 3D amateur, ce n'est pas prêt.
+
+Accès réseau : les banques d'assets étaient bloquées par l'environnement ; un
+environnement dédié (Poly Haven, ambientCG, Wikimedia Commons, Hugging Face,
+jsDelivr) a été créé pour ce lab.
+
+## Piste A · 2.5D photographique : RETENUE
+
+- **Matière** : une vraie photo de ruelle la nuit (Wikimedia Commons, CC BY 4.0),
+  choisie sur planche contact parmi 56 candidates (critères : point de fuite
+  central, peu de personnes et lointaines, aucune lanterne, aucun portique,
+  pas de néon rose, enseignes réelles).
+- **Profondeur** : Depth Anything V2 Small (Apache 2.0) exécuté hors ligne
+  (onnxruntime, CPU). Cartes très propres sur les trois photos testées.
+- **Préparation** (`scripts/city/prep_photo.py`) : masque du sol (tracé à la
+  main pour la ruelle, c'est une décision de direction artistique), masque
+  émissif, liste des enseignes (composantes connexes, triées du fond vers
+  nous), carte de débord lumineux floutée.
+- **Rendu** (`lib/city/PhotoRenderer.ts`) : un seul passage WebGL2, aucune
+  librairie. Parallaxe par profondeur lissée, travelling d'entrée de 8 s,
+  respiration à 9 s, main en parallaxe douce. Pluie en trois couches
+  occultées par la profondeur et visibles seulement devant les lumières,
+  avec réfraction. Sol mouillé : traînées verticales des sources, impacts.
+  Brume colorée par les sources. Étalonnage nuit / heure bleue, ACES, grain,
+  vignette, aberration discrète.
+- **Événements** : halte = les vraies enseignes s'éteignent du fond vers nous,
+  la lumière qu'elles jetaient disparaît, la caméra recule ; distraction = une
+  enseigne grésille ; playlist prolongée = une enseigne s'allume ; objectif =
+  deux phares traversent au bout de la ruelle, leur reflet file sur le sol ;
+  panneau LED projeté en perspective sur une vraie enseigne de la photo.
+- **Itérations** : (1) image à l'envers (double retournement de texture) ;
+  (2) panneau LED inversé ; (3) phares en halo fantôme, remplacés par deux
+  points et un halo court ; (4) **bandes répétées sur le sol** : le reflet
+  copiait la photo entière à pas fixe ; corrigé en ne reflétant que les
+  sources, en tramant le pas par pixel et en lissant la profondeur de la
+  parallaxe ; (5) sol pas assez miroir face aux références, renforcé.
+- **Comparaison** : `shots/lab3/compare-A.jpg`. Verdict : tient face aux trois
+  photos réelles. Ce qui trahit encore : le panneau LED un peu trop propre, la
+  pluie fine invisible sur image fixe (visible en vidéo `a-alley.mp4`).
+- **Perf** : 7 i/s en rendu logiciel dans ce conteneur (aucun GPU) pour un
+  seul passage plein écran ; sur GPU réel ce shader est très en dessous du
+  budget de 16 ms. Poids : 0,95 Mo (photo 1920, version mobile 1024, masques,
+  débord). Repli statique naturel : la photo elle-même.
+
+## Piste B · gaussian splatting : NON VIABLE AUJOURD'HUI
+
+Spark (`@sparkjsdev/spark`) est disponible sur npm. Mais aucune capture de rue
+de nuit sous licence libre n'existe sur Hugging Face (recherches « splat »,
+« gaussian splatting city », « 3dgs night » : objets, personnes, tests
+d'intérieur, aucune licence claire). Une capture faite par nous suppose de
+filmer une vraie rue, hors de portée ici. À reprendre si une capture CC0 de
+rue de nuit apparaît, ou si l'utilisateur en fournit une.
+
+## Piste C · 3D temps réel, assets Poly Haven : ÉCARTÉE
+
+- **Matière** : kit « hidden alley » de Poly Haven (CC0) : façade modulaire,
+  rideaux métalliques, climatiseurs, escalier de secours, gouttières,
+  boîtiers, applique ; asphalte PBR complet ; HDRI de nuit. Compressé en glb
+  (meshopt, WebP 1K) : 7,9 Mo.
+- **Éclairage et rendu** : applique au sodium avec ombres, vitrine froide en
+  lumière rectangulaire, contre-jour chaud au bout, caissons biseautés à
+  face émissive qui éclairent le mur, sol à flaques au-dessus d'un miroir,
+  pluie éclairée par les sources, SSAO, bloom à seuil, AgX, profondeur de
+  champ, grain, vignette.
+- **Deux passes** : la première surexposée, la seconde maîtrisée.
+- **Comparaison** : `shots/lab3/compare-C.jpg`. Verdict : se lit
+  immédiatement comme de la 3D. Façade néoclassique européenne (corniches,
+  encadrements moulurés) hors thème, caissons trop propres, asphalte sec à
+  flaques noires, objets qui flottent. Atteindre la crédibilité de A
+  demanderait un kit urbain asiatique (inexistant en CC0) et des semaines
+  d'éclairage précalculé. À perf égale, A est très au-dessus et 8 fois plus
+  léger.
+
+## Décision
+
+**Piste A, 2.5D photographique**, branchée derrière l'interface `CityScene`
+existante. La landing, la halte, le mode Spotify et le résumé n'ont pas à
+changer. Les fenêtres vertes des amis n'existent pas dans une photo : les amis
+en focus restent affichés par l'interface (tiroir Amis).

@@ -4,7 +4,7 @@
 // LANDING · la ville qui ne dort pas (docs/redesign/02-CONCEPTS.md, LAB.md)
 //
 // Une seule scène fixe pour toute la page : la ruelle sous la pluie
-// (components/CityScene, 3D modélisée en code). Le scroll est une nuit qui
+// (components/CityScene : une vraie photo en 2.5D, pluie et lumières en shader). Le scroll est une nuit qui
 // avance (l'horloge du bandeau va de 22:00 au petit matin) et chaque section
 // déclenche un vrai événement de FocusFlow sur la ruelle :
 //   1. vingt-cinq minutes  → le panneau à LED décompte avec le scroll
@@ -13,8 +13,8 @@
 //   4. Flowtime            → la rue se rallume, sans échéance au panneau
 //   5. la file se prolonge → une enseigne neuve s'allume
 //   6. la trace            → le petit matin (le thème clair de l'app)
-//   7. les amis            → des fenêtres vertes s'allument
-//   8. fin                 → objectif atteint, un taxi traverse la ruelle
+//   7. les amis            → la ruelle veille, le texte dit qui est en focus
+//   8. fin                 → objectif atteint, des phares passent au bout
 //
 // Moteur : motion/react (useScroll, useInView), défilement natif (pas de
 // scroll-jacking). Le texte ne s'anime pas : seule la ville bouge, et
@@ -30,7 +30,7 @@ import { defaultVideos, type Video } from "@/data/videos";
 import { cleanTitle } from "@/lib/text";
 import { cn } from "@/lib/utils";
 import type { CityHandle } from "@/components/CityScene";
-import type { CityPhase } from "@/lib/city/CityRenderer";
+import { CITY_CREDIT, type CityPhase } from "@/lib/city/types";
 
 const CityScene = dynamic(() => import("@/components/CityScene"), { ssr: false });
 
@@ -201,7 +201,7 @@ export default function LandingPage() {
   }, [act, flicker]);
 
   const sceneLabel =
-    act === "halt" ? "La ruelle pendant la halte : les enseignes sont éteintes, la supérette reste allumée."
+    act === "halt" ? "La ruelle pendant la halte : les enseignes sont éteintes, seuls les lampadaires restent allumés."
     : act === "trace" ? "La même ruelle au petit matin."
     : `Une ruelle la nuit sous la pluie. Le panneau à LED affiche ${board.toLowerCase()}.`;
 
@@ -209,14 +209,14 @@ export default function LandingPage() {
     <div className="relative bg-[#0b1016] text-[#e9f2ff] font-sans selection:bg-[#ff9a3c] selection:text-[#1c0e02]">
       {/* La scène : une seule ruelle, fixe, pour toute la page. */}
       <div className="fixed inset-0 z-0">
-        <CityScene ref={city} phase={phase} board={board} friends={friends} time={dawn ? "dawn" : "night"} label={sceneLabel} className="absolute inset-0" />
+        <CityScene ref={city} phase={phase} board={board} friends={friends} time={dawn ? "dawn" : "night"} label={sceneLabel} credit={false} className="absolute inset-0" />
         {/* Voile de lecture : fort à gauche (texte), nul à droite (la rue). */}
         <div
           aria-hidden
           className={cn(
             "absolute inset-0 pointer-events-none transition-opacity duration-700",
             "bg-[linear-gradient(90deg,#0b1016_0%,rgba(11,16,22,0.84)_34%,rgba(11,16,22,0.2)_62%,transparent_80%)]",
-            "max-md:bg-[linear-gradient(0deg,#0b1016_0%,rgba(11,16,22,0.88)_36%,rgba(11,16,22,0.25)_58%,transparent_72%)]",
+            "max-md:bg-[linear-gradient(0deg,#0b1016_0%,rgba(11,16,22,0.92)_44%,rgba(11,16,22,0.45)_62%,rgba(11,16,22,0.1)_80%)]",
             dawn && "opacity-0",
           )}
         />
@@ -226,7 +226,7 @@ export default function LandingPage() {
       <header
         className={cn(
           "fixed top-0 inset-x-0 z-30 flex items-center justify-between px-5 sm:px-10 lg:px-16 h-16 transition-colors duration-300",
-          dawn ? "text-[#1d232b] bg-[#e7e6e1]/90" : "text-[#e9f2ff] bg-[linear-gradient(180deg,#0b1016_10%,rgba(11,16,22,0.7)_60%,transparent)]",
+          dawn ? "text-[#1d232b] bg-[#e7e6e1]/92 backdrop-blur-sm" : "text-[#e9f2ff] bg-[#0b1016]/82 backdrop-blur-sm border-b border-[#e9f2ff]/[0.06]",
         )}
       >
         <Wordmark className="text-2xl" lit={!dawn} />
@@ -308,7 +308,7 @@ export default function LandingPage() {
           <Panel>
             <H2>À zéro, la rue s&apos;éteint.</H2>
             <P>
-              Les enseignes s&apos;éteignent une à une, du fond vers toi. Restent le lampadaire et la supérette ouverte toute
+              Les enseignes s&apos;éteignent une à une, du fond vers toi. Restent les lampadaires, qui veillent toute
               la nuit. Cinq minutes de pause, une longue toutes les quatre sessions. Si tu veux, respire au rythme quatre, quatre,
               quatre, quatre.
             </P>
@@ -362,10 +362,10 @@ export default function LandingPage() {
         {/* 7 · Les amis */}
         <Scene act="friends" onAct={onAct}>
           <Panel>
-            <H2>Les fenêtres vertes sont tes amis.</H2>
+            <H2>Tu n&apos;es pas seul à veiller.</H2>
             <P>
-              Ajoute des amis avec un code. Quand l&apos;un d&apos;eux lance une session, une fenêtre s&apos;allume en vert. Tu
-              vois le temps de chacun sur la semaine, jamais ses tâches ni son journal.
+              Ajoute des amis avec un code. Tu vois qui est en focus en ce moment, ce qu&apos;il écoute, et le temps de chacun
+              sur la semaine. Jamais ses tâches ni son journal.
             </P>
           </Panel>
         </Scene>
@@ -375,7 +375,7 @@ export default function LandingPage() {
           <Panel>
             <p className="font-display font-extrabold uppercase text-[clamp(2.8rem,7vw,5.4rem)] leading-[0.9]">
               Objectif atteint,
-              <span className="block text-[#ffc21a]">un taxi passe.</span>
+              <span className="block text-[#ffc21a]">des phares passent.</span>
             </p>
             <P>Chaque grand moment de la session a son événement dans la ville. Le reste du temps, elle te laisse travailler.</P>
             <div className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -389,7 +389,10 @@ export default function LandingPage() {
       <footer className="relative z-10 bg-[#0b1016] border-t border-[#e9f2ff]/10 px-5 sm:px-10 lg:px-16 py-8 flex flex-wrap items-center gap-x-8 gap-y-2 text-[13px] text-[#e9f2ff]/60">
         <Wordmark className="text-lg text-[#e9f2ff]/85" lit={false} />
         <span>Les vidéos appartiennent à leurs auteurs et se lisent sur YouTube.</span>
-        <span>Polices Big Shoulders, Doto, Atkinson Hyperlegible Next (OFL). Ruelle modélisée en code.</span>
+        <span>Polices Big Shoulders, Doto, Atkinson Hyperlegible Next (OFL).</span>
+        <a href={CITY_CREDIT.href} target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:underline">
+          Ruelle : {CITY_CREDIT.text}. Profondeur, pluie et lumières ajoutées.
+        </a>
       </footer>
     </div>
   );
@@ -421,7 +424,7 @@ function Trace() {
           ].map(([v, l]) => (
             <div key={l}>
               <dt className="sr-only">{l}</dt>
-              <dd className="font-led text-2xl sm:text-3xl whitespace-nowrap">{v}</dd>
+              <dd className="font-display font-bold text-3xl sm:text-4xl whitespace-nowrap tabular-nums">{v}</dd>
               <dd className="text-[13px] text-[#1d232b]/70 mt-1">{l}</dd>
             </div>
           ))}
