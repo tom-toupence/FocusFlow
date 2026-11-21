@@ -1,41 +1,45 @@
 "use client";
 
-// La COLONNE de la Clepsydre : primitive centrale de l'identité.
-// Une colonne graduée où l'eau monte avec le temps réel. Elle sert partout où
-// FocusFlow mesure une durée : temps de pomodoro, niveau du jour face à
-// l'objectif, pause qui se vide, Flowtime qui déborde (vases pleins = `laps`).
+// La FAÇADE : jauge de l'identité « la ville qui ne dort pas ».
+// Une tour dont les étages s'allument un à un à mesure que le temps passe :
+//   . étages faits      → fenêtres vert supérette (« fait ») ;
+//   . étage en cours    → fenêtre sodium (« maintenant ») ;
+//   . étages à venir    → fenêtres éteintes.
+// Horizontale, c'est une rangée de fenêtres, comme la jauge du panneau de
+// session. `mark` est le toit visé (l'objectif du jour), `laps` le nombre de
+// tours déjà allumées (Flowtime, pomodoros terminés).
 //
-// Réactions (événements RÉELS uniquement, jamais le son) :
-//   pulse.kind = "drop"  → une goutte tombe (changement de piste, minute pleine)
-//   pulse.kind = "stone" → un caillou trouble la surface (distraction)
-// Le `key` de pulse change pour rejouer l'effet. Tout est en SVG/CSS : aucune
-// cible WebGL, la colonne peut vivre par-dessus une vidéo sans la concurrencer.
-import { useId } from "react";
+// Réactions (événements RÉELS uniquement) :
+//   pulse.kind = "drop"  → la fenêtre en cours clignote (piste suivante, minute pleine)
+//   pulse.kind = "stone" → l'étage en cours grésille en rouge (distraction)
+// Le `key` de pulse change pour rejouer l'effet. SVG/CSS uniquement.
 import { cn } from "@/lib/utils";
 
 export interface GaugePulse { kind: "drop" | "stone"; key: number }
 
 interface GaugeProps {
-  /** Remplissage 0..1 (au-delà, la colonne reste pleine). */
+  /** Remplissage 0..1 (au-delà, la tour reste allumée). */
   value: number;
-  /** Repère gravé (0..1), ex. l'objectif du jour. */
+  /** Toit visé (0..1), ex. l'objectif du jour. */
   mark?: number;
   markLabel?: string;
-  /** Nombre de graduations (mineures). */
+  /** Nombre d'étages (ou de fenêtres en horizontal). */
   ticks?: number;
-  /** Une graduation majeure toutes les N. */
+  /** Un étage marqué (plancher plus épais) toutes les N. */
   majorEvery?: number;
   orientation?: "vertical" | "horizontal";
   /** Taille principale en px (hauteur si verticale, largeur si horizontale). */
   length?: number;
-  /** Épaisseur du tube en px. */
+  /** Largeur de la tour en px. */
   thickness?: number;
-  /** Vases déjà pleins (Flowtime / pomodoros terminés). */
+  /** Tours déjà allumées (Flowtime / pomodoros terminés). */
   laps?: number;
   pulse?: GaugePulse | null;
-  /** Teinte l'eau du reflet de la vidéo (var --reflet). */
+  /** L'étage en cours est-il « maintenant » (sodium) ? false pour un jour passé. */
+  live?: boolean;
+  /** Conservé pour compatibilité (ancienne teinte de la vidéo) : sans effet. */
   reflet?: boolean;
-  /** Sur une vidéo : graduations claires quel que soit le thème. */
+  /** Sur une vidéo : fenêtres éteintes plus claires quel que soit le thème. */
   onMedia?: boolean;
   /** Nom accessible + valeur lisible (« 12 min sur 25 »). */
   label: string;
@@ -54,28 +58,28 @@ export function Gauge({
   thickness = 12,
   laps = 0,
   pulse,
-  reflet,
+  live = true,
   onMedia,
   label,
   valueText,
   className,
 }: GaugeProps) {
-  const id = useId().replace(/:/g, "");
   const v = Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
   const vertical = orientation === "vertical";
-  const pad = 6; // place pour les graduations
-  const W = vertical ? thickness + pad * 2 + 8 : length;
-  const H = vertical ? length : thickness + pad * 2 + 8;
-  const tubeX = vertical ? pad : 0;
-  const tubeY = vertical ? 0 : pad;
-  const tubeW = vertical ? thickness : length;
-  const tubeH = vertical ? length : thickness;
-  const level = vertical ? tubeH * v : tubeW * v;
-  const waterColor = reflet
-    ? "color-mix(in oklab, var(--water) 55%, var(--ambient-raw))"
-    : "var(--water)";
-  const tickColor = onMedia ? "oklch(0.95 0.01 85 / 0.55)" : "var(--line-strong)";
+  const n = Math.max(1, ticks);
+  const filled = v * n;
+  const done = Math.floor(filled);
+  const current = live && done < n && v > 0 ? done : -1;
+  const cols = vertical && thickness >= 10 ? 2 : 1;
+  const gap = 2;
+  const cell = ((vertical ? length : length) - gap * (n - 1)) / n;
+  const off = onMedia ? "oklch(0.95 0.01 85 / 0.16)" : "var(--surface-2)";
+  const offEdge = onMedia ? "transparent" : "var(--line)";
   const reached = mark !== undefined && v >= mark;
+  const W = vertical ? thickness + 10 : length;
+  const H = vertical ? length : thickness;
+
+  const fillFor = (i: number) => (i < done ? "var(--konbini)" : i === current ? "var(--sodium)" : off);
 
   return (
     <div
@@ -88,90 +92,72 @@ export function Gauge({
       className={cn("inline-flex", vertical ? "flex-col items-center gap-2" : "flex-col gap-1.5", className)}
     >
       <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block overflow-visible">
-        <defs>
-          <clipPath id={`tube-${id}`}>
-            <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={2} />
-          </clipPath>
-        </defs>
-        {/* Tube */}
-        <rect
-          x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={2}
-          fill={onMedia ? "oklch(0.12 0.02 248 / 0.55)" : "var(--surface-2)"}
-        />
-        {/* Eau : transform seul (compositeur), la montée suit le temps réel */}
-        <g clipPath={`url(#tube-${id})`}>
-          <rect
-            x={tubeX} y={tubeY} width={tubeW} height={tubeH}
-            fill={waterColor}
-            style={{
-              transformBox: "fill-box",
-              transformOrigin: vertical ? "50% 100%" : "0% 50%",
-              transform: vertical ? `scaleY(${v})` : `scaleX(${v})`,
-              transition: "transform 1s linear",
-            }}
-          />
-          {/* Surface : trait sodium = « maintenant » */}
-          <rect
-            x={vertical ? tubeX : tubeX + level - 1.5}
-            y={vertical ? tubeY + tubeH - level - 1 : tubeY}
-            width={vertical ? tubeW : 1.5}
-            height={vertical ? 1.5 : tubeH}
-            fill="var(--sodium)"
-            style={{ transition: "x 1s linear, y 1s linear" }}
-          />
-          {pulse && (
-            <g key={pulse.key} className={pulse.kind === "drop" ? "ff-drop" : "ff-stone"}>
-              <ellipse
-                cx={vertical ? tubeX + tubeW / 2 : tubeX + level}
-                cy={vertical ? tubeY + tubeH - level : tubeY + tubeH / 2}
-                rx={vertical ? tubeW * 0.9 : tubeH * 0.9}
-                ry={vertical ? 2.2 : tubeH * 0.9}
-                fill="none"
-                stroke={pulse.kind === "stone" ? "var(--danger)" : "var(--sodium)"}
-                strokeWidth={1}
-              />
-            </g>
-          )}
-        </g>
-        {/* Graduations : l'échelle ne bouge jamais */}
-        {Array.from({ length: ticks + 1 }, (_, i) => {
-          const major = i % majorEvery === 0;
-          const t = i / ticks;
+        {Array.from({ length: n }, (_, i) => {
+          const major = (i + 1) % majorEvery === 0;
+          const flick = pulse && i === (current >= 0 ? current : Math.max(0, done - 1));
           if (vertical) {
-            const y = tubeY + tubeH - tubeH * t;
+            // L'étage i part du bas.
+            const y = length - (i + 1) * cell - i * gap;
+            const w = (thickness - (cols - 1) * gap) / cols;
             return (
-              <line key={i} x1={tubeX + tubeW + 2} x2={tubeX + tubeW + (major ? 8 : 5)} y1={y} y2={y}
-                stroke={tickColor} strokeWidth={major ? 1 : 0.75} />
+              <g key={i} className={flick ? (pulse.kind === "drop" ? "ff-blink" : "ff-buzz") : undefined}>
+                {Array.from({ length: cols }, (_, c) => (
+                  <rect
+                    key={c}
+                    x={c * (w + gap)}
+                    y={y}
+                    width={w}
+                    height={Math.max(1, cell)}
+                    rx={0.75}
+                    fill={flick && pulse.kind === "stone" ? "var(--danger)" : fillFor(i)}
+                    stroke={fillFor(i) === off ? offEdge : "none"}
+                    strokeWidth={0.5}
+                    style={{ transition: "fill 400ms var(--ease-ui)" }}
+                  />
+                ))}
+                {major && <line x1={thickness + 2} x2={thickness + 6} y1={y + cell / 2} y2={y + cell / 2} stroke={onMedia ? "oklch(0.95 0.01 85 / 0.45)" : "var(--line-strong)"} strokeWidth={0.75} />}
+              </g>
             );
           }
-          const x = tubeX + tubeW * t;
+          const x = i * (cell + gap);
           return (
-            <line key={i} y1={tubeY + tubeH + 2} y2={tubeY + tubeH + (major ? 8 : 5)} x1={x} x2={x}
-              stroke={tickColor} strokeWidth={major ? 1 : 0.75} />
+            <rect
+              key={i}
+              className={flick ? (pulse.kind === "drop" ? "ff-blink" : "ff-buzz") : undefined}
+              x={x}
+              y={0}
+              width={Math.max(1, cell)}
+              height={thickness}
+              rx={0.75}
+              fill={flick && pulse.kind === "stone" ? "var(--danger)" : fillFor(i)}
+              stroke={fillFor(i) === off ? offEdge : "none"}
+              strokeWidth={0.5}
+              style={{ transition: "fill 400ms var(--ease-ui)" }}
+            />
           );
         })}
-        {/* Repère gravé (objectif) */}
+        {/* Le toit visé (objectif) : un trait au-dessus de l'étage cible. */}
         {mark !== undefined && (
           vertical ? (
-            <line x1={0} x2={tubeX + tubeW + 10} y1={tubeY + tubeH - tubeH * mark} y2={tubeY + tubeH - tubeH * mark}
-              stroke={reached ? "var(--sodium)" : onMedia ? "oklch(0.95 0.01 85 / 0.8)" : "var(--text-2)"} strokeWidth={1.25} />
+            <line x1={-3} x2={thickness + 8} y1={length - length * mark} y2={length - length * mark}
+              stroke={reached ? "var(--konbini)" : onMedia ? "oklch(0.95 0.01 85 / 0.8)" : "var(--text-2)"} strokeWidth={1.25} />
           ) : (
-            <line y1={0} y2={tubeY + tubeH + 10} x1={tubeW * mark} x2={tubeW * mark}
-              stroke={reached ? "var(--sodium)" : onMedia ? "oklch(0.95 0.01 85 / 0.8)" : "var(--text-2)"} strokeWidth={1.25} />
+            <line y1={-3} y2={thickness + 3} x1={length * mark} x2={length * mark}
+              stroke={reached ? "var(--konbini)" : onMedia ? "oklch(0.95 0.01 85 / 0.8)" : "var(--text-2)"} strokeWidth={1.25} />
           )
         )}
       </svg>
       {(markLabel || laps > 0) && (
-        <div className={cn("flex items-center gap-2 font-mono text-[11px] tabular-nums", onMedia ? "text-[oklch(0.95_0.01_85/0.7)]" : "text-ink-3")}>
+        <div className={cn("flex items-center gap-2 font-mono text-[11px]", onMedia ? "text-[oklch(0.95_0.01_85/0.7)]" : "text-ink-3")}>
           {laps > 0 && (
-            <span className="flex gap-[3px]" aria-label={`${laps} vase${laps > 1 ? "s" : ""} plein${laps > 1 ? "s" : ""}`}>
+            <span className="flex items-end gap-[3px]" aria-label={`${laps} tour${laps > 1 ? "s" : ""} allumée${laps > 1 ? "s" : ""}`}>
               {Array.from({ length: Math.min(laps, 8) }, (_, i) => (
-                <span key={i} className="w-[5px] h-[9px] rounded-[1px]" style={{ background: waterColor }} />
+                <span key={i} className="w-[5px] h-[10px] rounded-[1px] bg-konbini" />
               ))}
               {laps > 8 && <span>+{laps - 8}</span>}
             </span>
           )}
-          {markLabel && <span className={cn(reached && "text-sodium-text")}>{markLabel}</span>}
+          {markLabel && <span className={cn(reached && "text-konbini")}>{markLabel}</span>}
         </div>
       )}
     </div>

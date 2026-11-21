@@ -49,7 +49,7 @@ const catalogueMoods: VideoMood[] = allMoods.filter((m) => defaultVideos.some((v
 const SECTION_INDEX: Record<string, number> = { accueil: 0, ecouter: 1, organisation: 2, activite: 3 };
 
 // Carte vidéo du catalogue et de la bibliothèque : la MediaCard du système
-// (fenêtre 16:9 posée sur sa ligne d'eau à la couleur de la vidéo).
+// (fenêtre 16:9 posée sur un filet à la couleur de la vidéo).
 function VideoCard({
   video,
   selected,
@@ -1088,8 +1088,8 @@ export default function LandingPage() {
           <>
             <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5 mb-10">
               <div className="max-w-xl">
-                <h1 className="font-display font-light text-[clamp(1.9rem,4vw,2.6rem)] leading-tight text-ink">Choisis ta ville</h1>
-                <p className="text-ink-2 mt-2 text-[15px]">Une vidéo pour toute la session. Sa lumière teinte l&apos;eau ; clique pour régler la durée.</p>
+                <h1 className="font-display font-light text-[clamp(1.9rem,4vw,2.6rem)] leading-tight text-ink">Choisis ce qui joue derrière</h1>
+                <p className="text-ink-2 mt-2 text-[15px]">Une vidéo pour toute la session. Clique pour régler la durée et lancer.</p>
               </div>
               <Segmented
                 label="Filtrer par ambiance"

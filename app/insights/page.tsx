@@ -137,7 +137,7 @@ export function InsightsContent() {
         </div>
 
         {/* XP & niveau */}
-        <section className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-gradient-to-r from-ink/15 via-fuchsia-600/[0.06] to-transparent border border-line-strong/20">
+        <section className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-surface border border-line">
           <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-ink/15 text-ink-2 flex-shrink-0">
             <span className="text-xl font-bold tabular-nums">{level.level}</span>
           </div>
@@ -147,7 +147,7 @@ export function InsightsContent() {
               <span className="text-[11px] text-ink-3 tabular-nums">{level.xpInLevel} / {level.xpForNext} XP</span>
             </div>
             <div className="h-2 mt-2 rounded-full bg-foreground/[0.08] overflow-hidden">
-              <div className="h-full rounded-full bg-gradient-to-r from-ink/10 to-fuchsia-400 transition-all" style={{ width: `${Math.round(level.progress * 100)}%` }} />
+              <div className="h-full rounded-full bg-konbini transition-all" style={{ width: `${Math.round(level.progress * 100)}%` }} />
             </div>
             <p className="text-[10px] text-ink-3 mt-1.5">{xp.toLocaleString("fr-FR")} XP cumulés · sessions, minutes, succès et série.</p>
           </div>
@@ -247,7 +247,7 @@ export function InsightsContent() {
                     <div className="w-full flex flex-col justify-end flex-1">
                       <div
                         title={`${r.label}, ${fmtMin(r.avg)} de focus en moyenne (${r.count} jour${r.count !== 1 ? "s" : ""})`}
-                        className={cn("w-full rounded-md transition-all", r.count > 0 ? "bg-fuchsia-500/50" : "bg-foreground/[0.05]")}
+                        className={cn("w-full rounded-md transition-all", r.count > 0 ? "bg-sodium/70" : "bg-foreground/[0.05]")}
                         style={{ height: `${r.count > 0 ? Math.max((r.avg / maxMoodAvg) * 100, 6) : 3}%` }}
                       />
                     </div>

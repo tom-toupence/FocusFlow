@@ -392,6 +392,11 @@
 }
 @keyframes ffToastOut { to { opacity: 0; transform: translateY(4px); } }
 
+/* Façade : une fenêtre clignote (piste suivante), un étage grésille (distraction). */
+@keyframes ffBlink { 0%, 100% { opacity: 1; } 20% { opacity: 0.2; } 40% { opacity: 1; } 60% { opacity: 0.35; } }
+@keyframes ffBuzz { 0%, 100% { opacity: 1; } 10% { opacity: 0.15; } 18% { opacity: 0.9; } 32% { opacity: 0.1; } 50% { opacity: 0.8; } 62% { opacity: 0.25; } }
+.ff-blink { animation: ffBlink 700ms var(--ease-ui) both; }
+.ff-buzz  { animation: ffBuzz 1100ms var(--ease-ui) both; }
 .ff-drop  { transform-box: fill-box; transform-origin: center; animation: ffDrop var(--d-water) var(--ease-ui) both; }
 .ff-stone { transform-box: fill-box; transform-origin: center; animation: ffStone 1.1s var(--ease-ui) both; }
 .ff-fade  { animation: ffFade var(--d-panel) var(--ease-ui) both; }
@@ -402,7 +407,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ff-press:active { transform: none; }
-  .ff-drop, .ff-stone, .ff-fade, .ff-rise, .ff-wait, .ff-toast-in, .ff-toast-out {
+  .ff-drop, .ff-stone, .ff-blink, .ff-buzz, .ff-fade, .ff-rise, .ff-wait, .ff-toast-in, .ff-toast-out {
     animation: none !important;
   }
   .ff-drop, .ff-stone { opacity: 0; }
@@ -429,7 +434,9 @@
   }
   h1.font-semibold, h2.font-semibold, h3.font-semibold { font-weight: 650; }
   h1.font-medium, h2.font-medium, h3.font-medium,
-  h1.font-normal, h2.font-normal, h3.font-normal { font-weight: 600; }
+  h1.font-normal, h2.font-normal, h3.font-normal,
+  h1.font-light, h2.font-light, h3.font-light,
+  p.font-display.font-light, span.font-display.font-light { font-weight: 650; }
   /* font-mono = chiffres et micro-labels : Atkinson en chiffres tabulaires. */
   .font-mono { font-variant-numeric: tabular-nums; }
   /* font-led = l'afficheur à points du quai (Doto) : grands chiffres seulement. */

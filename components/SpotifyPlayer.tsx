@@ -368,8 +368,8 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
       )}
 
       {isFirefox && (
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 max-w-md px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 backdrop-blur-sm">
-          <p className="text-amber-300 text-xs leading-relaxed text-center">
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 max-w-md px-4 py-2.5 rounded-[4px] bg-[#ff9a3c]/15 border border-[#ff9a3c]/35 backdrop-blur-sm">
+          <p className="text-[#ffd2a8] text-xs leading-relaxed text-center">
             Spotify ne supporte pas officiellement <strong>Firefox</strong> pour la lecture intégrée
             (coupures fréquentes). Utilise <strong>Chrome</strong> ou <strong>Edge</strong> pour une lecture stable.
           </p>
@@ -381,8 +381,8 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
           <div className="flex flex-col items-center gap-3">
             {status === "error" ? (
               <>
-                <p className="text-red-400 text-sm font-medium">Erreur Spotify</p>
-                {errorMsg && <p className="text-red-400/60 text-xs max-w-xs text-center">{errorMsg}</p>}
+                <p className="text-[#ff8a7d] text-sm font-medium">Erreur Spotify</p>
+                {errorMsg && <p className="text-[#ff8a7d]/75 text-xs max-w-xs text-center">{errorMsg}</p>}
                 <button
                   onClick={() => {
                     setErrorMsg(null);

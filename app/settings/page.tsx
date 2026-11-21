@@ -19,16 +19,16 @@ import { Button } from "@/components/ff/Button";
 import { Modal } from "@/components/ff/Modal";
 import { IconPlay } from "@/components/ff/icons";
 
-// Chaque format se lit comme un CYCLE : longueur d'eau (travail) puis
-// longueur de pause, à la même échelle. Pas d'icône décorative.
+// Chaque format se lit comme un CYCLE : longueur de travail puis longueur
+// de pause, à la même échelle. Pas d'icône décorative.
 const presetConfig = [
   { id: "classic" as TimerPreset, label: "Classique", sub: "25 / 5", desc: "Le Pomodoro original. Bon pour des tâches variées.", work: 25, rest: 5 },
   { id: "deep" as TimerPreset, label: "Deep Work", sub: "50 / 10", desc: "Des blocs longs pour entrer dans un sujet difficile.", work: 50, rest: 10 },
-  { id: "flowtime" as TimerPreset, label: "Flowtime", sub: "sans trait", desc: "Tu travailles tant que ça tient. Pause = temps passé ÷ 5.", work: 0, rest: 0 },
+  { id: "flowtime" as TimerPreset, label: "Flowtime", sub: "sans échéance", desc: "Tu travailles tant que ça tient. Pause = temps passé ÷ 5.", work: 0, rest: 0 },
   { id: "custom" as TimerPreset, label: "Personnalisé", sub: "tes durées", desc: "Règle chaque durée ci-dessous.", work: -1, rest: -1 },
 ];
 
-/** Diagramme du cycle : eau (travail) puis filet sodium (pause), échelle 60 min. */
+/** Diagramme du cycle : travail puis pause, échelle 60 min. */
 function CycleShape({ work, rest, customWork, customRest }: { work: number; rest: number; customWork: number; customRest: number }) {
   const w = work < 0 ? customWork : work;
   const r = rest < 0 ? customRest : rest;

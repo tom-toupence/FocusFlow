@@ -81,15 +81,25 @@ export default function AppNav() {
 
   return (
     <>
-      {/* Rail desktop : la marque est une petite échelle de marée graduée */}
+      {/* Rail desktop : la marque est une petite tour dont les étages s'allument
+          (la même façade que la jauge : vert = fait, sodium = maintenant). */}
       <nav aria-label="Navigation principale" className="hidden md:flex flex-col items-center gap-1 w-[84px] shrink-0 sticky top-0 h-screen border-r border-line bg-bg py-5">
-        <div className="mb-6 flex items-end gap-1 h-9" title="FocusFlow" aria-label="FocusFlow">
-          <svg width="16" height="34" viewBox="0 0 16 34" aria-hidden>
-            <rect x="1" y="0" width="5" height="34" rx="1" fill="var(--surface-2)" />
-            <rect x="1" y="14" width="5" height="20" rx="1" fill="var(--water)" />
-            <rect x="0" y="13.2" width="7" height="1.6" fill="var(--sodium)" />
-            {[0, 6, 12, 18, 24, 30].map((y, i) => (
-              <line key={y} x1="8" x2={i % 2 === 0 ? 15 : 12} y1={y + 1} y2={y + 1} stroke="var(--line-strong)" strokeWidth="1" />
+        <div className="mb-6 flex items-end h-9" title="FocusFlow" aria-label="FocusFlow">
+          <svg width="14" height="34" viewBox="0 0 14 34" aria-hidden>
+            {Array.from({ length: 6 }, (_, f) => (
+              [0, 1].map((c) => (
+                <rect
+                  key={`${f}-${c}`}
+                  x={c * 7}
+                  y={34 - (f + 1) * 5.6}
+                  width={6}
+                  height={4.6}
+                  rx={0.6}
+                  fill={f < 3 ? "var(--konbini)" : f === 3 && c === 0 ? "var(--sodium)" : "var(--surface-2)"}
+                  stroke={f > 3 || (f === 3 && c === 1) ? "var(--line)" : "none"}
+                  strokeWidth={0.5}
+                />
+              ))
             ))}
           </svg>
         </div>

@@ -24,7 +24,6 @@ import BreathingExercise from "@/components/BreathingExercise";
 import SessionCity from "@/components/SessionCity";
 import type { CityHandle } from "@/components/CityScene";
 import Equalizer from "@/components/Equalizer";
-import TimerDigits from "@/components/TimerDigits";
 import { useIdleHide } from "@/lib/useIdleHide";
 import { usePrefsStore } from "@/store/prefsStore";
 import { useDistractionStore } from "@/store/distractionStore";
@@ -837,7 +836,7 @@ export default function SessionPage() {
             }
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-black/70 backdrop-blur-md border border-[#9146ff]/30 text-white/70 hover:text-white hover:border-[#9146ff]/60 text-xs font-medium transition-all"
+            className="flex items-center gap-2.5 px-4 py-2.5 rounded-[6px] bg-black/70 backdrop-blur-md border border-[#9146ff]/30 text-white/70 hover:text-white hover:border-[#9146ff]/60 text-xs font-medium transition-all"
           >
             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-[#9146ff]" fill="currentColor">
               <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
@@ -920,7 +919,7 @@ export default function SessionPage() {
           <button
             onClick={addNote}
             title="Ajouter un post-it"
-            className="fixed bottom-20 md:bottom-6 left-3 md:left-6 z-[100] flex items-center gap-2 px-3 py-2 rounded-xl bg-black/70 backdrop-blur-sm border border-white/25 text-white/75 hover:text-white hover:bg-black/80 text-xs font-medium transition-all"
+            className="fixed bottom-20 md:bottom-6 left-3 md:left-6 z-[100] flex items-center gap-2 px-3 py-2 rounded-[6px] bg-black/70 backdrop-blur-sm border border-white/25 text-white/75 hover:text-white hover:bg-black/80 text-xs font-medium transition-all"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round" />
@@ -943,7 +942,7 @@ export default function SessionPage() {
             <div className={cn("flex flex-col items-start gap-2 max-w-[calc(100%-9rem)] md:max-w-[42%] anim-cascade", chromeHideCls)}>
               <button
                 onClick={handleStop}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/75 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/10 text-xs font-medium transition-all"
+                className="flex items-center gap-2 px-4 py-2 rounded-[6px] bg-black/60 backdrop-blur-sm border border-white/20 text-white/75 hover:text-[#ff8a7d] hover:border-[#ff6b5c]/50 hover:bg-[#ff6b5c]/10 text-xs font-medium transition-all"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
                   <rect x="6" y="6" width="12" height="12" rx="1.5" />
@@ -951,7 +950,7 @@ export default function SessionPage() {
                 Terminer
               </button>
               {nowPlaying && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/50 backdrop-blur-sm border border-white/10 max-w-full">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-black/50 backdrop-blur-sm border border-white/10 max-w-full">
                   <Equalizer
                     playing={isRunning}
                     mood={!isQueueMode && !isPlaylistMode ? video.mood : undefined}
@@ -965,39 +964,32 @@ export default function SessionPage() {
               )}
             </div>
 
-            {/* Timer — centré en absolu sur desktop, en flux à droite sur mobile */}
-            <div className="flex-shrink-0 md:absolute md:left-1/2 md:-translate-x-1/2 flex flex-col items-center gap-1.5 anim-cascade [animation-delay:80ms]">
-              {/* Halo d'ambiance discret derrière le timer */}
-              <div
-                className="absolute -inset-x-16 -inset-y-6 -z-10 pointer-events-none rounded-full"
-                style={{
-                  background: "radial-gradient(ellipse at center, color-mix(in oklab, var(--ambient) 60%, transparent) 0%, transparent 70%)",
-                  opacity: 0.45,
-                }}
-              />
-              <div className="w-24 md:w-36 h-[2px] bg-white/10 rounded-full overflow-hidden">
-                {isFlowtime ? (
-                  <div className="h-full w-full bg-white/25 rounded-full animate-pulse" />
-                ) : (
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      background: "color-mix(in oklab, var(--ambient-2) 45%, white)",
-                      width: `${progress * 100}%`,
-                      transition: "width 1s linear",
-                    }}
-                  />
+            {/* Minuteur : un panneau d'affichage de quai (plaque sombre, chiffres
+                à points Doto en sodium), centré sur desktop, à droite sur mobile.
+                Lisible sur n'importe quelle vidéo grâce à la plaque. */}
+            <div className="flex-shrink-0 md:absolute md:left-1/2 md:-translate-x-1/2 anim-cascade [animation-delay:80ms]">
+              <div className="flex flex-col items-center gap-1 rounded-[4px] bg-[#05070a]/80 backdrop-blur-sm border border-white/10 px-3 md:px-4 pt-1.5 pb-1.5 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.8)]">
+                <span
+                  role="timer"
+                  aria-label={`${isFlowtime ? "Flowtime" : "Temps restant"} : ${formatTime(isFlowtime ? flowSeconds : secondsLeft)}`}
+                  className="font-led text-[26px] md:text-[34px] leading-none text-[#ff9a3c] [text-shadow:0_0_12px_rgba(255,154,60,0.45)]"
+                >
+                  {formatTime(isFlowtime ? flowSeconds : secondsLeft)}
+                </span>
+                {/* Jauge : une rangée de 25 points qui s'allument, comme le panneau. */}
+                {!isFlowtime && (
+                  <span aria-hidden className="flex gap-[3px]">
+                    {Array.from({ length: 25 }, (_, i) => (
+                      <span key={i} className={cn("w-[3px] h-[3px] rounded-[1px]", i < Math.round(progress * 25) ? "bg-[#ff9a3c]" : "bg-white/15")} />
+                    ))}
+                  </span>
                 )}
+                <span className="text-white/60 text-[10px] font-mono uppercase tracking-[0.14em] whitespace-nowrap">
+                  {isFlowtime
+                    ? `Flow · pause méritée ${earnedBreakMin} min`
+                    : `Pomodoro ${sessionsCompleted + 1}`}
+                </span>
               </div>
-              <TimerDigits
-                text={formatTime(isFlowtime ? flowSeconds : secondsLeft)}
-                className="text-2xl md:text-3xl font-light text-white tabular-nums tracking-tight drop-shadow-lg"
-              />
-              <span className="text-white/30 text-[10px] font-mono uppercase tracking-[0.14em]">
-                {isFlowtime
-                  ? `Flow · pause méritée ≈ ${earnedBreakMin} min`
-                  : `Focus · ${sessionsCompleted} session${sessionsCompleted !== 1 ? "s" : ""}`}
-              </span>
             </div>
 
             {/* Contrôles — à droite de la top bar sur desktop, barre fixe en bas
@@ -1018,7 +1010,7 @@ export default function SessionPage() {
                   <>
                     <button
                       onClick={() => skipTrack("prev")}
-                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
+                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-[6px] text-white/75 hover:text-white hover:bg-white/10 transition-all"
                       title="Titre précédent"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -1027,7 +1019,7 @@ export default function SessionPage() {
                     </button>
                     <button
                       onClick={() => skipTrack("next")}
-                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
+                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-[6px] text-white/75 hover:text-white hover:bg-white/10 transition-all"
                       title="Titre suivant"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -1040,7 +1032,7 @@ export default function SessionPage() {
                       <button
                         onClick={() => usePlaybackPrefsStore.getState().toggleShuffle()}
                         className={cn(
-                          "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl transition-all",
+                          "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-[6px] transition-all",
                           shuffle ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
                         )}
                         title={shuffle ? "Lecture aléatoire activée" : "Activer la lecture aléatoire"}
@@ -1056,7 +1048,7 @@ export default function SessionPage() {
                     <button
                       onClick={() => usePlaybackPrefsStore.getState().toggleLoop()}
                       className={cn(
-                        "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl transition-all",
+                        "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-[6px] transition-all",
                         loop ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
                       )}
                       title={loop ? "Boucle activée" : "Boucle désactivée — la fin de liste enchaîne sur des titres similaires"}
@@ -1073,7 +1065,7 @@ export default function SessionPage() {
                 {/* Distraction marker (shortcut: D) */}
                 <button
                   onClick={handleDistraction}
-                  className="relative w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-amber-400 hover:bg-amber-500/10 transition-all"
+                  className="relative w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-[6px] text-white/75 hover:text-[#ff8a7d] hover:bg-[#ff6b5c]/10 transition-all"
                   title="Marquer une distraction · touche D"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -1081,7 +1073,7 @@ export default function SessionPage() {
                     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   {distractionCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-black text-[10px] font-bold flex items-center justify-center tabular-nums">
+                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-[#ff6b5c] text-[#1c0604] text-[10px] font-bold flex items-center justify-center tabular-nums">
                       {distractionCount}
                     </span>
                   )}
@@ -1089,7 +1081,7 @@ export default function SessionPage() {
                   {distractionFlash > 0 && (
                     <span
                       key={distractionFlash}
-                      className="absolute inset-0 flex items-center justify-center pointer-events-none text-amber-300 text-xs font-bold animate-[distractionPop_0.7s_ease-out_forwards]"
+                      className="absolute inset-0 flex items-center justify-center pointer-events-none text-[#ff8a7d] text-xs font-bold animate-[distractionPop_0.7s_ease-out_forwards]"
                     >
                       +1
                     </span>
@@ -1108,7 +1100,7 @@ export default function SessionPage() {
                     <div
                       onPointerMove={armVolumeHide}
                       className={cn(
-                        "absolute bottom-full mb-2 md:bottom-auto md:top-full md:mb-0 md:mt-2 right-0 w-9 h-28 flex items-center justify-center rounded-xl bg-black/70 backdrop-blur-sm border border-white/15 shadow-lg shadow-black/40 transition-[opacity,transform] duration-300",
+                        "absolute bottom-full mb-2 md:bottom-auto md:top-full md:mb-0 md:mt-2 right-0 w-9 h-28 flex items-center justify-center rounded-[6px] bg-black/70 backdrop-blur-sm border border-white/15 shadow-lg shadow-black/40 transition-[opacity,transform] duration-300",
                         showVolume
                           ? "opacity-100 translate-y-0"
                           : "opacity-0 translate-y-1 md:-translate-y-1 pointer-events-none"
@@ -1127,7 +1119,7 @@ export default function SessionPage() {
                     </div>
                     <button
                       onClick={() => setShowVolume((v) => { const next = !v; if (next) armVolumeHide(); return next; })}
-                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
+                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-[6px] text-white/75 hover:text-white hover:bg-white/10 transition-all"
                       title="Volume de la vidéo"
                     >
                       {volume === 0 ? (
@@ -1152,7 +1144,7 @@ export default function SessionPage() {
                     href={selectedVodId ? `https://www.twitch.tv/videos/${selectedVodId}` : `https://www.twitch.tv/${selectedChannel}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-[#9146ff] hover:bg-[#9146ff]/10 transition-all"
+                    className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-[6px] text-white/75 hover:text-[#9146ff] hover:bg-[#9146ff]/10 transition-all"
                     title="Ouvrir sur Twitch"
                   >
                     <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
@@ -1165,7 +1157,7 @@ export default function SessionPage() {
                 <button
                   onClick={() => setShowHelp((v) => !v)}
                   className={cn(
-                    "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl transition-all",
+                    "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-[6px] transition-all",
                     showHelp ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
                   )}
                   title="Aide & raccourcis"
@@ -1181,7 +1173,7 @@ export default function SessionPage() {
               {isFlowtime && (
                 <button
                   onClick={handleFlowBreak}
-                  className="flex-shrink-0 flex items-center gap-2 px-3 md:px-4 py-2 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-400/40 text-emerald-200 text-xs font-semibold transition-all hover:bg-emerald-500/30 shadow-lg shadow-black/30"
+                  className="flex-shrink-0 flex items-center gap-2 px-3 md:px-4 py-2 rounded-[4px] bg-[#53e0a1]/15 backdrop-blur-md border border-[#53e0a1]/45 text-[#bff5dc] text-xs font-semibold transition-all hover:bg-[#53e0a1]/25 shadow-lg shadow-black/30"
                   title={`Terminer ce flow et prendre ${earnedBreakMin} min de pause`}
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>

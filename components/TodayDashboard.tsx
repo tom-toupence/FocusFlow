@@ -106,7 +106,7 @@ function Quiet({ onClick, children }: { onClick: () => void; children: React.Rea
   return <Button variant="quiet" size="sm" onClick={onClick}>{children}</Button>;
 }
 
-/* ── La semaine : sept colonnes d'eau ──────────────────────────────────── */
+/* ── La semaine : sept tours, une par soir ─────────────────────────────── */
 
 function WeekColumns({ data, goal }: { data: { date: string; minutes: number; label: string }[]; goal: number }) {
   const today = localToday();
@@ -126,7 +126,7 @@ function WeekColumns({ data, goal }: { data: { date: string; minutes: number; la
               thickness={isToday ? 12 : 9}
               ticks={10}
               majorEvery={5}
-              reflet={isToday}
+              live={isToday}
             />
             <span className={cn("font-mono text-[11px] tabular-nums", isToday ? "text-sodium-text" : "text-ink-3")}>{d.label}</span>
             <span className="font-mono text-[11px] tabular-nums text-ink-3">{d.minutes || ""}</span>
@@ -369,7 +369,7 @@ export default function TodayDashboard({
                 {progress.reached ? "0" : Math.max(0, target - progress.value)}
                 <span className="text-[14px] text-ink-3"> {unit === "minutes" ? "min" : "pomo."}</span>
               </p>
-              <p className="mt-2 text-[12px] text-ink-3">{progress.reached ? "le reste est du bonus" : "avant le trait"}</p>
+              <p className="mt-2 text-[12px] text-ink-3">{progress.reached ? "le reste est du bonus" : "avant l'objectif"}</p>
             </div>
           </div>
         </div>

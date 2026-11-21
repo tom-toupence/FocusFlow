@@ -35,7 +35,7 @@ function seedFull() {
     days[day(i)] = { date: day(i), sessions: s, minutesWorked: s * 25 };
   }
   const entries = Array.from({ length: 24 }, (_, i) => ({
-    id: `p${i}`, type: "youtube", title: ["Study With Me — Rainy Shibuya Crossing", "Study With Me — Osaka Midnight (4h)", "Lofi drive — Kyoto"][i % 3],
+    id: `p${i}`, type: "youtube", title: ["Study With Me · Rainy crossing at night", "Study With Me · Midnight canal (4h)", "Dawn drive · Ambient lofi"][i % 3],
     subtitle: ["Abao in Tokyo", "study with japan", "Abao Vision"][i % 3], mediaKey: ["86CFyZDqiAI", "gHmq9Xd6qMQ", "z-j6jsLtgjs"][i % 3],
     thumbnailUrl: `https://img.youtube.com/vi/${["86CFyZDqiAI", "gHmq9Xd6qMQ", "z-j6jsLtgjs"][i % 3]}/mqdefault.jpg`,
     timestamp: Date.now() - i * 3600e3 * 7, date: day(Math.floor(i / 3)), minutes: 25,
@@ -58,8 +58,8 @@ function seedFull() {
     ], activeProjectId: "pr1" }),
     "focusflow-goal": st({ unit: "minutes", target: 120 }),
     "focusflow-queue": st({ items: [
-      { id: "q1", youtubeId: "86CFyZDqiAI", title: "Study With Me — Rainy Shibuya Crossing", channelName: "Abao in Tokyo", thumbnailUrl: "https://img.youtube.com/vi/86CFyZDqiAI/mqdefault.jpg" },
-      { id: "q2", youtubeId: "gHmq9Xd6qMQ", title: "Study With Me — Osaka Midnight (4h)", channelName: "study with japan", thumbnailUrl: "https://img.youtube.com/vi/gHmq9Xd6qMQ/mqdefault.jpg" },
+      { id: "q1", youtubeId: "86CFyZDqiAI", title: "Study With Me · Rainy crossing at night", channelName: "Abao in Tokyo", thumbnailUrl: "https://img.youtube.com/vi/86CFyZDqiAI/mqdefault.jpg" },
+      { id: "q2", youtubeId: "gHmq9Xd6qMQ", title: "Study With Me · Midnight canal (4h)", channelName: "study with japan", thumbnailUrl: "https://img.youtube.com/vi/gHmq9Xd6qMQ/mqdefault.jpg" },
     ] }),
   };
 }
@@ -121,7 +121,7 @@ for (const theme of themes) {
         const h = [...id].reduce((a, c) => a + c.charCodeAt(0), 0) % PLACEHOLDERS.length;
         r.fulfill({ body: PLACEHOLDERS[h], contentType: "image/jpeg" });
       });
-      await ctx.route(/youtube\.com|scdn\.co|spotify\.com|twitch\.tv/, (r) => r.abort());
+      await ctx.route(/^https?:\/\/(www\.)?youtube\.com|scdn\.co|spotify\.com|twitch\.tv/, (r) => r.abort());
       const page = await ctx.newPage();
       page.on("pageerror", (e) => console.log(`  [pageerror ${plan.name}] ${e.message.slice(0, 160)}`));
       try {

@@ -283,12 +283,19 @@ float ch(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }`
     const w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;
     renderer.setSize(w, h, false);
     composer.setSize(w, h);
-    cam.aspect = w / h;
-    cam.fov = w / h < 1 ? 62 : CAM.fov;
+    const a = w / h;
+    cam.aspect = a;
+    // Bandeau très large (résumé) : focale longue, pas de montant, regard
+    // abaissé sur la ville et la tour. Portrait : focale courte.
+    band = a > 2.4;
+    cam.fov = a < 1 ? 62 : band ? 22 : CAM.fov;
     cam.updateProjectionMatrix();
+    if (glassU) glassU.get("uMullion")!.value = band ? 0 : 1;
     dirty = true;
   };
   let dirty = true;
+  let band = false;
+  const glassU: Map<string, THREE.Uniform> | null = glass.uniforms;
   const ro = new ResizeObserver(resize);
   ro.observe(canvas);
   resize();
@@ -315,6 +322,8 @@ float ch(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }`
   };
 
   const camPos = (reduce ? CAM.pos : CAM_IN).clone();
+  // En bandeau, on vise un peu plus bas et vers la tour.
+  const bandLook = LOOK.clone().lerp(new THREE.Vector3(-17, 41, 29), 0.35).add(new THREE.Vector3(0, -2.5, 0));
   const t0 = performance.now();
   let last = t0;
   renderer.setAnimationLoop((now) => {
@@ -328,7 +337,7 @@ float ch(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }`
     const breathe = reduce ? 0 : Math.sin(t * 0.7) * 0.02;
     const base = camPos;
     cam.position.set(base.x + ptr.x * 0.5 + st.pull * 0.6, base.y + breathe - ptr.y * 0.25 + st.pull * 0.2, base.z + st.pull * 0.9);
-    cam.lookAt(LOOK);
+    cam.lookAt(band ? bandLook : LOOK);
     U.uTime.value = reduce ? 0 : t;
     U.uDawn.value = st.dawn;
     gU.get("uTime")!.value = reduce ? 0 : t;
