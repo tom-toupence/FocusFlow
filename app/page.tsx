@@ -1629,13 +1629,8 @@ export default function LandingPage() {
           <>
             <div className="mb-8">
               <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">Organisation</h1>
-              <p className="text-ink-3 mt-1 text-sm">
-                {orgTab === "projets" && "Suis tes gros objectifs et le rythme à tenir."}
-                {orgTab === "planning" && "Planifie ta semaine en blocs de focus."}
-                {orgTab === "sprint" && "Un objectif, une deadline, un plan généré pour toi."}
-                {orgTab === "routines" && "Relance en un clic tes sessions favorites."}
-                {orgTab === "journal" && "Note ton humeur et ce qui a marché (ou pas)."}
-              </p>
+              {/* Sous-titre stable : chaque onglet a déjà son en-tête qui le décrit. */}
+              <p className="text-ink-3 mt-1 text-sm">Tes projets, ta semaine et tes rituels de travail.</p>
             </div>
             <SubTabs<OrgTab>
               tabs={[

@@ -18,9 +18,9 @@ Captures : `shots/crit4/` (dark et light, desktop 1440 et mobile 390).
 | `/_design` | boutons « Goutte » et « Caillou » | « Clignement », « Grésillement » (types `blink`/`buzz` dans `Gauge`) |
 | Bibliothèque, Planning, Journal, Spotify, Twitch, Découvrir | conformes ; Découvrir reste sur ses squelettes quand YouTube est injoignable (réseau de l'environnement) | rien à corriger côté design |
 
-**Reste assumé** : les sous-onglets d'Organisation répètent parfois le
-sous-titre de la page dans leur propre en-tête. Ces en-têtes de section
-appartiennent aux composants partagés : les retirer demande une passe dédiée.
+Organisation : chaque sous-onglet répétait le sous-titre de la page dans son
+propre en-tête. La page garde désormais un sous-titre stable, et chaque onglet
+se décrit seul.
 
 ## Transition réglages vers session
 
