@@ -55,12 +55,15 @@ function NumberInput({
   min,
   max,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: number;
   min: number;
   max: number;
   onChange: (v: number) => void;
+  /** Format imposé : la valeur reste lisible, les réglages disparaissent (clavier compris). */
+  disabled?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between py-3 border-b border-foreground/[0.06] last:border-0">
@@ -68,7 +71,9 @@ function NumberInput({
       <div className="flex items-center gap-3">
         <button
           onClick={() => onChange(Math.max(min, value - (label.includes("Sessions") ? 1 : 5)))}
-          className="w-7 h-7 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-ink-2 flex items-center justify-center transition-colors text-sm font-medium"
+          disabled={disabled}
+          aria-label={`${label} : diminuer`}
+          className="disabled:invisible w-7 h-7 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-ink-2 flex items-center justify-center transition-colors text-sm font-medium"
         >
           −
         </button>
@@ -77,7 +82,9 @@ function NumberInput({
         </span>
         <button
           onClick={() => onChange(Math.min(max, value + (label.includes("Sessions") ? 1 : 5)))}
-          className="w-7 h-7 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-ink-2 flex items-center justify-center transition-colors text-sm font-medium"
+          disabled={disabled}
+          aria-label={`${label} : augmenter`}
+          className="disabled:invisible w-7 h-7 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-ink-2 flex items-center justify-center transition-colors text-sm font-medium"
         >
           +
         </button>
@@ -587,13 +594,16 @@ export default function SettingsPage() {
           </div>
 
           {/* Custom settings */}
-          <div className={cn("transition-all duration-300", preset !== "custom" && "opacity-40 pointer-events-none")}>
-            <h2 className="font-display text-xl text-ink mb-4">Durées</h2>
+          {/* Hors « Personnalisé », les durées restent LISIBLES (contraste plein) :
+              elles décrivent le format choisi ; seuls les réglages sont inactifs. */}
+          <div className={cn("transition-all duration-300", preset !== "custom" && "pointer-events-none")} aria-disabled={preset !== "custom"}>
+            <h2 className="font-display text-xl text-ink mb-1">Durées</h2>
+            <p className="text-[13px] text-ink-3 mb-4">{preset === "custom" ? "Règle chaque durée." : "Celles du format choisi. Passe en Personnalisé pour les modifier."}</p>
             <div className="rounded-[var(--r-surface)] border border-line px-4">
-              <NumberInput label="Durée de focus" value={work} min={5} max={120} onChange={setWork} />
-              <NumberInput label="Pause courte" value={shortBreak} min={1} max={30} onChange={setShortBreak} />
-              <NumberInput label="Pause longue" value={longBreak} min={5} max={60} onChange={setLongBreak} />
-              <NumberInput label="Sessions avant pause longue" value={sessions} min={2} max={8} onChange={setSessions} />
+              <NumberInput label="Durée de focus" value={work} min={5} max={120} onChange={setWork} disabled={preset !== "custom"} />
+              <NumberInput label="Pause courte" value={shortBreak} min={1} max={30} onChange={setShortBreak} disabled={preset !== "custom"} />
+              <NumberInput label="Pause longue" value={longBreak} min={5} max={60} onChange={setLongBreak} disabled={preset !== "custom"} />
+              <NumberInput label="Sessions avant pause longue" value={sessions} min={2} max={8} onChange={setSessions} disabled={preset !== "custom"} />
             </div>
           </div>
 
@@ -649,6 +659,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleAddTodo}
                 disabled={!todoInput.trim()}
+                aria-label="Ajouter la tâche"
                 className="w-9 h-9 flex items-center justify-center rounded-xl bg-foreground/10 hover:bg-foreground/15 disabled:opacity-20 text-foreground transition-colors flex-shrink-0"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>

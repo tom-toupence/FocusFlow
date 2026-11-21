@@ -131,6 +131,7 @@ export default function TodoList() {
         <button
           onClick={handleAdd}
           disabled={!input.trim()}
+          aria-label="Ajouter la tâche"
           className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/15 disabled:opacity-20 disabled:cursor-not-allowed text-white transition-colors flex-shrink-0"
         >
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>

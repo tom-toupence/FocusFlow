@@ -1034,7 +1034,7 @@ export default function LandingPage() {
               onClick={() => useCommandPalette.getState().setOpen(true)}
               className="flex items-center gap-2 h-9 w-9 justify-center sm:w-auto sm:px-3 rounded-[var(--r-control)] text-ink-2 hover:text-ink hover:bg-surface-2 text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-sodium"
               title="Aller à… (⌘K)"
-              aria-label="Aller à, palette de commandes"
+              aria-label="Aller à ⌘K : palette de commandes"
             >
               <IconSearch size={16} />
               <span className="hidden lg:inline">Aller à</span>

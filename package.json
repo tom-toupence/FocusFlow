@@ -33,6 +33,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/three": "^0.187.0",
+    "axe-core": "^4.14.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "gpu-curtains": "^0.17.4",

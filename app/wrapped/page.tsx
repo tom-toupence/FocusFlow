@@ -27,9 +27,9 @@ function Panel({
 }) {
   return (
     <div className={cn("flex flex-col justify-end gap-1 p-6 rounded-3xl border border-foreground/[0.08] overflow-hidden relative", className)}>
-      <span className="text-[13px] font-semibold opacity-50">{label}</span>
+      <span className="text-[13px] font-semibold text-ink-3">{label}</span>
       <span className={cn("font-extralight tracking-tight tabular-nums", big ? "text-6xl" : "text-4xl")}>{value}</span>
-      {sub && <span className="text-xs opacity-50 leading-snug">{sub}</span>}
+      {sub && <span className="text-xs text-ink-3 leading-snug">{sub}</span>}
     </div>
   );
 }
