@@ -93,5 +93,6 @@ performance). Planches avant / après dans `shots/crit1/`, `shots/crit2/`.
   labs ne doivent pas rester dans le dépôt.
 - CSP : `'wasm-unsafe-eval'` et `blob:` ajoutés (modèles, WASM des labs) ; à
   restreindre si les labs partent.
-- Variable d'environnement « focusflow (assets libres) » créée pour accéder aux
-  banques d'assets ; elle peut être supprimée dans les réglages.
+- Environnement cloud « focusflow (assets libres) » créé pour accéder aux
+  banques d'assets (hôtes ajoutés : Poly Haven, ambientCG, Wikimedia, Hugging
+  Face, jsDelivr) ; il peut être supprimé dans les réglages Claude Code.
