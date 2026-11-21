@@ -41,11 +41,19 @@ export async function suggestFromTracks(
   return interleave(lists, have, opts.limit ?? 10).map((t) => ({ id: t.id, title: t.title, subtitle: t.subtitle, source: "spotify" as const, suggested: true }));
 }
 
-/** Suggestions pour une playlist (hors session), par son URI. */
+// Cache par playlist (10 min) : rouvrir le modal ne refait pas une requête par artiste.
+const cache = new Map<string, { at: number; list: Track[] }>();
+const TTL = 10 * 60_000;
+
+/** Suggestions pour une playlist (hors session), par son URI. null = non connecté. */
 export async function suggestForPlaylist(playlistUri: string, limit = 12): Promise<Track[] | null> {
+  const hit = cache.get(playlistUri);
+  if (hit && Date.now() - hit.at < TTL) return hit.list;
   const token = await validSpotifyToken();
   if (!token) return null;
   const tracks = await fetchPlaylistTracks(token, playlistUri);
   if (!tracks.length) return [];
-  return suggestFromTracks(token, tracks, { limit });
+  const list = await suggestFromTracks(token, tracks, { limit });
+  if (list.length) cache.set(playlistUri, { at: Date.now(), list });
+  return list;
 }

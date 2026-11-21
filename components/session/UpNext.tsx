@@ -23,6 +23,9 @@ export default function UpNext({ adapter, pb }: Props) {
   const [loading, setLoading] = useState(false);
   const [added, setAdded] = useState<Set<string>>(() => new Set());
   const root = useRef<HTMLDivElement>(null);
+  // Adaptateur courant : une réponse arrivée après un changement de source est ignorée.
+  const current = useRef(adapter);
+  useEffect(() => { current.current = adapter; }, [adapter]);
 
   // Changement de source : les suggestions affichées ne valent plus rien.
   useEffect(() => {
@@ -46,9 +49,9 @@ export default function UpNext({ adapter, pb }: Props) {
     setLoading(true);
     try {
       const list = await adapter.getSuggestions(undefined, 8);
-      setSuggestions(list);
+      if (current.current === adapter) setSuggestions(list);
     } catch {
-      setSuggestions([]);
+      if (current.current === adapter) setSuggestions([]);
     } finally {
       setLoading(false);
     }
@@ -71,11 +74,9 @@ export default function UpNext({ adapter, pb }: Props) {
     toast({ title: "Impossible d'ajouter ce titre", description: "La source n'a pas répondu. Réessaie dans un instant.", accent: "amber" });
   };
 
-  const skipTo = (t: Track) => {
-    // Spotify : pas de retrait possible, on peut seulement passer le titre
-    // s'il est le prochain.
-    if (pb.upcoming[0]?.id === t.id) adapter.next();
-  };
+  // Spotify : la file n'a pas d'endpoint de retrait. On ne prétend pas
+  // « passer » un titre ; on propose de l'écouter tout de suite.
+  const playNow = (t: Track) => { if (pb.upcoming[0]?.id === t.id) adapter.next(); };
 
   return (
     <div ref={root} className="relative flex-shrink-0">
@@ -125,7 +126,7 @@ export default function UpNext({ adapter, pb }: Props) {
                       <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
                     </IconButton>
                   ) : i === 0 && pb.caps.skip ? (
-                    <IconButton label={`Passer ${t.title}`} onClick={() => skipTo(t)}>
+                    <IconButton label={`Écouter maintenant ${t.title}`} onClick={() => playNow(t)}>
                       <path d="M5 6l8 6-8 6zM17 6v12" strokeLinecap="round" strokeLinejoin="round" />
                     </IconButton>
                   ) : null}

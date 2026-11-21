@@ -74,3 +74,13 @@ describe("TrackQueue.remove / upcoming", () => {
     expect(q.order).not.toContain(later);
   });
 });
+
+describe("TrackQueue : titres retirés", () => {
+  it("un titre retiré n'est pas réintroduit par une prolongation, sauf ajout explicite", () => {
+    const q = new TrackQueue(["a", "b", "c"]);
+    q.remove("b");
+    expect(q.excluded.has("b")).toBe(true);
+    expect(q.append(["b", "d"])).toEqual(["d"]);
+    expect(q.append(["b"], true)).toEqual(["b"]);
+  });
+});

@@ -5,7 +5,7 @@
 // un titre en file, et les autorisations demandées à Spotify n'incluent pas la
 // modification des playlists : chaque titre s'ouvre donc dans Spotify. En
 // session, le panneau « À venir » permet de les ajouter à la suite.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { suggestForPlaylist } from "@/lib/playback/spotifySuggest";
 import type { Track } from "@/lib/playback/types";
@@ -20,11 +20,15 @@ export default function SpotifyRelatedModal({ playlist, onClose }: { playlist: {
     return () => { cancelled = true; };
   }, [playlist.uri]);
 
+  const close = useRef(onClose);
+  useEffect(() => { close.current = onClose; });
+  const closeBtn = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    closeBtn.current?.focus(); // focus initial dans la boîte de dialogue
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") close.current(); };
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
-  }, [onClose]);
+  }, []);
 
   return createPortal(
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-4" onClick={onClose}>
@@ -40,7 +44,7 @@ export default function SpotifyRelatedModal({ playlist, onClose }: { playlist: {
             <h3 id="spotify-related-title" className="text-sm font-semibold text-foreground truncate">Titres proches de « {playlist.name} »</h3>
             <p className="text-xs text-ink-3 mt-0.5">Choisis-en un pour l&apos;écouter dans Spotify. En session, ajoute-les à la suite depuis « À venir ».</p>
           </div>
-          <button onClick={onClose} aria-label="Fermer" className="text-ink-3 hover:text-foreground transition-colors flex-shrink-0 ml-3">
+          <button ref={closeBtn} onClick={onClose} aria-label="Fermer" className="text-ink-3 hover:text-foreground transition-colors flex-shrink-0 ml-3">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
               <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
             </svg>

@@ -3,7 +3,7 @@
 // (YouTube via son adaptateur, Spotify, Twitch), l'habillage qui va avec, et
 // remonte l'adaptateur à la page. C'est le SEUL endroit qui distingue les
 // sources : la page ne pilote qu'un `PlayerAdapter`.
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import SpotifyPlayer from "@/components/SpotifyPlayer";
 import TwitchPlayer from "@/components/TwitchPlayer";
 import { usePlaybackPrefsStore } from "@/store/playbackPrefsStore";
@@ -19,7 +19,8 @@ interface Props {
   volume: number;
   /** Identifiant de la piste en cours (pulsation du halo à chaque titre). */
   trackId?: string;
-  onAdapter: (a: PlayerAdapter | null) => void;
+  /** Setter React : le nettoyage ne retire que SON adaptateur. */
+  onAdapter: Dispatch<SetStateAction<PlayerAdapter | null>>;
   onExtended: (e: ExtendedEvent, kind: Media["kind"]) => void;
   /** Décor quand la source n'a pas d'image (Spotify) : la ville. */
   backdrop: ReactNode;
@@ -45,7 +46,7 @@ export default function SessionMedia({ media, playing, isBreak, volume, trackId,
       onExtended: (e) => latest.current.onExtended(e, "youtube"),
     });
     latest.current.onAdapter(a);
-    return () => { a.destroy(); latest.current.onAdapter(null); };
+    return () => { a.destroy(); latest.current.onAdapter((cur) => (cur === a ? null : cur)); };
   }, [ytKey]);
 
   const loop = usePlaybackPrefsStore((s) => s.loop);

@@ -17,6 +17,8 @@ export class TrackQueue {
   private original: string[];
   private i = 0;
   private shuffled = false;
+  /** Titres retirés par l'utilisateur : jamais réintroduits par une prolongation. */
+  private removed = new Set<string>();
 
   constructor(ids: string[], opts: { shuffle?: boolean; random?: () => number } = {}) {
     this.random = opts.random ?? Math.random;
@@ -34,6 +36,8 @@ export class TrackQueue {
   get isShuffled() { return this.shuffled; }
   /** Tout ce qui est dans la file, quel que soit l'ordre (pour exclure des recos). */
   get all(): ReadonlySet<string> { return new Set(this.original); }
+  /** À exclure des recommandations : la file ET les titres retirés. */
+  get excluded(): ReadonlySet<string> { return new Set([...this.original, ...this.removed]); }
   /** Pistes déjà jouées ou en cours, dans l'ordre de lecture. */
   get played(): string[] { return this.ids.slice(0, this.i + 1); }
   get isLast() { return this.i >= this.ids.length - 1; }
@@ -88,6 +92,7 @@ export class TrackQueue {
     this.ids.splice(at, 1);
     const o = this.original.indexOf(id);
     if (o >= 0) this.original.splice(o, 1);
+    this.removed.add(id);
     return true;
   }
 
@@ -98,10 +103,12 @@ export class TrackQueue {
 
   /**
    * Ajoute des pistes à la fin (prolongation). Ignore les doublons de la file.
-   * Retourne les pistes réellement ajoutées.
+   * Retourne les pistes réellement ajoutées. Un titre retiré par l'utilisateur
+   * n'est accepté que sur ajout explicite (`explicit`).
    */
-  append(ids: string[]): string[] {
-    const have = new Set(this.original);
+  append(ids: string[], explicit = false): string[] {
+    if (explicit) for (const id of ids) this.removed.delete(id);
+    const have = this.excluded;
     const fresh = dedupe(ids).filter((id) => !have.has(id));
     this.original.push(...fresh);
     this.ids.push(...fresh);

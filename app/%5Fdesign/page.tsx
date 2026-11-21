@@ -235,8 +235,8 @@ export default function DesignPage() {
             <div className="flex flex-col gap-3 flex-1 min-w-64">
               <Gauge orientation="horizontal" label="Progression" valueText="61 %" value={level} length={320} thickness={6} ticks={25} />
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={() => setPulse({ kind: "drop", key: Date.now() })}>Goutte (piste suivante)</Button>
-                <Button size="sm" onClick={() => setPulse({ kind: "stone", key: Date.now() })}>Caillou (distraction)</Button>
+                <Button size="sm" onClick={() => setPulse({ kind: "blink", key: Date.now() })}>Clignement (piste suivante)</Button>
+                <Button size="sm" onClick={() => setPulse({ kind: "buzz", key: Date.now() })}>Grésillement (distraction)</Button>
                 <Button size="sm" onClick={() => setLevel((l) => (l >= 0.96 ? 0.04 : l + 0.08))}>Une graduation</Button>
               </div>
             </div>

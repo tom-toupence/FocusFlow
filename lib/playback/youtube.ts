@@ -235,7 +235,7 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     // Au plus 10 s : une requête qui pend ne doit pas geler la file (les fins
     // de titre et « suivant » sont ignorés pendant une prolongation).
     const res = await Promise.race([
-      continuePlaylist(q.order, q.current, this.opts.recommend ?? defaultRecommend, { exclude: q.all }),
+      continuePlaylist(q.order, q.current, this.opts.recommend ?? defaultRecommend, { exclude: q.excluded }),
       new Promise<{ kind: "loop" }>((r) => { this.raceTimer = setTimeout(() => r({ kind: "loop" }), 10_000); }),
     ]);
     if (this.raceTimer) { clearTimeout(this.raceTimer); this.raceTimer = null; }
@@ -298,7 +298,7 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     const res = await continuePlaylist(
       seeds?.length ? seeds : pool, seeds?.length ? null : (this.queue?.current ?? pool[0]),
       this.opts.recommend ?? defaultRecommend,
-      { exclude: this.queue?.all ?? new Set(pool), limit },
+      { exclude: this.queue?.excluded ?? new Set(pool), limit },
     ).catch(() => ({ kind: "loop" as const }));
     if (res.kind !== "extend") return [];
     for (const t of res.tracks) this.titles[t.id] ??= t.title;
@@ -311,7 +311,7 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
    */
   async enqueue(t: Track) {
     if (!this.queue) return false;
-    const added = this.queue.append([t.id]);
+    const added = this.queue.append([t.id], true);
     if (!added.length) return false;
     this.titles[t.id] = t.title;
     this.suggested.add(t.id);

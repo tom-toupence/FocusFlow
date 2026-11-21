@@ -10,12 +10,12 @@
 // tours déjà allumées (Flowtime, pomodoros terminés).
 //
 // Réactions (événements RÉELS uniquement) :
-//   pulse.kind = "drop"  → la fenêtre en cours clignote (piste suivante, minute pleine)
-//   pulse.kind = "stone" → l'étage en cours grésille en rouge (distraction)
+//   pulse.kind = "blink"  → la fenêtre en cours clignote (piste suivante, minute pleine)
+//   pulse.kind = "buzz" → l'étage en cours grésille en rouge (distraction)
 // Le `key` de pulse change pour rejouer l'effet. SVG/CSS uniquement.
 import { cn } from "@/lib/utils";
 
-export interface GaugePulse { kind: "drop" | "stone"; key: number }
+export interface GaugePulse { kind: "blink" | "buzz"; key: number }
 
 interface GaugeProps {
   /** Remplissage 0..1 (au-delà, la tour reste allumée). */
@@ -100,7 +100,7 @@ export function Gauge({
             const y = length - (i + 1) * cell - i * gap;
             const w = (thickness - (cols - 1) * gap) / cols;
             return (
-              <g key={i} className={flick ? (pulse.kind === "drop" ? "ff-blink" : "ff-buzz") : undefined}>
+              <g key={i} className={flick ? (pulse.kind === "blink" ? "ff-blink" : "ff-buzz") : undefined}>
                 {Array.from({ length: cols }, (_, c) => (
                   <rect
                     key={c}
@@ -109,7 +109,7 @@ export function Gauge({
                     width={w}
                     height={Math.max(1, cell)}
                     rx={0.75}
-                    fill={flick && pulse.kind === "stone" ? "var(--danger)" : fillFor(i)}
+                    fill={flick && pulse.kind === "buzz" ? "var(--danger)" : fillFor(i)}
                     stroke={fillFor(i) === off ? offEdge : "none"}
                     strokeWidth={0.5}
                     style={{ transition: "fill 400ms var(--ease-ui)" }}
@@ -123,13 +123,13 @@ export function Gauge({
           return (
             <rect
               key={i}
-              className={flick ? (pulse.kind === "drop" ? "ff-blink" : "ff-buzz") : undefined}
+              className={flick ? (pulse.kind === "blink" ? "ff-blink" : "ff-buzz") : undefined}
               x={x}
               y={0}
               width={Math.max(1, cell)}
               height={thickness}
               rx={0.75}
-              fill={flick && pulse.kind === "stone" ? "var(--danger)" : fillFor(i)}
+              fill={flick && pulse.kind === "buzz" ? "var(--danger)" : fillFor(i)}
               stroke={fillFor(i) === off ? offEdge : "none"}
               strokeWidth={0.5}
               style={{ transition: "fill 400ms var(--ease-ui)" }}
