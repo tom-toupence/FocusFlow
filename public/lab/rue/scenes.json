@@ -54,5 +54,37 @@
   "href": "https://commons.wikimedia.org/wiki/File:Osaka_Neon_-_OsakaNeon6674.jpg",
   "style": 0.9,
   "frameY": 0.5
+ },
+ {
+  "id": "fleuve",
+  "label": "Skyline au bord du fleuve",
+  "style": 0.35,
+  "frameY": 0.6,
+  "credit": "Photo personnelle",
+  "href": ""
+ },
+ {
+  "id": "pavillon",
+  "label": "Pavillon sur l'eau",
+  "style": 0.15,
+  "frameY": 0.3,
+  "credit": "Photo personnelle",
+  "href": ""
+ },
+ {
+  "id": "tours",
+  "label": "Tours et esplanade",
+  "style": 0.4,
+  "frameY": 0.6,
+  "credit": "Photo personnelle",
+  "href": ""
+ },
+ {
+  "id": "boulevard",
+  "label": "Boulevard la nuit",
+  "style": 0.45,
+  "frameY": 0.5,
+  "credit": "Photo personnelle",
+  "href": ""
  }
 ]

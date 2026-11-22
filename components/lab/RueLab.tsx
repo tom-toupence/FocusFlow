@@ -19,10 +19,14 @@ export default function RueLab() {
 
   // Le manifeste des scènes (produit avec scripts/rue/).
   useEffect(() => {
-    fetch("/lab/rue/scenes.json").then((res) => res.json()).then((list: SceneInfo[]) => {
+    fetch("/lab/rue/scenes.json").then((res) => res.json()).then((all: SceneInfo[]) => {
+      let list = all;
       // ?scene=<id> : commencer par cette scène.
-      const want = new URLSearchParams(window.location.search).get("scene");
-      const at = Math.max(0, list.findIndex((s) => s.id === want));
+      const params = new URLSearchParams(window.location.search);
+      // ?only=a,b,c : seulement ces scènes (aperçu d'un lot de photos).
+      const only = params.get("only")?.split(",").filter(Boolean);
+      if (only?.length) list = list.filter((s) => only.includes(s.id));
+      const at = Math.max(0, list.findIndex((s) => s.id === params.get("scene")));
       setScenes([...list.slice(at), ...list.slice(0, at)]);
     }).catch(() => setFallback(true));
   }, []);
@@ -106,7 +110,10 @@ export default function RueLab() {
           </div>
         )}
       </div>
-      {scene && (
+      {scene && !scene.href && (
+        <p className="absolute bottom-2 right-3 z-10 text-[10px] text-white/60">{scene.credit}</p>
+      )}
+      {scene && scene.href && (
         <a href={scene.href} target="_blank" rel="noopener noreferrer" className="absolute bottom-2 right-3 z-10 text-[10px] text-white/60 hover:text-white/90">
           {scene.credit}
         </a>
