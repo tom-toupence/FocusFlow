@@ -19,7 +19,7 @@ import glob
 import cv2
 import numpy as np
 
-from common import OUT, WORK, load_rgb, save_gray
+from common import OUT, WORK, load_rgb, save_gray, scene
 
 img = load_rgb()
 H, W = img.shape[:2]
@@ -30,7 +30,7 @@ yy = np.mgrid[0:H, 0:W][0]
 
 # Sol : la rue entre les trottoirs, jusqu'au point de fuite.
 floor = np.zeros((H, W), np.uint8)
-poly = np.array([(120, 1280), (300, 1060), (560, 960), (800, 885), (1020, 885), (1250, 960), (1560, 1110), (1760, 1280)], np.int32)
+poly = np.array(scene()["floor"], np.int32)
 cv2.fillPoly(floor, [poly], 1)
 objects = np.zeros((H, W), bool)
 for f in glob.glob(str(WORK / "obj_*.png")):
@@ -56,7 +56,7 @@ for i in range(1, n):
     m = lab == i
     cyan = np.median(hue[m])
     small = area < 1600
-    is_window = small and y < 640 and np.median(depth[m]) < 0.32 and (np.median(sat[m]) < 0.5 or 80 <= cyan <= 105) and w < 160
+    is_window = small and y < 0.6 * H and np.median(depth[m]) < 0.45 and (np.median(sat[m]) < 0.5 or 80 <= cyan <= 105) and w < 160
     if is_window:
         wid = wid % 255 + 1
         win_ids[m] = wid
@@ -78,8 +78,8 @@ for i in range(1, n):
 
 # Les enseignes segmentées par SAM forment chacune UN élément (elles
 # s'allument et s'éteignent d'un bloc), prioritaire sur le découpage.
-for name in ["enseigne_mart_haut", "pilier_mart", "enseigne_change", "neon_gauche", "panneau_parking"]:
-    om = cv2.imread(str(WORK / f"obj_{name}.png"), 0) > 127
+for f in sorted(glob.glob(str(WORK / "obj_enseigne_*.png"))):
+    om = cv2.imread(f, 0) > 127
     sid = sid % 255 + 1
     sign_ids[om & (emissive > 0)] = sid
 

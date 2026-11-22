@@ -1,7 +1,7 @@
-"""Outils communs de la préparation 2.5D (photo de Séoul).
+"""Outils communs de la préparation 2.5D (photo de rue).
 
-Usage : les modèles ONNX sont téléchargés une fois dans SEOUL_MODELS
-(voir README.md), les sorties vont dans public/lab/seoul/.
+Usage : les modèles ONNX sont téléchargés une fois dans RUE_MODELS
+(voir README.md), les sorties vont dans public/lab/rue/.
 """
 import os
 from pathlib import Path
@@ -10,12 +10,18 @@ import cv2
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
-SRC = ROOT / "scripts" / "seoul" / "source.webp"
-OUT = ROOT / "public" / "lab" / "seoul"
-WORK = Path(os.environ.get("SEOUL_WORK", "/tmp/seoul-work"))
-MODELS = Path(os.environ.get("SEOUL_MODELS", "/tmp/seoul-models"))
+SRC = Path(os.environ.get("RUE_SRC", ROOT / "scripts" / "rue" / "source.jpg"))
+OUT = ROOT / "public" / "lab" / "rue"
+WORK = Path(os.environ.get("RUE_WORK", "/tmp/rue-work"))
+MODELS = Path(os.environ.get("RUE_MODELS", "/tmp/rue-models"))
 OUT.mkdir(parents=True, exist_ok=True)
 WORK.mkdir(parents=True, exist_ok=True)
+
+
+def scene() -> dict:
+    """Réglages propres à la photo : seuils des plans, polygone du sol."""
+    import json
+    return json.loads((ROOT / "scripts" / "rue" / "scene.json").read_text())
 
 
 def load_rgb() -> np.ndarray:

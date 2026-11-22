@@ -5,23 +5,18 @@ La profondeur seule bave sur les bords ; SAM donne des contours nets que
 03_layers.py combine avec la profondeur pour ranger chaque objet dans un plan.
 Sortie : WORK/obj_<nom>.png (masques binaires pleine résolution).
 """
+import json
+from pathlib import Path
+
 import cv2
 import numpy as np
 import onnxruntime as ort
 
 from common import MODELS, WORK, load_rgb
 
-# Points dans la photo 1920x1280 : (x, y, 1 = sur l'objet, 0 = hors objet).
-OBJECTS = {
-    "neon_gauche": [(70, 700, 1), (75, 400, 1), (75, 1000, 1)],
-    "pilier_mart": [(560, 640, 1), (560, 800, 1)],
-    "enseigne_change": [(1265, 870, 1), (1265, 960, 1)],
-    "passant_centre": [(935, 735, 1), (930, 900, 1), (935, 1000, 1)],
-    "passants_gauche": [(668, 712, 1), (630, 860, 1), (705, 860, 1)],
-    "enfant_rose": [(525, 772, 1), (480, 768, 1), (572, 778, 1), (520, 860, 1)],
-    "enseigne_mart_haut": [(470, 200, 1), (470, 380, 1)],
-    "panneau_parking": [(1440, 580, 1)],
-}
+# Points par objet, en pixels de la photo : [x, y, 1 = sur l'objet / 0 = hors],
+# dans objects.json (propre à chaque photo).
+OBJECTS = json.loads((Path(__file__).parent / "objects.json").read_text())
 
 img = load_rgb()
 H, W = img.shape[:2]
@@ -35,6 +30,8 @@ enc = ort.InferenceSession(str(MODELS / "sam_encoder.onnx"), providers=["CPUExec
 dec = ort.InferenceSession(str(MODELS / "sam_decoder.onnx"), providers=["CPUExecutionProvider"])
 emb, pos = enc.run(None, {"pixel_values": pad.transpose(2, 0, 1)[None]})
 
+for f in WORK.glob("obj_*.png"):
+    f.unlink()
 for name, pts in OBJECTS.items():
     p = np.array([[[[px * S, py * S] for px, py, _ in pts]]], np.float32)
     l = np.array([[[lab for _, _, lab in pts]]], np.int64)

@@ -1,11 +1,11 @@
 "use client";
-// Banc d'essai du visuel « rue de Séoul en 2.5D », avant toute intégration.
+// Banc d'essai du visuel « rue de nuit en 2.5D », avant toute intégration.
 import { useEffect, useRef, useState } from "react";
-import { createSeoul, supportsSeoul, type SeoulRenderer } from "@/lib/seoul/SeoulRenderer";
+import { createRue, supportsRue, type RueRenderer } from "@/lib/rue/RueRenderer";
 
-export default function SeoulLab() {
+export default function RueLab() {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const r = useRef<SeoulRenderer | null>(null);
+  const r = useRef<RueRenderer | null>(null);
   const [fallback, setFallback] = useState(false);
   const [mode, setMode] = useState<"work" | "break">("work");
   const [night, setNight] = useState(0);
@@ -13,21 +13,21 @@ export default function SeoulLab() {
 
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!canvas.current || !supportsSeoul()) {
+    if (!canvas.current || !supportsRue()) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setFallback(true);
       return;
     }
     let disposed = false;
-    // ?record : horloge manuelle pilotée par la capture vidéo (window.__seoul).
+    // ?record : horloge manuelle pilotée par la capture vidéo (window.__rue).
     const record = new URLSearchParams(window.location.search).has("record");
-    createSeoul(canvas.current, { reducedMotion: reduce, manualClock: record })
+    createRue(canvas.current, { reducedMotion: reduce, manualClock: record })
       .then((x) => {
         if (disposed) { x.dispose(); return; }
         r.current = x;
-        if (record) (window as unknown as { __seoul?: SeoulRenderer }).__seoul = x;
+        if (record) (window as unknown as { __rue?: RueRenderer }).__rue = x;
       })
-      .catch((e) => { console.warn("[seoul] repli :", e); setFallback(true); });
+      .catch((e) => { console.warn("[rue] repli :", e); setFallback(true); });
     const move = (e: PointerEvent) => r.current?.pointer((e.clientX / window.innerWidth) * 2 - 1, (e.clientY / window.innerHeight) * 2 - 1);
     window.addEventListener("pointermove", move);
     return () => { disposed = true; window.removeEventListener("pointermove", move); r.current?.dispose(); r.current = null; };
@@ -40,9 +40,9 @@ export default function SeoulLab() {
     <main className="fixed inset-0 bg-black text-white">
       {fallback ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src="/lab/seoul/still.webp" alt="Rue commerçante sous la pluie, la nuit" className="absolute inset-0 w-full h-full object-cover" />
+        <img src="/lab/rue/still.webp" alt="Rue commerçante sous la pluie, la nuit, enseignes lumineuses" className="absolute inset-0 w-full h-full object-cover" />
       ) : (
-        <canvas ref={canvas} className="absolute inset-0 w-full h-full block" aria-label="Rue commerçante sous la pluie, la nuit" role="img" />
+        <canvas ref={canvas} className="absolute inset-0 w-full h-full block" aria-label="Rue commerçante sous la pluie, la nuit, enseignes lumineuses" role="img" />
       )}
 
       <div className="absolute top-3 left-3 z-10 text-xs">
@@ -71,7 +71,14 @@ export default function SeoulLab() {
           </div>
         )}
       </div>
-      <p className="absolute bottom-2 right-3 z-10 text-[10px] text-white/55">Photo : Nocalz (droits à vérifier avant toute mise en production)</p>
+      <a
+        href="https://commons.wikimedia.org/wiki/File:Walking_around_Kabukicho,_Shinjuku_at_night._(29362321701).jpg"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="absolute bottom-2 right-3 z-10 text-[10px] text-white/60 hover:text-white/90"
+      >
+        Photo : Daniel Ramirez, CC BY 2.0 (modifiée : profondeur, plans, effets)
+      </a>
     </main>
   );
 }

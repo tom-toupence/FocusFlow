@@ -1,7 +1,7 @@
 """3. Plans de profondeur et reconstitution de ce qu'ils cachent.
 
-Quatre plans, du fond vers l'avant (seuils sur la profondeur relative) :
-  0 fond (< 0.16)  1 milieu (< 0.30)  2 proche (< 0.55)  3 premier plan.
+Quatre plans, du fond vers l'avant, par seuils sur la profondeur relative
+(scene.json) : 0 fond, 1 milieu, 2 proche, 3 premier plan.
 Chaque objet segmenté par SAM passe entier dans le plan de sa profondeur
 médiane (contours nets). Les coupes à travers une surface continue (le sol,
 un mur) restent douces : en rendu, le décalage dépend de la profondeur du
@@ -20,10 +20,10 @@ import cv2
 import numpy as np
 import onnxruntime as ort
 
-from common import MODELS, OUT, WORK, load_rgb
+from common import MODELS, OUT, WORK, load_rgb, scene
 
-T = [0.16, 0.30, 0.55]
-BAND = 90          # px révélables au plus (amplitude max de la caméra ~ 40 px)
+T = scene()["thresholds"]   # fond | milieu | proche | premier plan
+BAND = 150         # px révélables au plus par la caméra (travelling et avancée)
 FRINGE = 5         # px de liseré de l'objet retiré avec lui (halo de couleur)
 
 img = load_rgb()
@@ -77,6 +77,17 @@ for k in range(4):
         dk = cv2.inpaint(d8, band.astype(np.uint8) * 255, 9, cv2.INPAINT_TELEA)
     else:
         color, dk = img, d8
+    # Au-delà de sa silhouette (vers le fond), un plan garde la profondeur de
+    # son bord : sinon, en vraie perspective, les triangles à cheval sur la
+    # silhouette relieraient l'objet au fond et s'étireraient en traînées.
+    if k > 0:
+        outside = (layer < k).astype(np.uint8)
+        _, lab = cv2.distanceTransformWithLabels(outside, cv2.DIST_L2, 5, labelType=cv2.DIST_LABEL_PIXEL)
+        inside = outside == 0
+        ys, xs = np.nonzero(inside)
+        lut = np.zeros(lab.max() + 1, np.uint8)
+        lut[lab[ys, xs]] = dk[ys, xs]
+        dk = np.where(inside, dk, lut[lab]).astype(np.uint8)
     # Alpha : « ce plan ou plus proche ». Bords nets sur les objets SAM,
     # adoucis (3 px) sur les coupes à travers une surface continue.
     a = (layer >= k).astype(np.float32)
