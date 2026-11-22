@@ -12,11 +12,11 @@ import cv2
 import numpy as np
 import onnxruntime as ort
 
-from common import MODELS, WORK, load_rgb
+from common import MODELS, SCENE_DIR, WORK, load_rgb
 
 # Points par objet, en pixels de la photo : [x, y, 1 = sur l'objet / 0 = hors],
 # dans objects.json (propre à chaque photo).
-OBJECTS = json.loads((Path(__file__).parent / "objects.json").read_text())
+OBJECTS = json.loads((SCENE_DIR / "objects.json").read_text())
 
 img = load_rgb()
 H, W = img.shape[:2]

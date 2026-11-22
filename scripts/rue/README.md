@@ -6,7 +6,7 @@ commités dans `public/lab/rue/`. Licences : `docs/redesign/ASSETS.md`.
 
 ```bash
 pip install numpy opencv-python onnxruntime   # déjà présents dans l'environnement cloud
-export RUE_MODELS=/chemin/modeles RUE_WORK=/chemin/travail
+export RUE_MODELS=/chemin/modeles RUE_WORK=/chemin/travail RUE_SCENE=pont
 mkdir -p "$RUE_MODELS" && cd "$RUE_MODELS"
 curl -L -o depth_small.onnx https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/main/onnx/model.onnx
 curl -L -o sam_encoder.onnx https://huggingface.co/Xenova/slimsam-77-uniform/resolve/main/onnx/vision_encoder.onnx
@@ -24,9 +24,11 @@ python3 01_depth.py && python3 02_segment.py && python3 03_layers.py && python3 
 | `04_masks.py` | néons (lumineux et saturés, hors sol), fenêtres (petites lumières dans le haut), sol (polygone de la rue), ciel ; numéros par composante | chaque enseigne grésille, chaque fenêtre s'éteint pour son compte ; les gros blocs d'enseignes collées sont découpés |
 | `05_pack.py` | regroupe les 4 profondeurs dans une texture | une texture au lieu de quatre |
 
-Réglages propres à la photo : `objects.json` (points SAM par objet) et
-`scene.json` (seuils des plans, polygone du sol). Changer de photo = remplacer
-`source.jpg`, ces deux fichiers, puis relancer les cinq étapes.
+Une scène = un dossier `scenes/<nom>/` : `source.jpg`, `objects.json` (points
+SAM par objet) et `scene.json` (seuils des plans, polygone du sol). Lancer les
+cinq étapes avec `RUE_SCENE=<nom>` ; sorties dans `public/lab/rue/<nom>/`.
+Chaque objet segmenté reçoit une profondeur unique (sa médiane) : un carton
+découpé à sa distance, dont le bord reste net quand la caméra bouge.
 
 Rendu (`lib/rue/`) : chaque plan est une grille de sommets poussés à leur
 profondeur (z = 1 / mix(1/9, 1, d)) et vue par une caméra en perspective qui

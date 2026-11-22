@@ -33,7 +33,12 @@ depth = np.load(WORK / "depth.npy")
 layer = np.digitize(depth, T).astype(np.uint8)   # 0..3
 for f in sorted(glob.glob(str(WORK / "obj_*.png"))):
     m = cv2.imread(f, 0) > 127
-    layer[m] = np.digitize([np.median(depth[m])], T)[0]
+    med = float(np.median(depth[m]))
+    layer[m] = np.digitize([med], T)[0]
+    # Un objet segmenté = un carton découpé à sa distance : profondeur unique.
+    # Sinon la pente douce de la profondeur sur son bord est jetée comme un
+    # raccord étiré et la silhouette s'effiloche quand la caméra bouge.
+    depth[m] = med
 cv2.imwrite(str(WORK / "layers_index.png"), layer * 85)
 
 lama = ort.InferenceSession(str(MODELS / "lama.onnx"), providers=["CPUExecutionProvider"])

@@ -10,9 +10,12 @@ import cv2
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
-SRC = Path(os.environ.get("RUE_SRC", ROOT / "scripts" / "rue" / "source.jpg"))
-OUT = ROOT / "public" / "lab" / "rue"
-WORK = Path(os.environ.get("RUE_WORK", "/tmp/rue-work"))
+# Une scène = une photo et ses réglages : scripts/rue/scenes/<RUE_SCENE>/.
+SCENE = os.environ.get("RUE_SCENE", "kabukicho")
+SCENE_DIR = ROOT / "scripts" / "rue" / "scenes" / SCENE
+SRC = SCENE_DIR / "source.jpg"
+OUT = ROOT / "public" / "lab" / "rue" / SCENE
+WORK = Path(os.environ.get("RUE_WORK", "/tmp/rue-work")) / SCENE
 MODELS = Path(os.environ.get("RUE_MODELS", "/tmp/rue-models"))
 OUT.mkdir(parents=True, exist_ok=True)
 WORK.mkdir(parents=True, exist_ok=True)
@@ -21,7 +24,7 @@ WORK.mkdir(parents=True, exist_ok=True)
 def scene() -> dict:
     """Réglages propres à la photo : seuils des plans, polygone du sol."""
     import json
-    return json.loads((ROOT / "scripts" / "rue" / "scene.json").read_text())
+    return json.loads((SCENE_DIR / "scene.json").read_text())
 
 
 def load_rgb() -> np.ndarray:
