@@ -30,6 +30,24 @@ img = load_rgb()
 H, W = img.shape[:2]
 depth = np.load(WORK / "depth.npy")
 
+# Zones « aplaties » (scene.json flatten = [[x0,y0,x1,y1]]) : des passants
+# flous de bougé ne se découpent pas proprement (le flou reste en partie sur
+# le fond et la parallaxe les dédouble). On leur donne la profondeur de ce qui
+# les entoure : ils bougent avec le décor, comme peints dessus.
+keep = np.zeros((H, W), bool)
+for f in glob.glob(str(WORK / "obj_proche_*.png")):
+    keep |= cv2.imread(f, 0) > 127
+for x0, y0, x1, y1 in scene().get("flatten", []):
+    hole = np.zeros((H, W), np.uint8)
+    hole[y0:y1, x0:x1] = 1
+    hole[keep] = 0
+    d8 = (depth * 65535).astype(np.uint16)
+    lo = cv2.resize(d8, (W // 4, H // 4), interpolation=cv2.INTER_AREA).astype(np.float32) / 65535
+    hm = cv2.resize(hole, (W // 4, H // 4), interpolation=cv2.INTER_NEAREST)
+    filled = cv2.inpaint((lo * 255).astype(np.uint8), hm, 9, cv2.INPAINT_TELEA).astype(np.float32) / 255
+    filled = cv2.GaussianBlur(cv2.resize(filled, (W, H), interpolation=cv2.INTER_CUBIC), (0, 0), 6)
+    depth[hole > 0] = filled[hole > 0]
+
 layer = np.digitize(depth, T).astype(np.uint8)   # 0..3
 for f in sorted(glob.glob(str(WORK / "obj_*.png"))):
     m = cv2.imread(f, 0) > 127
