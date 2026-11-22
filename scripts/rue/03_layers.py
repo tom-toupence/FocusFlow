@@ -21,6 +21,7 @@ import numpy as np
 import onnxruntime as ort
 
 from common import MODELS, OUT, WORK, load_rgb, scene
+from dessin import dessin
 
 T = scene()["thresholds"]   # fond | milieu | proche | premier plan
 BAND = 150         # px révélables au plus par la caméra (travelling et avancée)
@@ -28,6 +29,8 @@ FRINGE = 5         # px de liseré de l'objet retiré avec lui (halo de couleur)
 
 img = load_rgb()
 H, W = img.shape[:2]
+if scene().get("dessin"):
+    img = dessin(img[..., ::-1].copy(), float(scene()["dessin"]))[..., ::-1].copy()
 depth = np.load(WORK / "depth.npy")
 
 # Zones « aplaties » (scene.json flatten = [[x0,y0,x1,y1]]) : des passants
