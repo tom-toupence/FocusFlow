@@ -68,6 +68,20 @@ for f in sorted(glob.glob(str(WORK / "obj_*.png"))):
     # Sinon la pente douce de la profondeur sur son bord est jetée comme un
     # raccord étiré et la silhouette s'effiloche quand la caméra bouge.
     depth[m] = med
+# Profondeur lissée DANS chaque plan (convolution normalisée) : le maillage
+# suit la profondeur pixel par pixel, et ses petites variations sur un visage
+# ou un corps (nez, cou, épaules mal estimés) le déformaient quand la caméra
+# bouge. Lissée, chaque silhouette se déplace d'un bloc ; les grandes pentes
+# (sol, façades en perspective) sont gardées.
+SMOOTH = 22
+for k in range(4):
+    m = (layer == k).astype(np.float32)
+    if not m.any():
+        continue
+    num = cv2.GaussianBlur(depth * m, (0, 0), SMOOTH)
+    den = cv2.GaussianBlur(m, (0, 0), SMOOTH)
+    sm = num / np.maximum(den, 1e-4)
+    depth[m > 0] = sm[m > 0]
 cv2.imwrite(str(WORK / "layers_index.png"), layer * 85)
 
 lama = ort.InferenceSession(str(MODELS / "lama.onnx"), providers=["CPUExecutionProvider"])
