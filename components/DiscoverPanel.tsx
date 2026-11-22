@@ -149,7 +149,7 @@ export default function DiscoverPanel() {
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">Découvrir</h1>
-          <p className="text-ink-3 mt-1 text-sm">
+          <p className="text-foreground/40 mt-1 text-sm">
             Des recommandations basées sur ce que tu écoutes, ou cherche directement un titre.
           </p>
         </div>
@@ -157,7 +157,7 @@ export default function DiscoverPanel() {
           <button
             onClick={() => setRefreshKey((k) => k + 1)}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-foreground/5 hover:bg-foreground/10 text-ink-3 hover:text-foreground text-xs font-medium transition-all disabled:opacity-40 flex-shrink-0"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-foreground/5 hover:bg-foreground/10 text-foreground/50 hover:text-foreground text-xs font-medium transition-all disabled:opacity-40 flex-shrink-0"
           >
             <svg className={cn("w-3.5 h-3.5", loading && "animate-spin")} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" strokeLinecap="round" strokeLinejoin="round" />
@@ -169,24 +169,24 @@ export default function DiscoverPanel() {
 
       {/* Barre de recherche — toujours en tête */}
       <div className="relative max-w-xl w-full">
-        <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+        <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
           <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" strokeLinecap="round" />
         </svg>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Rechercher une musique, un artiste, un mix…"
-          className="w-full bg-foreground/5 border border-foreground/10 rounded-xl pl-10 pr-9 py-2.5 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:border-foreground/25 transition-colors"
+          className="w-full bg-foreground/5 border border-foreground/10 rounded-xl pl-10 pr-9 py-2.5 text-sm text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-foreground/25 transition-colors"
         />
         {searchLoading && (
-          <svg className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-ink-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-foreground/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path d="M12 2v4M4.93 4.93l2.83 2.83M2 12h4M4.93 19.07l2.83-2.83" strokeLinecap="round" />
           </svg>
         )}
         {!searchLoading && isSearching && (
           <button
             onClick={() => setQuery("")}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full text-ink-3 hover:text-foreground hover:bg-foreground/10 transition-all"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full text-foreground/30 hover:text-foreground hover:bg-foreground/10 transition-all"
             aria-label="Effacer la recherche"
           >
             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" /></svg>
@@ -197,8 +197,8 @@ export default function DiscoverPanel() {
       {isSearching ? (
         <>
           <div className="flex items-center justify-between -mt-2">
-            <p className="text-[13px] font-semibold text-ink-3">Résultats pour « {query.trim()} »</p>
-            <button onClick={() => setQuery("")} className="text-xs text-ink-3 hover:text-foreground transition-colors">
+            <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Résultats pour « {query.trim()} »</p>
+            <button onClick={() => setQuery("")} className="text-xs text-foreground/40 hover:text-foreground transition-colors">
               Effacer
             </button>
           </div>
@@ -209,7 +209,7 @@ export default function DiscoverPanel() {
               ))}
             </div>
           ) : visibleSearchResults.length === 0 ? (
-            <p className="text-sm text-ink-3 py-8 text-center">Aucun résultat pour cette recherche.</p>
+            <p className="text-sm text-foreground/30 py-8 text-center">Aucun résultat pour cette recherche.</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {visibleSearchResults.map((v) => (
@@ -225,12 +225,12 @@ export default function DiscoverPanel() {
           ))}
         </div>
       ) : sections.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 gap-4 text-ink-3">
+        <div className="flex flex-col items-center justify-center py-16 gap-4 text-foreground/25">
           <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
             <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" strokeLinecap="round" />
           </svg>
           <p className="text-sm text-center max-w-sm">
-            Pas encore assez d&apos;écoutes pour te recommander des titres, cherche une musique
+            Pas encore assez d&apos;écoutes pour te recommander des titres — cherche une musique
             ci-dessus, ou lance quelques sessions puis reviens ici.
           </p>
           <div className="flex flex-wrap justify-center gap-2 mt-1">
@@ -238,7 +238,7 @@ export default function DiscoverPanel() {
               <button
                 key={c.label}
                 onClick={() => setQuery(c.query)}
-                className="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-foreground/5 hover:bg-foreground/10 text-ink-3 hover:text-foreground transition-all"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-foreground/5 hover:bg-foreground/10 text-foreground/50 hover:text-foreground transition-all"
               >
                 {c.label}
               </button>
@@ -249,7 +249,7 @@ export default function DiscoverPanel() {
         sections.map((section) => (
           <section key={section.label}>
             <div className="flex items-baseline gap-2 mb-4 flex-wrap">
-              <p className="text-[13px] font-semibold text-ink-3">{section.label}</p>
+              <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">{section.label}</p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {section.videos.map((v) => (
@@ -294,7 +294,7 @@ function DiscoverCard({ video, onPlay }: { video: RecVideo; onPlay: () => void }
           className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
         />
         {length && (
-          <span className="absolute top-2 right-2 text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-black/50 text-white/80">
+          <span className="absolute top-2 right-2 text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-black/50 text-white/80">
             {length}
           </span>
         )}
@@ -302,13 +302,13 @@ function DiscoverCard({ video, onPlay }: { video: RecVideo; onPlay: () => void }
 
       <div className="p-2.5 flex flex-col gap-2">
         <div>
-          <p className="text-xs font-medium text-ink leading-tight line-clamp-2">{video.title}</p>
-          {video.channel && <p className="text-[11px] text-ink-3 mt-0.5 line-clamp-1">{video.channel}</p>}
+          <p className="text-xs font-medium text-foreground/85 leading-tight line-clamp-2">{video.title}</p>
+          {video.channel && <p className="text-[11px] text-foreground/35 mt-0.5 line-clamp-1">{video.channel}</p>}
         </div>
         <div className="flex items-center gap-1.5">
           <button
             onClick={onPlay}
-            className="flex-1 flex items-center justify-center gap-1.5 bg-ink text-on-ink rounded-lg px-3 py-1.5 text-[11px] font-semibold hover:bg-foreground/90 transition-all"
+            className="flex-1 flex items-center justify-center gap-1.5 bg-foreground text-background rounded-lg px-3 py-1.5 text-[11px] font-semibold hover:bg-foreground/90 transition-all"
           >
             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
             Lire

@@ -8,9 +8,6 @@ interface PrefsState {
   setBreathingEnabled: (v: boolean) => void;
   onboarded: boolean;
   setOnboarded: (v: boolean) => void;
-  /** Scène 3D de la ville (landing, halte, Spotify, résumé). false = image fixe. */
-  sceneEffects: boolean;
-  setSceneEffects: (v: boolean) => void;
 }
 
 export const usePrefsStore = create<PrefsState>()(
@@ -20,8 +17,6 @@ export const usePrefsStore = create<PrefsState>()(
       setBreathingEnabled: (v) => set({ breathingEnabled: v }),
       onboarded: false,
       setOnboarded: (v) => set({ onboarded: v }),
-      sceneEffects: true,
-      setSceneEffects: (v) => set({ sceneEffects: v }),
     }),
     { name: "focusflow-prefs" }
   )

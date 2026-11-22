@@ -16,7 +16,7 @@ import type { User } from "@supabase/supabase-js";
 // le coût.
 const LandingPage = dynamic(() => import("@/components/LandingPage"), {
   ssr: false,
-  loading: () => <div className="min-h-screen bg-[#0b0f18]" />,
+  loading: () => <div className="min-h-screen bg-[#0a0a0c]" />,
 });
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
@@ -47,8 +47,8 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
 
   if (user === "loading") {
     return (
-      <div className="min-h-screen bg-bg flex items-center justify-center" aria-busy="true" aria-label="Chargement">
-        <span className="ff-wait block w-24 h-[2px] bg-sodium" />
+      <div className="min-h-screen bg-[#0d0d0f] flex items-center justify-center">
+        <div className="w-5 h-5 rounded-full border-2 border-white/20 border-t-white/60 animate-spin" />
       </div>
     );
   }

@@ -98,13 +98,13 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[15vh] px-4 bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[15vh] px-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
       <div
         className="w-full max-w-lg bg-card border border-foreground/10 rounded-2xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 px-4 border-b border-foreground/[0.08]">
-          <svg className="w-4 h-4 text-ink-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg className="w-4 h-4 text-foreground/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" strokeLinecap="round" />
           </svg>
           <input
@@ -113,13 +113,13 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
             onChange={(e) => { setQuery(e.target.value); setIndex(0); }}
             onKeyDown={onListKey}
             placeholder="Rechercher une action…"
-            className="flex-1 bg-transparent py-3.5 text-sm text-foreground placeholder:text-ink-3 focus:outline-none"
+            className="flex-1 bg-transparent py-3.5 text-sm text-foreground placeholder:text-foreground/30 focus:outline-none"
           />
-          <kbd className="text-[10px] text-ink-3 border border-foreground/15 rounded px-1.5 py-0.5">Échap</kbd>
+          <kbd className="text-[10px] text-foreground/30 border border-foreground/15 rounded px-1.5 py-0.5">Échap</kbd>
         </div>
         <div className="max-h-80 overflow-y-auto py-2">
           {filtered.length === 0 ? (
-            <p className="px-4 py-6 text-sm text-ink-3 text-center">Aucune action</p>
+            <p className="px-4 py-6 text-sm text-foreground/30 text-center">Aucune action</p>
           ) : (
             filtered.map((c, i) => (
               <button
@@ -131,8 +131,8 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
                   i === safeIndex ? "bg-foreground/[0.08]" : "hover:bg-foreground/[0.04]"
                 )}
               >
-                <span className="text-sm text-ink">{c.label}</span>
-                {c.hint && <span className="text-xs text-ink-3 flex-shrink-0">{c.hint}</span>}
+                <span className="text-sm text-foreground/85">{c.label}</span>
+                {c.hint && <span className="text-xs text-foreground/35 flex-shrink-0">{c.hint}</span>}
               </button>
             ))
           )}

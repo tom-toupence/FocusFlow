@@ -2,11 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSpotifyStore } from "@/store/spotifyStore";
-import { startPlayback, setRepeat, setShuffle as apiSetShuffle, refreshAccessToken, fetchPlaylistTracks, addToQueue, type PlaylistTrackLite } from "@/lib/spotify";
-import type { ExtendedEvent, PlayerAdapter, Track } from "@/lib/playback/types";
-import { SpotifyAdapter } from "@/lib/playback/spotify";
-import { continuePlaylist } from "@/lib/playback/continuation";
-import { recommendFor, suggestFromTracks } from "@/lib/playback/spotifySuggest";
+import { startPlayback, setRepeat, setShuffle as apiSetShuffle, refreshAccessToken } from "@/lib/spotify";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -21,7 +17,6 @@ interface SpotifySDKPlayer {
   nextTrack: () => Promise<void>;
   previousTrack: () => Promise<void>;
   setVolume: (vol: number) => Promise<void>;
-  seek: (ms: number) => Promise<void>;
   getCurrentState: () => Promise<{ paused: boolean; position: number } | null>;
   /** Débloque l'élément audio interne vis-à-vis des politiques d'autoplay (Safari…) */
   activateElement?: () => Promise<void>;
@@ -45,21 +40,11 @@ declare global {
 interface Props {
   shouldPlay: boolean;
   playlistUri: string;
-  /** false : pas de pochette floutée plein écran (la ville sert de décor derrière). */
-  backdrop?: boolean;
-  /** Reçoit l'adaptateur de lecture (interface unique de la session). */
-  onAdapter?: (a: PlayerAdapter | null) => void;
-  /** Préférences communes au démarrage. */
-  initialLoop?: boolean;
-  /** La playlist a été prolongée (toast, ville). */
-  onExtended?: (e: ExtendedEvent) => void;
-  /** false : pas de titre ni de commandes intégrés (la session a les siens). */
-  controls?: boolean;
 }
 
 type Status = "loading" | "connecting" | "ready" | "error";
 
-export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true, onAdapter, initialLoop = true, onExtended, controls = true }: Props) {
+export default function SpotifyPlayer({ shouldPlay, playlistUri }: Props) {
   const {
     accessToken, refreshToken, expiresAt,
     currentTrack, shuffle,
@@ -67,8 +52,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
   } = useSpotifyStore();
 
   const [status, setStatus] = useState<Status>("loading");
-  const [errorMsg, setErrorMsgState] = useState<string | null>(null);
-  const setErrorMsg = (m: string | null) => { setErrorMsgState(m); adapterRef.current?.patch({ error: m }); };
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [volume, setVolumeState] = useState(0.8);
   const [showVolume, setShowVolume] = useState(false);
   // Le SDK Spotify n'est officiellement supporté que sur Chrome/Edge/Safari ;
@@ -88,16 +72,6 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
   const shuffleRef = useRef(shuffle);
   const playlistUriRef = useRef(playlistUri);
   const initCalledRef = useRef(false);
-  const loopRef = useRef(initialLoop);
-  const adapterRef = useRef<SpotifyAdapter | null>(null);
-  const onExtendedRef = useRef(onExtended);
-  useEffect(() => { onExtendedRef.current = onExtended; }, [onExtended]);
-  // Lecture continue : pistes de la playlist (chargées une fois) et garde.
-  const playlistTracksRef = useRef<PlaylistTrackLite[] | null>(null);
-  const extendingRef = useRef(false);
-  const extendedAfterRef = useRef<string | null>(null);
-  // Titres déjà ajoutés par une prolongation : jamais reproposés.
-  const addedIdsRef = useRef(new Set<string>());
   const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
   // Tracks which playlistUri was last successfully started — prevents double-start
   const playlistStartedRef = useRef<string | null>(null);
@@ -143,7 +117,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
     playInFlightRef.current = true;
     try {
       let token = await getValidToken();
-      if (!token) { setStatus("error"); setErrorMsg("Session Spotify expirée : reconnecte-toi."); return false; }
+      if (!token) { setStatus("error"); setErrorMsg("Session Spotify expirée — reconnecte-toi."); return false; }
 
       let lastStatus = 0;
       for (let attempt = 0; attempt < 6; attempt++) {
@@ -154,7 +128,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
           setStatus("ready");
           // Best effort une fois le device actif ; ne bloque pas la lecture.
           apiSetShuffle(token, device_id, shuffleRef.current)
-            .then(() => setRepeat(token!, device_id, loopRef.current ? "context" : "off"))
+            .then(() => setRepeat(token!, device_id, "context"))
             .catch(() => {});
           return true;
         }
@@ -162,7 +136,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
         if (res.status === 401) {
           // Token révoqué/expiré côté Spotify : refresh forcé puis on retente.
           token = await getValidToken(true);
-          if (!token) { setStatus("error"); setErrorMsg("Session Spotify expirée : reconnecte-toi."); return false; }
+          if (!token) { setStatus("error"); setErrorMsg("Session Spotify expirée — reconnecte-toi."); return false; }
           continue;
         }
         if (res.status === 403) {
@@ -180,56 +154,6 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
       return false;
     } finally {
       playInFlightRef.current = false;
-    }
-  };
-
-  /** Pistes de la playlist, chargées une fois. */
-  const loadPlaylistTracks = async (token: string) => {
-    if (!playlistTracksRef.current && playlistUriRef.current) playlistTracksRef.current = await fetchPlaylistTracks(token, playlistUriRef.current);
-    return playlistTracksRef.current ?? [];
-  };
-  /** Suggestions à la demande (graines réparties sur toute la playlist). */
-  const suggest = async (seeds: string[] | undefined, limit: number): Promise<Track[]> => {
-    const token = await getValidToken();
-    if (!token) return [];
-    return suggestFromTracks(token, await loadPlaylistTracks(token), { seeds, exclude: addedIdsRef.current, limit });
-  };
-  const enqueue = async (t: Track) => {
-    const token = await getValidToken();
-    const device = deviceIdRef.current;
-    if (!token || !device) return false;
-    const ok = await addToQueue(token, device, `spotify:track:${t.id}`);
-    if (ok) addedIdsRef.current.add(t.id);
-    return ok;
-  };
-
-  /** Prolonge la lecture avec des titres proches de toute la playlist. */
-  const extendQueue = async (currentId: string, currentUri: string) => {
-    if (extendingRef.current || extendedAfterRef.current === currentUri) return;
-    // Une seule tentative par fin de playlist, réussie ou non : sinon chaque
-    // pause, reprise ou recherche du SDK relancerait les requêtes.
-    extendedAfterRef.current = currentUri;
-    extendingRef.current = true;
-    adapterRef.current?.patch({ extending: true });
-    try {
-      const token = await getValidToken();
-      const device = deviceIdRef.current;
-      if (!token || !device || !playlistUriRef.current) return;
-      const tracks = await loadPlaylistTracks(token);
-      const byId = new Map(tracks.map((t) => [t.id, t]));
-      const res = await continuePlaylist(
-        tracks.map((t) => t.id),
-        currentId,
-        recommendFor(token, byId),
-        { limit: 10, exclude: addedIdsRef.current },
-      );
-      if (res.kind !== "extend") return; // repli : la boucle Spotify reprend la main
-      let added = 0;
-      for (const t of res.tracks) if (await addToQueue(token, device, `spotify:track:${t.id}`)) { added++; addedIdsRef.current.add(t.id); }
-      if (added > 0) onExtendedRef.current?.({ added, titles: Object.fromEntries(res.tracks.map((t) => [t.id, t.title])) });
-    } finally {
-      extendingRef.current = false;
-      adapterRef.current?.patch({ extending: false });
     }
   };
 
@@ -269,33 +193,16 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
     player.addListener("player_state_changed", (state: unknown) => {
       if (!state) return;
       const s = state as {
-        paused?: boolean;
         track_window?: {
           current_track?: {
-            id?: string;
-            uri?: string;
             name: string;
             artists: Array<{ name: string }>;
             album: { name: string; images: Array<{ url: string }> };
           };
-          next_tracks?: Array<{ id?: string; uri?: string; name: string; artists: Array<{ name: string }>; album: { images: Array<{ url: string }> }; duration_ms?: number }>;
         };
       };
       const track = s.track_window?.current_track;
       if (track) {
-        adapterRef.current?.patch({
-          ready: true,
-          playing: !s.paused,
-          track: { id: track.uri ?? track.name, title: track.name, subtitle: track.artists.map((a) => a.name).join(", "), artwork: track.album.images[0]?.url, source: "spotify", suggested: !!track.id && addedIdsRef.current.has(track.id) },
-          upcoming: (s.track_window?.next_tracks ?? []).map((t) => ({
-            id: t.id ?? t.uri ?? t.name, title: t.name, subtitle: t.artists.map((a) => a.name).join(", "),
-            artwork: t.album.images[0]?.url, durationSec: t.duration_ms ? Math.round(t.duration_ms / 1000) : undefined,
-            source: "spotify" as const, suggested: !!t.id && addedIdsRef.current.has(t.id),
-          })),
-        });
-        // Dernier titre de la playlist, boucle coupée : on prolonge AVANT la fin
-        // pour que la lecture enchaîne sans silence.
-        if (!loopRef.current && (s.track_window?.next_tracks?.length ?? 1) === 0 && track.id) void extendQueue(track.id, track.uri ?? "");
         setCurrentTrack({
           name: track.name,
           artist: track.artists.map((a) => a.name).join(", "),
@@ -335,34 +242,6 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
     player.connect();
     playerRef.current = player;
   };
-
-  // ── Adaptateur exposé à la session ───────────────────────────────────────
-  useEffect(() => {
-    const a = new SpotifyAdapter({
-      play: () => {
-        if (!playlistStartedRef.current && deviceIdRef.current && playlistUriRef.current) void doPlay(deviceIdRef.current, playlistUriRef.current);
-        else playerRef.current?.resume().catch(() => {});
-      },
-      pause: () => { playerRef.current?.pause().catch(() => {}); },
-      next: () => { playerRef.current?.nextTrack().catch(() => {}); },
-      previous: () => { playerRef.current?.previousTrack().catch(() => {}); },
-      volume: (v) => { setVolumeState(v); playerRef.current?.setVolume(v).catch(() => {}); },
-      shuffle: (on) => {
-        shuffleRef.current = on;
-        void getValidToken().then((t) => { if (t && deviceIdRef.current) void apiSetShuffle(t, deviceIdRef.current, on); });
-      },
-      repeat: (on) => {
-        loopRef.current = on;
-        void getValidToken().then((t) => { if (t && deviceIdRef.current) void setRepeat(t, deviceIdRef.current, on ? "context" : "off"); });
-      },
-      seek: (sec) => { playerRef.current?.seek(Math.max(0, sec) * 1000).catch(() => {}); },
-      suggest: (seeds, limit) => suggest(seeds, limit),
-      enqueue: (t) => enqueue(t),
-    }, { shuffle: shuffleRef.current, loop: loopRef.current });
-    adapterRef.current = a;
-    onAdapter?.(a);
-    return () => { adapterRef.current = null; onAdapter?.(null); };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── SDK init ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -465,7 +344,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="absolute inset-0 w-full h-full overflow-hidden">
-      {!backdrop ? null : currentTrack?.albumArt ? (
+      {currentTrack?.albumArt ? (
         <img
           src={currentTrack.albumArt}
           alt=""
@@ -476,7 +355,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
         <div className="absolute inset-0 bg-gradient-to-br from-[#1a3a1a] to-black" />
       )}
 
-      {backdrop && currentTrack?.albumArt && (
+      {currentTrack?.albumArt && (
         <div className="absolute inset-0 flex items-center justify-center">
           <img
             src={currentTrack.albumArt}
@@ -487,8 +366,8 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
       )}
 
       {isFirefox && (
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 max-w-md px-4 py-2.5 rounded-[4px] bg-[#ff9a3c]/15 border border-[#ff9a3c]/35 backdrop-blur-sm">
-          <p className="text-[#ffd2a8] text-xs leading-relaxed text-center">
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 max-w-md px-4 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 backdrop-blur-sm">
+          <p className="text-amber-300 text-xs leading-relaxed text-center">
             Spotify ne supporte pas officiellement <strong>Firefox</strong> pour la lecture intégrée
             (coupures fréquentes). Utilise <strong>Chrome</strong> ou <strong>Edge</strong> pour une lecture stable.
           </p>
@@ -500,8 +379,8 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
           <div className="flex flex-col items-center gap-3">
             {status === "error" ? (
               <>
-                <p className="text-[#ff8a7d] text-sm font-medium">Erreur Spotify</p>
-                {errorMsg && <p className="text-[#ff8a7d]/75 text-xs max-w-xs text-center">{errorMsg}</p>}
+                <p className="text-red-400 text-sm font-medium">Erreur Spotify</p>
+                {errorMsg && <p className="text-red-400/60 text-xs max-w-xs text-center">{errorMsg}</p>}
                 <button
                   onClick={() => {
                     setErrorMsg(null);
@@ -530,7 +409,7 @@ export default function SpotifyPlayer({ shouldPlay, playlistUri, backdrop = true
         </div>
       )}
 
-      {controls && currentTrack && (
+      {currentTrack && (
         <div className="absolute bottom-20 left-6 flex items-end gap-4 z-10">
           {currentTrack.albumArt && (
             <img

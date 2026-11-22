@@ -42,9 +42,3 @@ yarn-error.log*
 next-env.d.ts
 
 certificates
-# Lab 3 piste C (écartée) : assets Poly Haven CC0 retéléchargeables, voir docs/redesign/ASSETS.md
-public/lab/city/assets/
-
-# Tests e2e
-test-results/
-playwright-report/

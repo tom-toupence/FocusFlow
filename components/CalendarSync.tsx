@@ -57,7 +57,7 @@ export default function CalendarSync() {
     <>
       <button
         onClick={handleOpen}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-foreground/8 hover:bg-foreground/15 text-ink-2 hover:text-ink text-xs font-medium transition-all"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-foreground/8 hover:bg-foreground/15 text-foreground/60 hover:text-foreground/90 text-xs font-medium transition-all"
         title={canFeed ? "Synchroniser avec ton calendrier (iPhone, Google…)" : "Télécharger le planning en .ics"}
       >
         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -69,38 +69,38 @@ export default function CalendarSync() {
 
       {/* Portal : le wrapper de section animé (transform) piègerait le `fixed`. */}
       {open && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/70" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-sm" onClick={() => setOpen(false)}>
           <div className="bg-background border border-foreground/10 rounded-2xl shadow-2xl shadow-black/20 w-full max-w-md max-h-[85vh] overflow-y-auto p-5 sm:p-6 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
             <div>
               <h2 className="text-sm font-semibold text-foreground">Synchro automatique du planning</h2>
-              <p className="text-xs text-ink-3 mt-1 leading-relaxed">
+              <p className="text-xs text-foreground/45 mt-1 leading-relaxed">
                 Abonne ton calendrier à ce lien secret : tes blocs de focus apparaîtront automatiquement
-                sur ton téléphone, avec un rappel 10 min avant. Lecture seule, rien d&apos;autre ne transite.
+                sur ton téléphone, avec un rappel 10 min avant. Lecture seule — rien d&apos;autre ne transite.
               </p>
             </div>
 
             {loading || !feedUrl ? (
-              <p className="text-xs text-ink-3 text-center py-4">Génération du lien…</p>
+              <p className="text-xs text-foreground/30 text-center py-4">Génération du lien…</p>
             ) : (
               <>
                 <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-foreground/[0.05] border border-foreground/10">
-                  <span className="flex-1 text-[11px] text-ink-2 font-mono truncate">{webcalUrl}</span>
-                  <button onClick={() => copy(webcalUrl, "Lien webcal copié")} className="text-xs text-ink-3 hover:text-foreground font-medium flex-shrink-0">Copier</button>
+                  <span className="flex-1 text-[11px] text-foreground/60 font-mono truncate">{webcalUrl}</span>
+                  <button onClick={() => copy(webcalUrl, "Lien webcal copié")} className="text-xs text-foreground/50 hover:text-foreground font-medium flex-shrink-0">Copier</button>
                 </div>
 
-                <div className="flex flex-col gap-3 text-xs text-ink-2 leading-relaxed">
+                <div className="flex flex-col gap-3 text-xs text-foreground/55 leading-relaxed">
                   <div>
-                    <p className="font-semibold text-ink-2 mb-0.5">iPhone / iPad</p>
+                    <p className="font-semibold text-foreground/75 mb-0.5">iPhone / iPad</p>
                     Réglages → Apps → Calendrier → Comptes → Ajouter un compte → Autre →
-                    <span className="text-ink-2"> Ajouter un cal. avec abonnement</span> → colle le lien.
+                    <span className="text-foreground/75"> Ajouter un cal. avec abonnement</span> → colle le lien.
                   </div>
                   <div>
-                    <p className="font-semibold text-ink-2 mb-0.5">Google Calendar (web)</p>
-                    Paramètres → Ajouter un agenda → <span className="text-ink-2">À partir de l&apos;URL</span> → colle le lien
+                    <p className="font-semibold text-foreground/75 mb-0.5">Google Calendar (web)</p>
+                    Paramètres → Ajouter un agenda → <span className="text-foreground/75">À partir de l&apos;URL</span> → colle le lien
                     (remplace <span className="font-mono">webcal://</span> par <span className="font-mono">https://</span>).
-                    <button onClick={() => copy(feedUrl, "Lien https copié")} className="ml-1 underline text-ink-3 hover:text-ink">copier en https</button>
+                    <button onClick={() => copy(feedUrl, "Lien https copié")} className="ml-1 underline text-foreground/45 hover:text-foreground/80">copier en https</button>
                   </div>
-                  <p className="text-[11px] text-ink-3">
+                  <p className="text-[11px] text-foreground/30">
                     Les calendriers se rafraîchissent automatiquement (de quelques minutes à quelques heures selon l&apos;appli).
                   </p>
                 </div>
@@ -110,7 +110,7 @@ export default function CalendarSync() {
             <div className="flex items-center justify-between pt-1">
               <button
                 onClick={() => { if (blocks.length > 0) downloadICS(blocks); }}
-                className="text-[11px] text-ink-3 hover:text-ink-2 transition-colors underline"
+                className="text-[11px] text-foreground/35 hover:text-foreground/60 transition-colors underline"
               >
                 ou télécharger un fichier .ics
               </button>
