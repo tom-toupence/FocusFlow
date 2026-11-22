@@ -81,7 +81,9 @@ for k in range(4):
     # adoucis (3 px) sur les coupes à travers une surface continue.
     a = (layer >= k).astype(np.float32)
     a = cv2.GaussianBlur(a, (0, 0), 1.2) if k > 0 else np.ones_like(a)
-    rgba = np.dstack([color, (a * 255).astype(np.uint8)])
+    # Alpha jamais nul : WebP jette la couleur des pixels totalement
+    # transparents, et le filtrage bilinéaire ferait des liserés sombres.
+    rgba = np.dstack([color, np.maximum((a * 255).astype(np.uint8), 1)])
     cv2.imwrite(str(OUT / f"layer{k}.webp"), cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGRA), [cv2.IMWRITE_WEBP_QUALITY, 88])
     cv2.imwrite(str(OUT / f"depth{k}.webp"), dk, [cv2.IMWRITE_WEBP_QUALITY, 95])
     cv2.imwrite(str(WORK / f"layer{k}_preview.jpg"), cv2.cvtColor(color, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 85])

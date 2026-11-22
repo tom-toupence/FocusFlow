@@ -7,6 +7,7 @@ from common import OUT
 
 d = [cv2.imread(str(OUT / f"depth{k}.webp"), cv2.IMREAD_GRAYSCALE) for k in range(4)]
 pack = np.dstack(d)  # RGBA
+pack[..., 3] = np.maximum(pack[..., 3], 1)  # alpha jamais nul (WebP jetterait R, G, B)
 cv2.imwrite(str(OUT / "depth.webp"), cv2.cvtColor(pack, cv2.COLOR_RGBA2BGRA), [cv2.IMWRITE_WEBP_QUALITY, 101])
 for k in range(4):
     (OUT / f"depth{k}.webp").unlink()

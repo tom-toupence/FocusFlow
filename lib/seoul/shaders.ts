@@ -16,8 +16,8 @@ void main() {
  *   un canal par plan), donc une surface continue coupée entre deux plans
  *   bouge d'un seul tenant ; seules les vraies discontinuités révèlent les
  *   zones reconstituées derrière.
- * - effets sur masques (masks : R néons, G fenêtres, B sol, A ciel ;
- *   ids : R numéro d'enseigne, G numéro de fenêtre).
+ * - effets sur masques (masks : R néons, G fenêtres, B sol ;
+ *   ids : R numéro d'enseigne, G numéro de fenêtre, B ciel).
  * Sorties : la couleur, et la part lumineuse (source du bloom).
  */
 export const SCENE = /* glsl */ `#version 300 es
@@ -71,9 +71,9 @@ float neon(float id, float t) {
   if (id < 0.5) return 1.0;
   float h = hash(id * 3.17);
   float f = 1.0;
-  if (h < 0.10) {                                     // tube fatigué
+  if (h < 0.06) {                                     // tube fatigué (rare)
     float n = noise(vec2(t * 9.0, id));
-    f = mix(0.25, 1.0, step(0.32, n)) * (0.85 + 0.15 * noise(vec2(t * 40.0, id * 7.0)));
+    f = mix(0.5, 1.0, step(0.28, n)) * (0.9 + 0.1 * noise(vec2(t * 40.0, id * 7.0)));
   } else {                                            // battement rare
     float period = 18.0 + h * 40.0;
     float ph = mod(t + h * 97.0, period);
@@ -151,17 +151,23 @@ void main() {
 
   vec4 m = texture(uMasks, qTop);
   vec4 ids = texture(uIds, qTop) * 255.0;
-  float emissive = m.r, win = m.g, sky = m.a;
+  float emissive = m.r, win = m.g;
 
-  // Fin de pomodoro : une vague de coupures traverse la rue du fond vers nous.
-  float ev = 0.0, et = uTime - uEvent.y;
-  if (uEvent.x > 0.5 && et >= 0.0 && et < 4.0) {
-    float front = et * 0.6;
-    ev = exp(-pow((1.0 - dTop) - (1.0 - front), 2.0) * 60.0);
-  }
-
+  // Fin de pomodoro : une coupure de courant balaie la rue du fond vers nous
+  // (front de profondeur qui avance en ~2,5 s) ; derrière le front, les
+  // enseignes se rallument en grésillant, chacune à son rythme.
+  float et = uTime - uEvent.y;
+  float cut = 0.0;
   float f = neon(floor(ids.r + 0.5), t);
-  if (uEvent.x > 0.5 && uEvent.x < 1.5) f *= 1.0 - 0.8 * ev * step(0.5, fract(et * 14.0));
+  if (uEvent.x > 0.5 && uEvent.x < 1.5 && et >= 0.0 && et < 4.0) {
+    float front = et * 0.45 - 0.1;
+    float h = hash(floor(ids.r + 0.5) * 1.7);
+    float behind = front - dTop;                       // > 0 : le front est passé
+    float dark = smoothstep(-0.06, 0.02, behind) * (1.0 - smoothstep(0.12 + h * 0.15, 0.3 + h * 0.2, behind));
+    float relight = step(0.12 + h * 0.15, behind) * (1.0 - step(0.3 + h * 0.2, behind)) * step(0.5, fract(et * 17.0 + h * 5.0));
+    cut = max(dark - relight, 0.0);
+  }
+  f *= 1.0 - 0.95 * cut;
   col *= 1.0 - emissive * (1.0 - f) * 0.9;
 
   float w = windowOn(floor(ids.g + 0.5));
@@ -176,8 +182,10 @@ void main() {
     col *= 1.0 + win * (1.0 - w) * 0.85 * smoothstep(0.0, 0.6, et);
   }
 
-  // Sol : scintillement des reflets sous la pluie.
+  // Sol : scintillement des reflets sous la pluie ; pendant la coupure, les
+  // reflets baissent avec les enseignes.
   float fm = texture(uMasks, qTop).b;
+  col *= 1.0 - fm * cut * 0.55;
   col *= 1.0 + fm * (noise(vec2(qTop.x * 80.0, qTop.y * 12.0 - t * 2.5)) - 0.5) * 0.25 * uMotion;
 
   // Brume qui dérive entre les plans, éclairée par la ville (lumière diffuse

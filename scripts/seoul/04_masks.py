@@ -1,9 +1,10 @@
 """4. Masques d'effets.
 
-masks.webp (RGBA, 8 bits) : R = néons et enseignes (intensité lumineuse),
-G = fenêtres, B = sol mouillé, A = ciel.
+masks.webp (RGB, 8 bits) : R = néons et enseignes (intensité lumineuse),
+G = fenêtres, B = sol mouillé. Pas d'alpha : WebP jette la couleur des
+pixels transparents, un ciel presque nul effaçait tous les masques.
 ids.webp (sans perte) : R = numéro d'enseigne (1..255), G = numéro de
-fenêtre ; chaque élément grésille ou s'allume pour son compte.
+fenêtre, B = ciel ; chaque élément grésille ou s'allume pour son compte.
 
 Détection :
 - enseignes : pixels lumineux et saturés (HSV), hors sol (sinon les reflets
@@ -90,8 +91,8 @@ sky = cv2.GaussianBlur(sky, (0, 0), 8)
 
 masks = np.dstack([emissive, windows, floor_soft, sky])
 masks8 = np.clip(masks * 255 + 0.5, 0, 255).astype(np.uint8)
-cv2.imwrite(str(OUT / "masks.webp"), cv2.cvtColor(masks8, cv2.COLOR_RGBA2BGRA), [cv2.IMWRITE_WEBP_QUALITY, 90])
-ids = np.dstack([sign_ids, win_ids, np.zeros_like(sign_ids)])
+cv2.imwrite(str(OUT / "masks.webp"), cv2.cvtColor(masks8[..., :3], cv2.COLOR_RGB2BGR), [cv2.IMWRITE_WEBP_QUALITY, 90])
+ids = np.dstack([sign_ids, win_ids, masks8[..., 3]])
 cv2.imwrite(str(OUT / "ids.webp"), cv2.cvtColor(ids, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_WEBP_QUALITY, 101])  # 101 = sans perte
 print("enseignes", sid, "fenêtres", wid)
 for c, name in enumerate(["emissive", "windows", "floor", "sky"]):

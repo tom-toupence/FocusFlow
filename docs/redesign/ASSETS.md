@@ -19,6 +19,6 @@ préparation (`scripts/seoul/`). L'application ne charge que des images WebP.
 |---|---|
 | `layer0.webp` à `layer3.webp` | les quatre plans (fond, milieu, proche, premier plan), RGBA ; chaque plan contient la photo avec ce qui est DEVANT lui retiré et reconstitué ; alpha = « ce plan ou plus proche » |
 | `depth.webp` | profondeur de chaque plan (un canal par plan), sans perte |
-| `masks.webp` | R néons et enseignes, G fenêtres, B sol mouillé, A ciel |
-| `ids.webp` | R numéro d'enseigne, G numéro de fenêtre (sans perte), pour que chaque élément vive pour son compte |
+| `masks.webp` | R néons et enseignes, G fenêtres, B sol mouillé (sans alpha : WebP jette la couleur des pixels transparents) |
+| `ids.webp` | R numéro d'enseigne, G numéro de fenêtre, B ciel (sans perte), pour que chaque élément vive pour son compte |
 | `still.webp` | image fixe de repli |
