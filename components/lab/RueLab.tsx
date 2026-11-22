@@ -10,12 +10,14 @@ const SCENES = {
     credit: "Photo : Moyan Brenn, CC BY 2.0 (modifiée : profondeur, plans, effets)",
     href: "https://commons.wikimedia.org/wiki/File:Tokyo_(16042877318).jpg",
     style: 0.35, // déjà étalonnée en cyan par son auteur
+    frameY: 1,   // garder le sol mouillé en bas du cadre
   },
   kabukicho: {
     label: "Rue commerçante",
     credit: "Photo : Daniel Ramirez, CC BY 2.0 (modifiée : profondeur, plans, effets)",
     href: "https://commons.wikimedia.org/wiki/File:Walking_around_Kabukicho,_Shinjuku_at_night._(29362321701).jpg",
     style: 1,
+    frameY: 0.4,
   },
 } as const;
 type SceneId = keyof typeof SCENES;
@@ -46,7 +48,7 @@ export default function RueLab() {
     let disposed = false;
     // ?record : horloge manuelle pilotée par la capture vidéo (window.__rue).
     const record = new URLSearchParams(window.location.search).has("record");
-    createRue(canvas.current, { base: `/lab/rue/${scene}`, reducedMotion: reduce, manualClock: record })
+    createRue(canvas.current, { base: `/lab/rue/${scene}`, reducedMotion: reduce, manualClock: record, frameY: SCENES[scene].frameY })
       .then((x) => {
         if (disposed) { x.dispose(); return; }
         r.current = x;

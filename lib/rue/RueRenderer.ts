@@ -12,6 +12,8 @@ export interface RueOptions {
   reducedMotion?: boolean;
   /** Horloge pilotée par `step()` (captures vidéo image par image), sans boucle. */
   manualClock?: boolean;
+  /** Décentrement vertical du cadre (-1..1 de la marge disponible) : 1 = garder le bas de la photo (le sol). */
+  frameY?: number;
 }
 
 export interface RueRenderer {
@@ -61,8 +63,9 @@ const mul = (a: M4, b: M4): M4 => {
   }
   return o;
 };
-const projection = (tx: number, ty: number, n: number, f: number): M4 =>
-  new Float32Array([1 / tx, 0, 0, 0, 0, 1 / ty, 0, 0, 0, 0, (f + n) / (n - f), -1, 0, 0, (2 * f * n) / (n - f), 0]);
+/** Perspective avec décentrement vertical de l'objectif (sy, en unités NDC), comme un objectif à bascule. */
+const projection = (tx: number, ty: number, n: number, f: number, sy = 0): M4 =>
+  new Float32Array([1 / tx, 0, 0, 0, 0, 1 / ty, 0, 0, 0, sy, (f + n) / (n - f), -1, 0, 0, (2 * f * n) / (n - f), 0]);
 /** Vue d'une caméra placée en `p`, tournée de `yaw` (autour de y) puis `pitch` (autour de x). */
 const view = (p: [number, number, number], yaw: number, pitch: number): M4 => {
   const cy = Math.cos(-yaw), sy = Math.sin(-yaw), cp = Math.cos(-pitch), sp = Math.sin(-pitch);
@@ -234,7 +237,10 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     const A = W / H, margin = 0.9;
     let tx: number, ty: number;
     if (A > imgAspect) { tx = TAN_X * margin; ty = tx / A; } else { ty = TAN_Y * margin; tx = ty * A; }
-    const proj = projection(tx, ty, 0.05, 50);
+    // Décentrement : la part de photo hors cadre en haut et en bas peut être
+    // répartie (frameY > 0 garde le bas, donc le sol). Bornée à la marge.
+    const spareY = Math.max(0, TAN_Y - ty) / ty;                 // en unités NDC
+    const proj = projection(tx, ty, 0.05, 50, -spareY * Math.min(1, Math.max(-1, opts.frameY ?? 0)) * 0.85);
     const vw = view(pos, yaw, pitch);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
