@@ -18,6 +18,7 @@ python3 01_depth.py && python3 02_segment.py && python3 03_layers.py && python3 
 
 | Étape | Ce qu'elle fait | Pourquoi |
 |---|---|---|
+| `00_auto.py` (après 01) | génère `objects.json` et `scene.json` : objets proches (zones de profondeur haute, points au cœur), enseignes (lumineuses et saturées), seuils par quantiles, sol en bas de l'image ; n'écrase jamais des réglages faits à la main | ajouter une photo sans placer les points à la main |
 | `01_depth.py` | Depth Anything V2 Small à 1022 x 686, moyenne avec le miroir, filtre guidé doux | la profondeur brute est fiable en structure ; un filtre trop fin recopiait la texture des LED dans la profondeur (les enseignes ondulaient) |
 | `02_segment.py` | SlimSAM, quelques points par objet (passants, enseignes sur pied, panneau néon) | contours nets là où la profondeur bave |
 | `03_layers.py` | 4 plans par seuils de profondeur, chaque objet SAM entier dans un plan ; LaMa reconstitue une bande de 90 px derrière les silhouettes | la caméra ne révèle jamais plus de ~30 px ; LaMa travaille mieux sur des trous étroits |
@@ -27,8 +28,13 @@ python3 01_depth.py && python3 02_segment.py && python3 03_layers.py && python3 
 Une scène = un dossier `scenes/<nom>/` : `source.jpg`, `objects.json` (points
 SAM par objet) et `scene.json` (seuils des plans, polygone du sol). Lancer les
 cinq étapes avec `RUE_SCENE=<nom>` ; sorties dans `public/lab/rue/<nom>/`.
-Chaque objet segmenté reçoit une profondeur unique (sa médiane) : un carton
-découpé à sa distance, dont le bord reste net quand la caméra bouge.
+Chaque objet segmenté « plat » reçoit une profondeur unique (sa médiane) : un
+carton découpé à sa distance, dont le bord reste net quand la caméra bouge. Un
+masque trop grand ou couvrant trop de profondeurs (le sol entier) est ignoré.
+
+Ajouter une scène : `scenes/<nom>/source.jpg` (+ `info.json` : auteur, licence,
+lien), puis `01_depth`, `00_auto`, `02` à `05`, et une entrée dans
+`public/lab/rue/scenes.json`.
 
 Rendu (`lib/rue/`) : chaque plan est une grille de sommets poussés à leur
 profondeur (z = 1 / mix(1/9, 1, d)) et vue par une caméra en perspective qui

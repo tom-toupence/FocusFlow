@@ -33,6 +33,14 @@ depth = np.load(WORK / "depth.npy")
 layer = np.digitize(depth, T).astype(np.uint8)   # 0..3
 for f in sorted(glob.glob(str(WORK / "obj_*.png"))):
     m = cv2.imread(f, 0) > 127
+    if not m.any():
+        continue
+    # Seuls les objets « plats » deviennent des cartons : un masque trop grand
+    # ou qui couvre beaucoup de profondeurs (le sol entier, par exemple) est
+    # laissé à la profondeur estimée, sinon il perdrait sa perspective.
+    p10, p90 = np.percentile(depth[m], [10, 90])
+    if m.mean() > 0.06 or p90 - p10 > 0.15:
+        continue
     med = float(np.median(depth[m]))
     layer[m] = np.digitize([med], T)[0]
     # Un objet segmenté = un carton découpé à sa distance : profondeur unique.

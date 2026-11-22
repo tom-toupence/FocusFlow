@@ -162,6 +162,7 @@ uniform vec2 uRes;
 uniform float uTime, uNight, uBreak, uRain, uMotion;
 uniform vec2 uRainDrift;    // la pluie suit un peu la caméra (parallaxe)
 uniform float uStyle;       // 0 = couleurs de la photo, 1 = étalonnage néon (cyan et magenta)
+uniform float uFade;        // lumière de la rue (0 = éteinte, pendant le relais des scènes)
 
 float hash(float n) { return fract(sin(n * 127.1) * 43758.5453); }
 float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -234,13 +235,17 @@ void main() {
   float fog = (1.0 - d) * (0.16 + 0.2 * fogN) * (1.0 + uBreak * 0.6);
   col = mix(col, haze, clamp(fog, 0.0, 0.6));
 
+  // Relais des scènes : la rue s'éteint puis la suivante se rallume ; la
+  // pluie (ajoutée après) continue de tomber dans le noir.
+  col *= uFade;
+
   // Pluie : trois rideaux à des profondeurs différentes, cachés par ce qui
   // est plus proche qu'eux ; le plus proche est large et flou, et glisse le
   // plus avec la caméra.
   if (uMotion > 0.5 && uRain > 0.01) {
     float aspect = uRes.x / uRes.y;
     vec2 sp = vec2(vUv.x * aspect, 1.0 - vUv.y);
-    vec3 lit = textureLod(uScene, vUv, 4.0).rgb * 1.6 + 0.06;
+    vec3 lit = textureLod(uScene, vUv, 4.0).rgb * 1.6 * max(uFade, 0.25) + 0.06;
     float r = rain(sp + uRainDrift * 0.3, 1.6, 1.6, 0.10, 0.10, 0.55 * uRain, 1.0, t) * 0.35 * step(d, 0.30)
             + rain(sp + uRainDrift * 0.6, 0.9, 1.1, 0.14, 0.16, 0.45 * uRain, 2.0, t) * 0.30 * step(d, 0.62)
             + rain(sp + uRainDrift * 1.0, 0.45, 0.75, 0.32, 0.26, 0.30 * uRain, 3.0, t) * 0.12;
@@ -249,7 +254,7 @@ void main() {
 
   vec3 b = textureLod(uBright, vUv, 2.0).rgb * 0.35 + textureLod(uBright, vUv, 3.5).rgb * 0.35 + textureLod(uBright, vUv, 5.0).rgb * 0.30;
   col = neonGrade(col, uStyle);
-  col += neonGrade(b, uStyle) * (0.9 + 0.6 * uStyle);   // halo des néons plus présent
+  col += neonGrade(b, uStyle) * (0.9 + 0.6 * uStyle) * uFade;   // halo des néons, éteint avec la rue
 
   // Étalonnage : la nuit avance (plus froid, plus sombre), la pause désature.
   float l = dot(col, vec3(0.299, 0.587, 0.114));

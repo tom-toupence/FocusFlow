@@ -7,7 +7,22 @@ import { MESH_FRAG, MESH_VERT, POST, QUAD_VERT } from "./shaders";
 
 export type RueMode = "work" | "break";
 
+/** Une photo préparée (public/lab/rue/<id>/) et ses réglages. */
+export interface RueScene {
+  base: string;
+  /** Dosage de l'étalonnage néon (0..1). */
+  style?: number;
+  /** Décentrement vertical du cadre (1 = garder le bas, le sol). */
+  frameY?: number;
+}
+
 export interface RueOptions {
+  /** Plusieurs scènes : elles se relaient (voir `interval`). */
+  scenes?: RueScene[];
+  /** Durée d'une scène, en secondes : tirée entre ces deux bornes. */
+  interval?: [number, number];
+  /** Appelé quand une nouvelle scène s'allume (son index). */
+  onScene?: (index: number) => void;
   base?: string;
   reducedMotion?: boolean;
   /** Horloge pilotée par `step()` (captures vidéo image par image), sans boucle. */
@@ -26,6 +41,8 @@ export interface RueRenderer {
   step(dt: number): void;
   /** 0 = couleurs de la photo, 1 = étalonnage néon. */
   setStyle(v: number): void;
+  /** Passe tout de suite à la scène suivante (ou à `index`). */
+  nextScene(index?: number): void;
   dispose(): void;
 }
 
@@ -99,46 +116,61 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
   const meshProg = program(MESH_VERT, MESH_FRAG, "aUv");
   const postProg = program(QUAD_VERT, POST, "aPos");
 
-  // Textures de la photo.
+  // ── Une scène = 7 textures + une grille au format de la photo ──────────
   const names = ["layer0", "layer1", "layer2", "layer3", "depth", "masks", "ids"] as const;
-  const bitmaps = await Promise.all(names.map((n) => loadBitmap(`${base}/${n}.webp`)));
-  const tex: Record<string, WebGLTexture> = {};
-  bitmaps.forEach((bmp, i) => {
-    const t = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, t);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, bmp);
-    const nearest = names[i] === "ids";
-    const mip = names[i].startsWith("layer");
-    if (mip) gl.generateMipmap(gl.TEXTURE_2D);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nearest ? gl.NEAREST : mip ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, nearest ? gl.NEAREST : gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    tex[names[i]] = t;
-    bmp.close();
-  });
-  const imgAspect = bitmaps[0].width / bitmaps[0].height || 1.5;
-  const texW = bitmaps[0].width || 1920;
+  interface Loaded { tex: Record<string, WebGLTexture>; aspect: number; texW: number; vao: WebGLVertexArrayObject; vb: WebGLBuffer; ib: WebGLBuffer; count: number; spec: RueScene }
+  const loadScene = async (spec: RueScene): Promise<Loaded> => {
+    const bitmaps = await Promise.all(names.map((n) => loadBitmap(`${spec.base}/${n}.webp`)));
+    const tex: Record<string, WebGLTexture> = {};
+    bitmaps.forEach((bmp, i) => {
+      const t = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, bmp);
+      const nearest = names[i] === "ids";
+      const mip = names[i].startsWith("layer");
+      if (mip) gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, nearest ? gl.NEAREST : mip ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, nearest ? gl.NEAREST : gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      tex[names[i]] = t;
+    });
+    const aspect = bitmaps[0].width / bitmaps[0].height || 1.5;
+    const texW = bitmaps[0].width || 1920;
+    bitmaps.forEach((b) => b.close());
+    // Grille commune aux 4 plans (le relief vient de la texture de profondeur).
+    const GX = 320, GY = Math.round(320 / aspect);
+    const uvs = new Float32Array((GX + 1) * (GY + 1) * 2);
+    for (let y = 0, k = 0; y <= GY; y++) for (let x = 0; x <= GX; x++) { uvs[k++] = x / GX; uvs[k++] = y / GY; }
+    const idx = new Uint32Array(GX * GY * 6);
+    for (let y = 0, k = 0; y < GY; y++) for (let x = 0; x < GX; x++) {
+      const a = y * (GX + 1) + x, b = a + 1, c = a + GX + 1, d = c + 1;
+      idx.set([a, c, b, b, c, d], k); k += 6;
+    }
+    const vao = gl.createVertexArray()!;
+    gl.bindVertexArray(vao);
+    const vb = gl.createBuffer()!;
+    gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+    gl.bufferData(gl.ARRAY_BUFFER, uvs, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    const ib = gl.createBuffer()!;
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
+    gl.bindVertexArray(null);
+    return { tex, aspect, texW, vao, vb, ib, count: idx.length, spec };
+  };
+  const freeScene = (sc: Loaded) => {
+    Object.values(sc.tex).forEach((t) => gl.deleteTexture(t));
+    gl.deleteBuffer(sc.vb); gl.deleteBuffer(sc.ib); gl.deleteVertexArray(sc.vao);
+  };
 
-  // Grille commune à tous les plans (le relief vient de la texture de profondeur).
-  const GX = 320, GY = Math.round(320 / imgAspect);
-  const uvs = new Float32Array((GX + 1) * (GY + 1) * 2);
-  for (let y = 0, i = 0; y <= GY; y++) for (let x = 0; x <= GX; x++) { uvs[i++] = x / GX; uvs[i++] = y / GY; }
-  const idx = new Uint32Array(GX * GY * 6);
-  for (let y = 0, i = 0; y < GY; y++) for (let x = 0; x < GX; x++) {
-    const a = y * (GX + 1) + x, b = a + 1, c = a + GX + 1, d = c + 1;
-    idx.set([a, c, b, b, c, d], i); i += 6;
-  }
-  const meshVao = gl.createVertexArray();
-  gl.bindVertexArray(meshVao);
-  const vb = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, vb);
-  gl.bufferData(gl.ARRAY_BUFFER, uvs, gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0);
-  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-  const ib = gl.createBuffer();
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
+  const specs: RueScene[] = opts.scenes?.length ? opts.scenes : [{ base: opts.base ?? "/lab/rue", style: 1, frameY: opts.frameY }];
+  let curIndex = 0;
+  let cur = await loadScene(specs[0]);
+  let pending: Loaded | null = null;
+  let pendingIndex = -1;
+  let loading = false;
 
   const quadVao = gl.createVertexArray();
   gl.bindVertexArray(quadVao);
@@ -191,22 +223,42 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
 
   const U = (p: WebGLProgram, n: string) => gl.getUniformLocation(p, n);
   const mu = Object.fromEntries(["uDepth", "uLayer", "uProj", "uView", "uTan", "uZ", "uColor", "uMasks", "uIds", "uTime", "uNight", "uBreak", "uRain", "uMotion", "uEvent", "uTexW"].map((n) => [n, U(meshProg, n)]));
-  const pu = Object.fromEntries(["uScene", "uBright", "uDepthTex", "uRes", "uTime", "uNight", "uBreak", "uRain", "uMotion", "uRainDrift", "uStyle"].map((n) => [n, U(postProg, n)]));
+  const pu = Object.fromEntries(["uScene", "uBright", "uDepthTex", "uRes", "uTime", "uNight", "uBreak", "uRain", "uMotion", "uRainDrift", "uStyle", "uFade"].map((n) => [n, U(postProg, n)]));
 
   // Optique de la photo : champ vertical supposé de 50 degrés.
   const TAN_Y = Math.tan((50 * Math.PI) / 180 / 2);
-  const TAN_X = TAN_Y * imgAspect;
   const Z_NEAR = 1.0, Z_FAR = 9.0;
 
   const reduce = !!opts.reducedMotion;
   const state = { night: 0, brk: 0, rain: 0.55, px: 0, py: 0 };
   const target = { night: 0, brk: 0, rain: 0.55, px: 0, py: 0 };
   let event: [number, number] = [0, -100];
-  let style = 1;   // étalonnage néon par défaut
+  let style = specs[0].style ?? 1;
+  // Relais des scènes : `fade` = lumière de la rue (0 = éteinte), `phase` =
+  // « off » (on éteint), « swap » (dans le noir), « on » (on rallume).
+  let fade = 1;
+  let phase: "idle" | "off" | "on" = "idle";
+  let phaseT = 0;
+  const [imin, imax] = opts.interval ?? [15, 20];
+  const pickInterval = () => imin + Math.random() * Math.max(0, imax - imin);
+  let nextAt = pickInterval();
+  const prepareNext = (index?: number) => {
+    if (specs.length < 2 || loading) return;
+    const target = index ?? (curIndex + 1) % specs.length;
+    if (pending && pendingIndex === target) return;
+    loading = true;
+    loadScene(specs[target]).then((sc) => {
+      loading = false;
+      if (disposed) { freeScene(sc); return; }
+      if (pending) freeScene(pending);
+      pending = sc; pendingIndex = target;
+    }).catch(() => { loading = false; });
+  };
   let virtual = 0;
   const clock = () => (opts.manualClock ? virtual : performance.now());
   const start = clock();
   let last = start, raf = 0, disposed = false, visible = true;
+  prepareNext();
 
   const draw = (now: number) => {
     const t = (now - start) / 1000;
@@ -219,6 +271,29 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     state.px += (target.px - state.px) * k(1.6);
     state.py += (target.py - state.py) * k(1.6);
     resize();
+
+    // Relais : à l'heure dite (et si la suivante est prête), la rue s'éteint
+    // en 0,8 s, on change d'image dans le noir, la nouvelle se rallume en
+    // 1,6 s avec la vague de rallumage des enseignes.
+    if (phase === "idle" && specs.length > 1 && t >= nextAt && pending) { phase = "off"; phaseT = t; }
+    if (phase === "off") {
+      fade = Math.max(0, 1 - (t - phaseT) / 0.8);
+      if (fade <= 0 && pending) {
+        freeScene(cur);
+        cur = pending; curIndex = pendingIndex; pending = null; pendingIndex = -1;
+        style = cur.spec.style ?? 1;
+        opts.onScene?.(curIndex);
+        phase = "on"; phaseT = t;
+        event = [1, t - 0.6];            // les enseignes se rallument en vague
+        prepareNext();
+      }
+    } else if (phase === "on") {
+      const u = Math.min(1, (t - phaseT) / 1.6);
+      fade = u * u * (3 - 2 * u);
+      if (u >= 1) { phase = "idle"; fade = 1; nextAt = t + pickInterval(); }
+    }
+    const imgAspect = cur.aspect;
+    const TAN_X = TAN_Y * imgAspect;
 
     // Caméra : on avance lentement dans la rue puis on recule (60 s), on
     // dérive de côté, on tourne et bascule à peine ; le pointeur incline le
@@ -240,7 +315,7 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     // Décentrement : la part de photo hors cadre en haut et en bas peut être
     // répartie (frameY > 0 garde le bas, donc le sol). Bornée à la marge.
     const spareY = Math.max(0, TAN_Y - ty) / ty;                 // en unités NDC
-    const proj = projection(tx, ty, 0.05, 50, -spareY * Math.min(1, Math.max(-1, opts.frameY ?? 0)) * 0.85);
+    const proj = projection(tx, ty, 0.05, 50, -spareY * Math.min(1, Math.max(-1, cur.spec.frameY ?? 0)) * 0.85);
     const vw = view(pos, yaw, pitch);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -253,10 +328,10 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(meshProg);
-    gl.bindVertexArray(meshVao);
-    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, tex.depth);
-    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, tex.masks);
-    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, tex.ids);
+    gl.bindVertexArray(cur.vao);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, cur.tex.depth);
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, cur.tex.masks);
+    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, cur.tex.ids);
     gl.uniform1i(mu.uDepth, 1); gl.uniform1i(mu.uMasks, 2); gl.uniform1i(mu.uIds, 3); gl.uniform1i(mu.uColor, 0);
     gl.uniformMatrix4fv(mu.uProj, false, proj);
     gl.uniformMatrix4fv(mu.uView, false, vw);
@@ -268,7 +343,7 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     gl.uniform1f(mu.uRain, state.rain);
     gl.uniform1f(mu.uMotion, m);
     gl.uniform3f(mu.uEvent, event[0], event[1], 0);
-    gl.uniform1f(mu.uTexW, texW);
+    gl.uniform1f(mu.uTexW, cur.texW);
     // Du fond vers l'avant, chaque plan PAR-DESSUS le précédent : le tampon
     // de profondeur est vidé entre deux plans (il ne sert qu'à l'intérieur
     // d'un plan). Sinon un plan arrière, qui garde loin des silhouettes la
@@ -276,9 +351,9 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     for (let l = 0; l < 4; l++) {
       gl.clear(gl.DEPTH_BUFFER_BIT);
       gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, tex[`layer${l}`]);
+      gl.bindTexture(gl.TEXTURE_2D, cur.tex[`layer${l}`]);
       gl.uniform1i(mu.uLayer, l);
-      gl.drawElements(gl.TRIANGLES, idx.length, gl.UNSIGNED_INT, 0);
+      gl.drawElements(gl.TRIANGLES, cur.count, gl.UNSIGNED_INT, 0);
     }
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
@@ -298,6 +373,7 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     gl.uniform1f(pu.uMotion, m);
     gl.uniform2f(pu.uRainDrift, pos[0] + yaw, -pos[1] - pitch);
     gl.uniform1f(pu.uStyle, style);
+    gl.uniform1f(pu.uFade, fade);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
 
@@ -319,15 +395,21 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     pointer(x, y) { target.px = x; target.py = y; },
     step(dt) { virtual += dt * 1000; draw(virtual); },
     setStyle(v) { style = Math.min(1, Math.max(0, v)); redraw(); },
+    nextScene(index) {
+      if (specs.length < 2) return;
+      if (index !== undefined && index !== pendingIndex) { if (pending) { freeScene(pending); pending = null; pendingIndex = -1; } prepareNext(index); }
+      nextAt = 0;
+    },
     dispose() {
       disposed = true;
       cancelAnimationFrame(raf);
       io.disconnect();
-      Object.values(tex).forEach((t) => gl.deleteTexture(t));
+      freeScene(cur);
+      if (pending) freeScene(pending);
       if (fbo) { gl.deleteFramebuffer(fbo); gl.deleteRenderbuffer(rb); tgt.forEach((t) => gl.deleteTexture(t)); }
       gl.deleteProgram(meshProg); gl.deleteProgram(postProg);
-      [vb, ib, qb].forEach((b) => gl.deleteBuffer(b));
-      gl.deleteVertexArray(meshVao); gl.deleteVertexArray(quadVao);
+      gl.deleteBuffer(qb);
+      gl.deleteVertexArray(quadVao);
       gl.getExtension("WEBGL_lose_context")?.loseContext();
     },
   };
