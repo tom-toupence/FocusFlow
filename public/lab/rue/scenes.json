@@ -16,14 +16,6 @@
   "frameY": 0.3
  },
  {
-  "id": "enseignes",
-  "label": "Enseignes au-dessus de la rue",
-  "credit": "Photo : Annie Spratt, CC0 (domaine public)",
-  "href": "https://commons.wikimedia.org/wiki/File:Hong_Kong_(Unsplash_cGUbzDqLCyg).jpg",
-  "style": 0.6,
-  "frameY": 0
- },
- {
   "id": "kabukicho",
   "label": "Rue commerçante",
   "credit": "Photo : Daniel Ramirez, CC BY 2.0 (modifiée : profondeur, plans, effets)",

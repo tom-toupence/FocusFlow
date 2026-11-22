@@ -7,7 +7,6 @@
 | « Tokyo » (16042877318), passant sous un parapluie sur un pont, version 1920 x 1173 | `scripts/rue/scenes/pont/`, dérivés dans `public/lab/rue/pont/` | Moyan Brenn, Wikimedia Commons (depuis Flickr) : https://commons.wikimedia.org/wiki/File:Tokyo_(16042877318).jpg | CC BY 2.0 | oui : auteur, licence, lien et modifications affichés sur la page. La mention « Copyright © Moyan Brenn - Flickr.com » incrustée par l'auteur est conservée dans l'image. À noter avant toute production : marques lisibles (enseignes) et visages de mannequins sur les affiches. |
 | « Walking around Kabukicho, Shinjuku at night. » (16 juin 2016), version 1920 x 1080 | `scripts/rue/scenes/kabukicho/`, dérivés dans `public/lab/rue/kabukicho/` | Daniel Ramirez, Wikimedia Commons (depuis Flickr) : https://commons.wikimedia.org/wiki/File:Walking_around_Kabukicho,_Shinjuku_at_night._(29362321701).jpg | CC BY 2.0 | oui : auteur, licence, lien et mention des modifications, affichés sur la page |
 | Tokyo (16204487106).jpg | `scripts/rue/scenes/carrefour/`, dérivés dans `public/lab/rue/carrefour/` | Moyan Brenn, Wikimedia Commons : https://commons.wikimedia.org/wiki/File:Tokyo_(16204487106).jpg | CC BY 2.0 | oui : auteur, licence, lien, modifications, affichés sur la page. La mention de copyright incrustée par l'auteur est conservée. |
-| Hong Kong (Unsplash cGUbzDqLCyg).jpg | `scripts/rue/scenes/enseignes/`, dérivés dans `public/lab/rue/enseignes/` | Annie Spratt, Wikimedia Commons : https://commons.wikimedia.org/wiki/File:Hong_Kong_(Unsplash_cGUbzDqLCyg).jpg | CC0 | non exigé (CC0), affiché quand même. |
 | 秋葉原 Akihabara Japan Agfa Vistaplus Nikon Fm2 (181746787).jpeg | `scripts/rue/scenes/viaduc/`, dérivés dans `public/lab/rue/viaduc/` | Toomore Chiang, Wikimedia Commons : https://commons.wikimedia.org/wiki/File:%E7%A7%8B%E8%91%89%E5%8E%9F_Akihabara_Japan_Agfa_Vistaplus_Nikon_Fm2_(181746787).jpeg | CC BY 3.0 | oui : auteur, licence, lien, modifications, affichés sur la page. |
 | Hong Kong night street.jpg | `scripts/rue/scenes/avenue/`, dérivés dans `public/lab/rue/avenue/` | Wilfredor, Wikimedia Commons : https://commons.wikimedia.org/wiki/File:Hong_Kong_night_street.jpg | CC0 | non exigé (CC0), affiché quand même. Recadrée sur la rue (1920 x 1200). |
 | Shibuya At Night (153069373).jpeg | `scripts/rue/scenes/ecrans/`, dérivés dans `public/lab/rue/ecrans/` | César García Pont, Wikimedia Commons : https://commons.wikimedia.org/wiki/File:Shibuya_At_Night_(153069373).jpeg | CC BY 3.0 | oui : auteur, licence, lien, modifications, affichés sur la page. |
@@ -24,7 +23,7 @@ préparation (`scripts/rue/`). L'application ne charge que des images WebP.
 
 Les scènes se relaient toutes les 15 à 20 s ; la liste (crédit, lien, dosage de l'étalonnage, cadrage) est dans `public/lab/rue/scenes.json`.
 
-### Fichiers produits (`public/lab/rue/<scène>/`, 2 à 5 Mo par scène, environ 28 Mo pour 8 scènes : à alléger avant toute production)
+### Fichiers produits (`public/lab/rue/<scène>/`, 2 à 5 Mo par scène, environ 26 Mo pour 7 scènes : à alléger avant toute production)
 
 | Fichier | Contenu |
 |---|---|
