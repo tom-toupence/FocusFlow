@@ -161,6 +161,7 @@ uniform sampler2D uScene, uBright, uDepthTex;
 uniform vec2 uRes;
 uniform float uTime, uNight, uBreak, uRain, uMotion;
 uniform vec2 uRainDrift;    // la pluie suit un peu la caméra (parallaxe)
+uniform float uStyle;       // 0 = couleurs de la photo, 1 = étalonnage néon (cyan et magenta)
 
 float hash(float n) { return fract(sin(n * 127.1) * 43758.5453); }
 float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -185,6 +186,43 @@ float rain(vec2 sp, float scale, float speed, float width, float len, float dens
   return streak * exp(-x * x / (width * width));
 }
 
+vec3 rgb2hsv(vec3 c) {
+  vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+  float d = q.x - min(q.w, q.y);
+  return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + 1e-10)), d / (q.x + 1e-10), q.x);
+}
+vec3 hsv2rgb(vec3 c) {
+  vec3 p = abs(fract(c.xxx + vec3(1.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);
+  return c.z * mix(vec3(1.0), clamp(p - 1.0, 0.0, 1.0), c.y);
+}
+// Étalonnage néon, celui des photos de rue de nuit « cyan et magenta » :
+// les oranges et jaunes virent au rose, les verts au cyan, les ombres au bleu
+// nuit ; les blancs (peu saturés) restent blancs.
+vec3 neonGrade(vec3 c, float amt) {
+  vec3 h = rgb2hsv(c);
+  float hue = h.x;
+  // Rouges et oranges -> magenta ; jaunes et verts -> cyan. Le rose reste un
+  // accent, le cyan et le bleu nuit dominent (comme la référence).
+  float warm = smoothstep(0.0, 0.02, hue) * (1.0 - smoothstep(0.08, 0.11, hue));
+  float yel = smoothstep(0.08, 0.11, hue) * (1.0 - smoothstep(0.20, 0.24, hue));
+  float green = smoothstep(0.20, 0.24, hue) * (1.0 - smoothstep(0.42, 0.47, hue));
+  float red = smoothstep(0.92, 0.97, hue) + (1.0 - smoothstep(0.0, 0.02, hue));
+  float target = hue;
+  target = mix(target, 0.915, warm);
+  target = mix(target, 0.53, yel * 0.85);
+  target = mix(target, 0.50, green);
+  target = mix(target, 0.93, clamp(red, 0.0, 1.0) * 0.6);
+  float s = h.y * (1.0 + 0.3 * amt);
+  vec3 g = hsv2rgb(vec3(mix(hue, fract(target), amt * smoothstep(0.08, 0.3, h.y)), clamp(s, 0.0, 1.0), h.z));
+  // Ombres et tons moyens bleu nuit, noirs un peu écrasés.
+  float l = dot(g, vec3(0.299, 0.587, 0.114));
+  g = mix(g, g * vec3(0.45, 0.72, 1.25) + vec3(0.0, 0.015, 0.05), (1.0 - smoothstep(0.0, 0.6, l)) * amt);
+  g = mix(g, pow(g, vec3(1.1)), amt);
+  return mix(c, g, amt);
+}
+
 void main() {
   float t = uTime * uMotion;
   vec3 col = texture(uScene, vUv).rgb;
@@ -206,11 +244,12 @@ void main() {
     float r = rain(sp + uRainDrift * 0.3, 1.6, 1.6, 0.10, 0.10, 0.55 * uRain, 1.0, t) * 0.35 * step(d, 0.30)
             + rain(sp + uRainDrift * 0.6, 0.9, 1.1, 0.14, 0.16, 0.45 * uRain, 2.0, t) * 0.30 * step(d, 0.62)
             + rain(sp + uRainDrift * 1.0, 0.45, 0.75, 0.32, 0.26, 0.30 * uRain, 3.0, t) * 0.12;
-    col += r * lit;
+    col += r * lit * (1.0 + 0.6 * uStyle);
   }
 
   vec3 b = textureLod(uBright, vUv, 2.0).rgb * 0.35 + textureLod(uBright, vUv, 3.5).rgb * 0.35 + textureLod(uBright, vUv, 5.0).rgb * 0.30;
-  col += b * 0.9;
+  col = neonGrade(col, uStyle);
+  col += neonGrade(b, uStyle) * (0.9 + 0.6 * uStyle);   // halo des néons plus présent
 
   // Étalonnage : la nuit avance (plus froid, plus sombre), la pause désature.
   float l = dot(col, vec3(0.299, 0.587, 0.114));

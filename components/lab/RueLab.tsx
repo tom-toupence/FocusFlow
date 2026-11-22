@@ -9,6 +9,7 @@ export default function RueLab() {
   const [fallback, setFallback] = useState(false);
   const [mode, setMode] = useState<"work" | "break">("work");
   const [night, setNight] = useState(0);
+  const [style, setStyle] = useState(1);
   const [panel, setPanel] = useState(true);
 
   useEffect(() => {
@@ -35,6 +36,7 @@ export default function RueLab() {
 
   useEffect(() => { r.current?.setMode(mode); }, [mode]);
   useEffect(() => { r.current?.setNight(night); }, [night]);
+  useEffect(() => { r.current?.setStyle(style); }, [style]);
 
   return (
     <main className="fixed inset-0 bg-black text-white">
@@ -62,6 +64,10 @@ export default function RueLab() {
             <label className="block">
               <span className="text-white/60">Avancée de la nuit : {Math.round(night * 100)} %</span>
               <input type="range" min={0} max={1} step={0.01} value={night} onChange={(e) => setNight(parseFloat(e.target.value))} className="w-full" />
+            </label>
+            <label className="block">
+              <span className="text-white/60">Étalonnage néon : {Math.round(style * 100)} %</span>
+              <input type="range" min={0} max={1} step={0.01} value={style} onChange={(e) => setStyle(parseFloat(e.target.value))} className="w-full" />
             </label>
             <div className="flex gap-2">
               <button onClick={() => r.current?.pomodoroDone()} className="flex-1 py-1 rounded border border-white/20">Fin de pomodoro</button>

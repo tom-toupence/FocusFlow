@@ -22,6 +22,8 @@ export interface RueRenderer {
   /** Réaction au pointeur, en -1..1. */
   pointer(x: number, y: number): void;
   step(dt: number): void;
+  /** 0 = couleurs de la photo, 1 = étalonnage néon. */
+  setStyle(v: number): void;
   dispose(): void;
 }
 
@@ -186,7 +188,7 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
 
   const U = (p: WebGLProgram, n: string) => gl.getUniformLocation(p, n);
   const mu = Object.fromEntries(["uDepth", "uLayer", "uProj", "uView", "uTan", "uZ", "uColor", "uMasks", "uIds", "uTime", "uNight", "uBreak", "uRain", "uMotion", "uEvent", "uTexW"].map((n) => [n, U(meshProg, n)]));
-  const pu = Object.fromEntries(["uScene", "uBright", "uDepthTex", "uRes", "uTime", "uNight", "uBreak", "uRain", "uMotion", "uRainDrift"].map((n) => [n, U(postProg, n)]));
+  const pu = Object.fromEntries(["uScene", "uBright", "uDepthTex", "uRes", "uTime", "uNight", "uBreak", "uRain", "uMotion", "uRainDrift", "uStyle"].map((n) => [n, U(postProg, n)]));
 
   // Optique de la photo : champ vertical supposé de 50 degrés.
   const TAN_Y = Math.tan((50 * Math.PI) / 180 / 2);
@@ -197,6 +199,7 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
   const state = { night: 0, brk: 0, rain: 0.55, px: 0, py: 0 };
   const target = { night: 0, brk: 0, rain: 0.55, px: 0, py: 0 };
   let event: [number, number] = [0, -100];
+  let style = 1;   // étalonnage néon par défaut
   let virtual = 0;
   const clock = () => (opts.manualClock ? virtual : performance.now());
   const start = clock();
@@ -288,6 +291,7 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     gl.uniform1f(pu.uRain, state.rain);
     gl.uniform1f(pu.uMotion, m);
     gl.uniform2f(pu.uRainDrift, pos[0] + yaw, -pos[1] - pitch);
+    gl.uniform1f(pu.uStyle, style);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
 
@@ -308,6 +312,7 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     goal() { event = [2, (clock() - start) / 1000]; },
     pointer(x, y) { target.px = x; target.py = y; },
     step(dt) { virtual += dt * 1000; draw(virtual); },
+    setStyle(v) { style = Math.min(1, Math.max(0, v)); redraw(); },
     dispose() {
       disposed = true;
       cancelAnimationFrame(raf);
