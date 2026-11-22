@@ -10,9 +10,9 @@ Entrée et sortie en BGR.
 import cv2, numpy as np, sys
 def dessin(bgr, a=1.0):
     # 1. aplats : lissage qui préserve les bords (texture -> zones peintes)
-    flat = cv2.edgePreservingFilter(bgr, flags=cv2.RECURS_FILTER, sigma_s=40, sigma_r=0.25)
+    flat = cv2.edgePreservingFilter(bgr, flags=cv2.RECURS_FILTER, sigma_s=12, sigma_r=0.12)
     # 2. contraste local fort (rendu HDR / illustration)
-    det = cv2.detailEnhance(flat, sigma_s=12, sigma_r=0.2)
+    det = cv2.detailEnhance(flat, sigma_s=8, sigma_r=0.12)
     lab = cv2.cvtColor(det, cv2.COLOR_BGR2LAB)
     l, A, B = cv2.split(lab)
     l = cv2.createCLAHE(clipLimit=2.2, tileGridSize=(8, 8)).apply(l)

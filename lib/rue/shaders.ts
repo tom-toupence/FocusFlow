@@ -228,11 +228,17 @@ void main() {
   float t = uTime * uMotion;
   vec3 col = texture(uScene, vUv).rgb;
   float d = texture(uDepthTex, vUv).r;
+  // Netteté : masque flou à 1 px (la photo passe par un maillage et un
+  // rééchantillonnage qui l'adoucissent).
+  vec2 px = 1.0 / uRes;
+  vec3 nb = texture(uScene, vUv + vec2(px.x, 0.0)).rgb + texture(uScene, vUv - vec2(px.x, 0.0)).rgb
+          + texture(uScene, vUv + vec2(0.0, px.y)).rgb + texture(uScene, vUv - vec2(0.0, px.y)).rgb;
+  col = max(col + (col - nb * 0.25) * 0.7, 0.0);
 
   // Brume entre les plans, éclairée par la ville (l'image très floue).
   vec3 haze = textureLod(uScene, vUv, 6.0).rgb * 1.3 + vec3(0.02, 0.03, 0.05);
   float fogN = fbm(vUv * vec2(3.0, 5.0) + vec2(t * 0.012, -t * 0.006));
-  float fog = (1.0 - d) * (0.16 + 0.2 * fogN) * (1.0 + uBreak * 0.6);
+  float fog = (1.0 - d) * (0.07 + 0.11 * fogN) * (1.0 + uBreak * 0.6);
   col = mix(col, haze, clamp(fog, 0.0, 0.6));
 
   // Relais des scènes : la rue s'éteint puis la suivante se rallume ; la
