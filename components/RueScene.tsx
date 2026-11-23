@@ -47,6 +47,9 @@ const RueScene = forwardRef<RueHandle, Props>(function RueScene(
   const r = useRef<RueRenderer | null>(null);
   const [fallback, setFallback] = useState(false);
   const [current, setCurrent] = useState(0);
+  // Image fixe : la photo précédente reste DESSOUS pendant le fondu (sinon
+  // l'ancienne disparaît d'un coup et la nouvelle monte depuis le noir).
+  const [prev, setPrev] = useState<number | null>(null);
   const list = useRef<RueSceneInfo[]>([]);
   const ids = (scenes ?? RUE_SCENES.map((s) => s.id)).join(",");
   const onSceneRef = useRef(onScene);
@@ -69,6 +72,7 @@ const RueScene = forwardRef<RueHandle, Props>(function RueScene(
       // Image fixe : on passe à la photo suivante (fondu CSS).
       if (fallbackRef.current && list.current.length > 1) {
         const n = (currentRef.current + 1) % list.current.length;
+        setPrev(currentRef.current);
         currentRef.current = n;
         setCurrent(n);
         onSceneRef.current?.(list.current[n]);
@@ -131,12 +135,17 @@ const RueScene = forwardRef<RueHandle, Props>(function RueScene(
   }, [pointer, fallback]);
 
   const still = list.current[current] ?? RUE_SCENES.find((s) => s.id === ids.split(",")[0]) ?? RUE_SCENES[0];
+  const under = prev !== null && prev !== current ? list.current[prev] : null;
 
   return (
     <div className={cn("overflow-hidden bg-night", className)} role="img" aria-label={label}>
       {fallback ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img key={still.id} src={rueStill(still.id)} alt="" className="absolute inset-0 w-full h-full object-cover motion-safe:animate-[rueFade_1.2s_ease-out]" />
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {under && <img key={`u-${under.id}`} src={rueStill(under.id)} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img key={still.id} src={rueStill(still.id)} alt="" className="absolute inset-0 w-full h-full object-cover motion-safe:animate-[rueFade_1.6s_ease-in-out]" />
+        </>
       ) : (
         <canvas ref={canvas} aria-hidden className="absolute inset-0 w-full h-full block" />
       )}

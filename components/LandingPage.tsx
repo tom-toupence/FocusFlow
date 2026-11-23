@@ -3,23 +3,22 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // LANDING : « Une rue de plus »
 //
-// La page se lit comme une marche de nuit. Une seule rue en projection caméra
-// (components/RueScene, WebGL2) reste FIXE derrière tout le document :
-//   . le défilement pousse la caméra dans la rue (vraie perspective : le
-//     proche grossit et glisse plus que le loin) ;
-//   . chaque chapitre allume une autre rue (coupure puis rallumage) ;
-//   . la section « Le rythme » fait passer la rue en pause quand le curseur
-//     du cycle traverse une pause (pluie plus dense, lumière baissée).
+// La page se lit comme une marche de nuit. Derrière tout le document, une
+// BOUCLE VIDÉO continue des onze rues (components/RueLoop : rendues par le
+// moteur lib/rue, pluie, néons, caméra qui respire, fondus entre les rues) :
+//   . le défilement fait entrer doucement dans l'image (léger travelling) ;
+//   . chaque chapitre règle la densité du voile, sans couper la vidéo ;
+//   . la section « Le rythme » baisse la lumière quand le curseur du cycle
+//     traverse une pause.
 // Par-dessus, le contenu défile avec ses propres couches de photos à des
-// vitesses différentes : deux parallaxes superposées, l'une vraie (3D),
-// l'autre de plans (2D).
+// vitesses différentes (parallaxe de plans).
 //
 // Moteur : GSAP + ScrollTrigger + SplitText, Lenis pour l'amorti. Jamais
 // motion/react sur cette page (règle « un moteur par surface »).
 // Formes : angles droits, boutons rectangulaires à filet. Police : Geist.
-// Repli : téléphone, économie de données ou sans WebGL matériel, la rue
-// devient la photo fixe de la scène (RueScene s'en charge) ; sous
-// `prefers-reduced-motion`, rien n'est épinglé ni scrubé.
+// Repli : économie de données ou `prefers-reduced-motion`, la vidéo laisse
+// place à la photo fixe de la première rue ; sous mouvement réduit, rien
+// n'est épinglé ni scrubé.
 // « Commencer » n'apparaît qu'à TROIS endroits : bandeau, hero, fin.
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -31,7 +30,7 @@ import { SplitText } from "gsap/SplitText";
 import { useGSAP } from "@gsap/react";
 import type LenisInstance from "lenis";
 import { signInWithGoogle } from "@/lib/supabase";
-import RueScene, { type RueHandle } from "@/components/RueScene";
+import RueLoop, { RUE_LOOP_ORDER, type RueLoopHandle } from "@/components/RueLoop";
 import { RUE_SCENES, rueStill, type RueSceneInfo } from "@/lib/rue/scenes";
 import { cn } from "@/lib/utils";
 
@@ -40,8 +39,8 @@ if (typeof window !== "undefined") gsap.registerPlugin(useGSAP, ScrollTrigger, S
 const EASE = "power4.out";
 const DUR = 1.2;
 
-/** Ordre des rues : la première est la plus lumineuse (premier écran). */
-const STREET = ["kabukicho", "pont", "avenue", "pavillon", "ruelle", "boulevard", "fleuve", "carrefour", "ecrans", "viaduc", "tours"];
+/** Ordre des rues (celui de la vidéo) : la première est la plus lumineuse. */
+const STREET = RUE_LOOP_ORDER;
 
 const sceneById = (id: string) => RUE_SCENES.find((s) => s.id === id) ?? RUE_SCENES[0];
 
@@ -293,7 +292,7 @@ const SOURCES: { scene: string; kicker: string; title: string; body: string }[] 
 
 export default function LandingPage() {
   const root = useRef<HTMLDivElement>(null);
-  const street = useRef<RueHandle>(null);
+  const street = useRef<RueLoopHandle>(null);
   const veil = useRef<HTMLDivElement>(null);
   const [scene, setScene] = useState<RueSceneInfo>(sceneById(STREET[0]));
   const [phase, setPhase] = useState<"work" | "break">("work");
@@ -316,8 +315,8 @@ export default function LandingPage() {
       // Barre de lecture.
       gsap.to("[data-progress]", { scaleX: 1, ease: "none", scrollTrigger: { trigger: root.current, start: "top top", end: "bottom bottom", scrub: 0.3 } });
 
-      // Chaque chapitre : une autre rue, et la densité du voile qui lui va.
-      gsap.utils.toArray<HTMLElement>("[data-chapter]").forEach((el, i) => {
+      // Chaque chapitre : la densité du voile qui lui va (la vidéo continue).
+      gsap.utils.toArray<HTMLElement>("[data-chapter]").forEach((el) => {
         const v = Number(el.dataset.veil ?? 0.55);
         ScrollTrigger.create({
           trigger: el,
@@ -326,7 +325,6 @@ export default function LandingPage() {
           onToggle: (self) => {
             if (!self.isActive) return;
             gsap.to(veil.current, { opacity: v, duration: 0.9, ease: "power2.out", overwrite: true });
-            if (i > 0) street.current?.next();
           },
         });
       });
@@ -410,16 +408,15 @@ export default function LandingPage() {
 
       {/* ── La rue, fixe derrière toute la page ─────────────────────────── */}
       <div className="fixed inset-0 z-0">
-        <RueScene
+        <RueLoop
           ref={street}
-          scenes={STREET}
-          mode={phase}
-          interval={[18, 24]}
           onScene={setScene}
           className="absolute inset-0"
-          label="Une rue de nuit en vraie perspective : la caméra avance quand on fait défiler la page."
+          label="Des rues de nuit sous la pluie, qui se relaient en fondu."
         />
         <div ref={veil} aria-hidden className="absolute inset-0 bg-night opacity-[0.12]" />
+        {/* Pause du cycle : la lumière baisse, comme dans la session. */}
+        <div aria-hidden className={cn("absolute inset-0 bg-night transition-opacity duration-700", phase === "break" ? "opacity-40" : "opacity-0")} />
         <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(0,0,0,0.55)_100%)]" />
       </div>
 

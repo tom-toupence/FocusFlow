@@ -54,7 +54,7 @@ ambiances mixables dans une seule expérience bien maintenue.
   (profondeur Depth Anything V2 Small, SAM, LaMa : tous Apache 2.0) en 4 plans + masques, servies
   depuis `public/rue/<id>/` ; manifeste `lib/rue/scenes.ts` (11 rues, crédits). Rendu WebGL2 brut :
   maillage déplacé, pluie, néons, brume, bloom ; événements `pomodoroDone`/`goal`/`next`,
-  `setScroll`/`setPaused`. Utilisée par la landing, la **pause** de session et le **mode
+  `setScroll`/`setPaused`. Utilisée par la landing (en **boucle vidéo pré-rendue**, `RueLoop`), la **pause** de session et le **mode
   Spotify** (jamais sous une vidéo). Banc d'essai : `/lab/rue`.
 - **Spotify :** OAuth + Web Playback (Premium), helpers dans `lib/spotify.ts`
 - **Twitch :** OAuth + embed live/VOD, helpers dans `lib/twitch.ts` (+ route `app/api/twitch/token`)
@@ -757,15 +757,17 @@ TodoStatusDropdown, callback Twitch) ; build vert ; vitest 33/33 ; e2e 13/13 sur
 
 ### L'idée : « Une rue de plus »
 
-Une seule **rue de nuit en projection caméra** (`components/RueScene.tsx`, moteur WebGL2
-`lib/rue/`) reste **fixe derrière toute la page** :
-- le **défilement pousse la caméra** dans la rue (`RueHandle.setScroll`, vraie perspective) ;
-- chaque **chapitre** (`data-chapter`) allume une autre rue (coupure puis rallumage) et règle
-  la densité du voile (`data-veil`) ;
-- la section **« Le rythme »** (épinglée) fait passer la rue en **pause** quand le curseur du
-  cycle traverse une pause (`mode="break"` : pluie plus dense, lumière baissée).
-Par-dessus, le contenu a ses propres couches de photos (`Plate`, `data-speed`) : deux
-parallaxes superposées, l'une vraie (3D), l'autre de plans (2D).
+Derrière toute la page, une **boucle vidéo continue des onze rues** (`components/RueLoop.tsx`,
+`public/rue/loop/rue-{1080,720}.{webm,mp4}`) : chaque rue rendue à l'avance par le moteur
+`lib/rue/` (pluie, néons, caméra qui respire), 6 s par rue, fondus de 1,5 s, raccord de boucle
+invisible. Produite par `scripts/rue/loop_record.cjs` + `scripts/rue/loop.sh` (ordre =
+`RUE_LOOP_ORDER`, le crédit affiché suit le temps de la vidéo). Pourquoi une vidéo et pas le
+WebGL en direct (2026-11-23, retour utilisateur : transitions « bizarres », il voulait la vidéo
+en fond) : même rendu partout, aucune coupure, une fraction du coût batterie.
+- le **défilement** fait entrer doucement dans l'image (`setScroll` = zoom de 8 %) ;
+- chaque **chapitre** (`data-chapter`) règle la densité du voile (`data-veil`), sans couper la vidéo ;
+- la section **« Le rythme »** (épinglée) baisse la lumière quand le curseur du cycle traverse une pause.
+Par-dessus, le contenu a ses propres couches de photos (`Plate`, `data-speed`).
 
 Chapitres : premier écran (titre néon « La ville ne dort pas. ») · la session (réplique fidèle
 de `/session` qui s'ouvre en `clip-path`) · le rythme (cycle 25/5 épinglé, horloge 21:00 →) ·
@@ -779,10 +781,11 @@ hero, fin). Crédits des photos CC BY affichés (rue courante en bas à gauche +
 - Texte : `Lines` (lignes masquées, `power4.out`, 1,2 s) ; titre : `Neon` (variable `--glow`).
 - Formes : angles droits, boutons rectangulaires à filet. Police : Geist. Seule exception : la
   réplique de session, qui montre l'app telle qu'elle est (donc ses rayons).
-- **Repli** : téléphone (< 768 px), économie de données, sans WebGL matériel (SwiftShader,
-  llvmpipe) ou `prefers-reduced-motion` → la rue devient la **photo fixe** de la scène
-  (`still.webp`, fondu entre chapitres). `localStorage focusflow-force-webgl=1` force le WebGL
-  (captures). Sous mouvement réduit, rien n'est épinglé ni scrubé.
+- **Repli** : économie de données ou `prefers-reduced-motion` → **photo fixe** de la première
+  rue (poster, aussi affiché tant que la vidéo n'a pas démarré). Téléphone : vidéo 720p. Sous
+  mouvement réduit, rien n'est épinglé ni scrubé. (`RueScene`, le moteur en direct, reste
+  utilisé par la pause de session et le mode Spotify ; son repli photo fixe fait un vrai
+  fondu enchaîné, l'ancienne photo reste dessous.)
 - Aperçu sans compte : `/lab/landing` (dev, ou `NEXT_PUBLIC_LAB=1`).
 
 ### Outillage : ce qu'on ne peut PAS vérifier ici
