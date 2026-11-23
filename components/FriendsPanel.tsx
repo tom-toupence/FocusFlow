@@ -292,6 +292,7 @@ function FriendGroup({ label, count, dim, children }: { label: string; count: nu
 }
 
 function FriendRow({ f, status, unread, onOpen, onRemove }: { f: Friend; status: Presence; unread: number; onOpen: () => void; onRemove: () => void }) {
+  const cheer = useChatStore((s) => s.cheer);
   const sub = status === "focus" ? (f.stats?.activity || "En focus") : status === "online" ? "En ligne" : "Hors ligne";
   const subColor = status === "focus" ? "text-emerald-500 dark:text-emerald-400" : status === "online" ? "text-emerald-500/70 dark:text-emerald-400/70" : "text-foreground/30";
   return (
@@ -301,6 +302,20 @@ function FriendRow({ f, status, unread, onOpen, onRemove }: { f: Friend; status:
         <p className={cn("text-[13px] truncate", status === "offline" ? "text-foreground/55" : "text-foreground/90 font-medium")}>{f.displayName}</p>
         <p className={cn("text-[10px] truncate", subColor)}>{sub}</p>
       </div>
+      {status === "focus" && (
+        <button
+          onClick={async (e) => {
+            e.stopPropagation();
+            const ok = await cheer(f.userId);
+            toast(ok ? { title: `Encouragement envoyé à ${f.displayName}`, accent: "sky" } : { title: "Déjà encouragé il y a peu", description: "Un encouragement toutes les 10 minutes.", accent: "amber" });
+          }}
+          className="text-focus/80 hover:text-focus p-1.5 -m-0.5 rounded-lg hover:bg-focus/10 transition-all flex-shrink-0"
+          title={`Encourager ${f.displayName}`}
+          aria-label={`Encourager ${f.displayName}`}
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
+      )}
       {unread > 0 && (
         <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-sky-500 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{unread > 9 ? "9+" : unread}</span>
       )}

@@ -32,6 +32,7 @@ import { ACHIEVEMENTS } from "@/lib/achievements";
 import { toast } from "@/components/Toast";
 import { playBreakChime, playWorkChime } from "@/lib/sounds";
 import { upsertMyFriendStats } from "@/lib/friends";
+import { CHEER_EVENT } from "@/store/chatStore";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -375,6 +376,14 @@ export default function SessionPage() {
     "transition-[opacity,transform] duration-500",
     chromeHidden && "opacity-0 motion-safe:translate-y-2 pointer-events-none"
   );
+
+  // Encouragement d'un ami : une vague de lumière traverse la rue (visible en
+  // pause et en mode Spotify ; sous une vidéo, le toast suffit).
+  useEffect(() => {
+    const onCheer = () => city.current?.goal();
+    window.addEventListener(CHEER_EVENT, onCheer);
+    return () => window.removeEventListener(CHEER_EVENT, onCheer);
+  }, []);
 
   // Un clic n'importe où réaffiche le chrome masqué manuellement (H).
   useEffect(() => {
