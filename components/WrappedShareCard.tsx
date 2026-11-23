@@ -68,8 +68,8 @@ function drawCard(data: WrappedData): HTMLCanvasElement {
   const tiles: { label: string; value: string }[] = [
     { label: "SESSIONS", value: String(data.sessions) },
     { label: "JOURS ACTIFS", value: `${data.activeDays}/7` },
-    { label: "MEILLEUR JOUR", value: data.bestDay ? data.bestDay.label : "—" },
-    { label: "HEURE DE POINTE", value: data.peakHour !== null ? `${data.peakHour}h` : "—" },
+    { label: "MEILLEUR JOUR", value: data.bestDay ? data.bestDay.label : "-" },
+    { label: "HEURE DE POINTE", value: data.peakHour !== null ? `${data.peakHour}h` : "-" },
   ];
   const tileW = (W - 160 - 3 * 30) / 4;
   tiles.forEach((t, i) => {
@@ -133,7 +133,7 @@ function drawCard(data: WrappedData): HTMLCanvasElement {
   // Footer
   ctx.fillStyle = "rgba(255,255,255,0.25)";
   ctx.font = `500 30px ${sans}`;
-  ctx.fillText("focusflow — pomodoro & ambiances de focus", 80, H - 70);
+  ctx.fillText("focusflow · pomodoro et ambiances de focus", 80, H - 70);
 
   return canvas;
 }

@@ -30,7 +30,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "FocusFlow — Pomodoro + Lofi",
+  title: "FocusFlow · Pomodoro et musique, la nuit",
   description: "Reste focus avec un timer Pomodoro et de la musique lofi YouTube",
 };
 

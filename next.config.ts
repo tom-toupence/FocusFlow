@@ -11,7 +11,9 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               // Scripts : app + YouTube IFrame API + Spotify Web Playback SDK
-              "script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com https://sdk.scdn.co https://embed.twitch.tv",
+              // `unsafe-eval` en développement seulement : React s'en sert pour ses
+              // outils de débogage (jamais en production).
+              `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""} https://www.youtube.com https://s.ytimg.com https://sdk.scdn.co https://embed.twitch.tv`,
               // Iframes : YouTube embed + Spotify SDK + Twitch player
               "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://sdk.scdn.co https://player.twitch.tv https://embed.twitch.tv",
               // Images : YouTube thumbnails + Spotify artwork + oEmbed

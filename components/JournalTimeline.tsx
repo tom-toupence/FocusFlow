@@ -43,7 +43,7 @@ export default function JournalTimeline() {
               <p className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-3">Humeur vs focus</p>
               <div className="flex items-end gap-2 h-20">
                 {correlationDays.map((d) => (
-                  <div key={d.date} className="flex-1 flex flex-col items-center gap-1" title={`${fmtDate(d.date)} — ${Math.round(d.minutes)} min`}>
+                  <div key={d.date} className="flex-1 flex flex-col items-center gap-1" title={`${fmtDate(d.date)} · ${Math.round(d.minutes)} min`}>
                     <span className="w-2.5 h-2.5 rounded-full" style={{ background: MOODS.find((m) => m.value === Math.round(d.mood))?.color }} />
                     <div className="w-full flex flex-col justify-end" style={{ height: "44px" }}>
                       <div className="w-full rounded-sm bg-emerald-500/50" style={{ height: `${Math.max((d.minutes / maxMin) * 100, d.minutes > 0 ? 8 : 3)}%` }} />

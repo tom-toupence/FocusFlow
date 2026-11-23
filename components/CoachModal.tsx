@@ -63,10 +63,10 @@ export default function CoachModal({
       } else {
         const err = await res.json().catch(() => ({}));
         if (err?.status === 429) {
-          setNotice("Limite de l'IA atteinte (quota gratuit). Plan local utilisé — réessaie dans ~1 min pour l'IA.");
+          setNotice("Limite de l'IA atteinte (quota gratuit). Plan local utilisé, réessaie dans ~1 min pour l'IA.");
         }
       }
-    } catch { /* ignore — fall through to local */ }
+    } catch { /* ignore, fall through to local */ }
     applyTasks(planTasks(obj), "local");
     setLoading(false);
   };

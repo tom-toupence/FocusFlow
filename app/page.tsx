@@ -693,7 +693,7 @@ function CompletedTodosBacklog() {
   // Group by completedAt date
   const groups: Record<string, typeof done> = {};
   for (const t of done) {
-    const key = t.completedAt ?? "—";
+    const key = t.completedAt ?? "-";
     if (!groups[key]) groups[key] = [];
     groups[key].push(t);
   }
@@ -890,6 +890,8 @@ function MediaTab({ id, label, accent, badge }: { id: MediaSource; label: string
   const activeText = accent === "spotify" ? "text-[#1db954]" : accent === "twitch" ? "text-[#9146ff]" : "text-foreground";
   return (
     <button
+      role="tab"
+      aria-selected={active}
       onClick={() => openMedia(id)}
       className={cn(
         "relative flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold transition-colors",
@@ -1175,7 +1177,7 @@ export default function LandingPage() {
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 pb-28 sm:px-8 sm:py-12 md:pb-16">
         {/* Sous-sélecteur de sources (section Écouter) */}
         {section === "ecouter" && (
-          <div className="mb-7 inline-flex flex-wrap gap-1 rounded-xl border border-foreground/[0.08] bg-foreground/[0.025] p-1">
+          <div role="tablist" aria-label="Sources" className="mb-7 inline-flex flex-wrap gap-1 rounded-xl border border-foreground/[0.08] bg-foreground/[0.025] p-1">
             <MediaTab id="catalogue" label="Catalogue" />
             <MediaTab id="discover" label="Découvrir" />
             <MediaTab id="library" label="Ma bibliothèque" badge={hasLibraryContent ? `${customVideos.length + playlists.length + localPlaylists.length}` : undefined} />
@@ -1362,7 +1364,7 @@ export default function LandingPage() {
               </h1>
               <p className="text-foreground/40 mt-1 text-sm">
                 {isSpotifyConnected
-                  ? "Tes playlists — clique sur une playlist pour démarrer."
+                  ? "Tes playlists, clique sur une playlist pour démarrer."
                   : "Connecte ton compte Spotify Premium pour écouter tes playlists."}
               </p>
             </div>
@@ -1446,7 +1448,7 @@ export default function LandingPage() {
                 <div className="text-center max-w-sm">
                   <p className="text-sm font-medium text-foreground/70">Accès refusé par Spotify</p>
                   <p className="text-xs text-foreground/40 mt-2 leading-relaxed">
-                    L&apos;application est en <strong className="text-foreground/60">mode développement</strong> — seuls les comptes ajoutés manuellement peuvent l&apos;utiliser.
+                    L&apos;application est en <strong className="text-foreground/60">mode développement</strong>, seuls les comptes ajoutés manuellement peuvent l&apos;utiliser.
                     Demande au propriétaire de l&apos;app de t&apos;ajouter dans le <strong className="text-foreground/60">Spotify Developer Dashboard</strong>.
                   </p>
                 </div>
@@ -1534,7 +1536,7 @@ export default function LandingPage() {
                 </h1>
                 <p className="text-foreground/40 mt-1 text-sm">
                   {isTwitchConnected
-                    ? `Connecté en tant que ${twitchUserLogin} — tes abonnements Twitch.`
+                    ? `Connecté en tant que ${twitchUserLogin}, tes abonnements Twitch.`
                     : "Connecte ton compte Twitch pour voir tes abonnements, ou entre directement un nom de chaîne."}
                 </p>
               </div>

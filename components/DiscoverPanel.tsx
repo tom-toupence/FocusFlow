@@ -230,7 +230,7 @@ export default function DiscoverPanel() {
             <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" strokeLinecap="round" />
           </svg>
           <p className="text-sm text-center max-w-sm">
-            Pas encore assez d&apos;écoutes pour te recommander des titres — cherche une musique
+            Pas encore assez d&apos;écoutes pour te recommander des titres, cherche une musique
             ci-dessus, ou lance quelques sessions puis reviens ici.
           </p>
           <div className="flex flex-wrap justify-center gap-2 mt-1">

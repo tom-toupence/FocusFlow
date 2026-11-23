@@ -27,7 +27,7 @@ const SEND_MESSAGES: Record<SendResult, { title: string; accent: "emerald" | "am
   already_pending: { title: "Demande déjà en attente", accent: "amber" },
   invalid_code: { title: "Code invalide", accent: "amber" },
   cannot_add_self: { title: "C'est ton propre code", accent: "amber" },
-  error: { title: "Erreur — réessaie", accent: "amber" },
+  error: { title: "Erreur, réessaie", accent: "amber" },
 };
 
 type Presence = "focus" | "online" | "offline";

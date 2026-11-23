@@ -6,7 +6,7 @@ test("accueil : navigation principale et minuteur d'aperçu", async ({ page }) =
   const nav = page.getByRole("navigation", { name: "Navigation principale" }).first();
   await expect(nav).toBeVisible();
   await nav.getByRole("button", { name: /Écouter/ }).click();
-  await expect(page.getByRole("heading", { name: "Choisis ce qui joue derrière" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Choisis ton ambiance" })).toBeVisible();
 });
 
 test("thème petit matin : la classe dark disparaît et les jetons changent", async ({ page }) => {
@@ -20,7 +20,7 @@ test("thème petit matin : la classe dark disparaît et les jetons changent", as
 test("réglages : hors Personnalisé, les durées restent lisibles mais ne sont pas réglables, même au clavier", async ({ page }) => {
   await prepare(page);
   await open(page, "/settings");
-  await page.getByRole("button", { name: /Classique/ }).first().click();
+  await page.getByRole("button", { name: /Classic/ }).first().click();
   const minus = page.getByRole("button", { name: "Durée de focus : diminuer" });
   // Format imposé : la valeur reste affichée, le réglage n'est ni visible ni atteignable.
   await expect(page.getByText("Durée de focus")).toBeVisible();

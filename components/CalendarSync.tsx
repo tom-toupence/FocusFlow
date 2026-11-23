@@ -75,7 +75,7 @@ export default function CalendarSync() {
               <h2 className="text-sm font-semibold text-foreground">Synchro automatique du planning</h2>
               <p className="text-xs text-foreground/45 mt-1 leading-relaxed">
                 Abonne ton calendrier à ce lien secret : tes blocs de focus apparaîtront automatiquement
-                sur ton téléphone, avec un rappel 10 min avant. Lecture seule — rien d&apos;autre ne transite.
+                sur ton téléphone, avec un rappel 10 min avant. Lecture seule, rien d&apos;autre ne transite.
               </p>
             </div>
 

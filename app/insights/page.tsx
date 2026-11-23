@@ -158,7 +158,7 @@ export function InsightsContent() {
         {/* Highlights */}
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Highlight label="Score de focus moyen" value={`${avgScore}`} sub="14 derniers jours" accent="emerald" />
-          <Highlight label="Heure la plus productive" value={byHour[peakHour] > 0 ? `${peakHour}h` : "—"} sub="cumul de focus" accent="violet" />
+          <Highlight label="Heure la plus productive" value={byHour[peakHour] > 0 ? `${peakHour}h` : "-"} sub="cumul de focus" accent="violet" />
           <Highlight
             label="Cette semaine"
             value={fmtMin(thisWeek.minutes)}
@@ -167,7 +167,7 @@ export function InsightsContent() {
           />
           <Highlight
             label="Précision d'estimation"
-            value={accuracy === null ? "—" : `${accuracy}%`}
+            value={accuracy === null ? "-" : `${accuracy}%`}
             sub={accuracy === null ? "pas assez de données" : "estimé / réel"}
             accent="amber"
           />
@@ -180,7 +180,7 @@ export function InsightsContent() {
             {byHour.map((m, h) => (
               <div key={h} className="flex-1 flex flex-col items-center justify-end gap-1 group relative h-full">
                 <div
-                  title={`${h}h — ${fmtMin(m)}`}
+                  title={`${h}h · ${fmtMin(m)}`}
                   className={cn("w-full rounded-sm transition-all", m > 0 ? (h === peakHour ? "bg-violet-400" : "bg-violet-500/40") : "bg-foreground/[0.05]")}
                   style={{ height: `${Math.max((m / maxHour) * 100, m > 0 ? 6 : 2)}%` }}
                 />
@@ -219,7 +219,7 @@ export function InsightsContent() {
               {trend.map((t) => (
                 <div key={t.date} className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
                   <div
-                    title={`${t.date} — score ${t.score} (${t.distractions} distraction${t.distractions !== 1 ? "s" : ""})`}
+                    title={`${t.date} · score ${t.score} (${t.distractions} distraction${t.distractions !== 1 ? "s" : ""})`}
                     className={cn(
                       "w-full rounded-sm transition-all",
                       !t.active ? "bg-foreground/[0.04]"
@@ -248,7 +248,7 @@ export function InsightsContent() {
                     <span className="text-[10px] text-foreground/40 tabular-nums">{r.count > 0 ? fmtMin(r.avg) : ""}</span>
                     <div className="w-full flex flex-col justify-end flex-1">
                       <div
-                        title={`${r.label} — ${fmtMin(r.avg)} de focus en moyenne (${r.count} jour${r.count !== 1 ? "s" : ""})`}
+                        title={`${r.label} · ${fmtMin(r.avg)} de focus en moyenne (${r.count} jour${r.count !== 1 ? "s" : ""})`}
                         className={cn("w-full rounded-md transition-all", r.count > 0 ? "bg-fuchsia-500/50" : "bg-foreground/[0.05]")}
                         style={{ height: `${r.count > 0 ? Math.max((r.avg / maxMoodAvg) * 100, 6) : 3}%` }}
                       />
@@ -273,7 +273,7 @@ export function InsightsContent() {
               onClick={() => exportAllJson({ days, history, distractions: distractionsByDate, achievements: unlocked })}
             />
           </div>
-          <p className="text-[10px] text-foreground/30">Tes données restent sur ton appareil — l&apos;export te permet de les garder ou de les analyser ailleurs.</p>
+          <p className="text-[10px] text-foreground/30">Tes données restent sur ton appareil, l&apos;export te permet de les garder ou de les analyser ailleurs.</p>
         </section>
     </>
   );

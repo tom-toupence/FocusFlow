@@ -61,7 +61,7 @@ function NavButton({
         )}
       >
         {/* Pastille active partagée : elle GLISSE d'une section à l'autre
-            (layoutId) — le déplacement dit d'où l'on vient. */}
+            (layoutId), le déplacement dit d'où l'on vient. */}
         {active && (
           <motion.span
             layoutId={`nav-pill-${layout}`}
@@ -91,7 +91,7 @@ export default function AppNav() {
   return (
     <>
       {/* Desktop rail */}
-      <nav className="hidden md:flex flex-col items-center gap-1.5 w-20 shrink-0 sticky top-0 h-screen border-r border-foreground/[0.06] bg-background/70 backdrop-blur-sm py-4 px-2">
+      <nav aria-label="Navigation principale" className="hidden md:flex flex-col items-center gap-1.5 w-20 shrink-0 sticky top-0 h-screen border-r border-foreground/[0.06] bg-background/70 backdrop-blur-sm py-4 px-2">
         <div
           className="w-9 h-9 rounded-xl bg-foreground text-background flex items-center justify-center font-semibold text-sm mb-4"
           title="FocusFlow"
@@ -104,7 +104,7 @@ export default function AppNav() {
       </nav>
 
       {/* Mobile bottom bar */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 flex items-stretch gap-1 px-2 pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] border-t border-foreground/[0.08] bg-background/90 backdrop-blur-md">
+      <nav aria-label="Navigation principale" className="md:hidden fixed bottom-0 inset-x-0 z-30 flex items-stretch gap-1 px-2 pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] border-t border-foreground/[0.08] bg-background/90 backdrop-blur-md">
         {ORDER.map((s) => (
           <NavButton key={s} s={s} active={section === s} onClick={() => setSection(s)} layout="bar" />
         ))}

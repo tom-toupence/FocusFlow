@@ -61,6 +61,7 @@ export async function prepare(page: Page, seed: Seed = {}) {
   await page.addInitScript(({ seed, st0 }) => {
     const st = (s: object) => JSON.stringify({ state: s, version: 0 });
     void st0;
+    localStorage.setItem("focusflow-splash", "off");
     localStorage.setItem("focusflow-prefs", st({ onboarded: true, breathingEnabled: true, sceneEffects: false }));
     localStorage.setItem("focusflow-theme", st({ theme: seed.theme ?? "dark" }));
     if (seed.queue) {
@@ -85,12 +86,10 @@ export async function prepare(page: Page, seed: Seed = {}) {
   await page.route(/scdn\.co|spotify\.com|player\.twitch\.tv|www\.twitch\.tv|supabase\.co/, (r) => r.abort());
 }
 
-/** Ouvre une page et lève le splash d'arrivée (il ne part que sur un geste). */
+/** Ouvre une page (le splash est coupé par `focusflow-splash` = "off"). */
 export async function open(page: Page, path: string) {
   await page.goto(path);
-  await page.waitForTimeout(600);
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(1500);
 }
 
 export const test = base;

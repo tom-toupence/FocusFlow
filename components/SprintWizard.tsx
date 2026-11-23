@@ -95,7 +95,7 @@ export default function SprintWizard() {
 
         {st.missed > 0 && (
           <p className="text-xs text-amber-500/90 mb-3">
-            {st.missed} bloc{st.missed > 1 ? "s" : ""} manqué{st.missed > 1 ? "s" : ""} — recalcule le plan pour redistribuer le travail.
+            {st.missed} bloc{st.missed > 1 ? "s" : ""} manqué{st.missed > 1 ? "s" : ""}, recalcule le plan pour redistribuer le travail.
           </p>
         )}
 
@@ -109,7 +109,7 @@ export default function SprintWizard() {
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-foreground text-background text-sm font-semibold hover:bg-foreground/90 transition-all shadow-lg shadow-black/20"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-              Go — bloc de {formatMinOfDay(st.todayBlock.startMin)} ({st.todayBlock.durationMin} min)
+              Go · bloc de {formatMinOfDay(st.todayBlock.startMin)} ({st.todayBlock.durationMin} min)
             </button>
           )}
           {st.missed > 0 && (
@@ -252,7 +252,7 @@ export default function SprintWizard() {
                   onClick={validate}
                   className="py-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/25 text-emerald-600 dark:text-emerald-300 text-sm font-semibold transition-all"
                 >
-                  ✓ Valider — ajouter au planning et au Kanban
+                  Valider : ajouter au planning et au Kanban
                 </button>
               </div>
             )}

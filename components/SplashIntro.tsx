@@ -145,6 +145,10 @@ function SplashIntroInner() {
 
   // Capacités + boucle de rendu WebGL.
   useEffect(() => {
+    // Interrupteur local (tests e2e, démos) : `focusflow-splash` = "off".
+    let off = false;
+    try { off = localStorage.getItem("focusflow-splash") === "off"; } catch { /* stockage indisponible */ }
+    if (off) { setPhase("done"); return; }
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const canvas = canvasRef.current;
     const gl = !reduced && canvas

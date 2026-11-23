@@ -102,7 +102,7 @@ export default function ProjectsSection() {
                 </div>
                 <p className="text-[11px] mt-2 flex items-center gap-2 flex-wrap">
                   {p.deadline ? (
-                    st.overdue ? <span className="text-red-400">Deadline dépassée — {st.pomodorosLeft} pomodoros restants</span>
+                    st.overdue ? <span className="text-red-400">Deadline dépassée, {st.pomodorosLeft} pomodoros restants</span>
                     : st.daysLeft === 0 ? <span className="text-amber-400">Deadline aujourd&apos;hui · {st.pomodorosLeft} restants</span>
                     : <span className="text-foreground/45">{st.daysLeft}j restants · vise <strong className="text-foreground/65">{st.perDayNeeded}/jour</strong></span>
                   ) : <span className="text-foreground/30">Sans deadline · {st.pomodorosLeft} restants</span>}

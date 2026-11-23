@@ -145,7 +145,7 @@ export default function ProfilePanel({ open, onClose }: Props) {
     try {
       const text = await file.text();
       const count = importBackup(text);
-      setImportStatus(`✓ ${count} données restaurées — rechargement…`);
+      setImportStatus(`✓ ${count} données restaurées, rechargement…`);
       // Recharge pour que tous les stores Zustand relisent le localStorage importé
       setTimeout(() => window.location.reload(), 1200);
     } catch (err) {

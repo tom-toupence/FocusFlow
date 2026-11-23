@@ -7,6 +7,8 @@ export default defineConfig({
   testDir: "e2e",
   timeout: 90_000,
   retries: 0,
+  // Le serveur de dev compile à la demande : deux navigateurs à la fois au plus.
+  workers: 2,
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
     viewport: { width: 1280, height: 800 },
