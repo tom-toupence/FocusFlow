@@ -99,13 +99,13 @@ export default function PipTimer({
       <button
         onClick={() => (pipWindow ? close() : open())}
         className={cn(
-          "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl transition-all",
-          pipWindow ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10",
+          "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-lg border transition-colors",
+          pipWindow ? "border-white/30 bg-white/20 text-white" : "border-white/15 bg-black/50 text-white/75 backdrop-blur-sm hover:bg-black/70 hover:text-white",
           !supported && "hidden"
         )}
         title={pipWindow ? "Fermer la fenêtre flottante" : "Timer flottant (toujours visible)"}
       >
-        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
           <rect x="2" y="4" width="20" height="16" rx="2" />
           <rect x="12" y="12" width="7" height="5" rx="1" fill="currentColor" stroke="none" />
         </svg>

@@ -237,6 +237,7 @@ function SessionReplica() {
         <div className="rounded-lg bg-night/80 border border-white/10 px-2.5 sm:px-3 py-1 text-center">
           <p className="font-mono tabular-nums text-[20px] sm:text-[28px] leading-none text-sodium [text-shadow:0_0_14px_color-mix(in_oklab,var(--sodium)_55%,transparent)]" aria-label={`Minuteur ${mm} minutes ${ss}`}>{mm}:{ss}</p>
           <div className="mt-1 h-[2px] w-full bg-white/10 overflow-hidden"><div className="h-full bg-sodium origin-left" style={{ transform: `scaleX(${progress})` }} /></div>
+          <p className="mt-0.5 font-mono text-[7px] sm:text-[8px] uppercase tracking-[0.14em] text-white/45">Pomodoro 2</p>
         </div>
       </div>
       {/* File à venir */}
@@ -253,11 +254,14 @@ function SessionReplica() {
           </div>
         ))}
       </div>
-      {/* Contrôles */}
-      <div className="absolute bottom-0 inset-x-0 flex items-center justify-center gap-1.5 p-3">
+      {/* Contrôles : la même rangée que dans l'app (app/session/page.tsx). */}
+      <div className="absolute bottom-0 inset-x-0 flex items-center justify-center gap-1 sm:gap-1.5 p-3">
         {["Pause", "Distraction", "Suivant", "À venir", "Tâches"].map((l, i) => (
-          <span key={l} className={cn("rounded-lg border px-2 sm:px-3 py-1 text-[9px] sm:text-[10px]", i === 0 ? "bg-white text-black border-white" : "border-white/15 bg-black/50 text-white/75")}>{l}</span>
+          <span key={l} className={cn("rounded-lg border px-2 sm:px-3 py-1 text-[9px] sm:text-[10px]", i === 0 ? "bg-white text-black border-white" : i === 3 ? "border-white/30 bg-white/20 text-white" : "border-white/15 bg-black/50 text-white/75")}>{l}</span>
         ))}
+        <span aria-hidden className="mx-0.5 hidden h-3 w-px bg-white/15 lg:block" />
+        {[0, 1, 2].map((k) => <span key={k} aria-hidden className="hidden lg:block h-[22px] w-[22px] rounded-lg border border-white/15 bg-black/50" />)}
+        <span className="hidden lg:inline rounded-lg border border-white/15 bg-black/50 px-3 py-1 text-[10px] text-white/75">Terminer</span>
       </div>
     </div>
   );

@@ -782,6 +782,15 @@ Piège : les sections épinglées allongent la page après la création des déc
 chapitre ; `ScrollTrigger.sort()` + `refresh()` en fin de configuration, sinon le voile se trompe. **« Commencer » à trois endroits seulement** (bandeau,
 hero, fin). Crédits des photos CC BY affichés (rue courante en bas à gauche + pied de page).
 
+**Session = réplique de la landing (2026-11-23, demande utilisateur « uniformise »).**
+`app/session/page.tsx` reprend exactement `SessionReplica` : en cours en haut à gauche (point
+cyan + titre + sous-titre mono), minuteur sodium en haut à droite (filet de progression +
+« Pomodoro N »), panneau « À venir » docké en bas à droite (`UpNext`, ouvert d'office sur
+grand écran, replié sur téléphone, 3 titres puis « voir la suite »), rangée de boutons
+`Pill` en bas au centre (Pause en blanc, Distraction, Suivant, À venir, Tâches, puis
+icônes carrées et Terminer). Tâches repliées par défaut, panneau en bas à gauche. Toute
+modification de l'un se reporte sur l'autre.
+
 ### Le système
 
 - **GSAP + ScrollTrigger + SplitText**, **Lenis** pour l'amorti ; jamais `motion/react` ici.

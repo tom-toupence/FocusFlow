@@ -89,8 +89,13 @@ test("À venir : titres suivants, suggestion ajoutée marquée, titre retiré", 
   });
   await open(page, "/session");
   await loadedCount(page, 1);
+  // Le panneau est ouvert d'office sur grand écran (comme sur la landing) ;
+  // le bouton « À venir » le replie puis le rouvre.
+  const panel = page.getByRole("region", { name: "À venir" });
+  await expect(panel).toBeVisible();
   await page.getByTitle("À venir").click();
-  const panel = page.getByRole("dialog", { name: "À venir" });
+  await expect(panel).toHaveCount(0);
+  await page.getByTitle("À venir").click();
   await expect(panel.getByText("Deuxième titre")).toBeVisible();
   await expect(panel.getByText("Troisième titre")).toBeVisible();
 
