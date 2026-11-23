@@ -314,6 +314,9 @@ export default function LandingPage() {
         onUpdate: (self) => street.current?.setScroll(self.progress),
       });
 
+      // L'ombre du premier écran s'efface à mesure qu'on le quitte.
+      gsap.fromTo("[data-hero-shade]", { autoAlpha: 1 }, { autoAlpha: 0, ease: "none", scrollTrigger: { trigger: "[data-hero]", start: "center top", end: "bottom top", scrub: true } });
+
       // Barre de lecture.
       gsap.to("[data-progress]", { scaleX: 1, ease: "none", scrollTrigger: { trigger: root.current, start: "top top", end: "bottom bottom", scrub: 0.3 } });
 
@@ -469,6 +472,10 @@ export default function LandingPage() {
           label="Des rues de nuit sous la pluie, qui se relaient en fondu."
         />
         <div ref={veil} aria-hidden className="absolute inset-0 bg-night opacity-[0.12]" />
+        {/* Ombre du premier écran (lisibilité du titre). FIXE, pas dans la
+            section : un dégradé qui défile montre son bord quand la section
+            remonte. Elle s'estompe pendant que le voile de la session monte. */}
+        <div data-hero-shade aria-hidden className="absolute inset-x-0 bottom-0 h-[70%] bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
         {/* Pause du cycle : la lumière baisse, comme dans la session. */}
         <div aria-hidden className={cn("absolute inset-0 bg-night transition-opacity duration-700", phase === "break" ? "opacity-40" : "opacity-0")} />
         <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(0,0,0,0.55)_100%)]" />
@@ -501,7 +508,6 @@ export default function LandingPage() {
         {/* ── 1. Premier écran ────────────────────────────────────────────── */}
         <section data-hero data-chapter data-veil="0.12" className="relative min-h-[150vh]">
           <div className="sticky top-0 h-[100svh] flex items-end">
-            <div aria-hidden className="absolute inset-x-0 bottom-0 h-[70%] bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
             <div data-hero-copy className="relative w-full px-4 sm:px-8 lg:px-14 pb-20 sm:pb-24">
               <Label className="text-white/60">Pomodoro · musique · gratuit</Label>
               <h1 className="mt-5 max-w-[15ch] text-[clamp(2.9rem,8.4vw,8rem)] font-light leading-[0.92] tracking-[-0.045em]">
