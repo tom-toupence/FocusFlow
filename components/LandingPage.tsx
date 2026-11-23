@@ -289,7 +289,7 @@ const SOURCES: { scene: string; kicker: string; title: string; body: string }[] 
   { scene: "carrefour", kicker: "02 · YouTube", title: "Tes playlists", body: "Colle un lien de playlist ou de mix. Lecture dans l'ordre, en boucle ou au hasard." },
   { scene: "ecrans", kicker: "03 · Spotify", title: "Spotify", body: "Tes playlists, avec un compte Premium." },
   { scene: "viaduc", kicker: "04 · Twitch", title: "Twitch", body: "Un live ou une rediffusion en fond." },
-  { scene: "boulevard", kicker: "05 · La file continue", title: "Fin de playlist", body: "Si le minuteur tourne encore, des titres proches prennent le relais." },
+  { scene: "boulevard", kicker: "05 · La file continue", title: "Fin de playlist", body: "Quand ta playlist est finie, ça continue avec des titres du même style." },
 ];
 
 // ─── Page ───────────────────────────────────────────────────────────────────
@@ -504,12 +504,11 @@ export default function LandingPage() {
           <div className="sticky top-0 h-[100svh] flex items-end">
             <div data-hero-copy className="relative w-full px-4 sm:px-8 lg:px-14 pb-20 sm:pb-24">
               <h1 className="max-w-[15ch] text-[clamp(2.9rem,8.4vw,8rem)] font-light leading-[0.92] tracking-[-0.045em]">
-                <Neon delay={0.3}>Pomodoro et musique,</Neon>
-                <Lines as="span" immediate delay={1.2} className="block text-white/80">sur le même écran.</Lines>
+                <Neon delay={0.3}>Travaille en musique.</Neon>
               </h1>
               <div className="mt-8 flex flex-col sm:flex-row sm:items-end gap-6 sm:gap-10">
                 <Lines immediate delay={1.5} className="max-w-md text-[15px] sm:text-base leading-relaxed text-white/75">
-                  YouTube, Spotify ou Twitch derrière ton minuteur. Gratuit, sans pub.
+                  Un minuteur Pomodoro avec ta musique en fond, depuis YouTube, Spotify ou Twitch. C&apos;est gratuit.
                 </Lines>
                 <div className="flex items-center gap-5">
                   <Cta label="Commencer" onClick={signIn} tone="solid" />
@@ -526,10 +525,10 @@ export default function LandingPage() {
             <div className="lg:col-span-5">
               <Label>La session</Label>
               <Lines as="h2" className="mt-5 text-[clamp(2.2rem,4.6vw,4.2rem)] font-light leading-[0.98] tracking-[-0.035em]">
-                Ta vidéo en grand, le minuteur dans un coin.
+                La vidéo prend tout l&apos;écran, le minuteur reste dans un coin.
               </Lines>
               <Lines className="mt-6 max-w-md text-[15px] leading-relaxed text-white/70">
-                Espace pour la pause, D pour noter une distraction. Les boutons se cachent quand tu ne touches plus à rien.
+                Espace pour mettre en pause, D pour noter une distraction. Les boutons disparaissent quand tu ne touches plus à rien.
               </Lines>
               <ul className="mt-10 grid grid-cols-2 gap-x-6 gap-y-5 max-w-md">
                 {[
@@ -556,7 +555,7 @@ export default function LandingPage() {
           <div data-cycle className="h-[100svh] flex flex-col justify-center px-4 sm:px-8 lg:px-14">
             <Label>Le rythme</Label>
             <h2 className="mt-5 max-w-[18ch] text-[clamp(2.2rem,5vw,4.6rem)] font-light leading-[0.98] tracking-[-0.035em]">
-              25 minutes de travail, 5 de pause. Une pause longue toutes les quatre.
+              25 minutes de travail, 5 minutes de pause, et une vraie pause toutes les quatre.
             </h2>
             <div className="mt-12 sm:mt-16" aria-hidden>
               <div className="flex items-baseline justify-between font-mono text-[11px] uppercase tracking-[0.2em]">
@@ -578,7 +577,7 @@ export default function LandingPage() {
               </div>
             </div>
             <p className="mt-10 max-w-xl text-[15px] leading-relaxed text-white/70">
-              En Flowtime, pas de limite : ta pause vaut un cinquième du temps travaillé.
+              Tu n&apos;aimes pas être coupé ? Le mode Flowtime n&apos;a pas de limite.
             </p>
           </div>
         </section>
@@ -589,7 +588,7 @@ export default function LandingPage() {
             <div className="mb-8 md:mb-10 flex items-end justify-between gap-8">
               <div>
                 <Label>La musique</Label>
-                <h2 className="mt-5 text-[clamp(2.2rem,4.6vw,4.2rem)] font-light leading-[0.98] tracking-[-0.035em]">Ta musique.</h2>
+                <h2 className="mt-5 text-[clamp(2.2rem,4.6vw,4.2rem)] font-light leading-[0.98] tracking-[-0.035em]">Écoute ce que tu veux.</h2>
               </div>
               <p className="hidden md:block font-mono text-[11px] tabular-nums tracking-[0.2em] text-white/45" aria-hidden>
                 {lit < 0 ? "05" : String(lit + 1).padStart(2, "0")} / 05
@@ -652,7 +651,7 @@ export default function LandingPage() {
             <div className="lg:col-span-5 lg:order-2">
               <Label>Ta journée</Label>
               <Lines as="h2" className="mt-5 text-[clamp(2.2rem,4.6vw,4.2rem)] font-light leading-[0.98] tracking-[-0.035em]">
-                Ton suivi.
+                Garde un œil sur ta semaine.
               </Lines>
               <ul className="mt-10 space-y-6 max-w-md">
                 {[
@@ -704,7 +703,7 @@ export default function LandingPage() {
             <div className="lg:col-span-6">
               <Label>Les amis</Label>
               <Lines as="h2" className="mt-5 text-[clamp(2.2rem,4.6vw,4.2rem)] font-light leading-[0.98] tracking-[-0.035em]">
-                Tes amis.
+                Travaille avec tes amis.
               </Lines>
               <Lines className="mt-6 max-w-md text-[15px] leading-relaxed text-white/70">
                 Ajoute-les avec un code. Tu vois qui travaille, le classement de la semaine, et vous pouvez vous écrire. Tes tâches et ton journal restent privés.
@@ -744,7 +743,7 @@ export default function LandingPage() {
         <section data-chapter data-veil="0.3" className="relative min-h-[100svh] flex flex-col justify-end px-4 sm:px-8 lg:px-14 pb-24">
           <Label>Gratuit, sans publicité</Label>
           <Lines as="h2" className="mt-5 max-w-[14ch] text-[clamp(2.8rem,8vw,7.5rem)] font-light leading-[0.92] tracking-[-0.045em]">
-            Lance ta première session.
+            On s&apos;y met ?
           </Lines>
           <div className="mt-10 flex flex-wrap items-center gap-6">
             <Cta label="Commencer" onClick={signIn} tone="solid" />
