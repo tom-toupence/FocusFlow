@@ -1,5 +1,6 @@
 "use client";
 
+import AmbientBackdrop from "@/components/AmbientBackdrop";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useStatsStore } from "@/store/statsStore";
@@ -37,7 +38,8 @@ function Panel({
 export default function WrappedPage() {
   const router = useRouter();
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative isolate min-h-screen bg-background">
+      <AmbientBackdrop />
       {/* Header */}
       <header className="h-14 flex items-center px-6 border-b border-foreground/[0.06]">
         <button

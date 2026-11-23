@@ -8,6 +8,7 @@ import { useTwitchStore } from "@/store/twitchStore";
 import { loginWithSpotify } from "@/lib/spotify";
 import { loginWithTwitch } from "@/lib/twitch";
 import { signOut } from "@/lib/supabase";
+import { usePrefsStore } from "@/store/prefsStore";
 import { upsertProfile } from "@/lib/db";
 import { exportBackup, importBackup } from "@/lib/backup";
 import { getCurrentUserId } from "@/lib/authState";
@@ -66,6 +67,8 @@ export default function ProfilePanel({ open, onClose }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { displayName, avatarUrl } = resolvedProfile(profile);
+  const streetBackdrop = usePrefsStore((s) => s.streetBackdrop);
+  const setStreetBackdrop = usePrefsStore((s) => s.setStreetBackdrop);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [savingName, setSavingName] = useState(false);
@@ -338,6 +341,23 @@ export default function ProfilePanel({ open, onClose }: Props) {
               </button>
             )}
           </div>
+        </div>
+
+        {/* ── Apparence : la rue de nuit en fond ─────────────────────────────── */}
+        <div className="p-3 pt-0 space-y-2">
+          <p className="text-[10px] font-semibold text-foreground/30 uppercase tracking-wider px-1">Apparence</p>
+          <label className="flex items-center justify-between gap-3 rounded-xl p-3 bg-foreground/[0.03] border border-foreground/[0.06] cursor-pointer">
+            <span>
+              <span className="block text-xs text-foreground/75">Rue de nuit en fond</span>
+              <span className="block text-[11px] text-foreground/40 mt-0.5">Une photo différente chaque jour, en thème sombre.</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={streetBackdrop}
+              onChange={(e) => setStreetBackdrop(e.target.checked)}
+              className="h-4 w-4 accent-[var(--focus)]"
+            />
+          </label>
         </div>
 
         {/* ── Mes données (export / import localStorage) ───────────────────── */}

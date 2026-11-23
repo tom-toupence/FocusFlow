@@ -1,5 +1,6 @@
 "use client";
 
+import AmbientBackdrop from "@/components/AmbientBackdrop";
 import { useRouter } from "next/navigation";
 import { useTimerStore } from "@/store/timerStore";
 import { useSessionStore } from "@/store/sessionStore";
@@ -132,7 +133,8 @@ export default function SummaryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="relative isolate min-h-screen bg-background flex flex-col">
+      <AmbientBackdrop />
       {/* Header */}
       <header className="h-14 flex items-center px-6 border-b border-foreground/[0.06]">
         <button

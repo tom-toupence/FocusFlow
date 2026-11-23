@@ -1,5 +1,6 @@
 "use client";
 
+import AmbientBackdrop from "@/components/AmbientBackdrop";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useStatsStore } from "@/store/statsStore";
@@ -32,7 +33,8 @@ const WEEKDAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 export default function InsightsPage() {
   const router = useRouter();
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="relative isolate min-h-screen bg-background flex flex-col">
+      <AmbientBackdrop />
       {/* Header */}
       <header className="h-14 flex items-center px-6 border-b border-foreground/[0.06] sticky top-0 bg-background/90 backdrop-blur-md z-10">
         <button
