@@ -330,3 +330,6 @@
 .ff-press { transition: transform 120ms ease-out; }
 .ff-press:active { transform: scale(0.97); }
 @media (prefers-reduced-motion: reduce) { .ff-press:active { transform: none; } }
+
+/* Relais des photos fixes de la rue (repli sans WebGL). */
+@keyframes rueFade { from { opacity: 0; } to { opacity: 1; } }

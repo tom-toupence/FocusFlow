@@ -55,11 +55,23 @@ const RueScene = forwardRef<RueHandle, Props>(function RueScene(
   const nightRef = useRef(night);
   useEffect(() => { modeRef.current = mode; nightRef.current = night; }, [mode, night]);
   const scrollRef = useRef(0);
+  const fallbackRef = useRef(false);
+  const currentRef = useRef(0);
+  useEffect(() => { fallbackRef.current = fallback; }, [fallback]);
 
   useImperativeHandle(ref, () => ({
     pomodoroDone: () => r.current?.pomodoroDone(),
     goal: () => r.current?.goal(),
-    next: () => r.current?.nextScene(),
+    next: () => {
+      if (r.current) { r.current.nextScene(); return; }
+      // Image fixe : on passe à la photo suivante (fondu CSS).
+      if (fallbackRef.current && list.current.length > 1) {
+        const n = (currentRef.current + 1) % list.current.length;
+        currentRef.current = n;
+        setCurrent(n);
+        onSceneRef.current?.(list.current[n]);
+      }
+    },
     setScroll: (v) => { scrollRef.current = v; r.current?.setScroll(v); },
   }), []);
 
@@ -68,7 +80,11 @@ const RueScene = forwardRef<RueHandle, Props>(function RueScene(
     list.current = chosen;
     if (!chosen.length) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce || !canvas.current || !supportsRue()) {
+    // Téléphone ou économie de données : la photo fixe (4 plans de 2 à 5 Mpx
+    // en mémoire vidéo, c'est trop pour un mobile moyen).
+    const small = window.matchMedia("(max-width: 767px)").matches;
+    const saveData = !!(navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
+    if (reduce || small || saveData || !canvas.current || !supportsRue()) {
       setFallback(true);
       onSceneRef.current?.(chosen[0]);
       return;
@@ -78,7 +94,7 @@ const RueScene = forwardRef<RueHandle, Props>(function RueScene(
     createRue(canvas.current, {
       scenes: chosen.map((s) => ({ base: rueBase(s.id), style: s.style, frameY: s.frameY })),
       interval: iv,
-      onScene: (i) => { setCurrent(i); onSceneRef.current?.(chosen[i]); },
+      onScene: (i) => { currentRef.current = i; setCurrent(i); onSceneRef.current?.(chosen[i]); },
       reducedMotion: false,
     })
       .then((x) => {
@@ -112,7 +128,7 @@ const RueScene = forwardRef<RueHandle, Props>(function RueScene(
     <div className={cn("overflow-hidden bg-night", className)} role="img" aria-label={label}>
       {fallback ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={rueStill(still.id)} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        <img key={still.id} src={rueStill(still.id)} alt="" className="absolute inset-0 w-full h-full object-cover motion-safe:animate-[rueFade_1.2s_ease-out]" />
       ) : (
         <canvas ref={canvas} aria-hidden className="absolute inset-0 w-full h-full block" />
       )}
