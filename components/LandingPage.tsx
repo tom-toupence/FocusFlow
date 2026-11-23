@@ -278,7 +278,7 @@ function clockAt(minutes: number) {
   return `${String(Math.floor(t / 60) % 24).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 }
 
-// ─── Les sources (travelling) ───────────────────────────────────────────────
+// ─── Les sources (vitrines) ─────────────────────────────────────────────────
 
 const SOURCES: { scene: string; kicker: string; title: string; body: string }[] = [
   { scene: "ruelle", kicker: "01 · Catalogue", title: "Des villes d'Asie, la nuit", body: "Une cinquantaine de vidéos choisies une à une : Study With Me devant Tokyo, lofi sur Kyoto, Séoul, Hong Kong, Osaka. Pas de café, pas de cheminée." },
@@ -296,6 +296,8 @@ export default function LandingPage() {
   const veil = useRef<HTMLDivElement>(null);
   const [scene, setScene] = useState<RueSceneInfo>(sceneById(STREET[0]));
   const [phase, setPhase] = useState<"work" | "break">("work");
+  /** Vitrine allumée (index), ou -1 : toutes (mouvement réduit). */
+  const [lit, setLit] = useState(0);
   const [cycleLabel, setCycleLabel] = useState({ clock: "21:00", kind: "work" as "work" | "break", n: 1 });
 
   const signIn = useCallback(() => { void signInWithGoogle(); }, []);
@@ -311,6 +313,9 @@ export default function LandingPage() {
         end: "bottom bottom",
         onUpdate: (self) => street.current?.setScroll(self.progress),
       });
+
+      // L'ombre du premier écran s'efface à mesure qu'on le quitte.
+      gsap.fromTo("[data-hero-shade]", { autoAlpha: 1 }, { autoAlpha: 0, ease: "none", scrollTrigger: { trigger: "[data-hero]", start: "center top", end: "bottom top", scrub: true } });
 
       // Barre de lecture.
       gsap.to("[data-progress]", { scaleX: 1, ease: "none", scrollTrigger: { trigger: root.current, start: "top top", end: "bottom bottom", scrub: 0.3 } });
@@ -329,13 +334,42 @@ export default function LandingPage() {
         });
       });
 
-      // Premier écran : le titre s'éloigne plus vite que la rue (profondeur).
-      gsap.to("[data-hero-copy]", {
-        yPercent: -35,
-        autoAlpha: 0,
-        ease: "none",
-        scrollTrigger: { trigger: "[data-hero]", start: "top top", end: "bottom top", scrub: true },
-      });
+      // Premier écran → session : COUPURE DE COURANT. Pas un fondu piloté par
+      // le défilement : un événement joué d'un coup quand la session arrive.
+      // Les néons grésillent, tout s'éteint un instant, le titre disparaît
+      // dans le noir, puis la lumière revient sur la session (le même geste
+      // que la fin d'un pomodoro dans l'app). En remontant, coupure brève.
+      const black = document.querySelector<HTMLElement>("[data-blackout]");
+      let cut: gsap.core.Timeline | null = null;
+      if (black) {
+        gsap.set(black, { autoAlpha: 0 });
+        ScrollTrigger.create({
+          trigger: "#session",
+          start: "top 70%",
+          onEnter: () => {
+            cut?.kill();
+            cut = gsap.timeline()
+              .to(black, { autoAlpha: 0.75, duration: 0.05 })
+              .to(black, { autoAlpha: 0.1, duration: 0.07 })
+              .to(black, { autoAlpha: 0.9, duration: 0.04 })
+              .to(black, { autoAlpha: 0.3, duration: 0.1 })
+              .to(black, { autoAlpha: 1, duration: 0.05 })
+              .set("[data-hero-copy]", { autoAlpha: 0 })
+              .to(black, { autoAlpha: 0.55, duration: 0.06 }, "+=0.32")
+              .to(black, { autoAlpha: 1, duration: 0.05 })
+              .to(black, { autoAlpha: 0, duration: 0.9, ease: "power2.out" }, "+=0.12")
+              .fromTo("[data-replica]", { filter: "brightness(0.2)" }, { filter: "brightness(1)", duration: 1.1, ease: "power2.out" }, "<");
+          },
+          onLeaveBack: () => {
+            cut?.kill();
+            cut = gsap.timeline()
+              .to(black, { autoAlpha: 1, duration: 0.06 })
+              .set("[data-hero-copy]", { autoAlpha: 1 })
+              .set("[data-replica]", { clearProps: "filter" })
+              .to(black, { autoAlpha: 0, duration: 0.6, ease: "power2.out" }, "+=0.15");
+          },
+        });
+      }
 
       // Couches de photos : chacune à sa vitesse, l'image glisse dans son cadre.
       gsap.utils.toArray<HTMLElement>("[data-speed]").forEach((el) => {
@@ -344,9 +378,6 @@ export default function LandingPage() {
         const inner = el.querySelector("[data-inner]");
         if (inner) gsap.fromTo(inner, { yPercent: -6 }, { yPercent: 6, ease: "none", scrollTrigger: { trigger: el, start: "top bottom", end: "bottom top", scrub: true } });
       });
-
-      // La réplique de session s'ouvre par les quatre côtés.
-      gsap.fromTo("[data-replica]", { clipPath: "inset(14% 10% 14% 10%)" }, { clipPath: "inset(0% 0% 0% 0%)", ease: "none", scrollTrigger: { trigger: "[data-replica]", start: "top 90%", end: "top 35%", scrub: true } });
 
       // Le cycle : épinglé, le curseur traverse une soirée de travail.
       const cyc = document.querySelector<HTMLElement>("[data-cycle]");
@@ -379,25 +410,51 @@ export default function LandingPage() {
         });
       }
 
-      // Le travelling des sources : la piste file vers la gauche.
-      const track = document.querySelector<HTMLElement>("[data-track]");
-      const pan = document.querySelector<HTMLElement>("[data-pan]");
-      const desktop = window.matchMedia("(min-width: 768px)").matches;
-      if (track && pan && desktop) {
-        const dist = () => track.scrollWidth - window.innerWidth + 64;
-        const tween = gsap.to(track, {
-          x: () => -dist(),
-          ease: "none",
-          scrollTrigger: { trigger: pan, start: "top top", end: () => `+=${dist()}`, pin: true, scrub: 0.6, invalidateOnRefresh: true },
-        });
-        gsap.utils.toArray<HTMLElement>("[data-card-img]").forEach((img) => {
-          gsap.fromTo(img, { xPercent: -8 }, { xPercent: 8, ease: "none", scrollTrigger: { trigger: img, containerAnimation: tween, start: "left right", end: "right left", scrub: true } });
-        });
-      }
-
       // Présence des amis : les rangées arrivent une à une.
       gsap.from("[data-friend]", { y: 24, autoAlpha: 0, duration: 0.9, ease: EASE, stagger: 0.12, scrollTrigger: { trigger: "[data-friends]", start: "top 70%", once: true } });
+
+      // Les sections épinglées (cycle, vitrines) allongent la page APRÈS la
+      // création des déclencheurs de chapitre : on les remet dans l'ordre de
+      // la page et on recalcule, sinon le voile d'un chapitre se déclenche
+      // au mauvais endroit.
+      ScrollTrigger.sort();
+      ScrollTrigger.refresh();
+
+      // Les timelines de coupure naissent dans des rappels, hors du contexte
+      // de matchMedia : on les arrête et on rend les styles à la main.
+      return () => {
+        cut?.kill();
+        gsap.set(["[data-hero-copy]", "[data-replica]", "[data-blackout]"], { clearProps: "all" });
+      };
     });
+
+    // Les vitrines : la rue se réveille, une vitrine allumée à la fois.
+    // Bureau : section épinglée, la lumière passe de vitrine en vitrine.
+    // Téléphone : chaque vitrine s'allume quand elle passe au centre.
+    // Reconstruit si l'écran franchit 768 px (rotation d'une tablette).
+    mm.add("(prefers-reduced-motion: no-preference) and (min-width: 768px)", () => {
+      setLit(0);
+      ScrollTrigger.create({
+        trigger: "[data-shops]",
+        start: "top top",
+        end: `+=${SOURCES.length * 55}%`,
+        pin: true,
+        onUpdate: (self) => setLit(Math.min(SOURCES.length - 1, Math.floor(self.progress * SOURCES.length))),
+      });
+      ScrollTrigger.sort();
+      ScrollTrigger.refresh();
+    });
+    mm.add("(prefers-reduced-motion: no-preference) and (max-width: 767px)", () => {
+      setLit(0);
+      gsap.utils.toArray<HTMLElement>("[data-shop]").forEach((el, i) => {
+        ScrollTrigger.create({ trigger: el, start: "top 60%", end: "bottom 40%", onToggle: (self) => { if (self.isActive) setLit(i); } });
+      });
+      ScrollTrigger.sort();
+      ScrollTrigger.refresh();
+    });
+
+    // Mouvement réduit : toutes les vitrines allumées, rien d'épinglé.
+    mm.add("(prefers-reduced-motion: reduce)", () => { setLit(-1); });
 
     return () => mm.revert();
   }, { scope: root });
@@ -415,10 +472,16 @@ export default function LandingPage() {
           label="Des rues de nuit sous la pluie, qui se relaient en fondu."
         />
         <div ref={veil} aria-hidden className="absolute inset-0 bg-night opacity-[0.12]" />
+        {/* Ombre du premier écran (lisibilité du titre). FIXE, pas dans la
+            section : un dégradé qui défile montre son bord quand la section
+            remonte. Elle s'estompe pendant que le voile de la session monte. */}
+        <div data-hero-shade aria-hidden className="absolute inset-x-0 bottom-0 h-[70%] bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
         {/* Pause du cycle : la lumière baisse, comme dans la session. */}
         <div aria-hidden className={cn("absolute inset-0 bg-night transition-opacity duration-700", phase === "break" ? "opacity-40" : "opacity-0")} />
         <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(0,0,0,0.55)_100%)]" />
       </div>
+      {/* Coupure de courant (premier écran → session) : couvre la rue ET le texte. */}
+      <div data-blackout aria-hidden className="pointer-events-none fixed inset-0 z-30 bg-black opacity-0 invisible" />
 
       {/* ── Bandeau ─────────────────────────────────────────────────────── */}
       <header className="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-4 sm:px-8 py-4 bg-gradient-to-b from-black/60 to-transparent">
@@ -445,7 +508,6 @@ export default function LandingPage() {
         {/* ── 1. Premier écran ────────────────────────────────────────────── */}
         <section data-hero data-chapter data-veil="0.12" className="relative min-h-[150vh]">
           <div className="sticky top-0 h-[100svh] flex items-end">
-            <div aria-hidden className="absolute inset-x-0 bottom-0 h-[70%] bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
             <div data-hero-copy className="relative w-full px-4 sm:px-8 lg:px-14 pb-20 sm:pb-24">
               <Label className="text-white/60">Pomodoro · musique · gratuit</Label>
               <h1 className="mt-5 max-w-[15ch] text-[clamp(2.9rem,8.4vw,8rem)] font-light leading-[0.92] tracking-[-0.045em]">
@@ -528,31 +590,66 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ── 4. Les sources (travelling horizontal) ──────────────────────── */}
-        <section id="sources" data-chapter data-veil="0.82" className="relative">
-          <div data-pan className="md:h-[100svh] md:overflow-hidden flex flex-col justify-center py-24 md:py-0">
-            <div className="px-4 sm:px-8 lg:px-14 mb-10 md:mb-12 flex items-end justify-between gap-8">
+        {/* ── 4. Les sources : des vitrines qui s'allument ──────────────────── */}
+        <section id="sources" data-chapter data-veil="0.88" className="relative">
+          <div data-shops className="md:h-[100svh] flex flex-col justify-center px-4 sm:px-8 lg:px-14 py-24 md:py-0">
+            <div className="mb-8 md:mb-10 flex items-end justify-between gap-8">
               <div>
                 <Label>La musique</Label>
                 <h2 className="mt-5 text-[clamp(2.2rem,4.6vw,4.2rem)] font-light leading-[0.98] tracking-[-0.035em]">Ce qui joue derrière toi.</h2>
               </div>
-              <p className="hidden lg:block max-w-xs text-[13px] leading-relaxed text-white/55">Quatre sources, un seul lecteur. Les mêmes boutons quelle que soit celle que tu choisis.</p>
+              <p className="hidden md:block font-mono text-[11px] tabular-nums tracking-[0.2em] text-white/45" aria-hidden>
+                {lit < 0 ? "05" : String(lit + 1).padStart(2, "0")} / 05
+              </p>
             </div>
-            <div data-track className="flex flex-col md:flex-row gap-5 md:gap-7 px-4 sm:px-8 lg:px-14 md:w-max">
-              {SOURCES.map((s) => (
-                <article key={s.kicker} className="relative md:w-[min(46vw,640px)] shrink-0 border border-white/12 bg-black/40">
-                  <div className="relative aspect-[16/10] overflow-hidden">
-                    <div data-card-img className="absolute inset-[-8%]">
-                      <Image src={rueStill(s.scene)} alt={sceneById(s.scene).label} fill sizes="(min-width: 768px) 46vw, 100vw" className="object-cover" />
+            <div className="flex flex-col md:grid md:grid-cols-5 gap-6 md:gap-3 lg:gap-4">
+              {SOURCES.map((s, i) => {
+                const on = lit < 0 || lit === i;
+                return (
+                  <article key={s.kicker} data-shop className="relative">
+                    {/* L'enseigne : éteinte, un tube gris ; allumée, elle grésille puis brille. */}
+                    <p
+                      className={cn(
+                        "mb-2 inline-block border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.22em] transition-colors duration-300",
+                        on
+                          ? "border-neon text-white bg-neon/10 motion-safe:animate-[neonOn_0.9s_linear] [text-shadow:0_0_8px_var(--neon),0_0_22px_color-mix(in_oklab,var(--neon)_70%,transparent)] shadow-[0_0_24px_-2px_color-mix(in_oklab,var(--neon)_75%,transparent),inset_0_0_12px_-4px_var(--neon)]"
+                          : "border-white/10 text-white/25",
+                      )}
+                    >
+                      {s.kicker}
+                    </p>
+                    {/* La vitrine : la rue dans le noir, puis éclairée de l'intérieur. */}
+                    <div className={cn("relative aspect-[16/10] md:aspect-[3/4] overflow-hidden border transition-[border-color] duration-700", on ? "border-white/40 shadow-[0_0_60px_-20px_color-mix(in_oklab,var(--neon)_60%,transparent)]" : "border-white/[0.06]")}>
+                      <Image
+                        src={rueStill(s.scene)}
+                        alt={sceneById(s.scene).label}
+                        fill
+                        sizes="(min-width: 768px) 20vw, 100vw"
+                        className={cn("object-cover transition-[filter,transform] duration-[900ms] ease-out", on ? "brightness-100 saturate-100 scale-100" : "brightness-[0.18] saturate-[0.2] scale-[1.04]")}
+                      />
+                      <div aria-hidden className={cn("absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent transition-opacity duration-700", on ? "opacity-100" : "opacity-0")} />
+                      {/* Reflet de la vitre. */}
+                      <div aria-hidden className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.06)_45%,transparent_55%)]" />
                     </div>
-                    <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
-                    <p className="absolute top-4 left-4 font-mono text-[10px] uppercase tracking-[0.24em] text-white/70">{s.kicker}</p>
-                    <h3 className="absolute bottom-4 left-4 right-4 text-[clamp(1.5rem,2.6vw,2.3rem)] font-light leading-[1.02] tracking-[-0.03em]">{s.title}</h3>
-                  </div>
-                  <p className="p-4 sm:p-5 text-[14px] leading-relaxed text-white/65">{s.body}</p>
-                </article>
-              ))}
+                    {/* Téléphone : le texte suit sa vitrine. */}
+                    <div className={cn("mt-3 transition-opacity duration-500", lit >= 0 && "md:hidden", on ? "opacity-100" : "opacity-30")}>
+                      <h3 className="text-[1.5rem] font-light leading-[1.05] tracking-[-0.03em]">{s.title}</h3>
+                      <p className="mt-2 text-[14px] leading-relaxed text-white/65">{s.body}</p>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
+            {/* Bureau : un seul texte, celui de la vitrine allumée (mouvement
+                réduit : chaque vitrine porte le sien, voir plus haut). */}
+            {lit >= 0 && (
+              <div className="hidden md:block mt-8 min-h-[7.5rem] max-w-2xl">
+                <div key={lit} className="motion-safe:animate-[rueFade_0.7s_ease-out]">
+                  <h3 className="text-[clamp(1.6rem,2.6vw,2.4rem)] font-light leading-[1.02] tracking-[-0.03em]">{SOURCES[lit].title}</h3>
+                  <p className="mt-3 text-[14px] leading-relaxed text-white/65">{SOURCES[lit].body}</p>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 

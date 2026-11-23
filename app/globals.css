@@ -333,3 +333,5 @@
 
 /* Relais des photos fixes de la rue (repli sans WebGL). */
 @keyframes rueFade { from { opacity: 0; } to { opacity: 1; } }
+/* Enseigne qui s'allume : quelques ratés, puis la lumière tient. */
+@keyframes neonOn { 0% { opacity: .15 } 8% { opacity: 1 } 13% { opacity: .3 } 21% { opacity: 1 } 30% { opacity: .45 } 36%, 100% { opacity: 1 } }
