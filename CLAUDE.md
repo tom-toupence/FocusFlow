@@ -764,7 +764,7 @@ invisible. Produite par `scripts/rue/loop_record.cjs` + `scripts/rue/loop.sh` (o
 `RUE_LOOP_ORDER`, le crédit affiché suit le temps de la vidéo). Pourquoi une vidéo et pas le
 WebGL en direct (2026-11-23, retour utilisateur : transitions « bizarres », il voulait la vidéo
 en fond) : même rendu partout, aucune coupure, une fraction du coût batterie.
-- le **défilement** fait entrer doucement dans l'image (`setScroll` = zoom de 8 %) ;
+- le fond reste **fixe** au défilement (le zoom de 8 % faisait trembler la vidéo, retiré) ;
 - chaque **chapitre** (`data-chapter`) règle la densité du voile (`data-veil`), sans couper la vidéo ;
 - la section **« Le rythme »** (épinglée) baisse la lumière quand le curseur du cycle traverse une pause.
 Par-dessus, le contenu a ses propres couches de photos (`Plate`, `data-speed`).

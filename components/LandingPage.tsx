@@ -30,7 +30,7 @@ import { SplitText } from "gsap/SplitText";
 import { useGSAP } from "@gsap/react";
 import type LenisInstance from "lenis";
 import { signInWithGoogle } from "@/lib/supabase";
-import RueLoop, { RUE_LOOP_ORDER, type RueLoopHandle } from "@/components/RueLoop";
+import RueLoop, { RUE_LOOP_ORDER } from "@/components/RueLoop";
 import { RUE_SCENES, rueStill, type RueSceneInfo } from "@/lib/rue/scenes";
 import { cn } from "@/lib/utils";
 
@@ -292,7 +292,6 @@ const SOURCES: { scene: string; kicker: string; title: string; body: string }[] 
 
 export default function LandingPage() {
   const root = useRef<HTMLDivElement>(null);
-  const street = useRef<RueLoopHandle>(null);
   const veil = useRef<HTMLDivElement>(null);
   const [scene, setScene] = useState<RueSceneInfo>(sceneById(STREET[0]));
   const [phase, setPhase] = useState<"work" | "break">("work");
@@ -306,14 +305,6 @@ export default function LandingPage() {
     const mm = gsap.matchMedia();
 
     mm.add("(prefers-reduced-motion: no-preference)", () => {
-      // La caméra avance avec la lecture de la page entière.
-      ScrollTrigger.create({
-        trigger: root.current,
-        start: "top top",
-        end: "bottom bottom",
-        onUpdate: (self) => street.current?.setScroll(self.progress),
-      });
-
       // L'ombre du premier écran s'efface à mesure qu'on le quitte.
       gsap.fromTo("[data-hero-shade]", { autoAlpha: 1 }, { autoAlpha: 0, ease: "none", scrollTrigger: { trigger: "[data-hero]", start: "center top", end: "bottom top", scrub: true } });
 
@@ -466,7 +457,6 @@ export default function LandingPage() {
       {/* ── La rue, fixe derrière toute la page ─────────────────────────── */}
       <div className="fixed inset-0 z-0">
         <RueLoop
-          ref={street}
           onScene={setScene}
           className="absolute inset-0"
           label="Des rues de nuit sous la pluie, qui se relaient en fondu."

@@ -11,7 +11,7 @@
 //
 // Repli : sous `prefers-reduced-motion` ou en économie de données, la photo
 // fixe de la première rue (le poster), sans lecture.
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RUE_SCENES, rueStill, type RueSceneInfo } from "@/lib/rue/scenes";
 import { cn } from "@/lib/utils";
 
@@ -21,11 +21,6 @@ export const RUE_LOOP_ORDER = ["kabukicho", "pont", "avenue", "pavillon", "ruell
 const SEG = 6;
 /** Moitié du fondu : la rue suivante prend le dessus au milieu du fondu. */
 const HALF_FADE = 0.75;
-
-export interface RueLoopHandle {
-  /** Avancée dans la page (0..1) : la caméra « entre » doucement dans la rue. */
-  setScroll(v: number): void;
-}
 
 interface Props {
   onScene?: (scene: RueSceneInfo) => void;
@@ -38,20 +33,12 @@ const sceneAt = (t: number) => {
   return RUE_SCENES.find((s) => s.id === RUE_LOOP_ORDER[i]) ?? RUE_SCENES[0];
 };
 
-const RueLoop = forwardRef<RueLoopHandle, Props>(function RueLoop({ onScene, className, label }, ref) {
+export default function RueLoop({ onScene, className, label }: Props) {
   const video = useRef<HTMLVideoElement>(null);
-  const frame = useRef<HTMLDivElement>(null);
   const [still, setStill] = useState(true);
   const [src, setSrc] = useState<{ webm: string; mp4: string } | null>(null);
   const onSceneRef = useRef(onScene);
   useEffect(() => { onSceneRef.current = onScene; }, [onScene]);
-
-  useImperativeHandle(ref, () => ({
-    setScroll: (v) => {
-      // Un travelling avant léger : la vidéo grossit de 8 % sur toute la page.
-      if (frame.current) frame.current.style.transform = `scale(${1 + 0.08 * Math.min(1, Math.max(0, v))})`;
-    },
-  }), []);
 
   useEffect(() => {
     const saveData = !!(navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
@@ -86,7 +73,9 @@ const RueLoop = forwardRef<RueLoopHandle, Props>(function RueLoop({ onScene, cla
 
   return (
     <div className={cn("overflow-hidden bg-night", className)} role="img" aria-label={label}>
-      <div ref={frame} className="absolute inset-0 will-change-transform">
+      {/* Fond FIXE : aucun zoom au défilement (redimensionner la vidéo à
+          chaque pas la faisait trembler, retour utilisateur 2026-11-23). */}
+      <div className="absolute inset-0">
         {/* Le poster reste dessous : la vidéo apparaît en fondu par-dessus. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={rueStill(RUE_LOOP_ORDER[0])} alt="" className="absolute inset-0 w-full h-full object-cover" />
@@ -108,6 +97,4 @@ const RueLoop = forwardRef<RueLoopHandle, Props>(function RueLoop({ onScene, cla
       </div>
     </div>
   );
-});
-
-export default RueLoop;
+}
