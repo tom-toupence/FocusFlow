@@ -14,6 +14,8 @@ export interface RueScene {
   style?: number;
   /** Décentrement vertical du cadre (1 = garder le bas, le sol). */
   frameY?: number;
+  /** Intensité de la pluie (0 = temps sec, photo de jour ; défaut 0,55). */
+  rain?: number;
 }
 
 export interface RueOptions {
@@ -233,8 +235,9 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
   const Z_NEAR = 1.0, Z_FAR = 9.0;
 
   const reduce = !!opts.reducedMotion;
-  const state = { night: 0, brk: 0, rain: 0.55, px: 0, py: 0, scroll: 0 };
-  const target = { night: 0, brk: 0, rain: 0.55, px: 0, py: 0, scroll: 0 };
+  const RAIN = 0.55;
+  const state = { night: 0, brk: 0, rain: specs[0].rain ?? RAIN, px: 0, py: 0, scroll: 0 };
+  const target = { night: 0, brk: 0, rain: specs[0].rain ?? RAIN, px: 0, py: 0, scroll: 0 };
   let paused = false;
   let event: [number, number] = [0, -100];
   let style = specs[0].style ?? 1;
@@ -287,6 +290,7 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
         freeScene(cur);
         cur = pending; curIndex = pendingIndex; pending = null; pendingIndex = -1;
         style = cur.spec.style ?? 1;
+        state.rain = target.rain = (cur.spec.rain ?? RAIN) * (target.brk > 0.5 ? 1.65 : 1);   // changé dans le noir
         opts.onScene?.(curIndex);
         phase = "on"; phaseT = t;
         event = [1, t - 0.6];            // les enseignes se rallument en vague
@@ -396,7 +400,7 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
 
   return {
     setNight(v) { target.night = Math.min(1, Math.max(0, v)); redraw(); },
-    setMode(mode) { target.brk = mode === "break" ? 1 : 0; target.rain = mode === "break" ? 0.9 : 0.55; redraw(); },
+    setMode(mode) { target.brk = mode === "break" ? 1 : 0; target.rain = (cur.spec.rain ?? RAIN) * (mode === "break" ? 1.65 : 1); redraw(); },
     pomodoroDone() { event = [1, (clock() - start) / 1000]; },
     goal() { event = [2, (clock() - start) / 1000]; },
     pointer(x, y) { target.px = x; target.py = y; },

@@ -13,6 +13,8 @@ export interface RueSceneInfo {
   style: number;
   /** Décentrement vertical du cadre (1 = garder le bas, le sol). */
   frameY: number;
+  /** Photo de jour : pas de pluie (et pas d'enseignes, voir scene.json "day"). */
+  day?: boolean;
 }
 
 export const RUE_SCENES: RueSceneInfo[] = [
@@ -103,7 +105,68 @@ export const RUE_SCENES: RueSceneInfo[] = [
     "frameY": 0.7,
     "credit": "Photo personnelle",
     "href": ""
-  }
+  },
+  {
+    "id": "hanoi-rail",
+    "label": "Rue du train, Hanoï",
+    "credit": "Photo : lumoplank, CC0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File%3AHanoi1617.jpg",
+    "style": 0.5,
+    "frameY": 0.3
+  },
+  {
+    "id": "hanoi-arbres",
+    "label": "Vieux quartier de Hanoï",
+    "credit": "Photo : Alexkom000, CC BY 4.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File%3A2024-11-03_Hanoi%27s_Old_Quarter_5.jpg",
+    "style": 0.0,
+    "frameY": 0.3,
+    "day": true
+  },
+  {
+    "id": "ubud-maisons",
+    "label": "Rizières d'Ubud",
+    "credit": "Photo : Jakub Hałun, CC BY-SA 4.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File%3APaddy_fields_and_houses_in_Ubud%2C_Bali%2C_Indonesia%2C_20220822_1453_0152.jpg",
+    "style": 0.0,
+    "frameY": 0.3,
+    "day": true
+  },
+  {
+    "id": "ubud",
+    "label": "Champs d'Ubud",
+    "credit": "Photo : Jakub Hałun, CC BY-SA 4.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File%3AFields_in_Ubud%2C_Bali%2C_Indonesia%2C_20220822_1401_0133.jpg",
+    "style": 0.0,
+    "frameY": 0.3,
+    "day": true
+  },
+  {
+    "id": "gion-ruelle",
+    "label": "Ruelle de Gion",
+    "credit": "Photo : Basile Morin, CC BY-SA 4.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File%3AWooden_and_bamboo_facades_of_dwellings_with_sudare_in_a_cobbled_street_of_Gion%2C_perspective_effect_with_vanishing_point%2C_Kyoto%2C_Japan.jpg",
+    "style": 0.0,
+    "frameY": 0.3,
+    "day": true
+  },
+  {
+    "id": "gion-pavee",
+    "label": "Rue pavée de Gion",
+    "credit": "Photo : Josep M. Gracia, CC BY-SA 4.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File%3AGIO_-_Traditional_wooden_houses_along_a_stone-paved_street_in_Gion%2C_Kyoto%2C_Japan%2C_2015.jpg",
+    "style": 0.0,
+    "frameY": 0.3,
+    "day": true
+  },
+  {
+    "id": "gion-nuit",
+    "label": "Gion la nuit",
+    "credit": "Photo : lumoplank, CC0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File%3AStreets_of_Gion%2C_Kyoto_-_Gion7709.jpg",
+    "style": 0.5,
+    "frameY": 0.3
+  },
 ];
 
 export const rueBase = (id: string) => `/rue/${id}`;
