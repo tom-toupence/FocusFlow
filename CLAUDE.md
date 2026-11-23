@@ -39,6 +39,23 @@ ambiances mixables dans une seule expérience bien maintenue.
   contrôle total), seule façon fiable d'avoir SES morceaux (les radios `RD…` étant personnalisées).
   `store/queueStore.ts` (+ `fetchVideoMeta` oEmbed), UI `components/QueuePanel.tsx` (onglet Bibliothèque),
   sélection via `sessionStore.selectQueue()` / flag `playQueue`. Lecture = file maison ci-dessus.
+- **Lecture unifiée (`lib/playback/`) :** interface `PlayerAdapter` (load/play/pause/seek/next/
+  previous/volume/shuffle/loop, file « À venir », `getSuggestions`, piste normalisée `Track`) et
+  adaptateurs **YouTube** (file maison + pièges connus), **Spotify**, **Twitch** (live : pas de
+  suivant ni de suggestions, lien « Ouvrir sur Twitch »). `useSessionMedia` résout la source,
+  `components/session/SessionMedia.tsx` la rend, `UpNext.tsx` = panneau « À venir ». La page de
+  session ne distingue plus les sources. **Lecture continue** (`continuation.ts`) : boucle ON =
+  on reboucle ; OFF + minuteur actif = prolongation par des titres proches de TOUTE la playlist
+  (YouTube : radios RD round-robin ; Spotify : `spotifySuggest.ts`, endpoints coupés fin 2024 →
+  repli top titres des artistes / recherche). Tests : `npm test` (vitest, 33) et
+  `npm run test:e2e` (Playwright, 13 ; lancer sur un build : `E2E_BASE_URL=http://localhost:3100`,
+  le serveur de dev sature la mémoire). Les tests coupent le splash via `focusflow-splash=off`.
+- **Rue de nuit (`lib/rue/`, `components/RueScene.tsx`) :** photos préparées par `scripts/rue/`
+  (profondeur Depth Anything V2 Small, SAM, LaMa : tous Apache 2.0) en 4 plans + masques, servies
+  depuis `public/rue/<id>/` ; manifeste `lib/rue/scenes.ts` (11 rues, crédits). Rendu WebGL2 brut :
+  maillage déplacé, pluie, néons, brume, bloom ; événements `pomodoroDone`/`goal`/`next`,
+  `setScroll`/`setPaused`. Utilisée par la landing (en **boucle vidéo pré-rendue**, `RueLoop`), la **pause** de session et le **mode
+  Spotify** (jamais sous une vidéo). Banc d'essai : `/lab/rue`.
 - **Spotify :** OAuth + Web Playback (Premium), helpers dans `lib/spotify.ts`
 - **Twitch :** OAuth + embed live/VOD, helpers dans `lib/twitch.ts` (+ route `app/api/twitch/token`)
 - **Audio :** sons de transition générés en **Web Audio API** (aucun fichier audio)
@@ -115,6 +132,16 @@ choisir le média, qui enchaîne sur `/settings`. Les **routines** appliquent le
   `lib/progression.ts`, `components/ProgressionPanel.tsx` (onglet Activité)
 - **Toasts** partagés (montés dans `app/layout.tsx`) — `components/Toast.tsx`
 
+**Amis**
+- Présence, classement, chat (cf. journaux du 2026-07-23/24) + **encouragements** : bouton
+  « Encourager » (ami en focus, ou en tête de conversation), 1 par ami toutes les 10 min ; c'est
+  un message au corps réservé (`CHEER_BODY`) dans `friend_messages` (aucune migration),
+  affiché comme un événement (compte comme un non-lu, voulu) ; à la réception : événement
+  `focusflow:cheer` (toast par `PresenceProvider`) → vague de
+  lumière dans la rue de la session. En tête de conversation : la semaine de l'ami (minutes,
+  sessions, série, niveau, succès ; agrégats déjà partagés). Limite connue : l'anti-spam de
+  10 min est côté client seulement (un vrai contrôle demanderait une policy ou une RPC SQL).
+
 **Organisation (onglets « Aujourd'hui » & « Organisation »)**
 - **Tableau de bord « Aujourd'hui »** (command center) — `components/TodayDashboard.tsx`
 - **Routines de session** : capturer durées + ambiance + média + tâches, relancer en 1 clic —
@@ -184,10 +211,16 @@ Flux type d'une feature : `product-lead` (spec) → `state-architect`/`backend-e
 
 ### Langage visuel (refonte 2026-08-22)
 
-- **Deux surfaces, deux langages assumés.** La **landing** (`LandingPage.tsx`) est sombre et
-  cinématique (Séoul la nuit, blancs/noirs écrits en dur) : elle n'utilise **jamais** les tokens
-  `foreground`/`background`, et a son propre système de formes. Le **site connecté** vit
-  entièrement sur les tokens et suit le thème. Voir « La landing » en fin de fichier.
+- **Deux surfaces, un même monde : la rue de nuit.** La **landing** (`LandingPage.tsx`) est
+  sombre et cinématique (rue WebGL fixe, blancs/noirs écrits en dur, angles droits) : elle
+  n'utilise **jamais** les tokens `foreground`/`background`. Le **site connecté** vit sur les
+  tokens et suit le thème ; en **sombre**, son fond est **la rue du jour** (`AmbientBackdrop` :
+  photo fixe `still.webp` voilée à 90 %, jamais le moteur WebGL, désactivable dans le profil,
+  `prefs.streetBackdrop`). Plus de blobs « aurora ». Voir « La landing » en fin de fichier.
+- **Palette de nuit** (`globals.css`) : `--focus` = cyan (l'accent unique de l'app), `--neon` =
+  magenta (néons de la landing), `--sodium` = ambre des réverbères (minuteur de session),
+  `--night` = fond. Utilitaires `text-focus`/`bg-sodium`/`bg-night`/`text-neon`. Les deux
+  dernières lumières sont réservées aux MOMENTS (minuteur, titre), jamais au décor d'interface.
 - **Un seul accent dans l'app** : token `--focus` (utilitaires `text-focus` / `bg-focus` /
   `border-focus`), défini clair et sombre dans `globals.css`. Tout le reste s'exprime en niveaux de
   `foreground`. Restent légitimes car **sémantiques** : couleurs de marque (Spotify/Twitch), couleur
@@ -698,72 +731,65 @@ visuel reste à valider à l'œil.
 
 
 
+## Journal de session — 2026-11-23 (rue de nuit partout, lecture unifiée, landing, amis)
+
+Session autonome (l'utilisateur dormait, toutes les décisions prises seul).
+1. **Lab « rue de nuit »** (2.5D / projection caméra) : 11 rues (7 photos libres + 4 photos
+   personnelles de l'utilisateur, traitées en pleine résolution avec un traitement « dessin »
+   doux : `scripts/rue/dessin.py`, `scene.json "dessin"`), profondeur lissée par plan (visages
+   non déformés), zones `flatten` pour les passants flous.
+2. **Partie fonctionnelle récupérée** de la refonte annulée (PR #2, revertée pour son design) :
+   `lib/playback/*`, session unifiée, « À venir », suggestions Spotify, tests. La ville 3D de
+   l'époque est remplacée par `RueScene` (pause et mode Spotify).
+3. **Landing réécrite** autour de la rue fixe (voir « La landing »).
+4. **App connectée** : rue du jour en fond (sombre), surfaces de nuit (cartes translucides sans
+   flou, pas de glassmorphism), palette cyan / magenta / sodium.
+5. **Amis** : encouragements + semaine de l'ami dans la conversation.
+6. Correctifs : durées non réglables hors « Personnalisé » (même au clavier), `aria-label` de la
+   nav et `role="tab"` des sources, zéro tiret cadratin visible (titres du catalogue compris),
+   `unsafe-eval` autorisé en dev seulement.
+`tsc` 0 erreur ; lint au niveau baseline (4 erreurs pré-existantes : summary, StatsSection,
+TodoStatusDropdown, callback Twitch) ; build vert ; vitest 33/33 ; e2e 13/13 sur build de prod.
+
 ## La landing
 
-> Section unique et à jour. Les journaux de refonte successifs ont été retirés :
-> ils se contredisaient et décrivaient des versions mortes. Ce qui suit décrit
-> `components/LandingPage.tsx` tel qu'il est.
+> Section unique et à jour : décrit `components/LandingPage.tsx` tel qu'il est (2026-11-23).
 
-### L'idée : « Une nuit, quatre pomodoros »
+### L'idée : « Une rue de plus »
 
-La page EST une nuit à Séoul, de **21:00 à 01:00**, et le scroll fait avancer
-l'heure. Elle est découpée au rythme du pomodoro : des cycles de travail
-séparés par de **vraies pauses**, où la page respire au lieu d'enchaîner.
+Derrière toute la page, une **boucle vidéo continue des onze rues** (`components/RueLoop.tsx`,
+`public/rue/loop/rue-{1080,720}.{webm,mp4}`) : chaque rue rendue à l'avance par le moteur
+`lib/rue/` (pluie, néons, caméra qui respire), 6 s par rue, fondus de 1,5 s, raccord de boucle
+invisible. Produite par `scripts/rue/loop_record.cjs` + `scripts/rue/loop.sh` (ordre =
+`RUE_LOOP_ORDER`, le crédit affiché suit le temps de la vidéo). Pourquoi une vidéo et pas le
+WebGL en direct (2026-11-23, retour utilisateur : transitions « bizarres », il voulait la vidéo
+en fond) : même rendu partout, aucune coupure, une fraction du coût batterie.
+- le **défilement** fait entrer doucement dans l'image (`setScroll` = zoom de 8 %) ;
+- chaque **chapitre** (`data-chapter`) règle la densité du voile (`data-veil`), sans couper la vidéo ;
+- la section **« Le rythme »** (épinglée) baisse la lumière quand le curseur du cycle traverse une pause.
+Par-dessus, le contenu a ses propres couches de photos (`Plate`, `data-speed`).
 
-Ce n'est pas une métaphore posée après coup, c'est la structure du document :
-les sections SONT les cycles, l'horloge du bandeau SUIT le scroll, et les quatre
-marques de pomodoro se remplissent à mesure qu'on descend.
-
-Le propos, qui est la raison d'être d'une app de focus nocturne : **la nuit,
-tout le monde travaille.** La supérette, le taxi, la cuisine. Tu n'es pas seul.
-
-### Les trois gestes
-
-1. **`Neon`** — le titre ne monte pas et ne se fond pas, il **s'allume** :
-   quelques ratés d'amorçage aux durées irrégulières (un clignotement régulier
-   se lit comme une animation, pas comme un tube qui peine), puis la lueur
-   s'installe. ⚠️ Le halo passe par une **variable CSS animée** (`--glow`) et un
-   `calc()`, jamais par une interpolation de `text-shadow` : GSAP ne sait
-   interpoler une ombre que si les deux états ont exactement la même structure.
-2. **`Collapse`** — on ouvre sur Séoul en plein écran ; au scroll la photo **se
-   referme par les quatre côtés** jusqu'à n'être qu'une fenêtre éclairée.
-   `clip-path: inset()` animé, jamais `width`/`top`. Le filet est un élément
-   SÉPARÉ aux mêmes pourcentages (un `border` sur la photo serait coupé avec
-   elle). ⚠️ **Le voile s'efface, il ne s'épaissit pas** : il couvre tout,
-   fenêtre comprise, et l'épaissir éteignait ce qui devait rester allumé.
-3. **`Breath`** — entre deux cycles, la section **inspire puis expire** (une
-   timeline scrubée en deux temps). Une page qui enchaîne ses sections ne peut
-   pas parler de pauses de façon crédible ; celle-ci en impose une au lecteur.
-
-Plus : le **travelling horizontal** du catalogue, où le nom du pays s'écrit en
-très grand derrière et change quand la carte suivante prend le centre
-(`containerAnimation`, bornes en MOTS-CLÉS car les pourcentages y sont mesurés
-dans l'espace de la piste).
+Chapitres : premier écran (titre néon « La ville ne dort pas. ») · la session (réplique fidèle
+de `/session` qui s'ouvre en `clip-path`) · le rythme (cycle 25/5 épinglé, horloge 21:00 →) ·
+la musique (travelling horizontal des 4 sources + « la file continue ») · ta journée (collage
+en couches) · les amis · fin de nuit. **« Commencer » à trois endroits seulement** (bandeau,
+hero, fin). Crédits des photos CC BY affichés (rue courante en bas à gauche + pied de page).
 
 ### Le système
 
-- **Moteur : GSAP + ScrollTrigger + SplitText**, jamais `motion/react` ici.
-  **Lenis** pour le défilement amorti (et non `ScrollSmoother`, qui enveloppe la
-  page dans un conteneur transformé et déporte tout sur le fil principal).
-- **Tout le texte arrive par `Lines`** : découpage en lignes (SplitText,
-  `mask: "lines"`, `autoSplit`), chaque ligne montant derrière un masque.
-  `EASE = "power4.out"`, `DUR = 1.2`. Les blocs, eux, se dévoilent en `clip-path`.
-- **Formes : tout est à angle droit.** Aucun `rounded-*` sur la landing, hormis
-  points et anneaux. Boutons rectangulaires à filet, jamais de pilules.
-- **Police : Geist partout** (une serif a été essayée puis écartée).
-- **Imagerie, deux registres à ne pas mélanger** : les six photos de Séoul
-  (`public/seoul/`, Pexels, licence libre) portent l'atmosphère ; les vignettes
-  du catalogue portent le produit. Détail dans `docs/ASSETS_LANDING.md`.
-- **« Commencer » n'apparaît qu'à TROIS endroits** : bandeau, hero, fin de nuit.
-- ⚠️ **`refreshPriority` : une valeur PLUS ÉLEVÉE se rafraîchit EN PREMIER.**
-  Les sections épinglées allongent le document et doivent donc être mesurées
-  avant tout ce qui est plus bas. Échelle `PRIO` décroissante, `below: 0`
-  (défaut) parce que `ScrollTrigger.batch()` n'expose pas la propriété.
+- **GSAP + ScrollTrigger + SplitText**, **Lenis** pour l'amorti ; jamais `motion/react` ici.
+- Texte : `Lines` (lignes masquées, `power4.out`, 1,2 s) ; titre : `Neon` (variable `--glow`).
+- Formes : angles droits, boutons rectangulaires à filet. Police : Geist. Seule exception : la
+  réplique de session, qui montre l'app telle qu'elle est (donc ses rayons).
+- **Repli** : économie de données ou `prefers-reduced-motion` → **photo fixe** de la première
+  rue (poster, aussi affiché tant que la vidéo n'a pas démarré). Téléphone : vidéo 720p. Sous
+  mouvement réduit, rien n'est épinglé ni scrubé. (`RueScene`, le moteur en direct, reste
+  utilisé par la pause de session et le mode Spotify ; son repli photo fixe fait un vrai
+  fondu enchaîné, l'ancienne photo reste dessous.)
+- Aperçu sans compte : `/lab/landing` (dev, ou `NEXT_PUBLIC_LAB=1`).
 
 ### Outillage : ce qu'on ne peut PAS vérifier ici
 
-L'onglet piloté par l'extension Chrome est en arrière-plan : `requestAnimationFrame`
-y est bridé **et les captures d'écran sont en retard sur le DOM** (un `clip-path`
-appliqué et confirmé en style calculé s'affichait encore non découpé à la capture
-suivante). **Les mesures JS sont fiables, les captures ne le sont pas** pour du
-contenu animé ou photographique. Valider le rendu avec `npm run dev`.
+Pas de GPU dans le conteneur : le 60 fps réel n'est pas mesurable, les vidéos sont rendues image
+par image (Playwright + SwiftShader, `?record` sur `/lab/rue`). Les captures « temps réel » de
+contenu animé sont peu fiables ; valider avec `npm run dev` sur une vraie machine.

@@ -91,7 +91,7 @@ export default function PlaylistTracksModal({
             </div>
           ) : tracks.length === 0 ? (
             <p className="text-sm text-foreground/35 text-center py-6">
-              Impossible de récupérer les titres de cette playlist — elle sera quand même jouée normalement en session.
+              Impossible de récupérer les titres de cette playlist, elle sera quand même jouée normalement en session.
             </p>
           ) : (
             <div className="flex flex-col gap-1">
@@ -107,7 +107,7 @@ export default function PlaylistTracksModal({
           {extras.length > 0 && (
             <div>
               <p className="text-[11px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] px-2 mb-2">
-                Ajoutés par toi — joués à la suite
+                Ajoutés par toi, joués à la suite
               </p>
               <div className="flex flex-col gap-1">
                 {extras.map((t, idx) => (

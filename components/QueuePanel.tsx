@@ -65,7 +65,7 @@ export default function QueuePanel() {
     rest.forEach((it) => addTrack(id, { youtubeId: it.youtubeId, title: it.title, channelName: it.channelName, thumbnailUrl: it.thumbnailUrl }));
     toast({
       title: "Playlist créée",
-      description: `« ${name} » — ${items.length} titre${items.length > 1 ? "s" : ""}`,
+      description: `« ${name} », ${items.length} titre${items.length > 1 ? "s" : ""}`,
       accent: "emerald",
     });
     setSavingName(null);
@@ -84,7 +84,7 @@ export default function QueuePanel() {
             File d&apos;attente
             {items.length > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-foreground/10 text-foreground/50 font-medium">{items.length}</span>}
           </h3>
-          <p className="text-xs text-foreground/40 mt-1">Lue en session — remplacée quand tu lances une playlist.</p>
+          <p className="text-xs text-foreground/40 mt-1">Lue en session, remplacée quand tu lances une playlist.</p>
         </div>
         {items.length > 0 && (
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -160,7 +160,7 @@ export default function QueuePanel() {
       {/* List */}
       {items.length === 0 ? (
         <p className="text-sm text-foreground/30 py-2">
-          File vide. Ajoute des vidéos YouTube une par une pour composer ta session — l&apos;ordre est respecté à la lecture.
+          File vide. Ajoute des vidéos YouTube une par une pour composer ta session, l&apos;ordre est respecté à la lecture.
         </p>
       ) : (
         <div className="flex flex-col gap-1.5">

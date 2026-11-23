@@ -71,32 +71,37 @@ function NumberInput({
   min,
   max,
   onChange,
+  locked = false,
 }: {
   label: string;
   value: number;
   min: number;
   max: number;
   onChange: (v: number) => void;
+  /** Format imposé (hors Personnalisé) : valeur affichée, pas de réglage. */
+  locked?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between py-3 border-b border-foreground/[0.06] last:border-0">
       <span className="text-sm text-foreground/70">{label}</span>
       <div className="flex items-center gap-3">
-        <button
+        {!locked && <button
+          aria-label={`${label} : diminuer`}
           onClick={() => onChange(Math.max(min, value - (label.includes("Sessions") ? 1 : 5)))}
           className="w-7 h-7 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground/70 flex items-center justify-center transition-colors text-sm font-medium"
         >
           −
-        </button>
+        </button>}
         <span className="text-sm font-medium text-foreground tabular-nums w-10 text-center">
           {label.includes("Sessions") ? value : `${value}m`}
         </span>
-        <button
+        {!locked && <button
+          aria-label={`${label} : augmenter`}
           onClick={() => onChange(Math.min(max, value + (label.includes("Sessions") ? 1 : 5)))}
           className="w-7 h-7 rounded-lg bg-foreground/10 hover:bg-foreground/15 text-foreground/70 flex items-center justify-center transition-colors text-sm font-medium"
         >
           +
-        </button>
+        </button>}
       </div>
     </div>
   );
@@ -642,14 +647,14 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Custom settings */}
-          <div className={cn("transition-all duration-300", preset !== "custom" && "opacity-40 pointer-events-none")}>
+          {/* Custom settings (sans objet en Flowtime : chrono libre) */}
+          <div className={cn("transition-all duration-300", preset !== "custom" && "opacity-60", preset === "flowtime" && "hidden")}>
             <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-3">Durées</p>
             <div className="rounded-xl border border-foreground/[0.08] bg-foreground/[0.02] px-4">
-              <NumberInput label="Durée de focus" value={work} min={5} max={120} onChange={setWork} />
-              <NumberInput label="Pause courte" value={shortBreak} min={1} max={30} onChange={setShortBreak} />
-              <NumberInput label="Pause longue" value={longBreak} min={5} max={60} onChange={setLongBreak} />
-              <NumberInput label="Sessions avant pause longue" value={sessions} min={2} max={8} onChange={setSessions} />
+              <NumberInput locked={preset !== "custom"} label="Durée de focus" value={work} min={5} max={120} onChange={setWork} />
+              <NumberInput locked={preset !== "custom"} label="Pause courte" value={shortBreak} min={1} max={30} onChange={setShortBreak} />
+              <NumberInput locked={preset !== "custom"} label="Pause longue" value={longBreak} min={5} max={60} onChange={setLongBreak} />
+              <NumberInput locked={preset !== "custom"} label="Sessions avant pause longue" value={sessions} min={2} max={8} onChange={setSessions} />
             </div>
           </div>
 

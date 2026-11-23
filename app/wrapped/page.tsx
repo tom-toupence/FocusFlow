@@ -1,5 +1,6 @@
 "use client";
 
+import AmbientBackdrop from "@/components/AmbientBackdrop";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useStatsStore } from "@/store/statsStore";
@@ -37,7 +38,8 @@ function Panel({
 export default function WrappedPage() {
   const router = useRouter();
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative isolate min-h-screen bg-background">
+      <AmbientBackdrop />
       {/* Header */}
       <header className="h-14 flex items-center px-6 border-b border-foreground/[0.06]">
         <button
@@ -132,13 +134,13 @@ export function WrappedContent() {
             <Panel label="Jours actifs" value={`${data.activeDays}/7`} className="bg-foreground/[0.04] text-foreground" />
             <Panel
               label="Meilleur jour"
-              value={data.bestDay?.label ?? "—"}
+              value={data.bestDay?.label ?? "-"}
               sub={data.bestDay ? formatWrappedMinutes(data.bestDay.minutes) : undefined}
               className="bg-gradient-to-br from-emerald-600/25 to-transparent text-foreground"
             />
             <Panel
               label="Heure de pointe"
-              value={data.peakHour !== null ? `${data.peakHour}h` : "—"}
+              value={data.peakHour !== null ? `${data.peakHour}h` : "-"}
               className="bg-gradient-to-br from-sky-600/25 to-transparent text-foreground"
             />
           </div>
@@ -181,7 +183,7 @@ export function WrappedContent() {
             </div>
             <Panel
               label="Humeur moyenne"
-              value={data.avgMood !== null ? `${data.avgMood.toFixed(1)} · ${moodLabel}` : "—"}
+              value={data.avgMood !== null ? `${data.avgMood.toFixed(1)} · ${moodLabel}` : "-"}
               sub={data.avgMood !== null ? "d'après ton journal" : "pas de réflexion notée"}
               className="bg-foreground/[0.04] text-foreground"
             />
@@ -196,7 +198,7 @@ export function WrappedContent() {
           {/* Share */}
           <div className="flex flex-col items-center gap-2 pt-2 pb-8">
             <WrappedShareCard data={data} />
-            <p className="text-[11px] text-foreground/25">Image 1080×1350 générée en local — rien n&apos;est envoyé en ligne.</p>
+            <p className="text-[11px] text-foreground/25">Image 1080×1350 générée en local, rien n&apos;est envoyé en ligne.</p>
           </div>
         </main>
   );

@@ -1,0 +1,110 @@
+// Les rues de nuit préparées par scripts/rue/ (public/rue/<id>/).
+// Source unique : landing, fond de l'app, session et /lab/rue s'en servent.
+// Les crédits des photos sous licence CC BY sont affichés là où elles le sont.
+
+export interface RueSceneInfo {
+  id: string;
+  label: string;
+  /** Crédit à afficher (licence de la photo). */
+  credit: string;
+  /** Page de la photo d'origine ; vide pour les photos personnelles. */
+  href: string;
+  /** Dosage de l'étalonnage néon (0..1). */
+  style: number;
+  /** Décentrement vertical du cadre (1 = garder le bas, le sol). */
+  frameY: number;
+}
+
+export const RUE_SCENES: RueSceneInfo[] = [
+  {
+    "id": "pont",
+    "label": "Pont sous la pluie",
+    "credit": "Photo : Moyan Brenn, CC BY 2.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File:Tokyo_(16042877318).jpg",
+    "style": 0.35,
+    "frameY": 1
+  },
+  {
+    "id": "carrefour",
+    "label": "Carrefour sous la pluie",
+    "credit": "Photo : Moyan Brenn, CC BY 2.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File:Tokyo_(16204487106).jpg",
+    "style": 0.4,
+    "frameY": 0.3
+  },
+  {
+    "id": "kabukicho",
+    "label": "Rue commerçante",
+    "credit": "Photo : Daniel Ramirez, CC BY 2.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File:Walking_around_Kabukicho,_Shinjuku_at_night._(29362321701).jpg",
+    "style": 1,
+    "frameY": 0.4
+  },
+  {
+    "id": "viaduc",
+    "label": "Rue mouillée sous le viaduc",
+    "credit": "Photo : Toomore Chiang, CC BY 3.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File:%E7%A7%8B%E8%91%89%E5%8E%9F_Akihabara_Japan_Agfa_Vistaplus_Nikon_Fm2_(181746787).jpeg",
+    "style": 0.8,
+    "frameY": 0.6
+  },
+  {
+    "id": "avenue",
+    "label": "Avenue des enseignes",
+    "credit": "Photo : Wilfredor, CC0 (domaine public)",
+    "href": "https://commons.wikimedia.org/wiki/File:Hong_Kong_night_street.jpg",
+    "style": 0.5,
+    "frameY": 0.7
+  },
+  {
+    "id": "ecrans",
+    "label": "Rue des écrans",
+    "credit": "Photo : César García Pont, CC BY 3.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File:Shibuya_At_Night_(153069373).jpeg",
+    "style": 0.8,
+    "frameY": 0.5
+  },
+  {
+    "id": "ruelle",
+    "label": "Ruelle des enseignes",
+    "credit": "Photo : lumoplank, CC0 (domaine public)",
+    "href": "https://commons.wikimedia.org/wiki/File:Osaka_Neon_-_OsakaNeon6674.jpg",
+    "style": 0.9,
+    "frameY": 0.5
+  },
+  {
+    "id": "fleuve",
+    "label": "Skyline au bord du fleuve",
+    "style": 0.35,
+    "frameY": 0.6,
+    "credit": "Photo personnelle",
+    "href": ""
+  },
+  {
+    "id": "pavillon",
+    "label": "Pavillon sur l'eau",
+    "style": 0.15,
+    "frameY": 0.3,
+    "credit": "Photo personnelle",
+    "href": ""
+  },
+  {
+    "id": "tours",
+    "label": "Tours et esplanade",
+    "style": 0.4,
+    "frameY": 0.6,
+    "credit": "Photo personnelle",
+    "href": ""
+  },
+  {
+    "id": "boulevard",
+    "label": "Boulevard la nuit",
+    "style": 0.45,
+    "frameY": 0.7,
+    "credit": "Photo personnelle",
+    "href": ""
+  }
+];
+
+export const rueBase = (id: string) => `/rue/${id}`;
+export const rueStill = (id: string) => `/rue/${id}/still.webp`;

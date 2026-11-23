@@ -1,5 +1,6 @@
 "use client";
 
+import AmbientBackdrop from "@/components/AmbientBackdrop";
 import { useRouter } from "next/navigation";
 import { useTimerStore } from "@/store/timerStore";
 import { useSessionStore } from "@/store/sessionStore";
@@ -132,7 +133,8 @@ export default function SummaryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="relative isolate min-h-screen bg-background flex flex-col">
+      <AmbientBackdrop />
       {/* Header */}
       <header className="h-14 flex items-center px-6 border-b border-foreground/[0.06]">
         <button
@@ -202,7 +204,7 @@ export default function SummaryPage() {
             <StatCard
               label="Distractions"
               num={distractionCount}
-              sub={distractionCount === 0 ? "aucune — impeccable !" : "interruptions notées"}
+              sub={distractionCount === 0 ? "aucune, impeccable" : "interruptions notées"}
               accent={distractionCount === 0 ? "text-emerald-300" : "text-foreground"}
             />
           </div>
@@ -220,7 +222,7 @@ export default function SummaryPage() {
                 <div
                   key={i}
                   className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/25 flex items-center justify-center"
-                  title={`Session ${i + 1} — ${focusMinutesPerSession} min`}
+                  title={`Session ${i + 1} · ${focusMinutesPerSession} min`}
                 >
                   <svg className="w-3.5 h-3.5 text-orange-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" strokeLinecap="round" strokeLinejoin="round" />
@@ -299,7 +301,7 @@ export default function SummaryPage() {
 
         {/* ── Heatmap ───────────────────────────────────────────────────────── */}
         <section className="flex flex-col gap-3">
-          <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Activité — 17 semaines</h2>
+          <h2 className="text-[10px] font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em]">Activité · 17 semaines</h2>
           <div className="overflow-x-auto">
             <div className="inline-flex flex-col gap-1 min-w-0">
               {/* Month labels */}
@@ -327,7 +329,7 @@ export default function SummaryPage() {
                   <div
                     key={d.date}
                     className={cn("w-3.5 h-3.5 rounded-sm transition-colors", HEAT_LEVELS[heatLevel(d.minutes)])}
-                    title={`${d.date} — ${d.minutes} min`}
+                    title={`${d.date} · ${d.minutes} min`}
                   />
                 ))}
               </div>

@@ -6,7 +6,12 @@ import {
   ChatMessage,
   fetchConversation, sendMessage, markConversationRead,
   fetchUnreadCounts, subscribeMessages,
+  CHEER_BODY, CHEER_COOLDOWN_MS, isCheer,
 } from "@/lib/friends";
+/** Événement de fenêtre émis à la réception d'un encouragement, avec
+ *  `detail.senderId`. PresenceProvider en fait un toast, la session allume la
+ *  rue. Le store n'importe aucun composant. */
+export const CHEER_EVENT = "focusflow:cheer";
 
 // Chat direct entre amis (ONLINE-ONLY, non persisté). Une conversation ouverte à
 // la fois (façon launcher). Les messages arrivent en temps réel (Realtime) et la
@@ -21,6 +26,10 @@ interface ChatState {
   closeChat: () => void;
   send: (friendId: string, body: string) => Promise<void>;
   refreshUnread: () => Promise<void>;
+  /** Dernier encouragement envoyé, par ami (anti-spam, non persisté). */
+  cheeredAt: Record<string, number>;
+  /** Encourage un ami. false si un encouragement récent bloque l'envoi. */
+  cheer: (friendId: string) => Promise<boolean>;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -28,6 +37,24 @@ export const useChatStore = create<ChatState>((set) => ({
   messages: {},
   unread: {},
   loadingConvo: false,
+  cheeredAt: {},
+
+  cheer: async (friendId) => {
+    const last = useChatStore.getState().cheeredAt[friendId] ?? 0;
+    if (Date.now() - last < CHEER_COOLDOWN_MS) return false;
+    set((s) => ({ cheeredAt: { ...s.cheeredAt, [friendId]: Date.now() } }));
+    const m = await sendMessage(friendId, CHEER_BODY);
+    if (!m) {
+      set((s) => ({ cheeredAt: { ...s.cheeredAt, [friendId]: last } }));
+      return false;
+    }
+    set((s) => {
+      const list = s.messages[friendId];
+      if (!list || list.some((x) => x.id === m.id)) return {} as Partial<ChatState>;
+      return { messages: { ...s.messages, [friendId]: [...list, m] } };
+    });
+    return true;
+  },
 
   openChat: async (friendId) => {
     set({ openFriendId: friendId, loadingConvo: true });
@@ -95,11 +122,16 @@ export async function initChat(): Promise<void> {
 
       // Reçu dans la conversation ouverte → marque lu immédiatement.
       if (m.senderId !== me && isOpen) markConversationRead(friendId);
+
+      // Encouragement reçu : signalé à l'interface (toast, lumière dans la rue).
+      if (m.senderId !== me && isCheer(m) && typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent(CHEER_EVENT, { detail: { senderId: m.senderId } }));
+      }
     });
   }
 }
 
 export function teardownChat(): void {
   msgUnsub?.(); msgUnsub = null;
-  useChatStore.setState({ openFriendId: null, messages: {}, unread: {}, loadingConvo: false });
+  useChatStore.setState({ openFriendId: null, messages: {}, unread: {}, loadingConvo: false, cheeredAt: {} });
 }

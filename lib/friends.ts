@@ -222,6 +222,15 @@ export async function upsertMyFriendStats(partial: Partial<{
 
 // ── Chat (messagerie directe entre amis) ─────────────────────────────────────
 
+/** Encouragement : un message au corps réservé, envoyé dans la même table que
+ *  le chat (aucune migration). Affiché comme un événement, pas comme du texte,
+ *  et il fait passer une vague de lumière dans la rue de l'ami s'il est en
+ *  session (pause ou mode Spotify, là où la rue est visible). */
+export const CHEER_BODY = "::encouragement::";
+export const isCheer = (m: Pick<ChatMessage, "body">) => m.body === CHEER_BODY;
+/** Un encouragement par ami toutes les 10 minutes au plus (anti-spam). */
+export const CHEER_COOLDOWN_MS = 10 * 60 * 1000;
+
 export interface ChatMessage {
   id: string;
   senderId: string;

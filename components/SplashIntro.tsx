@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 // Écran d'arrivée : le wordmark « FocusFlow » repose sous une surface d'eau
@@ -117,7 +118,14 @@ function drawWordmark(width: number, height: number): HTMLCanvasElement | null {
   return canvas;
 }
 
+/** Pas de splash sur les pages de laboratoire (/lab) : on y regarde un visuel seul. */
 export default function SplashIntro() {
+  const pathname = usePathname();
+  if (pathname?.startsWith("/lab")) return null;
+  return <SplashIntroInner />;
+}
+
+function SplashIntroInner() {
   // show → revealing (vague qui découvre le site) → fading (résidu) → done.
   const [phase, setPhase] = useState<"show" | "revealing" | "fading" | "done">("show");
   // null = évaluation en cours (SSR + 1er paint : wordmark statique).
@@ -137,6 +145,10 @@ export default function SplashIntro() {
 
   // Capacités + boucle de rendu WebGL.
   useEffect(() => {
+    // Interrupteur local (tests e2e, démos) : `focusflow-splash` = "off".
+    let off = false;
+    try { off = localStorage.getItem("focusflow-splash") === "off"; } catch { /* stockage indisponible */ }
+    if (off) { setPhase("done"); return; }
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const canvas = canvasRef.current;
     const gl = !reduced && canvas

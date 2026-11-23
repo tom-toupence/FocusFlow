@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useChatStore } from "@/store/chatStore";
 import { useFriendsStore } from "@/store/friendsStore";
-import { isActivelyFocusing, isOnline } from "@/lib/friends";
+import { isActivelyFocusing, isOnline, isCheer } from "@/lib/friends";
+import { toast } from "@/components/Toast";
 import { cn } from "@/lib/utils";
 
 // Fenêtre de conversation (glisse par-dessus le panneau Amis, façon launcher).
@@ -15,6 +16,7 @@ export default function FriendChat() {
   const loading = useChatStore((s) => s.loadingConvo);
   const closeChat = useChatStore((s) => s.closeChat);
   const send = useChatStore((s) => s.send);
+  const cheer = useChatStore((s) => s.cheer);
   const friends = useFriendsStore((s) => s.friends);
 
   const [draft, setDraft] = useState("");
@@ -79,7 +81,38 @@ export default function FriendChat() {
           <p className="text-sm font-semibold text-foreground truncate">{friend?.displayName ?? "Ami"}</p>
           <p className={cn("text-[11px] truncate", statusColor)}>{status}</p>
         </div>
+        <button
+          onClick={async () => {
+            if (!openFriendId) return;
+            const ok = await cheer(openFriendId);
+            toast(ok
+              ? { title: `Encouragement envoyé à ${friend?.displayName ?? "ton ami"}`, accent: "sky" }
+              : { title: "Déjà encouragé il y a peu", description: "Un encouragement toutes les 10 minutes.", accent: "amber" });
+          }}
+          className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[11px] font-medium text-foreground/60 hover:text-foreground bg-foreground/5 hover:bg-foreground/10 transition-all flex-shrink-0"
+          title="Envoyer un encouragement"
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          Encourager
+        </button>
       </div>
+
+      {/* Profil : la semaine de l'ami (agrégats partagés uniquement). */}
+      {friend?.stats && (
+        <div className="grid grid-cols-4 gap-px bg-foreground/[0.06] border-b border-foreground/[0.08] flex-shrink-0">
+          {[
+            [fmtMinutes(friend.stats.weekMinutes), "semaine"],
+            [String(friend.stats.weekSessions), "sessions"],
+            [`${friend.stats.streak} j`, "série"],
+            [`niv. ${friend.stats.level}`, `${friend.stats.badges} succès`],
+          ].map(([v, l]) => (
+            <div key={l} className="bg-background px-2 py-2 text-center">
+              <p className="font-mono tabular-nums text-[12px] text-foreground">{v}</p>
+              <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-foreground/35 mt-0.5">{l}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-1.5">
@@ -98,6 +131,15 @@ export default function FriendChat() {
             // n'est pas l'ami. Robuste même si l'auth n'est pas encore résolue
             // (évite les bulles toutes de la même couleur au 1er rendu).
             const mine = m.senderId !== openFriendId;
+            if (isCheer(m)) {
+              return (
+                <div key={m.id} className="self-center flex items-center gap-1.5 my-1.5 px-3 py-1 rounded-full bg-focus/10 text-[11px] text-focus">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  {mine ? `Tu as encouragé ${friend?.displayName ?? "ton ami"}` : `${friend?.displayName ?? "Ton ami"} t'a encouragé`}
+                  <span className="text-foreground/30">· {fmtTime(m.createdAt)}</span>
+                </div>
+              );
+            }
             const prev = messages[i - 1];
             const grouped = prev && prev.senderId === m.senderId && m.createdAt - prev.createdAt < 5 * 60 * 1000;
             return (
@@ -133,6 +175,12 @@ export default function FriendChat() {
       </div>
     </div>
   );
+}
+
+function fmtMinutes(m: number): string {
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  return `${h} h ${String(m % 60).padStart(2, "0")}`;
 }
 
 function fmtTime(ts: number): string {
