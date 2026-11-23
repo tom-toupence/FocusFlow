@@ -769,10 +769,17 @@ en fond) : même rendu partout, aucune coupure, une fraction du coût batterie.
 - la section **« Le rythme »** (épinglée) baisse la lumière quand le curseur du cycle traverse une pause.
 Par-dessus, le contenu a ses propres couches de photos (`Plate`, `data-speed`).
 
-Chapitres : premier écran (titre néon « La ville ne dort pas. ») · la session (réplique fidèle
-de `/session` qui s'ouvre en `clip-path`) · le rythme (cycle 25/5 épinglé, horloge 21:00 →) ·
-la musique (travelling horizontal des 4 sources + « la file continue ») · ta journée (collage
-en couches) · les amis · fin de nuit. **« Commencer » à trois endroits seulement** (bandeau,
+Chapitres : premier écran (titre néon « La ville ne dort pas. ») · **coupure de courant**
+(`data-blackout` : les néons grésillent, tout s'éteint, la session se rallume ; événement joué
+d'un coup, pas un fondu scrubé ; coupure brève en remontant) · la session (réplique fidèle de
+`/session`) · le rythme (cycle 25/5 épinglé, horloge 21:00 →) · la musique : **5 vitrines dans
+le noir qui s'allument une à une** (bureau : section épinglée, une seule allumée, son texte
+dessous ; téléphone : chaque vitrine s'allume au centre ; mouvement réduit : toutes allumées) ·
+ta journée (collage en couches) · les amis · fin de nuit.
+**Refusé par l'utilisateur (2026-11-23)** : le travelling horizontal de cartes (« tu le fais tout
+le temps ») et le titre qui s'efface en glissant au premier écran. Ne pas y revenir.
+Piège : les sections épinglées allongent la page après la création des déclencheurs de
+chapitre ; `ScrollTrigger.sort()` + `refresh()` en fin de configuration, sinon le voile se trompe. **« Commencer » à trois endroits seulement** (bandeau,
 hero, fin). Crédits des photos CC BY affichés (rue courante en bas à gauche + pied de page).
 
 ### Le système
