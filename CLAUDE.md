@@ -769,7 +769,7 @@ en fond) : même rendu partout, aucune coupure, une fraction du coût batterie.
 - la section **« Le rythme »** (épinglée) baisse la lumière quand le curseur du cycle traverse une pause.
 Par-dessus, le contenu a ses propres couches de photos (`Plate`, `data-speed`).
 
-Chapitres : premier écran (titre néon « La ville ne dort pas. ») · **coupure de courant**
+Chapitres : premier écran (titre néon « Pomodoro et musique, sur le même écran. ») · **coupure de courant**
 (`data-blackout` : les néons grésillent, tout s'éteint, la session se rallume ; événement joué
 d'un coup, pas un fondu scrubé ; coupure brève en remontant) · la session (réplique fidèle de
 `/session`) · le rythme (cycle 25/5 épinglé, horloge 21:00 →) · la musique : **5 vitrines dans
@@ -790,6 +790,11 @@ grand écran, replié sur téléphone, 3 titres puis « voir la suite »), rang�
 `Pill` en bas au centre (Pause en blanc, Distraction, Suivant, À venir, Tâches, puis
 icônes carrées et Terminer). Tâches repliées par défaut, panneau en bas à gauche. Toute
 modification de l'un se reporte sur l'autre.
+
+**Textes : le minimum, simple et naturel (2026-11-23, demande utilisateur).** Pas de slogan,
+pas de formule poétique (« La ville ne dort pas », « Ce soir, une rue de plus »… retirés),
+pas de phrase qui a l'air générée. Dire ce que fait la fonction, en une phrase courte.
+Vaut pour la landing ET l'app (toasts, écran de pause).
 
 ### Le système
 

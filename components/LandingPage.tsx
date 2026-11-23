@@ -285,11 +285,11 @@ function clockAt(minutes: number) {
 // ─── Les sources (vitrines) ─────────────────────────────────────────────────
 
 const SOURCES: { scene: string; kicker: string; title: string; body: string }[] = [
-  { scene: "ruelle", kicker: "01 · Catalogue", title: "Des villes d'Asie, la nuit", body: "Une cinquantaine de vidéos choisies une à une : Study With Me devant Tokyo, lofi sur Kyoto, Séoul, Hong Kong, Osaka. Pas de café, pas de cheminée." },
-  { scene: "carrefour", kicker: "02 · YouTube", title: "Ta playlist, dans l'ordre", body: "Colle un lien de playlist ou de mix. FocusFlow la lit titre après titre, en boucle ou au hasard, et tu vois ce qui vient ensuite." },
-  { scene: "ecrans", kicker: "03 · Spotify", title: "Ta bibliothèque Spotify", body: "Avec un compte Premium, tes playlists passent dans le même lecteur, avec les mêmes contrôles et la même file." },
-  { scene: "viaduc", kicker: "04 · Twitch", title: "Un direct en fond", body: "Une chaîne en direct ou une rediffusion derrière ton minuteur, quand tu préfères une présence à une playlist." },
-  { scene: "boulevard", kicker: "05 · La file continue", title: "La musique ne s'arrête pas avant toi", body: "Ta playlist se termine alors que le minuteur tourne encore ? Des titres proches de toute la playlist, pas seulement du dernier morceau, prennent le relais. Tu peux les retirer ou les passer." },
+  { scene: "ruelle", kicker: "01 · Catalogue", title: "Une cinquantaine de vidéos", body: "Study With Me et lofi, surtout au Japon, en Corée et à Hong Kong." },
+  { scene: "carrefour", kicker: "02 · YouTube", title: "Tes playlists", body: "Colle un lien de playlist ou de mix. Lecture dans l'ordre, en boucle ou au hasard." },
+  { scene: "ecrans", kicker: "03 · Spotify", title: "Spotify", body: "Tes playlists, avec un compte Premium." },
+  { scene: "viaduc", kicker: "04 · Twitch", title: "Twitch", body: "Un live ou une rediffusion en fond." },
+  { scene: "boulevard", kicker: "05 · La file continue", title: "Fin de playlist", body: "Si le minuteur tourne encore, des titres proches prennent le relais." },
 ];
 
 // ─── Page ───────────────────────────────────────────────────────────────────
@@ -503,14 +503,13 @@ export default function LandingPage() {
         <section data-hero data-chapter data-veil="0.12" className="relative min-h-[150vh]">
           <div className="sticky top-0 h-[100svh] flex items-end">
             <div data-hero-copy className="relative w-full px-4 sm:px-8 lg:px-14 pb-20 sm:pb-24">
-              <Label className="text-white/60">Pomodoro · musique · gratuit</Label>
-              <h1 className="mt-5 max-w-[15ch] text-[clamp(2.9rem,8.4vw,8rem)] font-light leading-[0.92] tracking-[-0.045em]">
-                <Neon delay={0.3}>La ville ne dort pas.</Neon>
-                <Lines as="span" immediate delay={1.2} className="block text-white/80">Toi, tu avances.</Lines>
+              <h1 className="max-w-[15ch] text-[clamp(2.9rem,8.4vw,8rem)] font-light leading-[0.92] tracking-[-0.045em]">
+                <Neon delay={0.3}>Pomodoro et musique,</Neon>
+                <Lines as="span" immediate delay={1.2} className="block text-white/80">sur le même écran.</Lines>
               </h1>
               <div className="mt-8 flex flex-col sm:flex-row sm:items-end gap-6 sm:gap-10">
                 <Lines immediate delay={1.5} className="max-w-md text-[15px] sm:text-base leading-relaxed text-white/75">
-                  Un minuteur Pomodoro et ta musique dans le même écran plein cadre, devant une ville la nuit. YouTube, Spotify ou Twitch. Sans publicité, sans abonnement.
+                  YouTube, Spotify ou Twitch derrière ton minuteur. Gratuit, sans pub.
                 </Lines>
                 <div className="flex items-center gap-5">
                   <Cta label="Commencer" onClick={signIn} tone="solid" />
@@ -527,16 +526,16 @@ export default function LandingPage() {
             <div className="lg:col-span-5">
               <Label>La session</Label>
               <Lines as="h2" className="mt-5 text-[clamp(2.2rem,4.6vw,4.2rem)] font-light leading-[0.98] tracking-[-0.035em]">
-                Une vidéo, un minuteur, rien d&apos;autre.
+                Ta vidéo en grand, le minuteur dans un coin.
               </Lines>
               <Lines className="mt-6 max-w-md text-[15px] leading-relaxed text-white/70">
-                Tu choisis un paysage ou une playlist, tu lances. La vidéo prend tout l&apos;écran, le minuteur reste dans un coin. Espace met en pause, D note une distraction, et le reste se cache tant que tu ne bouges pas la souris.
+                Espace pour la pause, D pour noter une distraction. Les boutons se cachent quand tu ne touches plus à rien.
               </Lines>
               <ul className="mt-10 grid grid-cols-2 gap-x-6 gap-y-5 max-w-md">
                 {[
-                  ["25 / 5", "Classique, profond ou sur mesure"],
-                  ["Flowtime", "Le chrono monte, la pause suit"],
-                  ["À venir", "La file, avec retrait et ajout"],
+                  ["25 / 5", "Ou tes propres durées"],
+                  ["Flowtime", "Sans limite de temps"],
+                  ["À venir", "Les prochains titres"],
                   ["Mini-minuteur", "Toujours au premier plan"],
                 ].map(([k, v]) => (
                   <li key={k} className="border-t border-white/15 pt-3">
@@ -557,7 +556,7 @@ export default function LandingPage() {
           <div data-cycle className="h-[100svh] flex flex-col justify-center px-4 sm:px-8 lg:px-14">
             <Label>Le rythme</Label>
             <h2 className="mt-5 max-w-[18ch] text-[clamp(2.2rem,5vw,4.6rem)] font-light leading-[0.98] tracking-[-0.035em]">
-              25 minutes de travail, 5 de pause. La quatrième, on souffle vraiment.
+              25 minutes de travail, 5 de pause. Une pause longue toutes les quatre.
             </h2>
             <div className="mt-12 sm:mt-16" aria-hidden>
               <div className="flex items-baseline justify-between font-mono text-[11px] uppercase tracking-[0.2em]">
@@ -579,7 +578,7 @@ export default function LandingPage() {
               </div>
             </div>
             <p className="mt-10 max-w-xl text-[15px] leading-relaxed text-white/70">
-              Pendant la pause, la vidéo s&apos;efface et la rue prend l&apos;écran, avec un exercice de respiration si tu veux. Tu préfères ne pas couper ? Le mode Flowtime compte sans limite et te donne une pause égale au cinquième du temps passé.
+              En Flowtime, pas de limite : ta pause vaut un cinquième du temps travaillé.
             </p>
           </div>
         </section>
@@ -590,7 +589,7 @@ export default function LandingPage() {
             <div className="mb-8 md:mb-10 flex items-end justify-between gap-8">
               <div>
                 <Label>La musique</Label>
-                <h2 className="mt-5 text-[clamp(2.2rem,4.6vw,4.2rem)] font-light leading-[0.98] tracking-[-0.035em]">Ce qui joue derrière toi.</h2>
+                <h2 className="mt-5 text-[clamp(2.2rem,4.6vw,4.2rem)] font-light leading-[0.98] tracking-[-0.035em]">Ta musique.</h2>
               </div>
               <p className="hidden md:block font-mono text-[11px] tabular-nums tracking-[0.2em] text-white/45" aria-hidden>
                 {lit < 0 ? "05" : String(lit + 1).padStart(2, "0")} / 05
@@ -653,15 +652,15 @@ export default function LandingPage() {
             <div className="lg:col-span-5 lg:order-2">
               <Label>Ta journée</Label>
               <Lines as="h2" className="mt-5 text-[clamp(2.2rem,4.6vw,4.2rem)] font-light leading-[0.98] tracking-[-0.035em]">
-                Ce que tu as fait, sans tableur.
+                Ton suivi.
               </Lines>
               <ul className="mt-10 space-y-6 max-w-md">
                 {[
-                  ["Objectif du jour", "En minutes ou en pomodoros, avec un anneau qui se remplit."],
-                  ["Planning de la semaine", "Des blocs de focus qui arrivent dans ton agenda, rappel dix minutes avant."],
-                  ["Projets et échéances", "Un budget de pomodoros et le rythme à tenir pour finir à temps."],
-                  ["Journal", "Une humeur et deux lignes après chaque session, pour voir ce qui marche."],
-                  ["Le récap du lundi", "Ta semaine en une carte à partager."],
+                  ["Objectif du jour", "En minutes ou en pomodoros."],
+                  ["Planning", "Tes blocs de focus dans ton agenda."],
+                  ["Projets", "Un nombre de pomodoros par projet."],
+                  ["Journal", "Ton humeur après chaque session."],
+                  ["Récap du lundi", "Ta semaine en une image."],
                 ].map(([k, v]) => (
                   <li key={k} className="grid grid-cols-[auto_1fr] gap-4">
                     <span className="mt-[7px] h-1.5 w-1.5 bg-focus" />
@@ -705,10 +704,10 @@ export default function LandingPage() {
             <div className="lg:col-span-6">
               <Label>Les amis</Label>
               <Lines as="h2" className="mt-5 text-[clamp(2.2rem,4.6vw,4.2rem)] font-light leading-[0.98] tracking-[-0.035em]">
-                Seul devant ton écran, pas seul dans la ville.
+                Tes amis.
               </Lines>
               <Lines className="mt-6 max-w-md text-[15px] leading-relaxed text-white/70">
-                Ajoute tes amis avec un code. Tu vois qui est en focus en ce moment et ce qui l&apos;accompagne, le classement de la semaine, et vous pouvez vous écrire ou vous encourager d&apos;un geste. Ils ne voient jamais tes tâches ni ton journal.
+                Ajoute-les avec un code. Tu vois qui travaille, le classement de la semaine, et vous pouvez vous écrire. Tes tâches et ton journal restent privés.
               </Lines>
             </div>
             <div data-friends className="lg:col-span-5 lg:col-start-8">
@@ -745,11 +744,11 @@ export default function LandingPage() {
         <section data-chapter data-veil="0.3" className="relative min-h-[100svh] flex flex-col justify-end px-4 sm:px-8 lg:px-14 pb-24">
           <Label>Gratuit, sans publicité</Label>
           <Lines as="h2" className="mt-5 max-w-[14ch] text-[clamp(2.8rem,8vw,7.5rem)] font-light leading-[0.92] tracking-[-0.045em]">
-            Ce soir, une rue de plus.
+            Lance ta première session.
           </Lines>
           <div className="mt-10 flex flex-wrap items-center gap-6">
             <Cta label="Commencer" onClick={signIn} tone="solid" />
-            <p className="text-[13px] text-white/60">Connexion avec Google : tes réglages te suivent d&apos;un appareil à l&apos;autre.</p>
+            <p className="text-[13px] text-white/60">Connexion avec Google.</p>
           </div>
           <footer className="mt-24 border-t border-white/10 pt-6 grid gap-2 sm:grid-cols-2 text-[11px] text-white/40">
             <p>Photos des rues : {RUE_SCENES.filter((s) => s.href).map((s, i, a) => (

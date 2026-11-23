@@ -208,7 +208,7 @@ export default function SessionPage() {
       if (progress.reached) {
         goalCelebratedRef.current = true;
         playWorkChime();
-        toast({ title: "Objectif du jour atteint", description: "Une vague de lumière traverse la rue.", accent: "emerald" });
+        toast({ title: "Objectif du jour atteint", description: "Bien joué.", accent: "emerald" });
         // Événement de ville : une vague de lumière part de la tour, une fois la halte installée.
         setTimeout(() => city.current?.goal(), 3200);
       }
@@ -463,7 +463,7 @@ export default function SessionPage() {
                 <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-focus">{breakLabel[mode]}</p>
                 <h1 className="mt-2 font-semibold tracking-tight text-[clamp(2.75rem,7vw,5rem)] leading-[0.95]">Pause</h1>
                 <p className="mt-3 text-[15px] text-white/75">
-                  {sessionsCompleted > 0 ? `Pomodoro ${sessionsCompleted} terminé. ` : ""}La rue continue sans toi un moment. Lève les yeux de l&apos;écran.
+                  {sessionsCompleted > 0 ? `Pomodoro ${sessionsCompleted} terminé. ` : ""}Lève les yeux de l&apos;écran.
                 </p>
               </div>
               <div>

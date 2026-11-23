@@ -21,7 +21,7 @@ export default function PresenceProvider() {
     const onCheer = (e: Event) => {
       const id = (e as CustomEvent<{ senderId?: string }>).detail?.senderId;
       const name = useFriendsStore.getState().friends.find((f) => f.userId === id)?.displayName ?? "Un ami";
-      toast({ title: `${name} t'encourage`, description: "Continue, tu n'es pas seul ce soir.", accent: "sky" });
+      toast({ title: `${name} t'encourage`, accent: "sky" });
     };
     window.addEventListener(CHEER_EVENT, onCheer);
     return () => window.removeEventListener(CHEER_EVENT, onCheer);
