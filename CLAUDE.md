@@ -52,7 +52,10 @@ ambiances mixables dans une seule expérience bien maintenue.
   le serveur de dev sature la mémoire). Les tests coupent le splash via `focusflow-splash=off`.
 - **Rue de nuit (`lib/rue/`, `components/RueScene.tsx`) :** photos préparées par `scripts/rue/`
   (profondeur Depth Anything V2 Small, SAM, LaMa : tous Apache 2.0) en 4 plans + masques, servies
-  depuis `public/rue/<id>/` ; manifeste `lib/rue/scenes.ts` (11 rues, crédits). Rendu WebGL2 brut :
+  depuis `public/rue/<id>/` ; manifeste `lib/rue/scenes.ts` (31 scènes, crédits : les 11 rues de nuit d'origine + 20 points de vue
+  ajoutés le 2026-11-23, de jour et de nuit, Vietnam, Indonésie, Japon, États-Unis, Norvège ;
+  **photos de jour** : `day: true` côté manifeste = pas de pluie, `"day": true` dans scene.json =
+  pas d'enseignes ni de fenêtres animées). Rendu WebGL2 brut :
   maillage déplacé, pluie, néons, brume, bloom ; événements `pomodoroDone`/`goal`/`next`,
   `setScroll`/`setPaused`. Utilisée par la landing (en **boucle vidéo pré-rendue**, `RueLoop`), la **pause** de session et le **mode
   Spotify** (jamais sous une vidéo). Banc d'essai : `/lab/rue`.
@@ -750,6 +753,21 @@ Session autonome (l'utilisateur dormait, toutes les décisions prises seul).
    `unsafe-eval` autorisé en dev seulement.
 `tsc` 0 erreur ; lint au niveau baseline (4 erreurs pré-existantes : summary, StatsSection,
 TodoStatusDropdown, callback Twitch) ; build vert ; vitest 33/33 ; e2e 13/13 sur build de prod.
+
+## Journal de session — 2026-11-23 (suite : 20 nouvelles scènes)
+
+- Demande : une vingtaine de photos en plus, points de vue et belles vues (rues, ruelles, paysages),
+  **jamais un plan centré sur une personne ni un bâtiment en gros plan sans vue**.
+- Source : Wikimedia Commons (licences CC0, CC BY, CC BY-SA ; les dérivés des photos CC BY-SA sont
+  sous la même licence, noté dans `docs/redesign/ASSETS.md`). L'API `api.php` est limitée depuis le
+  conteneur : passer par `w/rest.php/v1/search/page` + `w/rest.php/v1/file/…`, télécharger via
+  `Special:FilePath/<nom>?width=…` (si 429, réessayer plus tard ou en 1920). Openverse est bloqué.
+- Traitement : `scripts/rue/` habituel, sources ramenées à 2880 px puis sorties à 2400 px (3 à 6 Mo
+  par scène), effet `dessin` sur les photos de jour, étalonnage néon bas (0,12) sur les nouvelles
+  scènes de nuit (à 0,5 les lumières chaudes viraient au vert). `still.webp` = image rendue par le
+  moteur (lab `?record`).
+- La boucle vidéo de la landing garde ses 11 rues de nuit ; les nouvelles scènes tournent dans l'app
+  (rue du jour en fond, pause de session, mode Spotify) et sur `/lab/rue`.
 
 ## La landing
 
