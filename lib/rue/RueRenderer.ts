@@ -1,5 +1,5 @@
 // Rue de nuit en vraie projection caméra. WebGL2 brut, sans dépendance.
-// Chaque plan (public/lab/rue/layerK.webp) est une grille de sommets
+// Chaque plan (public/rue/layerK.webp) est une grille de sommets
 // poussés à leur profondeur (depth.webp) : vue depuis la position d'origine,
 // la scène redonne exactement la photo ; dès que la caméra avance ou tourne,
 // la perspective est vraie (le proche grossit et glisse plus que le loin).
@@ -7,7 +7,7 @@ import { MESH_FRAG, MESH_VERT, POST, QUAD_VERT } from "./shaders";
 
 export type RueMode = "work" | "break";
 
-/** Une photo préparée (public/lab/rue/<id>/) et ses réglages. */
+/** Une photo préparée (public/rue/<id>/) et ses réglages. */
 export interface RueScene {
   base: string;
   /** Dosage de l'étalonnage néon (0..1). */
@@ -43,6 +43,10 @@ export interface RueRenderer {
   setStyle(v: number): void;
   /** Passe tout de suite à la scène suivante (ou à `index`). */
   nextScene(index?: number): void;
+  /** Avancée de la caméra pilotée de l'extérieur (défilement de la page), 0..1. */
+  setScroll(v: number): void;
+  /** Suspend le rendu (vidéo par-dessus, section hors écran). */
+  setPaused(v: boolean): void;
   dispose(): void;
 }
 
@@ -93,7 +97,6 @@ const view = (p: [number, number, number], yaw: number, pitch: number): M4 => {
 };
 
 export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}): Promise<RueRenderer> {
-  const base = opts.base ?? "/lab/rue";
   const gl = canvas.getContext("webgl2", { antialias: false, alpha: false, powerPreference: "high-performance" });
   if (!gl) throw new Error("WebGL2 indisponible");
 
@@ -165,7 +168,7 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     gl.deleteBuffer(sc.vb); gl.deleteBuffer(sc.ib); gl.deleteVertexArray(sc.vao);
   };
 
-  const specs: RueScene[] = opts.scenes?.length ? opts.scenes : [{ base: opts.base ?? "/lab/rue", style: 1, frameY: opts.frameY }];
+  const specs: RueScene[] = opts.scenes?.length ? opts.scenes : [{ base: opts.base ?? "/rue", style: 1, frameY: opts.frameY }];
   let curIndex = 0;
   let cur = await loadScene(specs[0]);
   let pending: Loaded | null = null;
@@ -230,8 +233,9 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
   const Z_NEAR = 1.0, Z_FAR = 9.0;
 
   const reduce = !!opts.reducedMotion;
-  const state = { night: 0, brk: 0, rain: 0.55, px: 0, py: 0 };
-  const target = { night: 0, brk: 0, rain: 0.55, px: 0, py: 0 };
+  const state = { night: 0, brk: 0, rain: 0.55, px: 0, py: 0, scroll: 0 };
+  const target = { night: 0, brk: 0, rain: 0.55, px: 0, py: 0, scroll: 0 };
+  let paused = false;
   let event: [number, number] = [0, -100];
   let style = specs[0].style ?? 1;
   // Relais des scènes : `fade` = lumière de la rue (0 = éteinte), `phase` =
@@ -270,6 +274,7 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     state.rain += (target.rain - state.rain) * k(0.5);
     state.px += (target.px - state.px) * k(1.6);
     state.py += (target.py - state.py) * k(1.6);
+    state.scroll += (target.scroll - state.scroll) * k(3);
     resize();
 
     // Relais : à l'heure dite (et si la suivante est prête), la rue s'éteint
@@ -299,10 +304,12 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     // dérive de côté, on tourne et bascule à peine ; le pointeur incline le
     // regard. Amplitudes bornées par la bande reconstituée derrière les plans.
     const m = reduce ? 0 : 1;
-    const dolly = (0.5 - 0.5 * Math.cos(t * 0.105)) * 0.11 * m;
+    // Le défilement pousse la caméra dans la rue (en plus de la respiration
+    // lente) et la fait légèrement monter : c'est la parallaxe de la landing.
+    const dolly = ((0.5 - 0.5 * Math.cos(t * 0.105)) * 0.11 * (1 - 0.5 * state.scroll) + state.scroll * 0.12) * m;
     const pos: [number, number, number] = [
       (Math.sin(t * 0.07) * 0.05 + state.px * 0.035) * m,
-      (Math.sin(t * 0.053 + 1.1) * 0.018 - state.py * 0.018) * m,
+      (Math.sin(t * 0.053 + 1.1) * 0.018 - state.py * 0.018 + state.scroll * 0.02) * m,
       -dolly,
     ];
     const yaw = (Math.sin(t * 0.061 + 0.4) * 0.014 - state.px * 0.022) * m;
@@ -379,7 +386,7 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
 
   const loop = (now: number) => {
     if (disposed) return;
-    if (visible && !document.hidden) draw(now);
+    if (visible && !paused && !document.hidden) draw(now);
     raf = requestAnimationFrame(loop);
   };
   const redraw = () => { if (reduce) { last = clock() - 5000; for (let i = 0; i < 40; i++) draw(clock()); } };
@@ -393,6 +400,8 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     pomodoroDone() { event = [1, (clock() - start) / 1000]; },
     goal() { event = [2, (clock() - start) / 1000]; },
     pointer(x, y) { target.px = x; target.py = y; },
+    setScroll(v) { target.scroll = Math.min(1, Math.max(0, v)); },
+    setPaused(v) { paused = v; },
     step(dt) { virtual += dt * 1000; draw(virtual); },
     setStyle(v) { style = Math.min(1, Math.max(0, v)); redraw(); },
     nextScene(index) {

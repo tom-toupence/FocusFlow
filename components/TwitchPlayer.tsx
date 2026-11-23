@@ -1,11 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-
-interface TwitchEmbedPlayer {
-  setQuality: (quality: string) => void;
-  setVolume: (volume: number) => void;
-}
+import type { PlayerAdapter } from "@/lib/playback/types";
+import { TwitchAdapter, type TwitchEmbedPlayer } from "@/lib/playback/twitch";
 
 interface TwitchEmbedInstance {
   destroy: () => void;
@@ -41,13 +38,17 @@ interface Props {
   vodId?: string;
   token?: string;
   volume?: number; // 0–1
+  /** Reçoit l'adaptateur de lecture (interface unique de la session). */
+  onAdapter?: (a: PlayerAdapter | null) => void;
 }
 
-export default function TwitchPlayer({ channel, vodId, token, volume = 0.8 }: Props) {
+export default function TwitchPlayer({ channel, vodId, token, volume = 0.8, onAdapter }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const embedRef = useRef<TwitchEmbedInstance | null>(null);
   const volumeRef = useRef(volume);
   useEffect(() => { volumeRef.current = volume; }, [volume]);
+  const onAdapterRef = useRef(onAdapter);
+  useEffect(() => { onAdapterRef.current = onAdapter; }, [onAdapter]);
 
   useEffect(() => {
     const initEmbed = () => {
@@ -81,6 +82,13 @@ export default function TwitchPlayer({ channel, vodId, token, volume = 0.8 }: Pr
       if (token) options.oauth_token = token;
 
       const embed = new window.Twitch.Embed("twitch-embed-container", options);
+      const adapter = new TwitchAdapter(
+        () => (embedRef.current === embed ? embed.getPlayer() : null),
+        vodId
+          ? { id: `vod:${vodId}`, title: `Rediffusion ${vodId}`, subtitle: "Twitch", vod: true }
+          : { id: `live:${channel}`, title: channel ?? "Twitch", subtitle: "Live Twitch", vod: false },
+      );
+      onAdapterRef.current?.(adapter);
 
       embed.addEventListener(window.Twitch.Embed.VIDEO_READY, () => {
         try {
@@ -90,6 +98,7 @@ export default function TwitchPlayer({ channel, vodId, token, volume = 0.8 }: Pr
           try { embed.getPlayer().setQuality("720p"); } catch { /* ignore */ }
         }
         try { embed.getPlayer().setVolume(volumeRef.current); } catch { /* ignore */ }
+        adapter.markReady();
       });
 
       embedRef.current = embed;
@@ -118,8 +127,9 @@ export default function TwitchPlayer({ channel, vodId, token, volume = 0.8 }: Pr
     return () => {
       embedRef.current?.destroy();
       embedRef.current = null;
+      onAdapterRef.current?.(null);
     };
-  }, [channel, vodId, token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [channel, vodId, token]);
 
   useEffect(() => {
     if (!embedRef.current) return;

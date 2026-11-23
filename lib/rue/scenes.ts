@@ -1,4 +1,21 @@
-[
+// Les rues de nuit préparées par scripts/rue/ (public/rue/<id>/).
+// Source unique : landing, fond de l'app, session et /lab/rue s'en servent.
+// Les crédits des photos sous licence CC BY sont affichés là où elles le sont.
+
+export interface RueSceneInfo {
+  id: string;
+  label: string;
+  /** Crédit à afficher (licence de la photo). */
+  credit: string;
+  /** Page de la photo d'origine ; vide pour les photos personnelles. */
+  href: string;
+  /** Dosage de l'étalonnage néon (0..1). */
+  style: number;
+  /** Décentrement vertical du cadre (1 = garder le bas, le sol). */
+  frameY: number;
+}
+
+export const RUE_SCENES: RueSceneInfo[] = [
   {
     "id": "pont",
     "label": "Pont sous la pluie",
@@ -87,4 +104,7 @@
     "credit": "Photo personnelle",
     "href": ""
   }
-]
+];
+
+export const rueBase = (id: string) => `/rue/${id}`;
+export const rueStill = (id: string) => `/rue/${id}/still.webp`;

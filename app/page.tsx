@@ -27,10 +27,11 @@ import { useNavStore, MediaSource } from "@/store/navStore";
 import { useCommandPalette } from "@/components/CommandPalette";
 import Onboarding from "@/components/Onboarding";
 import PlaylistTracksModal from "@/components/PlaylistTracksModal";
+import SpotifyRelatedModal from "@/components/SpotifyRelatedModal";
 import DiscoverPanel from "@/components/DiscoverPanel";
 import LocalPlaylistModal from "@/components/LocalPlaylistModal";
 import { useLocalPlaylistStore, LocalPlaylist } from "@/store/localPlaylistStore";
-import { playLocalPlaylist } from "@/lib/playback";
+import { playLocalPlaylist } from "@/lib/playback/local";
 import { useProfileStore, resolvedProfile } from "@/store/profileStore";
 import SubTabs from "@/components/SubTabs";
 import CreateMenu from "@/components/CreateMenu";
@@ -745,10 +746,12 @@ function SpotifyPlaylistCard({
   playlist,
   selected,
   onStart,
+  onRelated,
 }: {
   playlist: SpotifyPlaylist;
   selected: boolean;
   onStart: () => void;
+  onRelated: () => void;
 }) {
   const [imgError, setImgError] = useState(false);
 
@@ -790,10 +793,22 @@ function SpotifyPlaylistCard({
           <p className="text-white/50 text-[10px] mt-0.5">{playlist.trackCount} titres</p>
         )}
       </div>
-      <div className="absolute top-2 right-2">
+      <div className="absolute top-2 right-2 flex items-center gap-1">
         <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-[#1db954]/20 text-[#1db954]">
           Spotify
         </span>
+        {/* Bouton d'angle dédié (comme « Voir les titres ») : un clic ici ne
+            lance pas la session. */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onRelated(); }}
+          aria-label={`Titres proches de ${playlist.name}`}
+          title="Titres proches"
+          className="w-6 h-6 rounded-md bg-black/60 text-white/80 hover:text-white flex items-center justify-center"
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+            <path d="M4 6h11M4 12h11M4 18h7M18 15v6M15 18h6" strokeLinecap="round" />
+          </svg>
+        </button>
       </div>
       {selected && <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-[#1db954] shadow" />}
     </div>
@@ -947,6 +962,7 @@ export default function LandingPage() {
   const [showAddPlaylistModal, setShowAddPlaylistModal] = useState(false);
   // Playlist dont on visualise les titres (modal « Voir les titres »).
   const [tracksPlaylist, setTracksPlaylist] = useState<SavedPlaylist | null>(null);
+  const [relatedSpotify, setRelatedSpotify] = useState<{ uri: string; name: string } | null>(null);
   // Playlist locale ouverte (modal dédié) + mini-modal de création.
   const [openLocalPlaylistId, setOpenLocalPlaylistId] = useState<string | null>(null);
   const [showNewLocalPlaylistModal, setShowNewLocalPlaylistModal] = useState(false);
@@ -1497,6 +1513,7 @@ export default function LandingPage() {
                     playlist={pl}
                     selected={selectedPlaylistUri === pl.uri}
                     onStart={() => handleStartSpotify(pl.uri)}
+                    onRelated={() => setRelatedSpotify({ uri: pl.uri, name: pl.name })}
                   />
                 ))}
               </div>
@@ -1766,6 +1783,7 @@ export default function LandingPage() {
       {tracksPlaylist && (
         <PlaylistTracksModal playlist={tracksPlaylist} onClose={() => setTracksPlaylist(null)} />
       )}
+      {relatedSpotify && <SpotifyRelatedModal playlist={relatedSpotify} onClose={() => setRelatedSpotify(null)} />}
 
       {showAddPlaylistModal && (
         <AddPlaylistModal

@@ -3,8 +3,9 @@
 // photos libres de droits qui se relaient toutes les 15 à 20 secondes.
 import { useEffect, useRef, useState } from "react";
 import { createRue, supportsRue, type RueRenderer } from "@/lib/rue/RueRenderer";
+import { RUE_SCENES, type RueSceneInfo } from "@/lib/rue/scenes";
 
-interface SceneInfo { id: string; label: string; credit: string; href: string; style: number; frameY: number }
+type SceneInfo = RueSceneInfo;
 
 export default function RueLab() {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -19,16 +20,15 @@ export default function RueLab() {
 
   // Le manifeste des scènes (produit avec scripts/rue/).
   useEffect(() => {
-    fetch("/lab/rue/scenes.json").then((res) => res.json()).then((all: SceneInfo[]) => {
-      let list = all;
-      // ?scene=<id> : commencer par cette scène.
-      const params = new URLSearchParams(window.location.search);
-      // ?only=a,b,c : seulement ces scènes (aperçu d'un lot de photos).
-      const only = params.get("only")?.split(",").filter(Boolean);
-      if (only?.length) list = list.filter((s) => only.includes(s.id));
-      const at = Math.max(0, list.findIndex((s) => s.id === params.get("scene")));
-      setScenes([...list.slice(at), ...list.slice(0, at)]);
-    }).catch(() => setFallback(true));
+    let list = RUE_SCENES;
+    // ?scene=<id> : commencer par cette scène.
+    const params = new URLSearchParams(window.location.search);
+    // ?only=a,b,c : seulement ces scènes (aperçu d'un lot de photos).
+    const only = params.get("only")?.split(",").filter(Boolean);
+    if (only?.length) list = list.filter((s) => only.includes(s.id));
+    const at = Math.max(0, list.findIndex((s) => s.id === params.get("scene")));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setScenes([...list.slice(at), ...list.slice(0, at)]);
   }, []);
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export default function RueLab() {
     const every = Number(params.get("every")) || 0;           // durée imposée (captures)
     let disposed = false;
     createRue(canvas.current, {
-      scenes: scenes.map((s) => ({ base: `/lab/rue/${s.id}`, style: s.style, frameY: s.frameY })),
+      scenes: scenes.map((s) => ({ base: `/rue/${s.id}`, style: s.style, frameY: s.frameY })),
       interval: every ? [every, every] : [15, 20],
       onScene: (i) => { setCurrent(i); setStyle(null); },
       reducedMotion: reduce,
@@ -73,7 +73,7 @@ export default function RueLab() {
     <main className="fixed inset-0 bg-black text-white">
       {fallback ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={`/lab/rue/${scene?.id ?? "pont"}/still.webp`} alt="Rue de nuit sous la pluie, enseignes lumineuses" className="absolute inset-0 w-full h-full object-cover" />
+        <img src={`/rue/${scene?.id ?? "pont"}/still.webp`} alt="Rue de nuit sous la pluie, enseignes lumineuses" className="absolute inset-0 w-full h-full object-cover" />
       ) : (
         <canvas ref={canvas} className="absolute inset-0 w-full h-full block" aria-label="Rue de nuit sous la pluie, enseignes lumineuses" role="img" />
       )}

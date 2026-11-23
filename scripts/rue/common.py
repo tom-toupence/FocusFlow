@@ -1,7 +1,7 @@
 """Outils communs de la préparation 2.5D (photo de rue).
 
 Usage : les modèles ONNX sont téléchargés une fois dans RUE_MODELS
-(voir README.md), les sorties vont dans public/lab/rue/.
+(voir README.md), les sorties vont dans public/rue/.
 """
 import os
 from pathlib import Path
@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SCENE = os.environ.get("RUE_SCENE", "kabukicho")
 SCENE_DIR = ROOT / "scripts" / "rue" / "scenes" / SCENE
 SRC = SCENE_DIR / "source.jpg"
-OUT = ROOT / "public" / "lab" / "rue" / SCENE
+OUT = ROOT / "public" / "rue" / SCENE
 WORK = Path(os.environ.get("RUE_WORK", "/tmp/rue-work")) / SCENE
 MODELS = Path(os.environ.get("RUE_MODELS", "/tmp/rue-models"))
 OUT.mkdir(parents=True, exist_ok=True)

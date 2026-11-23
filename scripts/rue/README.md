@@ -2,7 +2,7 @@
 
 Une vraie photo devient une scène en profondeur (projection caméra, comme en
 motion design). Les scripts s'exécutent une fois ; leurs résultats sont
-commités dans `public/lab/rue/`. Licences : `docs/redesign/ASSETS.md`.
+commités dans `public/rue/`. Licences : `docs/redesign/ASSETS.md`.
 
 ```bash
 pip install numpy opencv-python onnxruntime   # déjà présents dans l'environnement cloud
@@ -27,14 +27,14 @@ python3 01_depth.py && python3 02_segment.py && python3 03_layers.py && python3 
 
 Une scène = un dossier `scenes/<nom>/` : `source.jpg`, `objects.json` (points
 SAM par objet) et `scene.json` (seuils des plans, polygone du sol). Lancer les
-cinq étapes avec `RUE_SCENE=<nom>` ; sorties dans `public/lab/rue/<nom>/`.
+cinq étapes avec `RUE_SCENE=<nom>` ; sorties dans `public/rue/<nom>/`.
 Chaque objet segmenté « plat » reçoit une profondeur unique (sa médiane) : un
 carton découpé à sa distance, dont le bord reste net quand la caméra bouge. Un
 masque trop grand ou couvrant trop de profondeurs (le sol entier) est ignoré.
 
 Ajouter une scène : `scenes/<nom>/source.jpg` (+ `info.json` : auteur, licence,
 lien), puis `01_depth`, `00_auto`, `02` à `05`, et une entrée dans
-`public/lab/rue/scenes.json`.
+`public/rue/scenes.json`.
 
 Rendu (`lib/rue/`) : chaque plan est une grille de sommets poussés à leur
 profondeur (z = 1 / mix(1/9, 1, d)) et vue par une caméra en perspective qui
