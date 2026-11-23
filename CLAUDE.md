@@ -52,7 +52,7 @@ ambiances mixables dans une seule expérience bien maintenue.
   le serveur de dev sature la mémoire). Les tests coupent le splash via `focusflow-splash=off`.
 - **Rue de nuit (`lib/rue/`, `components/RueScene.tsx`) :** photos préparées par `scripts/rue/`
   (profondeur Depth Anything V2 Small, SAM, LaMa : tous Apache 2.0) en 4 plans + masques, servies
-  depuis `public/rue/<id>/` ; manifeste `lib/rue/scenes.ts` (31 scènes, crédits : les 11 rues de nuit d'origine + 20 points de vue
+  depuis `public/rue/<id>/` ; manifeste `lib/rue/scenes.ts` (34 scènes, crédits : les 11 rues de nuit d'origine + 23 points de vue
   ajoutés le 2026-11-23, de jour et de nuit, Vietnam, Indonésie, Japon, États-Unis, Norvège ;
   **photos de jour** : `day: true` côté manifeste = pas de pluie, `"day": true` dans scene.json =
   pas d'enseignes ni de fenêtres animées). Rendu WebGL2 brut :
@@ -754,7 +754,7 @@ Session autonome (l'utilisateur dormait, toutes les décisions prises seul).
 `tsc` 0 erreur ; lint au niveau baseline (4 erreurs pré-existantes : summary, StatsSection,
 TodoStatusDropdown, callback Twitch) ; build vert ; vitest 33/33 ; e2e 13/13 sur build de prod.
 
-## Journal de session — 2026-11-23 (suite : 20 nouvelles scènes)
+## Journal de session — 2026-11-23 (suite : 23 nouvelles scènes)
 
 - Demande : une vingtaine de photos en plus, points de vue et belles vues (rues, ruelles, paysages),
   **jamais un plan centré sur une personne ni un bâtiment en gros plan sans vue**.

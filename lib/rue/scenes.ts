@@ -107,54 +107,10 @@ export const RUE_SCENES: RueSceneInfo[] = [
     "href": ""
   },
   {
-    "id": "hanoi-rail",
-    "label": "Rue du train, Hanoï",
-    "credit": "Photo : lumoplank, CC0 (modifiée : profondeur, plans, effets)",
-    "href": "https://commons.wikimedia.org/wiki/File%3AHanoi1617.jpg",
-    "style": 0.12,
-    "frameY": 0.3
-  },
-  {
-    "id": "hanoi-arbres",
-    "label": "Vieux quartier de Hanoï",
-    "credit": "Photo : Alexkom000, CC BY 4.0 (modifiée : profondeur, plans, effets)",
-    "href": "https://commons.wikimedia.org/wiki/File%3A2024-11-03_Hanoi%27s_Old_Quarter_5.jpg",
-    "style": 0.0,
-    "frameY": 0.3,
-    "day": true
-  },
-  {
     "id": "ubud-maisons",
     "label": "Rizières d'Ubud",
     "credit": "Photo : Jakub Hałun, CC BY-SA 4.0 (modifiée : profondeur, plans, effets)",
     "href": "https://commons.wikimedia.org/wiki/File%3APaddy_fields_and_houses_in_Ubud%2C_Bali%2C_Indonesia%2C_20220822_1453_0152.jpg",
-    "style": 0.0,
-    "frameY": 0.3,
-    "day": true
-  },
-  {
-    "id": "ubud",
-    "label": "Champs d'Ubud",
-    "credit": "Photo : Jakub Hałun, CC BY-SA 4.0 (modifiée : profondeur, plans, effets)",
-    "href": "https://commons.wikimedia.org/wiki/File%3AFields_in_Ubud%2C_Bali%2C_Indonesia%2C_20220822_1401_0133.jpg",
-    "style": 0.0,
-    "frameY": 0.3,
-    "day": true
-  },
-  {
-    "id": "gion-ruelle",
-    "label": "Ruelle de Gion",
-    "credit": "Photo : Basile Morin, CC BY-SA 4.0 (modifiée : profondeur, plans, effets)",
-    "href": "https://commons.wikimedia.org/wiki/File%3AWooden_and_bamboo_facades_of_dwellings_with_sudare_in_a_cobbled_street_of_Gion%2C_perspective_effect_with_vanishing_point%2C_Kyoto%2C_Japan.jpg",
-    "style": 0.0,
-    "frameY": 0.3,
-    "day": true
-  },
-  {
-    "id": "gion-pavee",
-    "label": "Rue pavée de Gion",
-    "credit": "Photo : Josep M. Gracia, CC BY-SA 4.0 (modifiée : profondeur, plans, effets)",
-    "href": "https://commons.wikimedia.org/wiki/File%3AGIO_-_Traditional_wooden_houses_along_a_stone-paved_street_in_Gion%2C_Kyoto%2C_Japan%2C_2015.jpg",
     "style": 0.0,
     "frameY": 0.3,
     "day": true
@@ -209,15 +165,6 @@ export const RUE_SCENES: RueSceneInfo[] = [
     "href": "https://commons.wikimedia.org/wiki/File%3ALower_Manhattan_from_Jersey_City_September_2020_panorama.jpg",
     "style": 0.12,
     "frameY": 0.3
-  },
-  {
-    "id": "chicago",
-    "label": "Chicago depuis 18th Street",
-    "credit": "Photo : DimiTalen, CC0 (modifiée : profondeur, plans, effets)",
-    "href": "https://commons.wikimedia.org/wiki/File%3AView_of_the_Metra_Electric_District_rail_yard_and_downtown_Chicago_from_the_18th_Street_station_pedestrian_bridge%2C_Chicago%2C_2025.jpg",
-    "style": 0.0,
-    "frameY": 0.3,
-    "day": true
   },
   {
     "id": "seattle",
@@ -275,6 +222,86 @@ export const RUE_SCENES: RueSceneInfo[] = [
     "label": "Fjord de Geiranger",
     "credit": "Photo : Ximonic (Simo Räsänen), CC BY-SA 3.0 (modifiée : profondeur, plans, effets)",
     "href": "https://commons.wikimedia.org/wiki/File%3AGeirangerfjord_from_%C3%98rnesvingen%2C_2013_June.jpg",
+    "style": 0.0,
+    "frameY": 0.3,
+    "day": true
+  },
+  {
+    "id": "sapa",
+    "label": "Rizières de Sapa",
+    "credit": "Photo : David McKelvey, CC BY 2.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File%3ASapa_view_3.jpg",
+    "style": 0.0,
+    "frameY": 0.3,
+    "day": true
+  },
+  {
+    "id": "sapa-vallee",
+    "label": "Vallée de Sapa",
+    "credit": "Photo : Phi Phi Hoang, CC BY 2.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File%3ARay_over_terrace_rice_field_in_Sapa_-_Trung_Ch%E1%BA%A3i..jpg",
+    "style": 0.0,
+    "frameY": 0.3,
+    "day": true
+  },
+  {
+    "id": "tegallalang",
+    "label": "Rizières en terrasses, Bali",
+    "credit": "Photo : Vyacheslav Argenberg, CC BY 4.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File%3ARice_terraces%2C_Ubud%2C_Bali.jpg",
+    "style": 0.0,
+    "frameY": 0.3,
+    "day": true
+  },
+  {
+    "id": "batad",
+    "label": "Terrasses de Batad, Philippines",
+    "credit": "Photo : CEphoto, Uwe Aranas, CC BY-SA 4.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File%3ABanaue_Philippines_Batad-Rice-Terraces-02.jpg",
+    "style": 0.0,
+    "frameY": 0.3,
+    "day": true
+  },
+  {
+    "id": "banaue",
+    "label": "Montagnes de Banaue, Philippines",
+    "credit": "Photo : Maezeltugas24, CC BY-SA 4.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File%3ABanaue_Rice_Terraces_2019.jpg",
+    "style": 0.0,
+    "frameY": 0.3,
+    "day": true
+  },
+  {
+    "id": "hoian",
+    "label": "Hoi An sous la pluie",
+    "credit": "Photo : lumoplank, CC0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File%3AHoi_An_-_HoiAn1457.jpg",
+    "style": 0.0,
+    "frameY": 0.3,
+    "day": true
+  },
+  {
+    "id": "hoian-nuit",
+    "label": "Hoi An la nuit",
+    "credit": "Photo : Alexkom000, CC BY 4.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File%3A2024-12-20_Hoi_An_Old_Town_at_night_4.jpg",
+    "style": 0.12,
+    "frameY": 0.3
+  },
+  {
+    "id": "kanazawa",
+    "label": "Higashi Chaya, Kanazawa",
+    "credit": "Photo : Andrea Schaffer, CC BY 2.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File%3AHigashi_Chaya_district%2C_Kanazawa_%283810720612%29.jpg",
+    "style": 0.0,
+    "frameY": 0.3,
+    "day": true
+  },
+  {
+    "id": "ninenzaka",
+    "label": "Ninenzaka et la pagode Yasaka, Kyoto",
+    "credit": "Photo : Domenico Convertini, CC BY-SA 2.0 (modifiée : profondeur, plans, effets)",
+    "href": "https://commons.wikimedia.org/wiki/File%3AGion_-_Nineizaka_%28Ninenzaka%29%2C_Kyoto%2C_Japan_%2848923271673%29.jpg",
     "style": 0.0,
     "frameY": 0.3,
     "day": true

@@ -7,15 +7,16 @@
 #      node scripts/rue/loop_record.cjs $W/<scène> <scène> 7.5 1920 1080
 # 3. Assembler : bash scripts/rue/loop.sh $W
 #
-# Chaque rue dure 6 s dans la boucle, fondu de 1,5 s compris. La boucle
+# Chaque rue dure SEG s dans la boucle (6 par défaut), fondu FADE compris. La boucle
 # commence 1,5 s dans la première rue et se termine par un fondu vers le
 # début de cette même rue : le raccord de la boucle est invisible.
 # L'ordre doit rester celui de RUE_LOOP_ORDER (components/RueLoop.tsx).
 set -euo pipefail
 W=${1:?dossier des captures}
 OUT=${2:-public/rue/loop}
-ORDER=(kabukicho pont avenue pavillon ruelle boulevard fleuve carrefour ecrans viaduc tours)
-FADE=1.5; SEG=6; FPS=24
+# Ordre, durée par rue et fondu : surchargeables (ORDER="a b c" SEG=5 FADE=1.2).
+read -r -a ORDER <<< "${ORDER:-kabukicho pont avenue pavillon ruelle boulevard fleuve carrefour ecrans viaduc tours}"
+FADE=${FADE:-1.5}; SEG=${SEG:-6}; FPS=24
 mkdir -p "$OUT"
 
 inputs=(); filter=""
