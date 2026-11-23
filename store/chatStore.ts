@@ -8,11 +8,9 @@ import {
   fetchUnreadCounts, subscribeMessages,
   CHEER_BODY, CHEER_COOLDOWN_MS, isCheer,
 } from "@/lib/friends";
-import { useFriendsStore } from "@/store/friendsStore";
-import { toast } from "@/components/Toast";
-
-/** Événement de fenêtre émis à la réception d'un encouragement (la session
- *  l'écoute pour allumer la rue). */
+/** Événement de fenêtre émis à la réception d'un encouragement, avec
+ *  `detail.senderId`. PresenceProvider en fait un toast, la session allume la
+ *  rue. Le store n'importe aucun composant. */
 export const CHEER_EVENT = "focusflow:cheer";
 
 // Chat direct entre amis (ONLINE-ONLY, non persisté). Une conversation ouverte à
@@ -125,11 +123,9 @@ export async function initChat(): Promise<void> {
       // Reçu dans la conversation ouverte → marque lu immédiatement.
       if (m.senderId !== me && isOpen) markConversationRead(friendId);
 
-      // Encouragement reçu : un mot, et la rue de la session s'illumine.
-      if (m.senderId !== me && isCheer(m)) {
-        const name = useFriendsStore.getState().friends.find((f) => f.userId === m.senderId)?.displayName ?? "Un ami";
-        toast({ title: `${name} t'encourage`, description: "Continue, tu n'es pas seul ce soir.", accent: "sky" });
-        if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(CHEER_EVENT, { detail: { from: name } }));
+      // Encouragement reçu : signalé à l'interface (toast, lumière dans la rue).
+      if (m.senderId !== me && isCheer(m) && typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent(CHEER_EVENT, { detail: { senderId: m.senderId } }));
       }
     });
   }

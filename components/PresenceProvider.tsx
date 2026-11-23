@@ -4,6 +4,9 @@ import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useProfileStore } from "@/store/profileStore";
 import { upsertMyFriendStats } from "@/lib/friends";
+import { CHEER_EVENT } from "@/store/chatStore";
+import { useFriendsStore } from "@/store/friendsStore";
+import { toast } from "@/components/Toast";
 
 // Présence « en ligne » globale : tant que l'app est ouverte (n'importe quelle
 // page) et qu'on est connecté, on publie un heartbeat online toutes les ~45 s.
@@ -13,6 +16,17 @@ import { upsertMyFriendStats } from "@/lib/friends";
 const ONLINE_BEAT_MS = 45_000;
 
 export default function PresenceProvider() {
+  // Encouragement d'un ami : un mot, où que l'on soit dans l'app.
+  useEffect(() => {
+    const onCheer = (e: Event) => {
+      const id = (e as CustomEvent<{ senderId?: string }>).detail?.senderId;
+      const name = useFriendsStore.getState().friends.find((f) => f.userId === id)?.displayName ?? "Un ami";
+      toast({ title: `${name} t'encourage`, description: "Continue, tu n'es pas seul ce soir.", accent: "sky" });
+    };
+    window.addEventListener(CHEER_EVENT, onCheer);
+    return () => window.removeEventListener(CHEER_EVENT, onCheer);
+  }, []);
+
   const email = useProfileStore((s) => s.googleEmail);
 
   useEffect(() => {

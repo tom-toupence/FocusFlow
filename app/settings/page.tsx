@@ -647,8 +647,8 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Custom settings */}
-          <div className={cn("transition-all duration-300", preset !== "custom" && "opacity-60")}>
+          {/* Custom settings (sans objet en Flowtime : chrono libre) */}
+          <div className={cn("transition-all duration-300", preset !== "custom" && "opacity-60", preset === "flowtime" && "hidden")}>
             <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-3">Durées</p>
             <div className="rounded-xl border border-foreground/[0.08] bg-foreground/[0.02] px-4">
               <NumberInput locked={preset !== "custom"} label="Durée de focus" value={work} min={5} max={120} onChange={setWork} />

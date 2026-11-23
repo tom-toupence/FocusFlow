@@ -55,6 +55,8 @@ const RueScene = forwardRef<RueHandle, Props>(function RueScene(
   const nightRef = useRef(night);
   useEffect(() => { modeRef.current = mode; nightRef.current = night; }, [mode, night]);
   const scrollRef = useRef(0);
+  const pausedRef = useRef(paused);
+  useEffect(() => { pausedRef.current = paused; }, [paused]);
   const fallbackRef = useRef(false);
   const currentRef = useRef(0);
   useEffect(() => { fallbackRef.current = fallback; }, [fallback]);
@@ -103,9 +105,15 @@ const RueScene = forwardRef<RueHandle, Props>(function RueScene(
         x.setMode(modeRef.current);
         x.setNight(nightRef.current);
         x.setScroll(scrollRef.current);
+        x.setPaused(pausedRef.current);
         onSceneRef.current?.(chosen[0]);
       })
-      .catch((e) => { console.warn("[rue] repli image fixe :", e); setFallback(true); });
+      .catch((e) => {
+        console.warn("[rue] repli image fixe :", e);
+        // Libère le contexte WebGL ouvert avant l'échec (le canvas est retiré).
+        canvas.current?.getContext("webgl2")?.getExtension("WEBGL_lose_context")?.loseContext();
+        setFallback(true);
+      });
     return () => { disposed = true; r.current?.dispose(); r.current = null; };
     // L'intervalle est lu à la création seulement.
     // eslint-disable-next-line react-hooks/exhaustive-deps

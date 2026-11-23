@@ -85,6 +85,9 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
   private queue: TrackQueue | null = null;
   private titles: Record<string, string> = {};
   private fetchingMore = false;
+  /** Erreurs de lecture d'affilée (titres indisponibles) : au-delà de la taille
+   *  de la file, on s'arrête au lieu de boucler sans fin. */
+  private errorStreak = 0;
   private wantPlay: boolean;
   private volume: number;
   private destroyed = false;
@@ -203,10 +206,21 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
         playerVars: vars,
         events: {
           onReady: (e: { target: YTPlayer }) => this.onReady(e.target),
-          onStateChange: (e: { data: number }) => { if (e.data === 0) this.onEnded(); },
+          onStateChange: (e: { data: number }) => {
+            if (e.data === 1) this.errorStreak = 0; // un titre joue : la série d'erreurs est rompue
+            if (e.data === 0) this.onEnded();
+          },
           // Vidéo supprimée, privée ou non embarquable (100, 101, 150) : pas de
-          // ENDED, la file resterait bloquée ; on passe au titre suivant.
-          onError: () => this.onEnded(),
+          // ENDED, la file resterait bloquée ; on passe au titre suivant, sauf si
+          // toute la file a échoué d'affilée (sinon boucle infinie en mode boucle).
+          onError: () => {
+            this.errorStreak++;
+            if (this.errorStreak > Math.max(3, this.queue?.order.length ?? 0)) {
+              this.set({ error: "Aucun titre de la file n'est lisible ici." });
+              return;
+            }
+            this.onEnded();
+          },
         },
       });
     }
@@ -232,27 +246,32 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     const q = this.queue!;
     this.fetchingMore = true;
     this.set({ extending: true });
-    // Au plus 10 s : une requête qui pend ne doit pas geler la file (les fins
-    // de titre et « suivant » sont ignorés pendant une prolongation).
-    const res = await Promise.race([
-      continuePlaylist(q.order, q.current, this.opts.recommend ?? defaultRecommend, { exclude: q.excluded }),
-      new Promise<{ kind: "loop" }>((r) => { this.raceTimer = setTimeout(() => r({ kind: "loop" }), 10_000); }),
-    ]);
-    if (this.raceTimer) { clearTimeout(this.raceTimer); this.raceTimer = null; }
-    this.fetchingMore = false;
-    if (this.destroyed) return;
-    if (res.kind === "extend") {
-      const added = q.append(res.tracks.map((t) => t.id));
-      for (const t of res.tracks) this.titles[t.id] = t.title;
-      for (const id of added) this.suggested.add(id);
-      this.opts.onExtended?.({ added: added.length, titles: Object.fromEntries(res.tracks.map((t) => [t.id, t.title])) });
-      const n = q.next(false);
-      if (n.kind === "track") { this.set({ extending: false }); this.load(n.id); return; }
+    try {
+      // Au plus 10 s : une requête qui pend ne doit pas geler la file (les fins
+      // de titre et « suivant » sont ignorés pendant une prolongation).
+      const res = await Promise.race([
+        continuePlaylist(q.order, q.current, this.opts.recommend ?? defaultRecommend, { exclude: q.excluded }),
+        new Promise<{ kind: "loop" }>((r) => { this.raceTimer = setTimeout(() => r({ kind: "loop" }), 10_000); }),
+      ]);
+      if (this.raceTimer) { clearTimeout(this.raceTimer); this.raceTimer = null; }
+      this.fetchingMore = false;
+      if (this.destroyed) return;
+      if (res.kind === "extend") {
+        const added = q.append(res.tracks.map((t) => t.id));
+        for (const t of res.tracks) this.titles[t.id] = t.title;
+        for (const id of added) this.suggested.add(id);
+        this.opts.onExtended?.({ added: added.length, titles: Object.fromEntries(res.tracks.map((t) => [t.id, t.title])) });
+        const n = q.next(false);
+        if (n.kind === "track") { this.set({ extending: false }); this.load(n.id); return; }
+      }
+      // Rien de neuf (réseau, doublons) : on reboucle plutôt que de s'arrêter.
+      const n = q.next(true);
+      this.set({ extending: false });
+      if (n.kind === "track") this.load(n.id);
+    } finally {
+      // Jamais de file gelée, même si un rappel lève une exception.
+      this.fetchingMore = false;
     }
-    // Rien de neuf (réseau, doublons) : on reboucle plutôt que de s'arrêter.
-    const n = q.next(true);
-    this.set({ extending: false });
-    if (n.kind === "track") this.load(n.id);
   }
 
   play() {

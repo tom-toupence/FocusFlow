@@ -38,7 +38,7 @@ export default function AmbientBackdrop() {
       <img src={rueStill(scene.id)} alt="" className="absolute inset-0 h-full w-full object-cover motion-safe:animate-[rueFade_1.6s_ease-out]" />
       <div className="absolute inset-0 bg-night/[0.9]" />
       <div className="absolute inset-0 bg-gradient-to-b from-night/30 via-transparent to-night/70" />
-      <p className="absolute bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-2 right-3 max-w-[60vw] truncate font-mono text-[9px] uppercase tracking-[0.16em] text-white/25">
+      <p className="absolute bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-2 right-3 max-w-[60vw] truncate font-mono text-[9px] uppercase tracking-[0.16em] text-white/25 pointer-events-auto">
         {scene.label} · {scene.href ? <a href={scene.href} target="_blank" rel="noopener noreferrer" className="hover:text-white/60">{scene.credit}</a> : scene.credit}
       </p>
     </div>
