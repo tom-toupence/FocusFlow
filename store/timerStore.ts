@@ -162,6 +162,10 @@ const STOP_REACHED = (settings: TimerSettings, now: number) => ({
   flowStartedAt: null,
   stopReached: true,
   updatedAt: now,
+  // Plus rien à proposer : l'agenda se tait jusqu'au prochain cycle.
+  agendaNotice: null,
+  agendaMeeting: null,
+  agendaCycleIgnored: [] as string[],
 });
 
 const CLEARED = { endsAt: null, flowStartedAt: null } as const;
@@ -705,6 +709,8 @@ export const useTimerStore = create<TimerState>()(
 
       dismissAgendaNotice: () => set({ agendaNotice: null }),
 
+      // Ne touche qu'à un cycle de TRAVAIL en cours : une pause déjà commencée
+      // n'est jamais rallongée après coup (seul nextSession la rallonge, à son début).
       refitAgenda: () => {
         const s = get();
         if (!agendaOn(s) || s.mode !== "work" || s.stopReached || !s.isRunning || s.endsAt == null) return;
@@ -757,7 +763,10 @@ export const useTimerStore = create<TimerState>()(
         cycleSeconds: state.cycleSeconds,
         stopReached: state.stopReached,
         videoSyncActive: state.videoSyncActive,
-        agendaMeeting: state.agendaMeeting,
+        // Sans le titre de l'événement : rien de l'agenda en clair dans le stockage.
+        agendaMeeting: state.agendaMeeting
+          ? { until: state.agendaMeeting.until, event: { start: state.agendaMeeting.event.start, end: state.agendaMeeting.event.end } }
+          : null,
       }),
       merge: (persisted, current) => mergeTimerState(persisted, current),
       // Relu au montage par <TimerHydrator /> : le SSR et le 1er rendu client

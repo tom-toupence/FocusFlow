@@ -20,7 +20,11 @@ interface AgendaState {
   clear: () => void;
 }
 
-let inflight: Promise<AgendaResult | null> | null = null;
+// Génération : incrémentée par clear() et au changement d'adresse. Un résultat
+// arrivé après (Retirer pendant la lecture, Tester une autre adresse) est ignoré.
+let generation = 0;
+let lastUrl: string | null = null;
+let inflight: { url: string; gen: number; promise: Promise<AgendaResult | null> } | null = null;
 
 export const useAgendaStore = create<AgendaState>()((set, get) => ({
   events: [],
@@ -33,20 +37,32 @@ export const useAgendaStore = create<AgendaState>()((set, get) => ({
       get().clear();
       return Promise.resolve(null);
     }
-    if (inflight) return inflight;
+    if (target !== lastUrl) {
+      generation++;
+      lastUrl = target;
+      // Les événements d'une autre adresse ne valent plus rien.
+      set({ events: [], fetchedAt: null });
+    }
+    if (inflight && inflight.url === target && inflight.gen === generation) return inflight.promise;
+    const gen = generation;
     set({ status: "loading", error: null });
-    inflight = fetchAgenda(target)
-      .then((r) => {
-        const now = Date.now();
-        if (r.ok) set({ events: r.events, fetchedAt: now, status: "ok", error: null });
-        // Erreur : on garde ce qu'on savait encore à venir.
-        else set((s) => ({ events: s.events.filter((e) => e.end > now), status: "error", error: r.error }));
-        return r;
-      })
-      .finally(() => {
-        inflight = null;
-      });
-    return inflight;
+    const promise = fetchAgenda(target).then((r): AgendaResult | null => {
+      if (gen !== generation) return null; // périmé : on ne touche à rien
+      const now = Date.now();
+      if (r.ok) set({ events: r.events, fetchedAt: now, status: "ok", error: null });
+      // Erreur : on garde ce qu'on savait encore à venir.
+      else set((s) => ({ events: s.events.filter((e) => e.end > now), status: "error", error: r.error }));
+      return r;
+    }).finally(() => {
+      if (inflight?.promise === promise) inflight = null;
+    });
+    inflight = { url: target, gen, promise };
+    return promise;
   },
-  clear: () => set({ events: [], fetchedAt: null, status: "idle", error: null }),
+  clear: () => {
+    generation++;
+    lastUrl = null;
+    inflight = null;
+    set({ events: [], fetchedAt: null, status: "idle", error: null });
+  },
 }));

@@ -959,3 +959,9 @@ contenu animé sont peu fiables ; valider avec `npm run dev` sur une vraie machi
   `store/timerAgenda.test.ts` (raccourci, Garder, Ignorer, tooShort, Attendre, pause rallongée, reprise,
   combinaison avec l'arrêt, Flowtime, calé) ; e2e `e2e/agenda.spec.ts` (route interceptée).
   **À vérifier avec un vrai agenda** (DNS sortant indisponible dans le conteneur) : Google, Apple, Outlook.
+- **Corrections de relecture** : IPv4 traduite SIIT (`::ffff:0:a.b.c.d`) jugée comme l'IPv4 ; route
+  limitée à 20 lectures/min par IP (mémoire, par instance) + Origin/Referer même origine quand présent
+  (403 sinon) ; `agendaStore` à générations (Retirer pendant une lecture, ou Tester une autre adresse :
+  résultat périmé ignoré) ; `STOP_REACHED` remet l'état agenda à zéro ; `agendaMeeting` persisté
+  **sans le titre** ; l'import d'une sauvegarde garde l'adresse iCal locale ; `refitAgenda` ne rallonge
+  jamais une pause déjà commencée (seul `nextSession` le fait, au début de la pause).

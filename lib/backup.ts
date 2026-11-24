@@ -26,6 +26,21 @@ function withoutSecrets(raw: string): string {
   return raw;
 }
 
+/** Import : l'adresse iCal de CE navigateur est conservée (la sauvegarde n'en contient pas). */
+function keepLocalIcal(imported: string): string {
+  try {
+    const local = JSON.parse(localStorage.getItem("focusflow-prefs") ?? "null") as { state?: { icalUrl?: unknown } } | null;
+    const url = local?.state?.icalUrl;
+    if (typeof url !== "string" || !url) return imported;
+    const parsed = JSON.parse(imported) as { state?: Record<string, unknown> };
+    if (!parsed || typeof parsed !== "object") return imported;
+    parsed.state = { ...(parsed.state ?? {}), icalUrl: url };
+    return JSON.stringify(parsed);
+  } catch {
+    return imported;
+  }
+}
+
 export function exportBackup(): void {
   const data: Record<string, string> = {};
   for (let i = 0; i < localStorage.length; i++) {
@@ -75,7 +90,7 @@ export function importBackup(jsonText: string): number {
     if (!key.startsWith(KEY_PREFIX) || typeof value !== "string") continue;
     // Vérifie que la valeur est bien du JSON avant d'écraser
     try { JSON.parse(value); } catch { continue; }
-    localStorage.setItem(key, value);
+    localStorage.setItem(key, key === "focusflow-prefs" ? keepLocalIcal(value) : value);
     count++;
   }
 

@@ -7,6 +7,8 @@ import {
   redirectTarget,
   fetchIcsText,
   expandIPv6,
+  rateLimiter,
+  sameOrigin,
   ImportError,
   type FetchDeps,
   type RawResponse,
@@ -60,12 +62,12 @@ describe("anti-SSRF : adresses", () => {
   it("refuse les IPv6 locales, privées, mappées sur une IPv4 privée", () => {
     for (const ip of [
       "::1", "::", "fe80::1", "fc00::1", "fd12:3456::1", "ff02::1", "::ffff:127.0.0.1", "::ffff:10.0.0.1",
-      "::ffff:7f00:1", "64:ff9b::a00:1", "2001:db8::1", "2002:c0a8:101::1", "fec0::1",
+      "::ffff:7f00:1", "::ffff:0:127.0.0.1", "::ffff:0:10.0.0.1", "::ffff:0:a9fe:a9fe", "64:ff9b::a00:1", "2001:db8::1", "2002:c0a8:101::1", "fec0::1",
     ]) expect(isBlockedAddress(ip), ip).toBe(true);
   });
 
   it("accepte les IPv6 publiques (et une IPv4 publique mappée)", () => {
-    for (const ip of ["2a00:1450:4007:80c::200e", "2606:4700:4700::1111", "::ffff:8.8.8.8"]) {
+    for (const ip of ["2a00:1450:4007:80c::200e", "2606:4700:4700::1111", "::ffff:8.8.8.8", "::ffff:0:8.8.8.8"]) {
       expect(isBlockedAddress(ip), ip).toBe(false);
     }
   });
@@ -209,5 +211,29 @@ describe("fetchIcsText", () => {
       { timeoutMs: 30 },
     );
     expect(await code(fetchIcsText("https://cal.example.com/slow", d.deps))).toBe("timeout");
+  });
+});
+
+describe("garde-fous de la route", () => {
+  it("limite de débit : 20 par minute et par IP", () => {
+    let t = 0;
+    const allow = rateLimiter(20, 60_000, () => t);
+    for (let i = 0; i < 20; i++) expect(allow("1.2.3.4")).toBe(true);
+    expect(allow("1.2.3.4")).toBe(false);
+    expect(allow("5.6.7.8")).toBe(true);
+    t = 60_001;
+    expect(allow("1.2.3.4")).toBe(true);
+  });
+
+  it("même origine quand l'en-tête est présent", () => {
+    const self = "https://focusflow.app";
+    expect(sameOrigin(null, null, self, "focusflow.app")).toBe(true);
+    expect(sameOrigin("https://focusflow.app", null, self, "focusflow.app")).toBe(true);
+    expect(sameOrigin(null, "https://focusflow.app/session", self, "focusflow.app")).toBe(true);
+    expect(sameOrigin("https://evil.example.com", null, self, "focusflow.app")).toBe(false);
+    expect(sameOrigin(null, "https://evil.example.com/x", self, "focusflow.app")).toBe(false);
+    expect(sameOrigin("null", null, self, "focusflow.app")).toBe(false);
+    // Derrière un proxy, l'origine interne diffère : l'hôte annoncé fait foi.
+    expect(sameOrigin("http://localhost:3107", null, "http://0.0.0.0:3107", "localhost:3107")).toBe(true);
   });
 });

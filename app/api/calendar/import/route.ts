@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchIcsText, ImportError, nodeFetchDeps } from "@/lib/calendarImport";
+import { fetchIcsText, ImportError, nodeFetchDeps, rateLimiter, sameOrigin } from "@/lib/calendarImport";
 import { parseIcsBusy } from "@/lib/icsRead";
 
 // Lecture de l'agenda privé de l'utilisateur (adresse iCal) pour le minuteur.
@@ -11,6 +11,9 @@ export const runtime = "nodejs";
 
 const HORIZON_MS = 36 * 3600_000;
 const MAX_BODY = 4096;
+
+// Limite simple, en mémoire, par IP : 20 lectures par minute (par instance).
+const limit = rateLimiter(20, 60_000);
 
 const NO_STORE = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
 
@@ -29,6 +32,12 @@ function validTimeZone(tz: unknown): string | undefined {
 }
 
 export async function POST(request: NextRequest) {
+  // Appel depuis une autre origine (en-tête présent et différent) : refusé.
+  if (!sameOrigin(request.headers.get("origin"), request.headers.get("referer"), request.nextUrl.origin, request.headers.get("host"))) {
+    return fail(403, "Requête refusée.");
+  }
+  const ip = (request.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || request.headers.get("x-real-ip") || "inconnue";
+  if (!limit(ip)) return fail(429, "Trop de lectures de l'agenda. Réessaie dans une minute.");
   let body: { url?: unknown; timeZone?: unknown };
   try {
     const text = await request.text();

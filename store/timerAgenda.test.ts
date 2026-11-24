@@ -267,3 +267,58 @@ describe("contraintes combinées et modes exclus", () => {
     expect(st().agendaMeeting).toBeNull();
   });
 });
+
+describe("corrections de relecture", () => {
+  it("heure d'arrêt atteinte : l'état agenda est remis à zéro", () => {
+    setEvents([meeting(24, 60)]);
+    st().setStopAt(T0 + min(30));
+    st().start(); // raccourci à 19 min par la réunion
+    expect(st().agendaNotice?.kind).toBe("fit");
+    vi.setSystemTime(T0 + min(19));
+    st().nextSession(true);
+    expect(st().stopReached).toBe(true);
+    expect(st().agendaNotice).toBeNull();
+    expect(st().agendaMeeting).toBeNull();
+    expect(st().agendaCycleIgnored).toEqual([]);
+  });
+
+  it("la réunion persistée ne contient pas son titre", () => {
+    setEvents([meeting(24, 60)]);
+    st().start();
+    vi.setSystemTime(T0 + min(19));
+    st().nextSession(true);
+    const persisted = JSON.parse(localStorage.getItem("focusflow-timer")!).state;
+    expect(persisted.agendaMeeting.event.title).toBeUndefined();
+    expect(JSON.stringify(persisted)).not.toContain("Réunion d'équipe");
+  });
+});
+
+describe("agendaStore : résultats périmés", () => {
+  const pending: ((v: unknown) => void)[] = [];
+  beforeEach(() => {
+    pending.length = 0;
+    useAgendaStore.getState().clear();
+    globalThis.fetch = vi.fn(() => new Promise((resolve) => pending.push(resolve))) as never;
+  });
+  const respond = (i: number, events: BusyEvent[]) =>
+    pending[i]({ ok: true, json: async () => ({ events }) });
+
+  it("Retirer pendant la lecture : le résultat est ignoré", async () => {
+    const p = useAgendaStore.getState().refresh("https://a.example.com/a.ics");
+    useAgendaStore.getState().clear();
+    respond(0, [meeting(24, 60)]);
+    expect(await p).toBeNull();
+    expect(useAgendaStore.getState().events).toEqual([]);
+    expect(useAgendaStore.getState().status).toBe("idle");
+  });
+
+  it("Tester une autre adresse : seul le dernier résultat compte", async () => {
+    const p1 = useAgendaStore.getState().refresh("https://a.example.com/a.ics");
+    const p2 = useAgendaStore.getState().refresh("https://b.example.com/b.ics");
+    respond(1, [meeting(40, 50, "B")]);
+    respond(0, [meeting(24, 60, "A")]);
+    expect(await p1).toBeNull();
+    expect((await p2)?.ok).toBe(true);
+    expect(useAgendaStore.getState().events.map((e) => e.title)).toEqual(["B"]);
+  });
+});

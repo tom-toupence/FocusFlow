@@ -147,7 +147,8 @@ function v6Blocked(ip: string): boolean {
   if (zeros(0, 8)) return true; // ::
   if (zeros(0, 7) && w[7] === 1) return true; // ::1
   // IPv4 mappée (::ffff:a.b.c.d) ou compatible (::a.b.c.d) : on juge l'IPv4.
-  if (zeros(0, 5) && (w[5] === 0xffff || w[5] === 0)) {
+  // Idem pour la forme traduite SIIT (::ffff:0:a.b.c.d, RFC 2765).
+  if ((zeros(0, 5) && (w[5] === 0xffff || w[5] === 0)) || (zeros(0, 4) && w[4] === 0xffff && w[5] === 0)) {
     return v4Blocked(`${w[6] >> 8}.${w[6] & 255}.${w[7] >> 8}.${w[7] & 255}`);
   }
   if (w[0] === 0x64 && w[1] === 0xff9b) return true; // NAT64
@@ -206,6 +207,44 @@ export function redirectTarget(base: string, location: string | undefined): stri
   const n = normalizeIcalUrl(next);
   if (!n.ok) throw new ImportError("blocked_host");
   return n.url;
+}
+
+// ── Garde-fous de la route ──────────────────────────────────────────────────
+
+/** Fenêtre glissante simple en mémoire : `max` appels par `windowMs` et par clé. */
+export function rateLimiter(max: number, windowMs: number, now: () => number = Date.now) {
+  const hits = new Map<string, number[]>();
+  return (key: string): boolean => {
+    const t = now();
+    const recent = (hits.get(key) ?? []).filter((x) => t - x < windowMs);
+    if (recent.length >= max) {
+      hits.set(key, recent);
+      return false;
+    }
+    recent.push(t);
+    hits.set(key, recent);
+    if (hits.size > 5000) {
+      for (const [k, v] of hits) if (v.every((x) => t - x >= windowMs)) hits.delete(k);
+    }
+    return true;
+  };
+}
+
+/**
+ * Même origine : Origin (ou à défaut Referer), quand l'en-tête est présent,
+ * doit désigner notre hôte. Sans en-tête (outils, anciens navigateurs) : accepté.
+ */
+export function sameOrigin(origin: string | null, referer: string | null, selfOrigin: string, host: string | null): boolean {
+  const claimed = origin && origin !== "null" ? origin : referer;
+  if (origin === "null") return false;
+  if (!claimed) return true;
+  try {
+    const u = new URL(claimed);
+    if (u.origin === selfOrigin) return true;
+    return host != null && u.host === host;
+  } catch {
+    return false;
+  }
 }
 
 // ── Transport ───────────────────────────────────────────────────────────────
