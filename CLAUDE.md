@@ -73,7 +73,7 @@ ambiances mixables dans une seule expérience bien maintenue.
 Navigation simplifiée à **4 destinations** (au lieu de 7 onglets) via une **nav persistante** :
 **sidebar verticale** (desktop) + **barre d'onglets basse** (mobile) — `components/AppNav.tsx`,
 pilotée par `store/navStore.ts` (`section` : accueil / ecouter / organisation / activite).
-La section **Écouter** regroupe les 4 sources média (Catalogue · Ma bibliothèque · Spotify · Twitch)
+La section **Écouter** regroupe 6 sources (Radio · Catalogue · Découvrir · Ma bibliothèque · Spotify · Twitch)
 derrière un **sous-sélecteur** (`MediaTab` dans `app/page.tsx`, `navStore.mediaSource`).
 **Palette de commandes ⌘K / Ctrl+K** globale (`components/CommandPalette.tsx`, montée dans `layout.tsx`)
 pour sauter à toute section/action au clavier. **Lancer en une phrase** (2026-11-24) : la palette comprend
@@ -794,6 +794,11 @@ TodoStatusDropdown, callback Twitch) ; build vert ; vitest 33/33 ; e2e 13/13 sur
   pour la session (`sessionDeadIds`), `caps.skip=false`, « À venir » = programme. Activité amis :
   « En focus · Radio FocusFlow · <titre> » ; l'onglet compte les amis en ligne dont l'activité
   contient la radio (hors « En pause »), rien sans Supabase.
+- Après relecture : « N amis écoutent » exige un heartbeat de focus frais (`isListeningToRadio`,
+  l'activité seule reste après une fermeture brutale ; `activity:null` aussi au `pagehide`) ;
+  minuteur arrêté = `cueVideoById` (jamais de son) ; erreur d'une vidéo déjà quittée ignorée
+  (`getVideoData`) ; `/settings` affiche « Radio FocusFlow · Programme commun » ; routines : média
+  `{kind:"radio"}` ; ⌘K « Radio FocusFlow » et « Rejoindre la radio ».
 - Tests : `lib/radioProgram.test.ts`, `lib/playback/youtubeRadio.test.ts`, `store/sessionRadio.test.ts`,
   `e2e/radio.spec.ts` (page.clock ; deux contextes = même vidéo, même seconde).
 

@@ -5,8 +5,8 @@ import { persist } from "zustand/middleware";
 import type { TimerPreset } from "@/store/timerStore";
 
 export interface RoutineMedia {
-  kind: "video" | "playlist" | "spotify" | "twitch-channel" | "twitch-vod";
-  ref: string; // videoId / playlistId / spotify uri / channel login / vod id
+  kind: "video" | "playlist" | "spotify" | "twitch-channel" | "twitch-vod" | "radio";
+  ref: string; // videoId / playlistId / spotify uri / channel login / vod id ("radio" pour la radio)
   label?: string;
 }
 

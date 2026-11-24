@@ -23,6 +23,10 @@ interface YTPlayer {
   nextVideo: () => void;
   previousVideo: () => void;
   loadVideoById: (id: string | { videoId: string; startSeconds?: number }) => void;
+  /** Prépare une vidéo sans la lancer (radio ouverte minuteur arrêté). */
+  cueVideoById: (opts: { videoId: string; startSeconds?: number }) => void;
+  /** Vidéo réellement chargée (pour attribuer une erreur à la bonne vidéo). */
+  getVideoData?: () => { video_id?: string } | undefined;
   loadPlaylist: (opts: string[] | { list: string; listType: string; index?: number; startSeconds?: number }) => void;
   setLoop: (loop: boolean) => void;
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
@@ -355,12 +359,16 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     if (this.ready && this.player && (this.wantPlay || this.loadedId === null)) {
       if (this.loadedId === id) {
         this.player.seekTo(t.offsetSec, true);
-        this.player.playVideo();
-      } else {
+        if (this.wantPlay) this.player.playVideo();
+      } else if (this.wantPlay) {
         this.player.loadVideoById({ videoId: id, startSeconds: t.offsetSec });
         this.loadedId = id;
+      } else {
+        // Minuteur arrêté : on prépare l'image sans lancer le son
+        // (loadVideoById démarre la lecture, même suivi d'une pause).
+        this.player.cueVideoById({ videoId: id, startSeconds: t.offsetSec });
+        this.loadedId = id;
       }
-      if (!this.wantPlay) this.player.pauseVideo();
     }
     // Fin du créneau : on recalcule (resynchro), pas un simple « suivant ».
     this.switchTimer = setTimeout(() => this.resync(t.switchAt), Math.max(0, t.switchAt - now) + 20);
@@ -383,6 +391,11 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
   private onRadioError(code: number | undefined) {
     const cur = this.onAir;
     if (!cur || !this.radio) return;
+    // Erreur tardive d'une vidéo qu'on a déjà quittée : elle ne dit rien de la
+    // piste en cours (sinon on marquerait morte une vidéo saine).
+    let playingId: string | undefined;
+    try { playingId = this.player?.getVideoData?.()?.video_id || undefined; } catch { playingId = undefined; }
+    if (playingId && playingId !== cur.slot.track.youtubeId) return;
     if (code !== undefined && UNAVAILABLE_ERRORS.has(code)) this.cursor!.dead.add(cur.slot.track.youtubeId);
     else this.cursor!.skipped.add(cur.slot.index);
     this.errorStreak++;

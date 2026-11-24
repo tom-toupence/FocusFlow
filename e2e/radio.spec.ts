@@ -5,7 +5,7 @@ import { catalogueRadio, newCursor, radioTarget } from "../lib/radioProgram";
 // Radio FocusFlow (lot 6) : programme commun calculé depuis l'heure. Horloge
 // du navigateur contrôlée par page.clock ; lecteur YouTube simulé (fixtures).
 
-type YT = { loaded: string[]; starts: (number | null)[]; seeks: number[]; playing: boolean; error(c: number): void };
+type YT = { loaded: string[]; starts: (number | null)[]; cued: { id: string; start: number | null }[]; seeks: number[]; playing: boolean; error(c: number): void };
 const yt = (page: Page) => page.evaluate(() => (window as unknown as { __yt: YT }).__yt);
 const loadedCount = (page: Page, n: number) =>
   page.waitForFunction((n) => ((window as unknown as { __yt?: YT }).__yt?.loaded.length ?? 0) >= n, n);
@@ -105,6 +105,23 @@ test("pause puis reprise : se recale sur le direct", async ({ page }) => {
   expect(last).toBeLessThan(expected + 10);
   expect(s.loaded).toEqual([slot.track.youtubeId]); // même vidéo : simple recalage
   expect(s.playing).toBe(true);
+});
+
+test("session reprise minuteur arrêté (rechargement en pause) : la radio est préparée, pas lancée", async ({ page }) => {
+  await prepare(page, { radio: true });
+  await page.clock.setFixedTime(T);
+  await open(page, "/session");
+  await loadedCount(page, 1);
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  await page.waitForFunction(() => (window as unknown as { __yt: YT }).__yt.playing === false);
+  await page.reload();
+  await page.waitForFunction(() => ((window as unknown as { __yt?: YT }).__yt?.cued.length ?? 0) > 0);
+  await page.waitForTimeout(500);
+  const s = await yt(page);
+  expect(s.loaded).toEqual([]);
+  expect(s.cued[0]).toEqual({ id: slot.track.youtubeId, start: 600 });
+  expect(s.playing).toBe(false);
+  await expect(page.getByRole("button", { name: "Reprendre", exact: true })).toBeVisible();
 });
 
 test("deux appareils au même instant : même vidéo, même seconde", async ({ browser }) => {

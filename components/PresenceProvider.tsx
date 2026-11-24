@@ -35,7 +35,9 @@ export default function PresenceProvider() {
     beat();
     const timer = setInterval(beat, ONLINE_BEAT_MS);
     const onVisible = () => { if (document.visibilityState === "visible") beat(); };
-    const onExit = () => { upsertMyFriendStats({ online: false }); };
+    // `activity` aussi : sinon une fermeture brutale pendant une session laisse
+    // « En focus · Radio FocusFlow · … » affiché aux amis.
+    const onExit = () => { upsertMyFriendStats({ online: false, activity: null }); };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("pagehide", onExit);
     return () => {

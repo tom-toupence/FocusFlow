@@ -28,6 +28,8 @@ export default function AmbientProvider() {
   const selectedVideoId = useSessionStore((s) => s.selectedVideoId);
   const selectedPlaylistId = useSessionStore((s) => s.selectedPlaylistId);
   const playQueue = useSessionStore((s) => s.playQueue);
+  // Radio : plusieurs vidéos qui se succèdent, comme la File (teinte neutre de playlist).
+  const playRadio = useSessionStore((s) => s.playRadio);
   const getAllVideos = useSessionStore((s) => s.getAllVideos);
   const spotifyUri = useSpotifyStore((s) => s.selectedPlaylistUri);
   const spotifyToken = useSpotifyStore((s) => s.accessToken);
@@ -38,7 +40,7 @@ export default function AmbientProvider() {
   let hex = NEUTRAL;
   if (twitchChannel || twitchVod) hex = TWITCH_PURPLE;
   else if (spotifyUri && spotifyToken) hex = SPOTIFY_GREEN;
-  else if (playQueue || selectedPlaylistId) hex = PLAYLIST_FALLBACK;
+  else if (playRadio || playQueue || selectedPlaylistId) hex = PLAYLIST_FALLBACK;
   else {
     const all = getAllVideos();
     const video = all.find((v) => v.id === selectedVideoId) ?? all[0];

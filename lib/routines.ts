@@ -7,6 +7,7 @@ import { useSpotifyStore } from "@/store/spotifyStore";
 import { useTwitchStore } from "@/store/twitchStore";
 import { selectMedia } from "@/lib/launch";
 import type { Routine } from "@/store/routineStore";
+import { RADIO_NAME } from "@/lib/radioProgram";
 
 /**
  * Applies a saved routine to the live stores: timer durations, the media
@@ -30,7 +31,12 @@ export function applyRoutine(r: Routine) {
 
   // Media
   const session = useSessionStore.getState();
-  if (r.media) {
+  if (r.media?.kind === "radio") {
+    // Radio FocusFlow : source YouTube, Spotify et Twitch coupés.
+    useSpotifyStore.getState().selectPlaylist(null);
+    useTwitchStore.getState().clear();
+    session.selectRadio();
+  } else if (r.media) {
     const { kind, ref } = r.media;
     selectMedia(
       kind === "video" ? { type: "video", id: ref }
@@ -54,7 +60,7 @@ export function applyRoutine(r: Routine) {
 /** Captures the current live setup into a routine draft (minus id/name/color). */
 export function captureCurrentRoutine(): Omit<Routine, "id" | "name" | "color"> {
   const { settings } = useTimerStore.getState();
-  const { todos, selectedVideoId, selectedPlaylistId } = useSessionStore.getState();
+  const { todos, selectedVideoId, selectedPlaylistId, playRadio } = useSessionStore.getState();
   const { selectedPlaylistUri } = useSpotifyStore.getState();
   const { selectedChannel, selectedVodId } = useTwitchStore.getState();
 
@@ -62,6 +68,7 @@ export function captureCurrentRoutine(): Omit<Routine, "id" | "name" | "color"> 
   if (selectedPlaylistUri) media = { kind: "spotify", ref: selectedPlaylistUri };
   else if (selectedVodId) media = { kind: "twitch-vod", ref: selectedVodId };
   else if (selectedChannel) media = { kind: "twitch-channel", ref: selectedChannel };
+  else if (playRadio) media = { kind: "radio", ref: "radio", label: RADIO_NAME };
   else if (selectedPlaylistId) media = { kind: "playlist", ref: selectedPlaylistId };
   else if (selectedVideoId) media = { kind: "video", ref: selectedVideoId };
 

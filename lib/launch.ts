@@ -18,6 +18,7 @@ import { useQueueStore, fetchVideoMeta } from "@/store/queueStore";
 import { useSpotifyStore } from "@/store/spotifyStore";
 import { useTwitchStore } from "@/store/twitchStore";
 import { useNotesStore } from "@/store/notesStore";
+import { RADIO_NAME } from "@/lib/radioProgram";
 
 /** Contexte d'analyse : tâches, médias (clés stables `kind:id`) et état courant. */
 export function buildQuickContext(): LaunchContext {
@@ -32,6 +33,7 @@ export function buildQuickContext(): LaunchContext {
     currentMediaTitle = spotify.playlists.find((p) => p.uri === spotify.selectedPlaylistUri)?.name ?? "Playlist Spotify";
   } else if (twitch.selectedVodId) currentMediaTitle = `VOD ${twitch.selectedVodId}`;
   else if (twitch.selectedChannel) currentMediaTitle = twitch.selectedChannel;
+  else if (session.playRadio) currentMediaTitle = RADIO_NAME;
   else if (session.playQueue && useQueueStore.getState().items.length) currentMediaTitle = "File d'attente";
   else if (session.selectedPlaylistId) currentMediaTitle = playlists.find((p) => p.id === session.selectedPlaylistId)?.title;
   else if (session.selectedVideoId) currentMediaTitle = session.getAllVideos().find((v) => v.id === session.selectedVideoId)?.title;

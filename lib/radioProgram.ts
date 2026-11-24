@@ -18,6 +18,7 @@
 //     (extrait choisi dans la vidéo par lib/radio.ts), pour tout le monde.
 import { defaultVideos, type Video } from "@/data/videos";
 import { createRadio, type Radio, type RadioSlot, type RadioTrack } from "@/lib/radio";
+import { isActivelyFocusing, type FriendStats } from "@/lib/friends";
 
 export const RADIO_NAME = "Radio FocusFlow";
 /** Longueur d'extrait sûre pour une vidéo dont la durée n'est pas connue. */
@@ -51,6 +52,14 @@ export function catalogueRadio(): Radio {
 /** Activité publiée par /session quand la source est la radio. */
 export const isRadioActivity = (activity: string | null | undefined): boolean =>
   !!activity && activity.includes(RADIO_NAME) && !activity.startsWith("En pause");
+
+/**
+ * Un ami écoute la radio : activité « radio » ET heartbeat de focus frais.
+ * L'activité seule ne suffit pas : une fermeture brutale de l'onglet ne la
+ * vide pas (le heartbeat de /session, lui, s'arrête).
+ */
+export const isListeningToRadio = (s: FriendStats | null | undefined, now: number): boolean =>
+  !!s && isActivelyFocusing(s, now) && isRadioActivity(s.activity);
 
 // ── Resynchronisation du lecteur ──────────────────────────────────────────────
 

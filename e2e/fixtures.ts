@@ -6,7 +6,7 @@ import { test as base, type Page } from "@playwright/test";
  * `window.__yt` et laisse le test simuler la fin d'un titre (`__yt.end()`).
  */
 const FAKE_YT = `
-window.__yt = { loaded: [], starts: [], lists: [], seeks: [], playing: false, players: 0,
+window.__yt = { loaded: [], starts: [], cued: [], current: null, lists: [], seeks: [], playing: false, players: 0,
   end() { this.onState && this.onState({ data: 0 }); },
   error(code) { this.onError && this.onError({ data: code }); } };
 window.YT = { Player: function (id, cfg) {
@@ -22,8 +22,10 @@ window.YT = { Player: function (id, cfg) {
     loadVideoById: function (vid) {
       var start = null;
       if (vid && typeof vid === "object") { start = vid.startSeconds == null ? null : vid.startSeconds; vid = vid.videoId; }
-      y.loaded.push(vid); y.starts.push(start);
+      y.loaded.push(vid); y.starts.push(start); y.current = vid;
     },
+    cueVideoById: function (o) { y.cued.push({ id: o.videoId, start: o.startSeconds == null ? null : o.startSeconds }); y.current = o.videoId; },
+    getVideoData: function () { return { video_id: y.current }; },
     loadPlaylist: function (o) { y.lists.push(o && o.list ? o.list : o); },
     seekTo: function (s) { y.seeks.push(s); }
   };

@@ -24,8 +24,13 @@ class FakePlayer {
   loadVideoById(o: string | { videoId: string; startSeconds?: number }) {
     if (typeof o === "string") throw new Error("la radio doit donner la seconde de départ");
     this.loads.push({ id: o.videoId, at: o.startSeconds ?? 0 });
+    this.current = o.videoId;
     this.playing = true;
   }
+  cues: { id: string; at: number }[] = [];
+  current: string | undefined;
+  cueVideoById(o: { videoId: string; startSeconds?: number }) { this.cues.push({ id: o.videoId, at: o.startSeconds ?? 0 }); this.current = o.videoId; }
+  getVideoData() { return { video_id: this.current }; }
   loadPlaylist() {}
   setLoop() {}
   seekTo(s: number) { this.seeks.push(s); }
@@ -139,6 +144,33 @@ describe("YouTubeAdapter : source radio", async () => {
     const cur = radio.nowPlaying(Date.now())!;
     expect(FakePlayer.last.loads.at(-1)).toEqual({ id: cur.track.youtubeId, at: cur.offsetSec });
     expect(cur.offsetSec).toBe(300);
+    a.destroy();
+  });
+
+  it("session ouverte minuteur arrêté : la vidéo est préparée (cue), jamais lancée ; « Reprendre » la lance au direct", async () => {
+    const a = make(false);
+    await flush();
+    const p = FakePlayer.last;
+    expect(p.loads).toEqual([]);
+    expect(p.cues).toEqual([{ id: slot0.track.youtubeId, at: 600 }]);
+    expect(p.playing).toBe(false);
+    advance(30_000);
+    a.play();
+    expect(p.loads).toEqual([]);
+    expect(p.seeks.at(-1)).toBe(630);
+    expect(p.playing).toBe(true);
+    a.destroy();
+  });
+
+  it("erreur tardive d'une vidéo déjà quittée : ignorée", async () => {
+    const cursor = newCursor();
+    const a = new YouTubeAdapter("el", { type: "radio" }, { volume: 1, shuffle: false, loop: true, playing: true, radio, now: () => Date.now(), radioCursor: cursor });
+    await flush();
+    const p = FakePlayer.last;
+    p.current = "autre000000"; // le lecteur signale une autre vidéo que la piste en cours
+    p.error(150);
+    expect(cursor.dead.size).toBe(0);
+    expect(p.loads).toHaveLength(1);
     a.destroy();
   });
 

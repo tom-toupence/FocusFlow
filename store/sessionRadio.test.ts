@@ -18,6 +18,7 @@ import { useSpotifyStore } from "./spotifyStore";
 import { useTwitchStore } from "./twitchStore";
 import { useTimerStore } from "./timerStore";
 import { joinRadio } from "@/lib/radioSession";
+import { applyRoutine, captureCurrentRoutine } from "@/lib/routines";
 
 describe("sélection « radio » (exclusive)", () => {
   beforeEach(() => useSessionStore.getState().selectVideo("abao-01"));
@@ -40,6 +41,17 @@ describe("sélection « radio » (exclusive)", () => {
     useSessionStore.getState().selectRadio();
     const saved = JSON.parse(localStorage.getItem("focusflow-session")!).state;
     expect(saved.playRadio).toBe(true);
+  });
+
+  it("routine : la radio est capturée comme média, puis réappliquée", () => {
+    useSessionStore.getState().selectRadio();
+    const draft = captureCurrentRoutine();
+    expect(draft.media).toMatchObject({ kind: "radio" });
+    useSessionStore.getState().selectVideo("abao-02");
+    useSpotifyStore.getState().selectPlaylist("spotify:playlist:y");
+    applyRoutine({ ...draft, id: "r1", name: "Radio", color: "#000" });
+    expect(useSessionStore.getState().playRadio).toBe(true);
+    expect(useSpotifyStore.getState().selectedPlaylistUri).toBeNull();
   });
 
   it("joinRadio : radio sélectionnée, Spotify et Twitch coupés, minuteur remis à zéro avec le preset courant, /session", () => {

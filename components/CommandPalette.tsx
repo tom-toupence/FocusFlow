@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { parseQuickLaunch, type QuickLaunch } from "@/lib/quickLaunch";
 import { resolveLaunch, provenanceOf, applyOverrides, isConfirmed, PRESET_LABEL, type LaunchContext, type LaunchMedia, type LaunchPlan, type Overrides } from "@/lib/launchPlan";
 import { buildQuickContext, launchFromQuick, RELAUNCH_LAST } from "@/lib/launch";
+import { joinRadio } from "@/lib/radioSession";
 import { PRESETS } from "@/store/timerStore";
 
 // État d'ouverture partagé : ⌘K (clavier) + bouton header peuvent tous deux l'ouvrir.
@@ -127,6 +128,8 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
     { id: "start", label: "Démarrer une session", hint: "Choisir une ambiance", keywords: "demarrer session focus pomodoro play lancer", run: goMedia("catalogue") },
     { id: "accueil", label: "Aujourd'hui", hint: "Tableau de bord", keywords: "accueil home dashboard aujourdhui", run: goSection("accueil") },
     { id: "ecouter", label: "Écouter", hint: "Catalogue & sources", keywords: "ecouter musique media son", run: goSection("ecouter") },
+    { id: "radio", label: "Radio FocusFlow", hint: "En direct", keywords: "radio direct live programme commun ecouter ensemble", run: goMedia("radio") },
+    { id: "join-radio", label: "Rejoindre la radio", hint: "Lance un focus", keywords: "rejoindre radio direct lancer focus session", run: () => { onClose(); joinRadio(router); } },
     { id: "catalogue", label: "Catalogue", hint: "Vidéos lofi/chill", keywords: "catalogue ambiance lofi videos", run: goMedia("catalogue") },
     { id: "library", label: "Ma bibliothèque", hint: "Vidéos, playlists & file", keywords: "bibliotheque library file queue playlist perso", run: goMedia("library") },
     { id: "discover", label: "Découvrir", hint: "Recommandations", keywords: "decouvrir discover recommandations suggestions recos", run: goMedia("discover") },

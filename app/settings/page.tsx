@@ -9,6 +9,7 @@ import { usePlaylistStore } from "@/store/playlistStore";
 import { useNotesStore } from "@/store/notesStore";
 import { useSpotifyStore } from "@/store/spotifyStore";
 import { useTwitchStore } from "@/store/twitchStore";
+import { RADIO_NAME } from "@/lib/radioProgram";
 import { getVideoColor } from "@/data/videos";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -283,7 +284,7 @@ function SettingsPageInner() {
   const expandTo = useExpandNavigate();
   const previewRef = useRef<HTMLDivElement>(null);
   const { settings, applyPreset, updateSettings, resetAll } = useTimerStore();
-  const { selectedVideoId, selectedPlaylistId, getAllVideos } = useSessionStore();
+  const { selectedVideoId, selectedPlaylistId, playRadio, getAllVideos } = useSessionStore();
   const { playlists } = usePlaylistStore();
   const { selectedPlaylistUri, playlists: spotifyPlaylists, shuffle, setShuffle } = useSpotifyStore();
   const { selectedChannel, selectedVodId } = useTwitchStore();
@@ -316,6 +317,8 @@ function SettingsPageInner() {
   const spotifyPlaylist = spotifyPlaylists.find((p) => p.uri === selectedPlaylistUri) ?? null;
   const isSpotifyMode = !!selectedPlaylistUri && !!spotifyPlaylist;
   const isTwitchMode = !!selectedChannel || !!selectedVodId;
+  // Radio FocusFlow : source YouTube, donc Spotify et Twitch passent devant (comme en session).
+  const isRadioMode = playRadio && !isSpotifyMode && !isTwitchMode;
   const [imgError, setImgError] = useState(false);
 
   const handleAddTodo = () => {
@@ -484,7 +487,7 @@ function SettingsPageInner() {
         {/* Left: selected content */}
         <div className="w-full lg:w-64 flex-shrink-0">
           <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-3">
-            {isTwitchMode ? "Stream Twitch" : isSpotifyMode ? "Playlist Spotify" : isPlaylistMode ? "Playlist choisie" : "Vidéo choisie"}
+            {isTwitchMode ? "Stream Twitch" : isSpotifyMode ? "Playlist Spotify" : isRadioMode ? "Radio" : isPlaylistMode ? "Playlist choisie" : "Vidéo choisie"}
           </p>
           <div ref={previewRef} className="rounded-xl overflow-hidden aspect-video relative">
             {isTwitchMode ? (
@@ -536,6 +539,25 @@ function SettingsPageInner() {
                 <div className="absolute top-2 right-2">
                   <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-[#1db954]/20 text-[#1db954]">
                     Spotify
+                  </span>
+                </div>
+              </>
+            ) : isRadioMode ? (
+              <>
+                <div className="w-full h-full bg-foreground/[0.06] flex items-center justify-center">
+                  <svg className="w-10 h-10 text-focus/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+                    <circle cx="12" cy="12" r="2" />
+                    <path d="M16.24 7.76a6 6 0 0 1 0 8.48M7.76 16.24a6 6 0 0 1 0-8.48M19.07 4.93a10 10 0 0 1 0 14.14M4.93 19.07a10 10 0 0 1 0-14.14" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-2.5">
+                  <p className="text-white text-xs font-medium line-clamp-1">{RADIO_NAME}</p>
+                  <p className="text-white/40 text-[10px]">Programme commun</p>
+                </div>
+                <div className="absolute top-2 right-2">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium backdrop-blur-sm bg-black/40 text-white/80">
+                    En direct
                   </span>
                 </div>
               </>

@@ -9,9 +9,8 @@ import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import { isOnline } from "@/lib/friends";
 import { useFriendsStore } from "@/store/friendsStore";
-import { catalogueRadio, clockLabel, durationLabel, isRadioActivity, radioUpcoming, sessionDeadIds, RADIO_NAME } from "@/lib/radioProgram";
+import { catalogueRadio, clockLabel, durationLabel, isListeningToRadio, radioUpcoming, sessionDeadIds, RADIO_NAME } from "@/lib/radioProgram";
 import { joinRadio } from "@/lib/radioSession";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -20,11 +19,12 @@ function Label({ children, className }: { children: React.ReactNode; className?:
   return <p className={cn("font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/35", className)}>{children}</p>;
 }
 
-/** Amis qui écoutent la radio en ce moment (activité publiée par /session). */
+/** Amis qui écoutent la radio en ce moment : activité publiée par /session ET
+ *  heartbeat de focus frais (une fermeture brutale ne vide pas `activity`). */
 function RadioFriends({ now }: { now: number }) {
   const { friends, loaded } = useFriendsStore();
   if (!supabase || !loaded) return null;
-  const listening = friends.filter((f) => isOnline(f.stats, now) && isRadioActivity(f.stats?.activity));
+  const listening = friends.filter((f) => isListeningToRadio(f.stats, now));
   if (listening.length === 0) return null;
   return (
     <div className="mt-5" data-testid="radio-friends">

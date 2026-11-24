@@ -5,7 +5,7 @@ import { useRoutineStore } from "@/store/routineStore";
 import { applyRoutine } from "@/lib/routines";
 
 const MEDIA_LABEL: Record<string, string> = {
-  video: "YouTube", playlist: "Playlist", spotify: "Spotify", "twitch-channel": "Twitch", "twitch-vod": "Twitch VOD",
+  video: "YouTube", playlist: "Playlist", spotify: "Spotify", "twitch-channel": "Twitch", "twitch-vod": "Twitch VOD", radio: "Radio",
 };
 
 export default function RoutinesManager() {

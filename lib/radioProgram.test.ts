@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { defaultVideos, type Video } from "@/data/videos";
 import { createRadio, RADIO_EPOCH, type RadioTrack } from "./radio";
 import {
-  buildRadio, catalogueRadio, clockLabel, durationLabel, isRadioActivity, newCursor, radioTarget, radioTracksFrom, radioUpcoming,
+  buildRadio, catalogueRadio, clockLabel, durationLabel, isListeningToRadio, isRadioActivity, newCursor, radioTarget, radioTracksFrom, radioUpcoming,
   RADIO_NAME, RADIO_SAFE_SEGMENT_SEC,
 } from "./radioProgram";
 
@@ -122,6 +122,17 @@ describe("présentation", () => {
     expect(isRadioActivity(`En pause · ${RADIO_NAME} · Titre`)).toBe(false);
     expect(isRadioActivity("En focus · Titre")).toBe(false);
     expect(isRadioActivity(null)).toBe(false);
+  });
+  it("ami qui écoute : activité radio ET heartbeat de focus frais (pas une activité restée après fermeture)", () => {
+    const now = T;
+    const base = { weekMinutes: 0, weekSessions: 0, streak: 0, level: 1, xp: 0, badges: 0, focusStartedAt: now - 600_000, online: true, onlineHeartbeat: now };
+    const activity = `En focus · ${RADIO_NAME} · Titre`;
+    expect(isListeningToRadio({ ...base, inFocus: true, focusHeartbeat: now - 30_000, activity }, now)).toBe(true);
+    // Onglet fermé brutalement : activité encore là, heartbeat périmé.
+    expect(isListeningToRadio({ ...base, inFocus: true, focusHeartbeat: now - 10 * 60_000, activity }, now)).toBe(false);
+    expect(isListeningToRadio({ ...base, inFocus: false, focusHeartbeat: now, activity }, now)).toBe(false);
+    expect(isListeningToRadio({ ...base, inFocus: true, focusHeartbeat: now, activity: "En focus · Autre" }, now)).toBe(false);
+    expect(isListeningToRadio(null, now)).toBe(false);
   });
   it("libellés", () => {
     expect(durationLabel(1082)).toBe("18:02");
