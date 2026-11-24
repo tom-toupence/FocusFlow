@@ -32,6 +32,7 @@ import { ACHIEVEMENTS } from "@/lib/achievements";
 import { toast } from "@/components/Toast";
 import { playBreakChime, playWorkChime } from "@/lib/sounds";
 import { upsertMyFriendStats } from "@/lib/friends";
+import { formatHM, pomodorosLeft } from "@/lib/stopPlan";
 import { CHEER_EVENT } from "@/store/chatStore";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -57,7 +58,7 @@ export default function SessionPage() {
   const router = useRouter();
   const {
     mode, secondsLeft, isRunning, sessionsCompleted, settings,
-    flowSeconds, flowBreakTotal, hydrated,
+    flowSeconds, flowBreakTotal, hydrated, stopAt, stopReached, cycleSeconds,
     tick, start, pause, nextSession, finishFlow, accumulateFlow,
   } = useTimerStore();
   const isFlowtime = settings.preset === "flowtime";
@@ -232,8 +233,10 @@ export default function SessionPage() {
     if (mode === "work") {
       if (!sessionEndedRef.current) {
         sessionEndedRef.current = true;
-        recordSession(settings.workDuration);
-        recordPlay(buildPlayEntry(settings.workDuration));
+        // Durée réelle du cycle (le plan « Dernier train » peut l'avoir étiré ou raccourci).
+        const cycleMinutes = Math.max(1, Math.round(useTimerStore.getState().cycleSeconds / 60));
+        recordSession(cycleMinutes);
+        recordPlay(buildPlayEntry(cycleMinutes));
         useProjectStore.getState().logPomodoro(); // advance the active project, if any
         celebrateProgress();
       }
@@ -241,7 +244,7 @@ export default function SessionPage() {
       sessionEndedRef.current = false;
     }
     nextSession(autoStart);
-  }, [mode, nextSession, recordSession, recordPlay, settings.workDuration]);
+  }, [mode, nextSession, recordSession, recordPlay]);
 
   // Tant que l'init (démarrage ou rattrapage) n'est pas faite, on suit juste la valeur :
   // le passage des défauts à l'état relu ne doit pas passer pour une fin de cycle.
@@ -265,7 +268,10 @@ export default function SessionPage() {
       if (st.isRunning && !flowWork && st.secondsLeft === 0) handleSessionEnd(false);
       return;
     }
+    // resetAll efface l'heure d'arrêt choisie dans /settings : on la garde pour ce départ.
+    const plannedStop = useTimerStore.getState().stopAt;
     useTimerStore.getState().resetAll();
+    if (plannedStop != null && plannedStop > Date.now()) useTimerStore.getState().setStopAt(plannedStop);
     const doneTodoIds = todos.filter((t) => t.status === "done").map((t) => t.id);
     startSession(settings.workDuration, doneTodoIds);
     resetDistractions();
@@ -291,7 +297,7 @@ export default function SessionPage() {
     if (mode === "work") {
       const minutesWorked = isFlowtime
         ? accumulateFlow()
-        : Math.round((settings.workDuration * 60 - secondsLeft) / 60);
+        : Math.round((useTimerStore.getState().cycleSeconds - secondsLeft) / 60);
       if (minutesWorked >= 1) {
         recordSession(minutesWorked);
         recordPlay(buildPlayEntry(minutesWorked));
@@ -391,17 +397,29 @@ export default function SessionPage() {
   const progress = (() => {
     if (isFlowtime && mode === "work") return 0; // open-ended stretch, no fixed total
     const total =
-      mode === "work" ? settings.workDuration * 60
-      : mode === "short-break" ? settings.shortBreakDuration * 60
-      : settings.longBreakDuration * 60;
+      isFlowtime ? 0 : cycleSeconds;
     return total > 0 ? 1 - secondsLeft / total : 0;
   })();
 
-  const breakTotal = isFlowtime
-    ? flowBreakTotal
-    : mode === "long-break"
-      ? settings.longBreakDuration * 60
-      : settings.shortBreakDuration * 60;
+  const breakTotal = isFlowtime ? flowBreakTotal : cycleSeconds;
+
+  // « Dernier train » : pomodoros restants jusqu'à l'heure d'arrêt (cycle en cours compris).
+  const [nowMs, setNowMs] = useState(0);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setNowMs(Date.now()), [secondsLeft, mode]);
+  const stopActive = stopAt != null && !isFlowtime;
+  const stopLeft = stopActive && nowMs > 0
+    ? pomodorosLeft({ stopAt: stopAt!, now: nowMs, mode, secondsLeft, sessionsCompleted, settings })
+    : 0;
+  const stopLine = stopActive
+    ? `Arrêt à ${formatHM(stopAt!)}${nowMs > 0 ? ` · ${stopLeft} pomodoro${stopLeft > 1 ? "s" : ""} restant${stopLeft > 1 ? "s" : ""}` : ""}`
+    : null;
+
+  // « Encore un pomodoro » : l'heure d'arrêt disparaît, un cycle normal démarre.
+  const handleOneMore = () => {
+    sessionEndedRef.current = false;
+    useTimerStore.getState().continueAfterStop();
+  };
 
   // Flowtime: break earned so far (elapsed ÷ 5, min 2 min)
   const earnedBreakMin = Math.max(2, Math.round(flowSeconds / 5 / 60));
@@ -465,7 +483,7 @@ export default function SessionPage() {
       )}
 
       {/* Liseré de progression ambiant le long du bord supérieur de l'écran */}
-      {!isBreak && !isFlowtime && (
+      {!isBreak && !stopReached && !isFlowtime && (
         <div className="fixed top-0 inset-x-0 h-[2px] z-30 pointer-events-none">
           <div
             className="h-full origin-left"
@@ -479,19 +497,47 @@ export default function SessionPage() {
       )}
 
       {/* ── La halte (pause) : la ville s'éteint, la vue se brouille ───────── */}
-      {isBreak && (
+      {(isBreak || stopReached) && (
         <div className="absolute inset-0 z-20 bg-[#07090d]">
           <RueScene
             ref={city}
             mode="break"
             interval={[40, 60]}
             className="absolute inset-0"
-            label={`La halte : une rue de nuit, il reste ${formatTime(secondsLeft)} de pause.`}
+            label={stopReached ? "La halte : une rue de nuit, l'heure d'arrêt est atteinte." : `La halte : une rue de nuit, il reste ${formatTime(secondsLeft)} de pause.`}
           />
           {/* Voile de lecture : à gauche sur grand écran, en bas sur mobile. */}
           <div aria-hidden className="absolute inset-0 pointer-events-none bg-[linear-gradient(90deg,#07090d_0%,rgba(7,9,13,0.86)_32%,rgba(7,9,13,0.15)_62%,transparent_80%)] max-md:bg-[linear-gradient(0deg,#07090d_0%,rgba(7,9,13,0.9)_45%,rgba(7,9,13,0.2)_70%,transparent_85%)]" />
           <div className="relative z-10 h-full overflow-y-auto flex items-end md:items-center px-5 sm:px-10 lg:px-16 py-8">
             <div className="flex flex-col gap-6 max-w-md text-white">
+              {stopReached ? (
+                <>
+                  <div>
+                    <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-focus">
+                      {stopAt != null ? `Arrêt à ${formatHM(stopAt)}` : "Arrêt"}
+                    </p>
+                    <h1 className="mt-2 font-semibold tracking-tight text-[clamp(2.25rem,6vw,4rem)] leading-[0.98]">Heure d&apos;arrêt atteinte</h1>
+                    <p className="mt-3 text-[15px] text-white/75">
+                      {sessionsCompleted > 0 ? `${sessionsCompleted} pomodoro${sessionsCompleted > 1 ? "s" : ""} terminé${sessionsCompleted > 1 ? "s" : ""}. ` : ""}Bien joué.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={handleStop}
+                      className="ff-press inline-flex items-center gap-2 h-10 px-5 rounded-lg bg-white text-black text-sm font-medium transition-colors hover:bg-white/90"
+                    >
+                      Terminer
+                    </button>
+                    <button
+                      onClick={handleOneMore}
+                      className="ff-press inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-white/30 hover:border-white/70 text-white/85 hover:text-white text-sm transition-colors"
+                    >
+                      Encore un pomodoro
+                    </button>
+                  </div>
+                </>
+              ) : (
+              <>
               <div>
                 <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-focus">{breakLabel[mode]}</p>
                 <h1 className="mt-2 font-semibold tracking-tight text-[clamp(2.75rem,7vw,5rem)] leading-[0.95]">Pause</h1>
@@ -530,12 +576,16 @@ export default function SessionPage() {
                   Terminer la session
                 </button>
               </div>
+              </>
+              )}
+              {!stopReached && (
               <button
                 onClick={() => usePrefsStore.getState().setBreathingEnabled(!breathingEnabled)}
                 className="self-start text-[12px] text-white/55 hover:text-white/85 underline-offset-4 hover:underline transition-colors"
               >
                 {breathingEnabled ? "Masquer la respiration guidée" : "Afficher la respiration guidée"}
               </button>
+              )}
             </div>
           </div>
         </div>
@@ -561,7 +611,7 @@ export default function SessionPage() {
       )}
 
       {/* ── Work screen overlay ─────────────────────────────────────────────── */}
-      {!isBreak && (
+      {!isBreak && !stopReached && (
         <>
           {/* L'écran annoncé sur la landing (SessionReplica) : en cours en haut
               à gauche, minuteur en haut à droite, « À venir » en bas à droite,
@@ -600,6 +650,11 @@ export default function SessionPage() {
                 <p className="mt-1 whitespace-nowrap font-mono text-[9px] uppercase tracking-[0.14em] text-white/45">
                   {isFlowtime ? `Flow · pause ${earnedBreakMin} min` : `Pomodoro ${sessionsCompleted + 1}`}
                 </p>
+                {stopLine && (
+                  <p data-testid="stop-line" className="mt-0.5 whitespace-nowrap font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">
+                    {stopLine}
+                  </p>
+                )}
               </div>
             </div>
           </div>

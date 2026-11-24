@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { remainingSeconds, elapsedSeconds, isAbandoned } from "@/lib/timerClock";
+import { nextCycleSeconds } from "@/lib/stopPlan";
 
 export type TimerMode = "work" | "short-break" | "long-break";
 
@@ -50,6 +51,14 @@ interface TimerState {
   // Une session a été démarrée et pas terminée (survit à la navigation et au rechargement).
   active: boolean;
   updatedAt: number | null;
+  // « Dernier train » : heure d'arrêt de la session (epoch ms), null = pas d'heure.
+  // Ignorée en Flowtime. Les durées des cycles viennent alors de planUntil.
+  stopAt: number | null;
+  // Durée réelle (s) du cycle courant, posée à son démarrage : c'est elle qui est
+  // créditée (stats, XP, projets), pas settings.workDuration.
+  cycleSeconds: number;
+  // Plan épuisé : l'heure d'arrêt est atteinte, la session attend (rien ne tourne).
+  stopReached: boolean;
   // Vrai une fois l'état persisté relu (skipHydration + TimerHydrator) : tant que
   // c'est faux, le store porte les valeurs par défaut et ne doit pas être ré-écrit.
   hydrated: boolean;
@@ -65,6 +74,9 @@ interface TimerState {
   finishFlow: () => void;
   accumulateFlow: () => number;
   resetAll: () => void;
+  setStopAt: (stopAt: number | null) => void;
+  // « Encore un pomodoro » après l'heure d'arrêt : efface l'heure et lance un cycle normal.
+  continueAfterStop: () => void;
   // Fin de session : désactive sans effacer sessionsCompleted/flowMinutesTotal (lus par /summary).
   endSession: () => void;
 }
@@ -90,18 +102,36 @@ function liveFlowSeconds(s: TimerState, now: number): number {
     : s.flowSeconds;
 }
 
+/** État « heure d'arrêt atteinte » : attente, rien ne tourne. Le cycle affiché reste un cycle neuf. */
+const STOP_REACHED = (settings: TimerSettings, now: number) => ({
+  mode: "work" as TimerMode,
+  secondsLeft: settings.workDuration * 60,
+  cycleSeconds: settings.workDuration * 60,
+  isRunning: false,
+  flowSeconds: 0,
+  endsAt: null,
+  flowStartedAt: null,
+  stopReached: true,
+  updatedAt: now,
+});
+
 const CLEARED = { endsAt: null, flowStartedAt: null } as const;
+
+/** Heure d'arrêt applicable (pas en Flowtime). */
+const stopAtOf = (s: Pick<TimerState, "stopAt" | "settings">): number | null =>
+  s.settings.preset === "flowtime" ? null : s.stopAt;
 
 /** Forme persistée. */
 type PersistedTimer = Pick<
   TimerState,
   | "settings" | "mode" | "secondsLeft" | "endsAt" | "isRunning" | "sessionsCompleted"
   | "flowSeconds" | "flowStartedAt" | "flowMinutesTotal" | "flowBreakTotal" | "active" | "updatedAt"
+  | "stopAt" | "cycleSeconds" | "stopReached"
 >;
 
-export const TIMER_PERSIST_VERSION = 1;
+export const TIMER_PERSIST_VERSION = 2;
 
-/** v0 (settings seul) -> v1 : les champs de session absents prennent les défauts au merge. */
+/** v0 (settings seul) -> v1 -> v2 (stopAt, cycleSeconds, stopReached) : les champs absents prennent les défauts au merge. */
 export function migrateTimerState(persisted: unknown, version: number): Partial<PersistedTimer> {
   const p = (persisted ?? {}) as Partial<PersistedTimer>;
   if (version < 1) return { settings: p.settings };
@@ -130,6 +160,9 @@ export function mergeTimerState(
     flowBreakTotal: p.flowBreakTotal ?? 0,
     active: p.active ?? false,
     updatedAt: p.updatedAt ?? null,
+    stopAt: p.stopAt ?? null,
+    cycleSeconds: typeof p.cycleSeconds === "number" ? p.cycleSeconds : getDuration(p.mode ?? "work", settings),
+    stopReached: p.stopReached ?? false,
   };
 
   if (isAbandoned(merged, now)) {
@@ -145,6 +178,9 @@ export function mergeTimerState(
       ...CLEARED,
       active: false,
       updatedAt: null,
+      stopAt: null,
+      cycleSeconds: getDuration("work", settings),
+      stopReached: false,
     };
   }
 
@@ -176,23 +212,26 @@ export const useTimerStore = create<TimerState>()(
       flowStartedAt: null,
       active: false,
       updatedAt: null,
+      stopAt: null,
+      cycleSeconds: defaultSettings.workDuration * 60,
+      stopReached: false,
       hydrated: false,
 
       applyPreset: (preset) => {
         const values = PRESETS[preset];
         const merged: TimerSettings = { preset, ...values };
-        set({ settings: merged, mode: "work", secondsLeft: values.workDuration * 60, isRunning: false, flowSeconds: 0, ...CLEARED });
+        set({ settings: merged, mode: "work", secondsLeft: values.workDuration * 60, cycleSeconds: values.workDuration * 60, isRunning: false, flowSeconds: 0, stopReached: false, ...CLEARED });
       },
 
       updateSettings: (newSettings) => {
         const { settings, mode } = get();
         const merged = { ...settings, ...newSettings, preset: "custom" as TimerPreset };
-        set({ settings: merged, secondsLeft: getDuration(mode, merged), isRunning: false, ...CLEARED });
+        set({ settings: merged, secondsLeft: getDuration(mode, merged), cycleSeconds: getDuration(mode, merged), isRunning: false, ...CLEARED });
       },
 
       setMode: (mode) => {
         const { settings } = get();
-        set({ mode, secondsLeft: getDuration(mode, settings), isRunning: false, flowSeconds: 0, ...CLEARED });
+        set({ mode, secondsLeft: getDuration(mode, settings), cycleSeconds: getDuration(mode, settings), isRunning: false, flowSeconds: 0, ...CLEARED });
       },
 
       // Recalcule depuis l'horloge (idempotent : appelable à tout moment, en retard ou non).
@@ -226,9 +265,27 @@ export const useTimerStore = create<TimerState>()(
             updatedAt: now,
           });
         } else {
+          if (s.stopReached) return;
+          let secondsLeft = s.secondsLeft;
+          let cycleSeconds = s.cycleSeconds;
+          const stopAt = stopAtOf(s);
+          // Cycle neuf avec heure d'arrêt : sa durée vient du plan, calculé maintenant.
+          if (stopAt != null && !s.isRunning && (!s.active || s.secondsLeft === s.cycleSeconds)) {
+            const planned = nextCycleSeconds({
+              stopAt, now, mode: s.mode, settings: s.settings, sessionsCompleted: s.sessionsCompleted,
+            });
+            if (planned == null) {
+              set({ ...STOP_REACHED(s.settings, now), active: true });
+              return;
+            }
+            secondsLeft = planned;
+            cycleSeconds = planned;
+          }
           set({
             isRunning: true,
-            endsAt: s.isRunning && s.endsAt != null ? s.endsAt : now + s.secondsLeft * 1000,
+            secondsLeft,
+            cycleSeconds,
+            endsAt: s.isRunning && s.endsAt != null ? s.endsAt : now + secondsLeft * 1000,
             flowStartedAt: null,
             active: true,
             updatedAt: now,
@@ -254,7 +311,7 @@ export const useTimerStore = create<TimerState>()(
 
       reset: () => {
         const { mode, settings } = get();
-        set({ secondsLeft: getDuration(mode, settings), isRunning: false, flowSeconds: 0, ...CLEARED });
+        set({ secondsLeft: getDuration(mode, settings), cycleSeconds: getDuration(mode, settings), isRunning: false, flowSeconds: 0, ...CLEARED });
       },
 
       nextSession: (autoStart = false) => {
@@ -273,11 +330,25 @@ export const useTimerStore = create<TimerState>()(
         }
 
         const now = Date.now();
-        const duration = getDuration(nextMode, settings);
+        let duration = getDuration(nextMode, settings);
         const flowWork = settings.preset === "flowtime" && nextMode === "work";
+        const stopAt = stopAtOf(get());
+        if (stopAt != null) {
+          const planned = nextCycleSeconds({
+            stopAt, now, mode: nextMode, settings, sessionsCompleted: newSessionsCompleted,
+          });
+          if (planned == null) {
+            // Plan épuisé : on attend, sans enchaîner (pas d'autoStart).
+            set({ ...STOP_REACHED(settings, now), sessionsCompleted: newSessionsCompleted });
+            return;
+          }
+          duration = planned;
+        }
         set({
           mode: nextMode,
           secondsLeft: duration,
+          cycleSeconds: duration,
+          stopReached: false,
           isRunning: autoStart,
           sessionsCompleted: newSessionsCompleted,
           flowSeconds: 0,
@@ -323,7 +394,7 @@ export const useTimerStore = create<TimerState>()(
       },
 
       endSession: () => {
-        set({ active: false, isRunning: false, endsAt: null, flowStartedAt: null, updatedAt: null });
+        set({ active: false, isRunning: false, endsAt: null, flowStartedAt: null, updatedAt: null, stopAt: null, stopReached: false });
       },
 
       resetAll: () => {
@@ -331,6 +402,7 @@ export const useTimerStore = create<TimerState>()(
         set({
           mode: "work",
           secondsLeft: getDuration("work", settings),
+          cycleSeconds: getDuration("work", settings),
           isRunning: false,
           sessionsCompleted: 0,
           flowSeconds: 0,
@@ -339,6 +411,29 @@ export const useTimerStore = create<TimerState>()(
           ...CLEARED,
           active: false,
           updatedAt: null,
+          stopAt: null,
+          stopReached: false,
+        });
+      },
+
+      // Une heure déjà passée est ignorée (rien à planifier).
+      setStopAt: (stopAt) => set({ stopAt: stopAt != null && stopAt > Date.now() ? stopAt : null, stopReached: false }),
+
+      continueAfterStop: () => {
+        const { settings } = get();
+        const now = Date.now();
+        const duration = settings.workDuration * 60;
+        set({
+          stopAt: null,
+          stopReached: false,
+          mode: "work",
+          secondsLeft: duration,
+          cycleSeconds: duration,
+          isRunning: true,
+          endsAt: now + duration * 1000,
+          flowStartedAt: null,
+          active: true,
+          updatedAt: now,
         });
       },
     }),
@@ -359,6 +454,9 @@ export const useTimerStore = create<TimerState>()(
         flowBreakTotal: state.flowBreakTotal,
         active: state.active,
         updatedAt: state.updatedAt,
+        stopAt: state.stopAt,
+        cycleSeconds: state.cycleSeconds,
+        stopReached: state.stopReached,
       }),
       merge: (persisted, current) => mergeTimerState(persisted, current),
       // Relu au montage par <TimerHydrator /> : le SSR et le 1er rendu client

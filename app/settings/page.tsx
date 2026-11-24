@@ -16,6 +16,7 @@ import CoachModal from "@/components/CoachModal";
 import AmbientBackdrop from "@/components/AmbientBackdrop";
 import { useExpandNavigate } from "@/lib/useExpandNavigate";
 import RoutineSaveModal from "@/components/RoutineSaveModal";
+import StopAtPicker from "@/components/StopAtPicker";
 import { PlannedTask } from "@/lib/coach";
 
 const presetConfig = [
@@ -292,6 +293,8 @@ function SettingsPageInner() {
   const [shortBreak, setShortBreak] = useState(settings.shortBreakDuration);
   const [longBreak, setLongBreak] = useState(settings.longBreakDuration);
   const [sessions, setSessions] = useState(settings.sessionsBeforeLongBreak);
+  // Heure d'arrêt facultative (epoch ms) : appliquée au démarrage, après resetAll.
+  const [stopAt, setStopAt] = useState<number | null>(null);
 
   const { todos, addTodo, setTodoStatus, deleteTodo } = useSessionStore();
   const [todoInput, setTodoInput] = useState("");
@@ -345,6 +348,7 @@ function SettingsPageInner() {
       updateSettings({ workDuration: work, shortBreakDuration: shortBreak, longBreakDuration: longBreak, sessionsBeforeLongBreak: sessions });
     }
     resetAll();
+    if (preset !== "flowtime") useTimerStore.getState().setStopAt(stopAt);
   };
 
   const handleStart = () => {
@@ -656,6 +660,15 @@ function SettingsPageInner() {
               ))}
             </div>
           </div>
+
+          {/* Dernier train : heure d'arrêt (sans objet en Flowtime) */}
+          {preset !== "flowtime" && (
+            <StopAtPicker
+              settings={{ workDuration: work, shortBreakDuration: shortBreak, longBreakDuration: longBreak, sessionsBeforeLongBreak: sessions }}
+              value={stopAt}
+              onChange={setStopAt}
+            />
+          )}
 
           {/* Custom settings (sans objet en Flowtime : chrono libre) */}
           <div className={cn("transition-all duration-300", preset !== "custom" && "opacity-60", preset === "flowtime" && "hidden")}>

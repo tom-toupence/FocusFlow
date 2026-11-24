@@ -20,7 +20,7 @@ export function closeActiveSession(): void {
     const minutes =
       t.settings.preset === "flowtime"
         ? t.accumulateFlow()
-        : Math.round((t.settings.workDuration * 60 - t.secondsLeft) / 60);
+        : Math.round((t.cycleSeconds - t.secondsLeft) / 60);
     if (minutes >= 1) useStatsStore.getState().recordSession(minutes);
   }
   useTimerStore.getState().endSession();
