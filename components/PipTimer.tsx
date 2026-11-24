@@ -52,9 +52,14 @@ function copyStyles(target: Window) {
 export default function PipTimer({
   onDistraction,
   onFlowBreak,
+  onPlay,
+  onPause,
 }: {
   onDistraction: () => void;
   onFlowBreak: () => void;
+  /** Mêmes actions que le bouton Pause de la session et les touches média. */
+  onPlay?: () => void;
+  onPause?: () => void;
 }) {
   const {
     mode, secondsLeft, isRunning, settings, flowSeconds,
@@ -138,7 +143,7 @@ export default function PipTimer({
             </span>
             <div className="flex items-center gap-1.5">
               <button
-                onClick={isRunning ? pause : start}
+                onClick={isRunning ? (onPause ?? pause) : (onPlay ?? start)}
                 className="px-3 py-1.5 rounded-full bg-white/15 hover:bg-white/25 text-white text-[11px] font-semibold transition-colors"
               >
                 {isRunning ? "Pause" : "Reprendre"}

@@ -22,6 +22,7 @@ import { usePlayback, type PlayerAdapter } from "@/lib/playback/types";
 import { useSessionMedia } from "@/lib/playback/useSessionMedia";
 import type { ExtendedEvent, SourceKind } from "@/lib/playback/types";
 import { useIdleHide } from "@/lib/useIdleHide";
+import { useMediaSession } from "@/lib/useMediaSession";
 import { usePrefsStore } from "@/store/prefsStore";
 import { useDistractionStore } from "@/store/distractionStore";
 import { useAchievementsStore } from "@/store/achievementsStore";
@@ -95,6 +96,9 @@ export default function SessionPage() {
   // L'adaptateur de la source en cours (interface de lecture unique, phase 8).
   const [adapter, setAdapter] = useState<PlayerAdapter | null>(null);
   const pb = usePlayback(adapter);
+  // Onglet, écran verrouillé et touches média : lecture/pause = bouton Pause de
+  // la session (minuteur, et la musique suit via l'effet de pilotage commun).
+  useMediaSession({ adapter, pb, onPlay: start, onPause: pause });
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
   // Téléphone : « À venir » replié au départ (la place est comptée).
@@ -737,7 +741,7 @@ export default function SessionPage() {
             )}
 
             {/* Mini-minuteur toujours au premier plan (Document PiP). */}
-            <PipTimer onDistraction={handleDistraction} onFlowBreak={handleFlowBreak} />
+            <PipTimer onDistraction={handleDistraction} onFlowBreak={handleFlowBreak} onPlay={start} onPause={pause} />
 
             {/* Ouvrir chez la source (Twitch). */}
             {media.external && (
