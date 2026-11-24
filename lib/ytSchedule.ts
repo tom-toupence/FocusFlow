@@ -33,11 +33,17 @@ function tsToSeconds(ts: string): number | null {
   return Number(m[1] ?? 0) * 3600 + Number(m[2]) * 60 + Number(m[3]);
 }
 
+/** Au-delà, ce n'est plus un rythme de travail (et la réponse reste petite). */
+export const MAX_CHAPTERS = 200;
+const MAX_TITLE = 120;
+
 function dedupe(chapters: Chapter[]): Chapter[] {
   const seen = new Set<number>();
   return chapters
     .filter((c) => c.title && Number.isFinite(c.startSec) && c.startSec >= 0 && !seen.has(c.startSec) && (seen.add(c.startSec), true))
-    .sort((a, b) => a.startSec - b.startSec);
+    .sort((a, b) => a.startSec - b.startSec)
+    .slice(0, MAX_CHAPTERS)
+    .map((c) => ({ startSec: c.startSec, title: c.title.slice(0, MAX_TITLE) }));
 }
 
 /** Chapitres structurés : barre de lecture (chapterRenderer), sinon panneau (macroMarkersListItemRenderer). */
@@ -85,7 +91,7 @@ export function scheduleFromWatchData(data: unknown, player: unknown): WatchSche
   const durationSec = lengthFrom(player);
   const structured = chaptersFromInitialData(data);
   if (structured.length) return { chapters: structured, durationSec, source: "chapters" };
-  const described = parseChaptersFromDescription(descriptionFrom(data, player));
+  const described = dedupe(parseChaptersFromDescription(descriptionFrom(data, player)));
   if (described.length >= 2) return { chapters: described, durationSec, source: "description" };
   return { chapters: [], durationSec, source: "none" };
 }

@@ -101,6 +101,17 @@ describe("videoSync : transitions", () => {
   });
 });
 
+describe("videoSync : trou (intro, chapitre ignoré)", () => {
+  const withIntro: VideoSchedule = [{ start: 120, end: 3120, kind: "work" }, { start: 3120, end: 3720, kind: "break" }];
+  it("intro : compte jusqu'au bloc 1, jamais créditable (cycleSeconds = secondsLeft)", () => {
+    const p = pilot(0, withIntro);
+    expect(p.view).toMatchObject({ phase: "gap", mode: "work", secondsLeft: 120, cycleSeconds: 120, block: 1 });
+    p.play(60);
+    expect(p.view!.cycleSeconds - p.view!.secondsLeft).toBe(0);
+    expect(p.events).toEqual([]);
+  });
+});
+
 describe("videoSync : seek manuel", () => {
   it("saut en avant dans le bloc : le minuteur se recale, pas de travail fantôme", () => {
     const p = pilot(0);

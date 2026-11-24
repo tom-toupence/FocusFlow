@@ -12,7 +12,7 @@ vi.hoisted(() => {
   g.window = { localStorage: ls };
 });
 
-import { useTimerStore } from "./timerStore";
+import { useTimerStore, mergeTimerState } from "./timerStore";
 import type { VideoSchedule } from "@/lib/videoSchedule";
 
 // « Calé sur la vidéo » : le minuteur piloté par le temps de la vidéo.
@@ -83,5 +83,65 @@ describe("timerStore piloté par la vidéo", () => {
     st().applyPreset("flowtime");
     st().startVideoSync("v", S);
     expect(st().videoSync).toBeNull();
+  });
+
+  it("trou (intro) : Terminer n'y crédite rien", () => {
+    const intro: VideoSchedule = [{ start: 120, end: 3120, kind: "work" }, { start: 3120, end: 3720, kind: "break" }];
+    st().startVideoSync("v", intro);
+    let wall = T0;
+    for (let t = 0; t <= 90; t++) st().syncVideo(t, (wall += 1000));
+    // même calcul que handleStop et closeActiveSession
+    expect(st().mode).toBe("work");
+    expect(st().cycleSeconds - st().secondsLeft).toBe(0);
+  });
+
+  it("bascule en cours de cycle normal : rend le travail déjà fait, à créditer", () => {
+    vi.setSystemTime(T0 + 10 * 60_000);
+    st().tick();
+    expect(st().startVideoSync("v", S)).toBe(600);
+  });
+
+  it("sortie de /session : crédit une seule fois, puis reprise inerte et sans double crédit", () => {
+    st().startVideoSync("v", S);
+    let wall = T0;
+    for (let t = 1000; t <= 1300; t++) st().syncVideo(t, (wall += 1000));
+    expect(st().suspendVideoSync()).toBe(300);
+    expect(st().suspendVideoSync()).toBe(0);
+    expect(st()).toMatchObject({ videoSync: null, videoSyncActive: { videoId: "v" } });
+    expect(st().cycleSeconds - st().secondsLeft).toBe(0);
+    // En attente de reprise : l'horloge ne fait pas avancer le minuteur.
+    const left = st().secondsLeft;
+    vi.setSystemTime(T0 + 5 * 60_000);
+    st().tick();
+    expect(st().secondsLeft).toBe(left);
+    // Reprise du calage sur la même vidéo : rien à créditer.
+    expect(st().startVideoSync("v", S)).toBe(0);
+  });
+
+  it("rechargement : l'indicateur de calage est persisté et relu", () => {
+    st().startVideoSync("v", S);
+    const raw = JSON.parse(localStorage.getItem("focusflow-timer")!).state;
+    expect(raw.videoSyncActive).toEqual({ videoId: "v", gap: false });
+    const merged = mergeTimerState(raw, { ...st(), videoSync: null }, T0);
+    expect(merged.videoSyncActive).toEqual({ videoId: "v", gap: false });
+    expect(merged.videoSync).toBeNull();
+  });
+
+  it("pas de rythme au retour : stopVideoSync efface l'attente et relance le décompte", () => {
+    st().startVideoSync("v", S);
+    st().syncVideo(2000, T0);
+    st().suspendVideoSync();
+    st().stopVideoSync();
+    expect(st()).toMatchObject({ videoSyncActive: null, secondsLeft: 1000, endsAt: T0 + 1000 * 1000 });
+  });
+
+  it("trou puis reprise impossible : jamais de décompte de travail sur l'intro", () => {
+    const intro: VideoSchedule = [{ start: 120, end: 3120, kind: "work" }, { start: 3120, end: 3720, kind: "break" }];
+    st().startVideoSync("v", intro);
+    st().syncVideo(30, T0);
+    expect(st().videoSyncActive).toEqual({ videoId: "v", gap: true });
+    st().suspendVideoSync();
+    st().stopVideoSync();
+    expect(st()).toMatchObject({ videoSyncActive: null, mode: "work", secondsLeft: 25 * 60, cycleSeconds: 25 * 60 });
   });
 });

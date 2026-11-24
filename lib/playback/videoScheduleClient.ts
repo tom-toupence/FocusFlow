@@ -46,8 +46,8 @@ export function resolveVideoSchedule(youtubeId: string): Promise<ResolvedSchedul
   return p;
 }
 
-/** Rythme de la vidéo `youtubeId` (null : inconnu, en cours, ou aucun rythme). */
-export function useVideoSchedule(youtubeId: string | null): ResolvedSchedule | null {
+/** Rythme de la vidéo `youtubeId` : undefined tant que c'est en cours, null si aucun (ou pas de vidéo). */
+export function useVideoSchedule(youtubeId: string | null): ResolvedSchedule | null | undefined {
   const [state, setState] = useState<{ id: string; value: ResolvedSchedule | null } | null>(null);
   useEffect(() => {
     if (!youtubeId) return;
@@ -55,5 +55,6 @@ export function useVideoSchedule(youtubeId: string | null): ResolvedSchedule | n
     void resolveVideoSchedule(youtubeId).then((value) => { if (!cancelled) setState({ id: youtubeId, value }); });
     return () => { cancelled = true; };
   }, [youtubeId]);
-  return youtubeId && state?.id === youtubeId ? state.value : null;
+  if (!youtubeId) return null;
+  return state?.id === youtubeId ? state.value : undefined;
 }

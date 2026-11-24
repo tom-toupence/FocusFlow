@@ -13,6 +13,7 @@ import { upsertProfile } from "@/lib/db";
 import { exportBackup, importBackup } from "@/lib/backup";
 import { getCurrentUserId } from "@/lib/authState";
 import { cn } from "@/lib/utils";
+import AgendaSettings from "@/components/AgendaSettings";
 
 interface Props {
   open: boolean;
@@ -359,6 +360,9 @@ export default function ProfilePanel({ open, onClose }: Props) {
             />
           </label>
         </div>
+
+        {/* ── Agenda : adresse iCal privée, locale à ce navigateur ─────────── */}
+        <AgendaSettings />
 
         {/* ── Mes données (export / import localStorage) ───────────────────── */}
         <div className="p-3 pt-0 space-y-2">

@@ -63,3 +63,27 @@ describe("ytSchedule : chapitres de la page watch", () => {
     expect(scheduleFromWatchHtml("<html>consent</html>")).toEqual({ chapters: [], durationSec: 0, source: "none" });
   });
 });
+
+describe("ytSchedule : bornes", () => {
+  it("nombre de chapitres borné", async () => {
+    const { MAX_CHAPTERS } = await import("./ytSchedule");
+    const many = Array.from({ length: 500 }, (_, i) => ({ chapterRenderer: { title: { simpleText: `Focus ${i}` }, timeRangeStartMillis: i * 60_000 } }));
+    const r = scheduleFromWatchData({ markers: many }, { videoDetails: { lengthSeconds: "40000" } });
+    expect(r.chapters).toHaveLength(MAX_CHAPTERS);
+  });
+});
+
+describe("ytParse : cache et lecture bornés", async () => {
+  const { makeTtlCache, readTextLimited } = await import("./ytParse");
+  it("makeTtlCache retire les plus anciennes au-delà de maxEntries", () => {
+    const c = makeTtlCache<number>(60_000, 3);
+    for (let i = 0; i < 5; i++) c.set(`k${i}`, i);
+    expect(c.size).toBe(3);
+    expect(c.get("k0")).toBeUndefined();
+    expect(c.get("k4")).toBe(4);
+  });
+  it("readTextLimited : null au-delà de la taille permise", async () => {
+    expect(await readTextLimited(new Response("x".repeat(100)), 50)).toBeNull();
+    expect(await readTextLimited(new Response("bonjour"), 50)).toBe("bonjour");
+  });
+});

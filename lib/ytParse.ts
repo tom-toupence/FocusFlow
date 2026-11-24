@@ -105,11 +105,45 @@ export function makeTtlCache<T>(ttlMs: number, maxEntries = 200) {
       return undefined;
     },
     set(key: string, value: T) {
+      cache.delete(key); // réinsertion : l'ordre de la Map reste celui des écritures
       cache.set(key, { value, at: Date.now() });
       if (cache.size > maxEntries) {
         const now = Date.now();
         for (const [k, v] of cache) if (now - v.at >= ttlMs) cache.delete(k);
+        // Toujours trop : on retire les plus anciennes (début de la Map).
+        for (const k of cache.keys()) {
+          if (cache.size <= maxEntries) break;
+          cache.delete(k);
+        }
       }
     },
+    get size() { return cache.size; },
   };
+}
+
+/**
+ * Corps texte d'une réponse, lu au plus jusqu'à `maxBytes` (null au-delà) :
+ * une page anormalement grosse ne doit pas saturer la mémoire du serveur.
+ */
+export async function readTextLimited(res: Response, maxBytes: number): Promise<string | null> {
+  const declared = Number(res.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) return null;
+  if (!res.body) return null;
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) { all.set(c, off); off += c.byteLength; }
+  return new TextDecoder().decode(all);
 }

@@ -81,3 +81,14 @@ test("vidéo sans rythme (tracklist) : pas de bouton, minuteur normal", async ({
   await expect(label(page)).toHaveText(/^Pomodoro \d+$/);
   await expect(page.getByRole("button", { name: "Calé sur la vidéo" })).toHaveCount(0);
 });
+
+test("rechargement en plein bloc : le minuteur attend la vidéo puis se recale", async ({ page }) => {
+  await setup(page, 1200);
+  await expect(label(page)).toHaveText("Calé sur la vidéo · bloc 1 / 3");
+  const active = await page.evaluate(() => JSON.parse(localStorage.getItem("focusflow-timer")!).state.videoSyncActive);
+  expect(active).toMatchObject({ videoId: expect.any(String) });
+  // Au rechargement, le faux lecteur repart à 20 min (même position que la vidéo).
+  await page.reload();
+  await expect(label(page)).toHaveText("Calé sur la vidéo · bloc 1 / 3");
+  await expect(timer(page)).toHaveText(/^(30:00|29:[345]\d)$/);
+});

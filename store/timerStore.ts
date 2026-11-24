@@ -4,8 +4,10 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { remainingSeconds, elapsedSeconds, isAbandoned } from "@/lib/timerClock";
 import { nextCycleSeconds } from "@/lib/stopPlan";
-import { freshCursor, stepVideoSync, type VideoSyncEvent, type VideoSyncState, type VideoSyncView } from "@/lib/videoSync";
+import { freshCursor, stepVideoSync, MIN_CREDIT_SEC, type VideoSyncEvent, type VideoSyncState, type VideoSyncView } from "@/lib/videoSync";
 import type { VideoSchedule } from "@/lib/videoSchedule";
+import { activeEvents, breakExtension, eventKey, workFit, type AgendaMeeting, type AgendaNotice } from "@/lib/agendaTimer";
+import { useAgendaStore } from "@/store/agendaStore";
 
 export type TimerMode = "work" | "short-break" | "long-break";
 
@@ -70,6 +72,19 @@ interface TimerState {
   videoSync: VideoSyncState | null;
   // Dernier état calculé (bloc n / total, phase) pour l'affichage.
   videoSyncView: VideoSyncView | null;
+  // Persisté : une session calée est en cours sur cette vidéo. Au rechargement
+  // (ou au retour sur /session), tick reste inerte jusqu'à la reprise du calage,
+  // au lieu de repartir sur des valeurs périmées. Effacé par stopVideoSync.
+  // `gap` : la vidéo était dans un trou (intro…), rien n'y est créditable.
+  videoSyncActive: { videoId: string; gap?: boolean } | null;
+
+  // Agenda (lot 4) : proposition affichée sous le minuteur (non persistée),
+  // réunion pendant laquelle la pause est rallongée (persistée), événements
+  // ignorés pour la session ou pour le cycle en cours (« Garder 25 min »).
+  agendaNotice: AgendaNotice | null;
+  agendaMeeting: AgendaMeeting | null;
+  agendaIgnored: string[];
+  agendaCycleIgnored: string[];
 
   applyPreset: (preset: TimerPreset) => void;
   updateSettings: (settings: Partial<TimerSettings>) => void;
@@ -88,11 +103,31 @@ interface TimerState {
   // Fin de session : désactive sans effacer sessionsCompleted/flowMinutesTotal (lus par /summary).
   endSession: () => void;
   /** Active le pilotage par la vidéo (le premier syncVideo pose mode et secondes). */
-  startVideoSync: (videoId: string, schedule: VideoSchedule) => void;
+  /**
+   * Active le pilotage par la vidéo (le premier syncVideo pose mode et secondes).
+   * Rend les secondes de travail du cycle normal écoulées avant la bascule, à
+   * créditer en partiel (0 à la reprise d'une session déjà calée).
+   */
+  startVideoSync: (videoId: string, schedule: VideoSchedule) => number;
   /** La vidéo est à `t` s : recale le minuteur, rend les transitions à traiter. */
   syncVideo: (t: number, wallMs?: number) => VideoSyncEvent[];
   /** Retour au minuteur normal : `fresh` = nouveau cycle de travail, sinon on continue le décompte en cours. */
   stopVideoSync: (fresh?: boolean) => void;
+  /**
+   * Sortie de /session (démontage, pagehide) en plein calage : rend les secondes
+   * de travail jouées à créditer (une seule fois : elles sont remises à zéro) et
+   * garde videoSyncActive pour reprendre le calage au retour.
+   */
+  suspendVideoSync: () => number;
+  /** Agenda : annule le raccourci du cycle en cours (durée pleine). */
+  keepFullCycle: () => void;
+  /** Agenda : oublie l'événement de la proposition pour la session. */
+  ignoreAgendaEvent: () => void;
+  /** Agenda : « Attendre » la fin de la réunion (pause jusqu'à sa fin). */
+  waitForMeeting: () => void;
+  dismissAgendaNotice: () => void;
+  /** Agenda relu : ajuste le cycle de travail en cours s'il chevauche un événement. */
+  refitAgenda: () => void;
 }
 
 const defaultSettings: TimerSettings = {
@@ -130,7 +165,19 @@ const STOP_REACHED = (settings: TimerSettings, now: number) => ({
 });
 
 const CLEARED = { endsAt: null, flowStartedAt: null } as const;
-const NO_SYNC = { videoSync: null, videoSyncView: null } as const;
+const NO_SYNC = { videoSync: null, videoSyncView: null, videoSyncActive: null } as const;
+/** Calage en cours ou en attente de reprise : l'horloge ne fait pas avancer le minuteur. */
+const synced = (s: Pick<TimerState, "videoSync" | "videoSyncActive">) => s.videoSync != null || s.videoSyncActive != null;
+
+const NO_AGENDA = { agendaNotice: null, agendaMeeting: null, agendaIgnored: [] as string[], agendaCycleIgnored: [] as string[] };
+
+/** L'agenda s'applique : ni en Flowtime (pas de durée), ni calé sur la vidéo (rythme du créateur). */
+const agendaOn = (s: Pick<TimerState, "settings" | "videoSync" | "videoSyncActive">) =>
+  s.settings.preset !== "flowtime" && !synced(s);
+
+/** Événements à respecter maintenant (hors ignorés pour la session et le cycle). */
+const agendaEventsFor = (s: Pick<TimerState, "agendaIgnored" | "agendaCycleIgnored">, now: number, extra: string[] = []) =>
+  activeEvents(useAgendaStore.getState().events, [...s.agendaIgnored, ...s.agendaCycleIgnored, ...extra], now);
 
 /** Heure d'arrêt applicable (pas en Flowtime). */
 const stopAtOf = (s: Pick<TimerState, "stopAt" | "settings">): number | null =>
@@ -141,7 +188,7 @@ type PersistedTimer = Pick<
   TimerState,
   | "settings" | "mode" | "secondsLeft" | "endsAt" | "isRunning" | "sessionsCompleted"
   | "flowSeconds" | "flowStartedAt" | "flowMinutesTotal" | "flowBreakTotal" | "active" | "updatedAt"
-  | "stopAt" | "cycleSeconds" | "stopReached"
+  | "stopAt" | "cycleSeconds" | "stopReached" | "videoSyncActive" | "agendaMeeting"
 >;
 
 export const TIMER_PERSIST_VERSION = 2;
@@ -178,6 +225,8 @@ export function mergeTimerState(
     stopAt: p.stopAt ?? null,
     cycleSeconds: typeof p.cycleSeconds === "number" ? p.cycleSeconds : getDuration(p.mode ?? "work", settings),
     stopReached: p.stopReached ?? false,
+    videoSyncActive: p.videoSyncActive ?? null,
+    agendaMeeting: p.agendaMeeting ?? null,
   };
 
   if (isAbandoned(merged, now)) {
@@ -196,6 +245,8 @@ export function mergeTimerState(
       stopAt: null,
       cycleSeconds: getDuration("work", settings),
       stopReached: false,
+      videoSyncActive: null,
+      agendaMeeting: null,
     };
   }
 
@@ -233,6 +284,11 @@ export const useTimerStore = create<TimerState>()(
       hydrated: false,
       videoSync: null,
       videoSyncView: null,
+      videoSyncActive: null,
+      agendaNotice: null,
+      agendaMeeting: null,
+      agendaIgnored: [],
+      agendaCycleIgnored: [],
 
       applyPreset: (preset) => {
         const values = PRESETS[preset];
@@ -254,7 +310,7 @@ export const useTimerStore = create<TimerState>()(
       // Recalcule depuis l'horloge (idempotent : appelable à tout moment, en retard ou non).
       tick: () => {
         const s = get();
-        if (!s.isRunning || s.videoSync) return; // calé : c'est la vidéo qui fait avancer
+        if (!s.isRunning || synced(s)) return; // calé : c'est la vidéo qui fait avancer
         const now = Date.now();
         if (isFlowWork(s)) {
           const flow = liveFlowSeconds(s, now);
@@ -273,7 +329,7 @@ export const useTimerStore = create<TimerState>()(
       start: () => {
         const s = get();
         const now = Date.now();
-        if (s.videoSync) {
+        if (synced(s)) {
           set({ isRunning: true, endsAt: null, flowStartedAt: null, active: true, updatedAt: now });
           return;
         }
@@ -302,7 +358,31 @@ export const useTimerStore = create<TimerState>()(
             secondsLeft = planned;
             cycleSeconds = planned;
           }
+          // Agenda : un cycle de travail neuf ne chevauche jamais un événement.
+          // Raccourci par défaut (proposition visible, annulable) ; trop court :
+          // on ne démarre pas et on demande. Un 2e démarrage = « quand même ».
+          let agendaNotice = s.agendaNotice;
+          let agendaCycleIgnored = s.agendaCycleIgnored;
+          if (s.mode === "work" && agendaOn(s) && !s.isRunning && (!s.active || s.secondsLeft === s.cycleSeconds)) {
+            if (agendaNotice?.kind === "tooShort") agendaCycleIgnored = [...agendaCycleIgnored, eventKey(agendaNotice.event)];
+            const base = agendaNotice?.kind === "fit" && stopAt == null ? agendaNotice.fullSeconds : secondsLeft;
+            const fit = workFit({
+              now, baseSeconds: base, settings: s.settings,
+              events: agendaEventsFor({ ...s, agendaCycleIgnored }, now),
+            });
+            if (fit.kind === "tooShort") {
+              set({ agendaNotice: fit.notice, secondsLeft: base, cycleSeconds: base, active: true, updatedAt: now });
+              return;
+            }
+            agendaNotice = fit.kind === "fit" ? fit.notice : null;
+            secondsLeft = fit.kind === "fit" ? fit.seconds : base;
+            cycleSeconds = secondsLeft;
+          } else if (agendaNotice?.kind === "resume") {
+            agendaNotice = null;
+          }
           set({
+            agendaNotice,
+            agendaCycleIgnored,
             isRunning: true,
             secondsLeft,
             cycleSeconds,
@@ -318,7 +398,7 @@ export const useTimerStore = create<TimerState>()(
         const s = get();
         const now = Date.now();
         if (!s.isRunning) return;
-        if (s.videoSync) {
+        if (synced(s)) {
           set({ isRunning: false, ...CLEARED, updatedAt: now });
           return;
         }
@@ -369,17 +449,49 @@ export const useTimerStore = create<TimerState>()(
           }
           duration = planned;
         }
+        // Agenda : la pause tombe sur une réunion -> rallongée jusqu'à sa fin ;
+        // fin de la réunion -> on attend « Reprendre » ; un cycle de travail
+        // neuf ne chevauche jamais un événement.
+        const cur = get();
+        let run = autoStart;
+        let agendaNotice: AgendaNotice | null = null;
+        let agendaMeeting: AgendaMeeting | null = null;
+        if (agendaOn(cur)) {
+          const events = agendaEventsFor({ ...cur, agendaCycleIgnored: [] }, now);
+          if (nextMode !== "work") {
+            const ext = breakExtension({ now, breakSeconds: duration, settings, events, stopAt });
+            duration = ext.seconds;
+            agendaMeeting = ext.meeting;
+          } else {
+            const m = cur.agendaMeeting;
+            if (m && now >= m.until - 1000) {
+              agendaNotice = { kind: "resume", event: m.event };
+              run = false;
+            }
+            const fit = workFit({ now, baseSeconds: duration, settings, events });
+            if (fit.kind === "tooShort") {
+              agendaNotice = fit.notice;
+              run = false;
+            } else if (fit.kind === "fit") {
+              duration = fit.seconds;
+              if (!agendaNotice) agendaNotice = fit.notice;
+            }
+          }
+        }
         set({
           mode: nextMode,
           secondsLeft: duration,
           cycleSeconds: duration,
           stopReached: false,
-          isRunning: autoStart,
+          isRunning: run,
           sessionsCompleted: newSessionsCompleted,
           flowSeconds: 0,
-          endsAt: autoStart && !flowWork ? now + duration * 1000 : null,
-          flowStartedAt: autoStart && flowWork ? now : null,
+          endsAt: run && !flowWork ? now + duration * 1000 : null,
+          flowStartedAt: run && flowWork ? now : null,
           updatedAt: now,
+          agendaNotice,
+          agendaMeeting,
+          agendaCycleIgnored: [],
         });
       },
 
@@ -419,7 +531,7 @@ export const useTimerStore = create<TimerState>()(
       },
 
       endSession: () => {
-        set({ active: false, isRunning: false, endsAt: null, flowStartedAt: null, updatedAt: null, stopAt: null, stopReached: false, ...NO_SYNC });
+        set({ active: false, isRunning: false, endsAt: null, flowStartedAt: null, updatedAt: null, stopAt: null, stopReached: false, ...NO_SYNC, ...NO_AGENDA });
       },
 
       resetAll: () => {
@@ -439,6 +551,7 @@ export const useTimerStore = create<TimerState>()(
           stopAt: null,
           stopReached: false,
           ...NO_SYNC,
+          ...NO_AGENDA,
         });
       },
 
@@ -474,21 +587,32 @@ export const useTimerStore = create<TimerState>()(
       startVideoSync: (videoId, schedule) => {
         // Flowtime et heure d'arrêt ont leur propre horloge : incompatibles.
         const s = get();
-        if (s.settings.preset === "flowtime" || s.stopAt != null || schedule.length === 0) return;
-        set({ videoSync: { videoId, schedule, cursor: freshCursor() }, videoSyncView: null, ...CLEARED, stopReached: false });
+        if (s.settings.preset === "flowtime" || s.stopAt != null || schedule.length === 0) return 0;
+        // Travail du cycle normal déjà fait (bascule en cours de cycle) ; rien à la
+        // reprise d'un calage (ses secondes jouées ont été créditées à la sortie).
+        const resuming = s.videoSyncActive?.videoId === videoId;
+        const left = s.isRunning && s.endsAt != null ? remainingSeconds(s.endsAt, Date.now()) : s.secondsLeft;
+        const elapsed = !resuming && s.mode === "work" && !s.stopReached ? Math.max(0, s.cycleSeconds - left) : 0;
+        set({
+          videoSync: { videoId, schedule, cursor: freshCursor() }, videoSyncView: null, videoSyncActive: { videoId, gap: false },
+          ...CLEARED, stopReached: false, agendaNotice: null,
+        });
+        return elapsed;
       },
 
       syncVideo: (t, wallMs = Date.now()) => {
         const s = get();
         if (!s.videoSync) return [];
         const r = stepVideoSync(s.videoSync, t, wallMs);
-        const completed = r.events.filter((e) => e.type === "work-end" && e.creditSec >= 60).length;
+        const completed = r.events.filter((e) => e.type === "work-end" && e.creditSec >= MIN_CREDIT_SEC).length;
         const patch: Partial<TimerState> = {
           videoSync: { ...s.videoSync, cursor: r.cursor },
           videoSyncView: r.view,
           sessionsCompleted: s.sessionsCompleted + completed,
           updatedAt: wallMs,
         };
+        const gap = r.view?.phase === "gap";
+        if (!!s.videoSyncActive?.gap !== gap) patch.videoSyncActive = { videoId: s.videoSync.videoId, gap };
         if (r.view) {
           patch.mode = r.view.mode;
           patch.secondsLeft = r.view.secondsLeft;
@@ -500,9 +624,10 @@ export const useTimerStore = create<TimerState>()(
 
       stopVideoSync: (fresh = false) => {
         const s = get();
-        if (!s.videoSync) return;
+        if (!synced(s)) return;
         const now = Date.now();
-        if (fresh) {
+        // Un trou ne se prolonge jamais en décompte de travail (ce serait du crédit fantôme).
+        if (fresh || s.videoSyncView?.phase === "gap" || s.videoSyncActive?.gap) {
           const duration = s.settings.workDuration * 60;
           set({
             ...NO_SYNC, mode: "work", secondsLeft: duration, cycleSeconds: duration,
@@ -511,6 +636,103 @@ export const useTimerStore = create<TimerState>()(
         } else {
           // Le décompte en cours continue à l'horloge (crédit : cycleSeconds reste « joué + restant »).
           set({ ...NO_SYNC, endsAt: s.isRunning ? now + s.secondsLeft * 1000 : null, flowStartedAt: null, updatedAt: now });
+        }
+      },
+
+      suspendVideoSync: () => {
+        const s = get();
+        if (!s.videoSync) return 0;
+        const work = s.videoSyncView?.phase === "work";
+        const credit = work ? Math.round(s.videoSync.cursor.workedSec) : 0;
+        set({
+          videoSync: null, videoSyncView: null,
+          // Plus rien de « joué » dans le cycle : Terminer ou closeActiveSession ne recréditent pas.
+          ...(work ? { cycleSeconds: s.secondsLeft } : {}),
+          updatedAt: Date.now(),
+        });
+        return credit;
+      },
+
+      keepFullCycle: () => {
+        const s = get();
+        const n = s.agendaNotice;
+        if (n?.kind !== "fit" || s.mode !== "work") return;
+        const now = Date.now();
+        const left = s.isRunning && s.endsAt != null ? remainingSeconds(s.endsAt, now) : s.secondsLeft;
+        const secondsLeft = Math.max(0, left + n.fullSeconds - s.cycleSeconds);
+        set({
+          cycleSeconds: n.fullSeconds,
+          secondsLeft,
+          endsAt: s.isRunning ? now + secondsLeft * 1000 : null,
+          agendaNotice: null,
+          agendaCycleIgnored: [...s.agendaCycleIgnored, eventKey(n.event)],
+          updatedAt: now,
+        });
+      },
+
+      ignoreAgendaEvent: () => {
+        const s = get();
+        const n = s.agendaNotice;
+        if (!n) return;
+        set({ agendaIgnored: [...s.agendaIgnored, eventKey(n.event)] });
+        if (n.kind === "fit") get().keepFullCycle();
+        else if (n.kind === "tooShort") { set({ agendaNotice: null }); get().start(); }
+        else set({ agendaNotice: null });
+      },
+
+      waitForMeeting: () => {
+        const s = get();
+        const n = s.agendaNotice;
+        if (n?.kind !== "tooShort") return;
+        const now = Date.now();
+        const seconds = Math.max(1, Math.ceil((n.until - now) / 1000));
+        set({
+          mode: "short-break",
+          secondsLeft: seconds,
+          cycleSeconds: seconds,
+          isRunning: true,
+          endsAt: now + seconds * 1000,
+          flowStartedAt: null,
+          flowSeconds: 0,
+          stopReached: false,
+          active: true,
+          agendaNotice: null,
+          agendaMeeting: { event: n.event, until: n.until },
+          agendaCycleIgnored: [],
+          updatedAt: now,
+        });
+      },
+
+      dismissAgendaNotice: () => set({ agendaNotice: null }),
+
+      refitAgenda: () => {
+        const s = get();
+        if (!agendaOn(s) || s.mode !== "work" || s.stopReached || !s.isRunning || s.endsAt == null) return;
+        const now = Date.now();
+        const left = remainingSeconds(s.endsAt, now);
+        const elapsed = Math.max(0, s.cycleSeconds - left);
+        const events = agendaEventsFor(s, now);
+        const full = s.agendaNotice?.kind === "fit" ? s.agendaNotice.fullSeconds : s.cycleSeconds;
+        if (elapsed < 60) {
+          // Cycle qui vient de démarrer (agenda arrivé juste après) : comme un départ.
+          const fit = workFit({ now, baseSeconds: full - elapsed, settings: s.settings, events });
+          if (fit.kind === "tooShort") {
+            set({ isRunning: false, ...CLEARED, secondsLeft: full, cycleSeconds: full, agendaNotice: { ...fit.notice, fullSeconds: full }, updatedAt: now });
+          } else if (fit.kind === "fit" && fit.seconds < left) {
+            set({
+              secondsLeft: fit.seconds, cycleSeconds: elapsed + fit.seconds, endsAt: now + fit.seconds * 1000,
+              agendaNotice: { ...fit.notice, fullSeconds: full }, updatedAt: now,
+            });
+          }
+          return;
+        }
+        // En plein cycle : on finit avant l'événement (au moins 1 min devant).
+        const fit = workFit({ now, baseSeconds: left, settings: s.settings, events, minWorkMin: 1 });
+        if (fit.kind === "fit" && fit.seconds < left) {
+          set({
+            secondsLeft: fit.seconds, cycleSeconds: elapsed + fit.seconds, endsAt: now + fit.seconds * 1000,
+            agendaNotice: { ...fit.notice, fullSeconds: full }, updatedAt: now,
+          });
         }
       },
     }),
@@ -534,6 +756,8 @@ export const useTimerStore = create<TimerState>()(
         stopAt: state.stopAt,
         cycleSeconds: state.cycleSeconds,
         stopReached: state.stopReached,
+        videoSyncActive: state.videoSyncActive,
+        agendaMeeting: state.agendaMeeting,
       }),
       merge: (persisted, current) => mergeTimerState(persisted, current),
       // Relu au montage par <TimerHydrator /> : le SSR et le 1er rendu client

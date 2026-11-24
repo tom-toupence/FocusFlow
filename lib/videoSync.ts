@@ -14,6 +14,11 @@ export type SyncMode = "work" | "short-break" | "long-break";
 export const LONG_BREAK_SEC = 15 * 60;
 /** Tolérance (s) entre l'avance de la vidéo et celle de l'horloge. */
 const PLAY_TOLERANCE_SEC = 2;
+/**
+ * Seuil unique de crédit (s) : en dessous, un bloc ne compte ni en minutes ni
+ * en pomodoro (store : sessionsCompleted ; session : crédit stats/XP/projet).
+ */
+export const MIN_CREDIT_SEC = 60;
 /** Fin de vidéo (bouclée) : on était à moins de 3 s de la fin du rythme. */
 const WRAP_MARGIN_SEC = 3;
 
@@ -85,11 +90,12 @@ function view(schedule: VideoSchedule, t: number, workedSec: number): VideoSyncV
     };
   }
   // Trou (intro, chapitre ignoré) : compte jusqu'au prochain segment, sans crédit.
+  // cycleSeconds = secondsLeft : « cycleSeconds − secondsLeft » (Terminer,
+  // closeActiveSession) vaut toujours 0, aucun travail fantôme.
   const nextIdx = schedule.findIndex((s) => s.start > t);
   if (nextIdx < 0) return null;
-  const prevEnd = nextIdx > 0 ? schedule[nextIdx - 1].end : 0;
   const left = Math.max(1, Math.ceil(schedule[nextIdx].start - t));
-  return { phase: "gap", mode: "work", secondsLeft: left, cycleSeconds: Math.max(left, Math.round(schedule[nextIdx].start - prevEnd)), block: blockNumber(schedule, nextIdx), blocks };
+  return { phase: "gap", mode: "work", secondsLeft: left, cycleSeconds: left, block: blockNumber(schedule, nextIdx), blocks };
 }
 
 /** Fin du rythme : après le dernier segment. */

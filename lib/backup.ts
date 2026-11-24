@@ -14,13 +14,25 @@ interface BackupFile {
   data: Record<string, string>;
 }
 
+/** L'adresse iCal privée donne accès à tout l'agenda : jamais dans un fichier exporté. */
+function withoutSecrets(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw) as { state?: Record<string, unknown> };
+    if (parsed?.state && "icalUrl" in parsed.state) {
+      parsed.state = { ...parsed.state, icalUrl: null };
+      return JSON.stringify(parsed);
+    }
+  } catch { /* valeur illisible : exportée telle quelle */ }
+  return raw;
+}
+
 export function exportBackup(): void {
   const data: Record<string, string> = {};
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (!key?.startsWith(KEY_PREFIX)) continue;
     const value = localStorage.getItem(key);
-    if (value !== null) data[key] = value;
+    if (value !== null) data[key] = key === "focusflow-prefs" ? withoutSecrets(value) : value;
   }
 
   const backup: BackupFile = {

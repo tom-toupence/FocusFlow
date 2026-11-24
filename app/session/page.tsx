@@ -37,8 +37,10 @@ import { formatHM, pomodorosLeft } from "@/lib/stopPlan";
 import { CHEER_EVENT } from "@/store/chatStore";
 import { RADIO_NAME } from "@/lib/radioProgram";
 import { useVideoSchedule } from "@/lib/playback/videoScheduleClient";
-import { arrivalChoice, scheduleEnd } from "@/lib/videoSync";
+import { arrivalChoice, scheduleEnd, MIN_CREDIT_SEC } from "@/lib/videoSync";
 import { nextWorkStart } from "@/lib/videoSchedule";
+import { useAgendaStore, AGENDA_REFRESH_MS } from "@/store/agendaStore";
+import { eventLabel, type AgendaNotice } from "@/lib/agendaTimer";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -68,6 +70,10 @@ export default function SessionPage() {
     tick, start, pause, nextSession, finishFlow, accumulateFlow,
   } = useTimerStore();
   const isFlowtime = settings.preset === "flowtime";
+  // Agenda : proposition sous le minuteur, réunion qui rallonge la pause.
+  const agendaNotice = useTimerStore((st) => st.agendaNotice);
+  const agendaMeeting = useTimerStore((st) => st.agendaMeeting);
+  const icalUrl = usePrefsStore((st) => st.icalUrl);
   const { todos } = useSessionStore();
   const { recordSession } = useStatsStore();
   const { startSession } = useSessionSummaryStore();
@@ -265,17 +271,27 @@ export default function SessionPage() {
     nextSession(autoStart);
     // Fin de plan « Dernier train » : rien ne s'enchaîne, on le dit (son, lueur, notification).
     const reached = useTimerStore.getState().stopReached;
+    // Agenda : fin de la réunion, la session attend qu'on la reprenne.
+    const after = useTimerStore.getState();
+    const resume = after.agendaNotice?.kind === "resume";
+    if (resume) toast({ title: "Réunion finie", description: "Reprendre ? Le bouton est sous le minuteur.", accent: "sky" });
     if (reached) {
       playBreakChime();
       setTimeout(() => setBloomKey((k) => k + 1), 0);
     }
     if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-      new Notification("FocusFlow", {
+      const n = new Notification("FocusFlow", {
         body: reached
           ? "Heure d'arrêt atteinte."
-          : mode === "work" ? "Session terminée ! Pause en cours." : "Pause terminée ! C'est reparti.",
+          : resume
+            ? "Réunion finie. Reprendre ?"
+            : mode === "work"
+              ? after.agendaMeeting ? "Pomodoro terminé. Pause jusqu'à la fin de la réunion." : "Session terminée ! Pause en cours."
+              : "Pause terminée ! C'est reparti.",
         icon: "/favicon.ico",
       });
+      // Un clic sur « Reprendre ? » relance la session (même média, mêmes tâches).
+      if (resume) n.onclick = () => { window.focus(); useTimerStore.getState().start(); n.close(); };
     }
   }, [mode, nextSession, recordSession, recordPlay]);
 
@@ -285,6 +301,19 @@ export default function SessionPage() {
     if (initDoneRef.current && prevSecondsRef.current > 0 && secondsLeft === 0) handleSessionEnd();
     prevSecondsRef.current = secondsLeft;
   }, [secondsLeft, handleSessionEnd]);
+
+  // ── Agenda : relu au démarrage, puis toutes les 15 min pendant la session ──
+  // En erreur ou hors ligne, l'agendaStore garde les derniers événements connus.
+  useEffect(() => {
+    if (!icalUrl) return;
+    let alive = true;
+    const run = () => useAgendaStore.getState().refresh().then(() => {
+      if (alive) useTimerStore.getState().refitAgenda();
+    });
+    run();
+    const id = setInterval(() => { if (useTimerStore.getState().active) run(); }, AGENDA_REFRESH_MS);
+    return () => { alive = false; clearInterval(id); };
+  }, [icalUrl]);
 
   // ── Démarrage ou reprise (une seule fois, une fois le minuteur relu) ─────────
   // Session déjà active (navigation, rechargement) : on la reprend telle quelle (en
@@ -311,27 +340,12 @@ export default function SessionPage() {
     start();
   }, [hydrated, tick, handleSessionEnd]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Calé sur la vidéo : activation, pilotage, transitions ─────────────────
-  useEffect(() => {
-    if (!hydrated || !adapter) return;
-    const st = useTimerStore.getState();
-    if (st.videoSync) {
-      if (!caleAvailable || !caleWanted || st.videoSync.videoId !== caleVideoId) {
-        // Retour au minuteur normal : on continue le décompte (un trou repart à neuf).
-        st.stopVideoSync(st.videoSyncView?.phase === "gap");
-      }
-    } else if (caleAvailable && caleWanted && caleVideoId && caleResolved) {
-      st.startVideoSync(caleVideoId, caleResolved.schedule);
-    }
-  }, [hydrated, adapter, caleAvailable, caleWanted, caleVideoId, caleResolved]);
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { if (!caleOn) setArrival(null); }, [caleOn]);
-
   // Fin d'un bloc de la vidéo : le même chemin qu'une fin de cycle (crédit, XP,
   // projet, objectif ; les sons et la lueur suivent le changement de mode).
+  // Seuil partagé avec le store (sessionsCompleted) : MIN_CREDIT_SEC.
   const creditVideoBlock = (sec: number, completedCycle: boolean) => {
-    const minutes = Math.round(sec / 60);
-    if (minutes < 1) return;
+    if (sec < MIN_CREDIT_SEC) return;
+    const minutes = Math.max(1, Math.round(sec / 60));
     recordSession(minutes);
     useSessionSummaryStore.getState().addFocusMinutes(minutes, completedCycle);
     recordPlay(buildPlayEntry(minutes));
@@ -343,6 +357,40 @@ export default function SessionPage() {
       }
     }
   };
+
+  const creditRef = useRef(creditVideoBlock);
+  useEffect(() => { creditRef.current = creditVideoBlock; });
+
+  // ── Calé sur la vidéo : activation, reprise, sortie ───────────────────────
+  // Le décompte en cours continue au retour au minuteur normal ; un trou
+  // (intro) repart à neuf (décidé par stopVideoSync).
+  useEffect(() => {
+    if (!hydrated || !adapter) return;
+    const st = useTimerStore.getState();
+    if (st.videoSync) {
+      if (!caleAvailable || !caleWanted || st.videoSync.videoId !== caleVideoId) st.stopVideoSync();
+    } else if (caleAvailable && caleWanted && caleVideoId && caleResolved) {
+      // Bascule en cours de cycle normal : le travail déjà fait est crédité en partiel.
+      creditRef.current(st.startVideoSync(caleVideoId, caleResolved.schedule), false);
+    }
+  }, [hydrated, adapter, caleAvailable, caleWanted, caleVideoId, caleResolved, caleOn]);
+  // Reprise impossible (rechargement d'une session calée, mais plus de rythme,
+  // autre média, mode coupé) : l'attente cesse, le minuteur normal reprend.
+  useEffect(() => {
+    if (!hydrated) return;
+    const st = useTimerStore.getState();
+    if (!st.videoSyncActive || st.videoSync || caleResolved === undefined) return;
+    if (!caleAvailable || !caleWanted || st.videoSyncActive.videoId !== caleVideoId) st.stopVideoSync();
+  }, [hydrated, caleResolved, caleAvailable, caleWanted, caleVideoId]);
+  // Sortie de /session (navigation, rechargement, fermeture) : les secondes jouées
+  // du bloc sont créditées une fois ; le calage reprendra au retour.
+  useEffect(() => {
+    const suspend = () => creditRef.current(useTimerStore.getState().suspendVideoSync(), false);
+    window.addEventListener("pagehide", suspend);
+    return () => { window.removeEventListener("pagehide", suspend); suspend(); };
+  }, []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { if (!caleOn) setArrival(null); }, [caleOn]);
 
   // Une lecture de la vidéo par seconde : mode, temps restant, transitions.
   const pausedStreak = useRef(0);
@@ -357,8 +405,10 @@ export default function SessionPage() {
     const d = adapter.getDuration?.();
     const expected = caleResolved.durationSec;
     if (d && ((expected && Math.abs(d - expected) > 10) || scheduleEnd(st.videoSync.schedule) > d + 5)) {
+      // Même règle que la désactivation : un trou repart à neuf (stopVideoSync).
+      const rejected = st.videoSync.videoId;
       st.stopVideoSync();
-      setCaleRejected(st.videoSync.videoId);
+      setCaleRejected(rejected);
       toast({ title: "Rythme de la vidéo introuvable", description: "Retour au minuteur normal.", accent: "amber" });
       return;
     }
@@ -692,6 +742,11 @@ export default function SessionPage() {
                 <p className="mt-3 text-[15px] text-white/75">
                   {sessionsCompleted > 0 ? `Pomodoro ${sessionsCompleted} terminé. ` : ""}Lève les yeux de l&apos;écran.
                 </p>
+                {agendaMeeting && (
+                  <p data-testid="agenda-meeting" className="mt-2 text-[14px] text-white/70">
+                    {eventLabel(agendaMeeting.event)} jusqu&apos;à {formatHM(agendaMeeting.until)}. La pause dure jusque-là.
+                  </p>
+                )}
               </div>
               <div>
                 <p className="font-mono tabular-nums text-[clamp(4.5rem,12vw,7.5rem)] leading-none text-focus" role="timer" aria-label={`Pause : ${formatTime(secondsLeft)}`}>
@@ -804,6 +859,15 @@ export default function SessionPage() {
                   </p>
                 )}
               </div>
+              {agendaNotice && !caleOn && !isFlowtime && (
+                <AgendaLine
+                  notice={agendaNotice}
+                  onKeep={() => useTimerStore.getState().keepFullCycle()}
+                  onIgnore={() => useTimerStore.getState().ignoreAgendaEvent()}
+                  onStart={start}
+                  onWait={() => useTimerStore.getState().waitForMeeting()}
+                />
+              )}
               {/* Arrivée en plein bloc : sans action, on prend en route. */}
               {arrival && (
                 <div role="dialog" aria-label="Arrivée en plein bloc" className="mt-2 w-[min(18rem,calc(100vw-1.5rem))] rounded-lg border border-white/10 bg-night/90 p-3 text-left backdrop-blur-sm">
@@ -1079,6 +1143,56 @@ function Pill({
 }
 
 // ─── Help panel row ───────────────────────────────────────────────────────────
+
+/**
+ * Agenda, sous le minuteur : la proposition est toujours visible et refusable.
+ * « Réunion d'équipe à 15:00. Fin à 14:55. » [Garder 25 min] [Ignorer la réunion]
+ */
+function AgendaLine({ notice, onKeep, onIgnore, onStart, onWait }: {
+  notice: AgendaNotice;
+  onKeep: () => void;
+  onIgnore: () => void;
+  onStart: () => void;
+  onWait: () => void;
+}) {
+  // « dans 8 min » : l'heure courante, relue toutes les 30 s.
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, [notice]);
+  const label = eventLabel(notice.event);
+  let text: string;
+  if (notice.kind === "fit") text = `${label} à ${formatHM(notice.event.start)}. Fin à ${formatHM(notice.endsAt)}.`;
+  else if (notice.kind === "resume") text = "Réunion finie. Reprendre ?";
+  else if (notice.inProgress) text = `${label} jusqu'à ${formatHM(notice.until)}.`;
+  else {
+    const mins = now > 0 ? Math.max(1, Math.ceil((notice.event.start - now) / 60_000)) : null;
+    text = mins != null ? `${label} dans ${mins} min. Pas assez pour un pomodoro.` : `${label} à ${formatHM(notice.event.start)}. Pas assez pour un pomodoro.`;
+  }
+  return (
+    <div role="status" data-testid="agenda-line" className="mt-2 ml-auto w-[min(18rem,calc(100vw-1.5rem))] rounded-lg border border-white/10 bg-night/90 p-3 text-left backdrop-blur-sm">
+      <p className="text-xs text-white/80">{text}</p>
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
+        {notice.kind === "fit" && (
+          <>
+            <Pill onClick={onKeep}>Garder {Math.round(notice.fullSeconds / 60)} min</Pill>
+            <Pill onClick={onIgnore}>Ignorer la réunion</Pill>
+          </>
+        )}
+        {notice.kind === "tooShort" && (
+          <>
+            <Pill primary onClick={onWait}>Attendre</Pill>
+            <Pill onClick={onStart}>Démarrer quand même</Pill>
+          </>
+        )}
+        {notice.kind === "resume" && <Pill primary onClick={onStart}>Reprendre</Pill>}
+      </div>
+    </div>
+  );
+}
 
 function HelpRow({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (

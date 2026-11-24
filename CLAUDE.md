@@ -63,7 +63,10 @@ ambiances mixables dans une seule expérience bien maintenue.
   pas d'enseignes ni de fenêtres animées). Rendu WebGL2 brut :
   maillage déplacé, pluie, néons, brume, bloom ; événements `pomodoroDone`/`goal`/`next`,
   `setScroll`/`setPaused`. Utilisée par la landing (en **boucle vidéo pré-rendue**, `RueLoop`), la **pause** de session et le **mode
-  Spotify** (jamais sous une vidéo). Banc d'essai : `/lab/rue`.
+  Spotify** (jamais sous une vidéo). Banc d'essai : `/lab/rue` (`?friends` = 8 amis simulés).
+  **Fenêtres des amis** : `setFriendWindows([{windowId, state, flickerAt}])` (16 au plus, uniforms
+  `uFriendWin`), fenêtres lues dans `ids.webp` (canal G) au quart de la résolution, profondeur lue
+  dans les textures du moteur (`readPixels`, canal du plan visible) ; voir « Amis ».
 - **Spotify :** OAuth + Web Playback (Premium), helpers dans `lib/spotify.ts`
 - **Twitch :** OAuth + embed live/VOD, helpers dans `lib/twitch.ts` (+ route `app/api/twitch/token`)
 - **Audio :** sons de transition générés en **Web Audio API** (aucun fichier audio)
@@ -115,6 +118,18 @@ choisir le média, qui enchaîne sur `/settings`. Les **routines** appliquent le
   `flowSeconds` / `finishFlow()` / `accumulateFlow()` dans `store/timerStore.ts`
 - **Timer flottant** Picture-in-Picture (Document PiP, Chrome/Edge ; bouton masqué ailleurs) :
   mini-fenêtre toujours au premier plan avec pause / distraction / fin de flow — `components/PipTimer.tsx`
+- **Le minuteur qui connaît ton agenda** (lot 4) : adresse iCal privée collée dans le profil
+  (section « Agenda », `components/AgendaSettings.tsx`, Tester / Retirer). Au démarrage d'un pomodoro, une
+  réunion « occupée » avant sa fin le **raccourcit par défaut** (marge 5 min), ligne visible sous le
+  minuteur « Réunion d'équipe à 15:00. Fin à 14:55. » + « Garder 25 min » / « Ignorer la réunion » ;
+  moins de 15 min devant : « Pas assez pour un pomodoro. » + Attendre / Démarrer quand même ; un cycle qui
+  finit sur une réunion rallonge la pause jusqu'à sa fin, puis toast + notification « Réunion finie.
+  Reprendre ? » (rien ne repart seul). L'heure d'arrêt et l'agenda se combinent (la plus proche gagne).
+  Sans effet en Flowtime et calé sur la vidéo. `lib/agendaTimer.ts` (pur) branché dans `start`/
+  `nextSession`/`refitAgenda` du `timerStore` ; événements en mémoire (`store/agendaStore.ts`, relus au
+  démarrage de session puis toutes les 15 min, derniers connus gardés hors ligne) ; route
+  `app/api/calendar/import` (POST). ⚠️ L'URL est un secret : uniquement dans `prefsStore` (local,
+  jamais synchronisée), retirée des sauvegardes exportées (`lib/backup.ts`), effacée au changement de compte.
 - Lecteur multi-sources : YouTube vidéos + playlists, Spotify, Twitch live/VOD
 - Catalogue curated par mood + **bibliothèque perso** (vidéos & playlists custom, synchro Supabase)
 - Tâches **Kanban** (statuts todo/in-progress/done, priorité, estimation & compteur de pomodoros)
@@ -156,6 +171,12 @@ choisir le média, qui enchaîne sur `/settings`. Les **routines** appliquent le
   lumière dans la rue de la session. En tête de conversation : la semaine de l'ami (minutes,
   sessions, série, niveau, succès ; agrégats déjà partagés). Limite connue : l'anti-spam de
   10 min est côté client seulement (un vrai contrôle demanderait une policy ou une RPC SQL).
+- **Fenêtres allumées** (lot 8) : à la pause de session et en mode Spotify, chaque ami a SA fenêtre
+  dans la rue de nuit (hash FNV-1a scène + id, `lib/rue/friendWindows.ts`) : en ligne = allumée,
+  en focus = plus vive, hors ligne = éteinte ; de focus à pause, grésillement de 1,2 s à 2,5 Hz
+  (rien sous mouvement réduit). Liste discrète `FriendWindowsList` (prénom + `activity`, jamais de
+  chiffres ; survol d'une ligne = la fenêtre pulse), survol d'une fenêtre = libellé
+  (`FriendWindowsLayer`). Scènes de jour et téléphone (photo fixe) : la liste seule. No-op sans amis.
 
 **Organisation (onglets « Aujourd'hui » & « Organisation »)**
 - **Tableau de bord « Aujourd'hui »** (command center) — `components/TodayDashboard.tsx`
@@ -297,6 +318,7 @@ Voir `.env.local.example`. Toutes **optionnelles** (l'app marche en localStorage
 `NEXT_PUBLIC_SUPABASE_URL/ANON_KEY` (sync), `SUPABASE_SERVICE_ROLE_KEY` (flux calendrier ICS, serveur
 uniquement), `NEXT_PUBLIC_SPOTIFY_*`, `NEXT_PUBLIC_TWITCH_*` + `TWITCH_CLIENT_SECRET`,
 `GROQ_API_KEY` (coach IA gratuit, recommandé) / `GEMINI_API_KEY` (+ `GROQ_MODEL` / `GEMINI_MODEL` optionnels).
+L'agenda (lot 4) ne demande **aucune** variable ni clé.
 
 ## Journal de session — 2026-06-10 (récap des ajouts)
 
@@ -807,6 +829,19 @@ TodoStatusDropdown, callback Twitch) ; build vert ; vitest 33/33 ; e2e 13/13 sur
 - Tests : `lib/radioProgram.test.ts`, `lib/playback/youtubeRadio.test.ts`, `store/sessionRadio.test.ts`,
   `e2e/radio.spec.ts` (page.clock ; deux contextes = même vidéo, même seconde).
 
+## Journal de session — 2026-11-24 (lot 8 : les fenêtres allumées)
+
+- Version de l'utilisateur : TOUS les amis ont une fenêtre (allumée / vive / éteinte) + une liste
+  avec ce qu'ils écoutent. `lib/rue/friendWindows.ts` (pur, testé), `RueRenderer` (`windows()`,
+  `setFriendWindows`, `highlightWindow`, `locateFriendWindows`), shader (`uFriendWin[16]`,
+  `uFriendHi`), `components/FriendWindowsLayer.tsx` (dans `RueScene` avec `friends`),
+  `components/FriendWindowsList.tsx`, `store/friendWindowsStore.ts`.
+- Pas de liste des fenêtres dans `scene.json` : dérivée de `ids.webp` (lecture 1/4 sans lissage,
+  différée par `requestIdleCallback`) ; préférence aux fenêtres assez grandes et centrales (bords
+  rognés selon le cadrage). Les fenêtres mal détectées par `04_masks.py` (panneaux, écrans) peuvent
+  être choisies.
+- Perf : uniforms renvoyés seulement quand la clé « id:état » change ; survol regroupé par image.
+
 ## La landing
 
 > Section unique et à jour : décrit `components/LandingPage.tsx` tel qu'il est (2026-11-23).
@@ -895,3 +930,32 @@ contenu animé sont peu fiables ; valider avec `npm run dev` sur une vraie machi
 - Tests : vitest `lib/ytSchedule.test.ts`, `lib/videoSync.test.ts`, `store/timerVideoSync.test.ts` ;
   e2e `e2e/cale-video.spec.ts` (faux lecteur à currentTime réel dans `e2e/fixtures.ts`).
   **À vérifier en prod** (youtube.com bloqué dans le conteneur) : l'extraction sur de vraies pages.
+- **Corrections de relecture** : un trou (intro) n'est jamais créditable (`cycleSeconds = secondsLeft`,
+  et `stopVideoSync` repart à neuf depuis un trou) ; seuil unique `MIN_CREDIT_SEC` (60 s) pour le crédit
+  et `sessionsCompleted` ; `startVideoSync` rend le travail du cycle normal déjà fait (crédité en partiel) ;
+  `videoSyncActive {videoId, gap}` persisté : au rechargement `tick` reste inerte jusqu'au recalage, et les
+  secondes jouées sont créditées une fois au `pagehide`/démontage (`suspendVideoSync`, remet le joué à 0).
+  Si le rythme n'est plus disponible au retour, l'attente cesse et le décompte reprend. Route : timeout 8 s,
+  page bornée à 4 Mo (`readTextLimited`), 200 chapitres max, cache négatif 2 min, `no-store` sur les
+  erreurs ; `makeTtlCache` retire les plus anciennes au-delà de `maxEntries`.
+
+## Journal de session — 2026-11-24 (lot 4 : « Le minuteur qui connaît ton agenda »)
+
+- **Route** `app/api/calendar/import` (POST `{url, timeZone}` seulement, GET = 405 : l'adresse ne doit
+  pas finir dans les journaux d'accès). `lib/calendarImport.ts` : https et port 443 seulement (webcal
+  converti, `lib/icalUrl.ts` partagé avec le profil, 2048 car. max, pas d'identifiants), hôte avec un
+  point et hors noms locaux, **toutes** les adresses DNS publiques (IPv4/IPv6 privées, lien local,
+  CGNAT, métadonnées, NAT64, 6to4, mappées refusées), connexion **épinglée** sur l'adresse vérifiée
+  (`lookup` forcé, pas de DNS rebinding), 3 redirections max revérifiées, 8 s, 2 Mo. Réponse
+  `{events}` (36 h, `parseIcsBusy`), `Cache-Control: no-store`, aucun log de l'URL, rien de stocké.
+- **Minuteur** : `timerStore` gagne `agendaNotice` (fit / tooShort / resume, non persisté),
+  `agendaMeeting` (pause rallongée, persisté), `agendaIgnored` (session) / `agendaCycleIgnored` (cycle),
+  actions `keepFullCycle`, `ignoreAgendaEvent`, `waitForMeeting`, `refitAgenda`, `dismissAgendaNotice`.
+  Choix assumé : ajustement **par défaut**, annulable en un clic (jamais silencieux). `cycleSeconds` suit,
+  donc le crédit est exact. Un 2e démarrage (Reprendre, Espace) vaut « Démarrer quand même ».
+  L'agenda arrivé après le départ (`refitAgenda`) : < 60 s de cycle = comme un départ ; en plein cycle,
+  on finit avant l'événement (1 min devant au moins).
+- Tests : `lib/calendarImport.test.ts` (validation, anti-SSRF, redirections, erreurs, timeout),
+  `store/timerAgenda.test.ts` (raccourci, Garder, Ignorer, tooShort, Attendre, pause rallongée, reprise,
+  combinaison avec l'arrêt, Flowtime, calé) ; e2e `e2e/agenda.spec.ts` (route interceptée).
+  **À vérifier avec un vrai agenda** (DNS sortant indisponible dans le conteneur) : Google, Apple, Outlook.

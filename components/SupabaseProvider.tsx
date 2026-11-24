@@ -24,6 +24,8 @@ import { useProfileStore, resolvedProfile } from "@/store/profileStore";
 import { initFriends, teardownFriends } from "@/store/friendsStore";
 import { useSpotifyStore } from "@/store/spotifyStore";
 import { useTwitchStore } from "@/store/twitchStore";
+import { usePrefsStore } from "@/store/prefsStore";
+import { useAgendaStore } from "@/store/agendaStore";
 
 // Guard module-level : évite de ré-écraser le state si l'event auth refire
 // (React Strict Mode double-mount, token refresh, etc.)
@@ -56,6 +58,9 @@ function resetLocalDataIfAccountChanged(userId: string): boolean {
       useLocalPlaylistStore.setState({ playlists: [] });
       usePlanStore.setState({ blocks: [] });
       resetPersonalStores();
+      // L'agenda privé du compte précédent : ni son adresse, ni ses événements.
+      usePrefsStore.setState({ icalUrl: null });
+      useAgendaStore.getState().clear();
       teardownFriends(); // coupe les subscriptions/Realtime du compte précédent
     }
     localStorage.setItem(DATA_OWNER_KEY, userId);
