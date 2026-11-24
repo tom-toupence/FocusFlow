@@ -208,9 +208,12 @@ choisir le média, qui enchaîne sur `/settings`. Les **routines** appliquent le
   prénom ; en ligne = lumière chaude (tungstène, lampe ou néon froid, rideau/store/rien selon l'ami),
   en focus = plus vive + lueur d'écran, hors ligne = verre sombre. Allumage : fondu, ou néon qui
   s'amorce en 3 battements sous 3 Hz ; rien sous mouvement réduit. Tout en CSS (`.ff-win` dans
-  `globals.css`), aucun travail par image côté JS. Seules les fenêtres hors du texte de la pause et
-  de la liste sont attribuées (`pauseZones`), donc l'attribution dépend de la taille d'écran.
-  Survol/toucher = bulle (portail). Mode Spotify : inchangé (rue + fenêtres du lot 8), pour ne pas
+  `globals.css`), aucun travail par image côté JS. Attribution sur les 39 fenêtres (stable quel que
+  soit l'écran ; plus d'amis que de fenêtres = les allumés d'abord), puis les fenêtres sous le texte
+  de la pause ou la liste sont MASQUÉES (`pauseZones`) et l'ami est « hors cadre » dans la liste.
+  Calques affichés après le chargement de la photo ; néons décalés (jamais deux battements
+  ensemble) ; halo en pseudo-élément animé en opacité. Accessibilité : résumé complet en sr-only,
+  fenêtres focusables (bulle au focus). Survol/toucher = bulle (portail), pas sur un bouton. Mode Spotify : inchangé (rue + fenêtres du lot 8), pour ne pas
   charger l'écran de session (réplique de la landing). Banc d'essai : `/lab/amis`.
 
 **Organisation (onglets « Aujourd'hui » & « Organisation »)**
