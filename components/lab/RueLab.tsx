@@ -4,33 +4,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createRue, supportsRue, type RueRenderer } from "@/lib/rue/RueRenderer";
 import { RUE_SCENES, type RueSceneInfo } from "@/lib/rue/scenes";
-import type { Friend, FriendStats } from "@/lib/friends";
+import { fakeFriends } from "@/components/lab/fakeFriends";
 import { useFriendsStore } from "@/store/friendsStore";
 import FriendWindowsLayer from "@/components/FriendWindowsLayer";
 import FriendWindowsList from "@/components/FriendWindowsList";
-
-// Amis simulés (sans Supabase) : 3 en focus, 2 en ligne, 3 hors ligne.
-const FAKE: [string, "focus" | "on" | "off", string | null][] = [
-  ["Léa Martin", "focus", "En focus · Kyoto Rain Lofi"],
-  ["Tom", "focus", "Radio FocusFlow · Nuit calme"],
-  ["Inès", "focus", "En focus · Spotify"],
-  ["Hugo", "on", "En pause"],
-  ["Maya", "on", null],
-  ["Noé", "off", null],
-  ["Sacha", "off", null],
-  ["Jade", "off", null],
-];
-function fakeFriends(): Friend[] {
-  const now = Date.now();
-  return FAKE.map(([name, st, activity], i): Friend => {
-    const stats: FriendStats = {
-      weekMinutes: 0, weekSessions: 0, streak: 0, level: 1, xp: 0, badges: 0,
-      inFocus: st === "focus", focusStartedAt: now, focusHeartbeat: st === "focus" ? now : 0,
-      online: st !== "off", onlineHeartbeat: st !== "off" ? now : 0, activity,
-    };
-    return { friendshipId: `f${i}`, userId: `lab-ami-${i}`, username: name.toLowerCase(), displayName: name, avatarUrl: null, stats };
-  });
-}
 
 type SceneInfo = RueSceneInfo;
 

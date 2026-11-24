@@ -89,14 +89,21 @@ export function assignFriendWindows(friendIds: string[], windows: RueWindow[], s
   const pool = (central.length >= need ? central : big.length >= need ? big : windows)
     .map((w) => w.id)
     .sort((a, b) => a - b);
-  const taken = new Set<number>();
-  const ids = [...new Set(friendIds)].sort().slice(0, MAX_FRIEND_WINDOWS);
-  for (const fid of ids) {
+  return pickSlots([...new Set(friendIds)].sort().slice(0, MAX_FRIEND_WINDOWS), pool, sceneKey, out);
+}
+
+/**
+ * Attribution déterministe : chaque identifiant (dans l'ordre donné) prend la
+ * case hash(clé, id) du `pool` (trié), ou la suivante libre. `taken` permet
+ * de réserver des cases d'avance.
+ */
+export function pickSlots(ids: string[], pool: number[], key: string, out = new Map<string, number>(), taken = new Set<number>(out.values())): Map<string, number> {
+  for (const id of ids) {
     if (taken.size >= pool.length) break;
-    let k = hashString(`${sceneKey}:${fid}`) % pool.length;
+    let k = hashString(`${key}:${id}`) % pool.length;
     while (taken.has(pool[k])) k = (k + 1) % pool.length;
     taken.add(pool[k]);
-    out.set(fid, pool[k]);
+    out.set(id, pool[k]);
   }
   return out;
 }

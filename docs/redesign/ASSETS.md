@@ -55,3 +55,11 @@ Les scènes se relaient toutes les 15 à 20 s ; la liste (crédit, lien, dosage 
 | `masks.webp` | R néons et enseignes, G fenêtres, B sol mouillé (sans alpha : WebP jette la couleur des pixels transparents) |
 | `ids.webp` | R numéro d'enseigne, G numéro de fenêtre, B ciel (sans perte), pour que chaque élément vive pour son compte |
 | `still.webp` | image fixe de repli |
+
+## « Ta rue » (écran de pause avec les amis, lot 8b)
+
+| Fichier | Source | Auteur | Licence | Usage |
+|---|---|---|---|---|
+| `public/rues-amis/facade/photo.webp` (2400 x 1500) et `photo-1200.webp` | [Window Front at Night 374889.jpg](https://commons.wikimedia.org/wiki/File:Window_Front_at_Night_374889.jpg) (Wikimedia Commons, depuis Shopify Burst) | Matthew Henry | CC0 | façade de nuit recadrée (partie droite), fenêtres annotées à la main dans `windows.json` (39 quadrilatères normalisés) |
+
+Alternatives regardées et écartées : « Tokyo Apartment Block (227773659) » (Joe Pettersson, CC BY 3.0 : façade grise surexposée, fenêtres toutes blanches et dépolies), « Wah Fu Estate », « HK Tonkin Street night residential high-rises » (fenêtres trop petites), « Light Encroached Homes » (fisheye), « Жилмассив на острове Декабристов » (fenêtres petites, hors Asie).

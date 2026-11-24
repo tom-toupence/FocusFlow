@@ -67,6 +67,9 @@ ambiances mixables dans une seule expérience bien maintenue.
   **Fenêtres des amis** : `setFriendWindows([{windowId, state, flickerAt}])` (16 au plus, uniforms
   `uFriendWin`), fenêtres lues dans `ids.webp` (canal G) au quart de la résolution, profondeur lue
   dans les textures du moteur (`readPixels`, canal du plan visible) ; voir « Amis ».
+  **« Ta rue »** (`components/FriendStreet.tsx`) : à la pause, si tu as des amis, une vraie façade
+  (`public/rues-amis/facade/`, fenêtres annotées à la main) remplace la scène aléatoire
+  (`components/PauseStreet.tsx`) ; ce n'est pas le moteur WebGL (calques CSS par fenêtre).
 - **Spotify :** OAuth + Web Playback (Premium), helpers dans `lib/spotify.ts`
 - **Twitch :** OAuth + embed live/VOD, helpers dans `lib/twitch.ts` (+ route `app/api/twitch/token`)
 - **Audio :** sons de transition générés en **Web Audio API** (aucun fichier audio)
@@ -177,6 +180,17 @@ choisir le média, qui enchaîne sur `/settings`. Les **routines** appliquent le
   (rien sous mouvement réduit). Liste discrète `FriendWindowsList` (prénom + `activity`, jamais de
   chiffres ; survol d'une ligne = la fenêtre pulse), survol d'une fenêtre = libellé
   (`FriendWindowsLayer`). Scènes de jour et téléphone (photo fixe) : la liste seule. No-op sans amis.
+  Depuis le lot 8b, à la PAUSE c'est « Ta rue » qui s'affiche (ci-dessous) ; le lot 8 reste en mode Spotify.
+- **Ta rue** (lot 8b) : écran de pause dédié quand tu as des amis. Photo de façade de nuit (CC0,
+  `public/rues-amis/facade/`, 39 fenêtres annotées dans `windows.json`), chaque ami EST une fenêtre
+  (hash, `lib/rue/friendStreet.ts`, ta fenêtre « Toi » d'abord, tamisée) avec une plaque à son
+  prénom ; en ligne = lumière chaude (tungstène, lampe ou néon froid, rideau/store/rien selon l'ami),
+  en focus = plus vive + lueur d'écran, hors ligne = verre sombre. Allumage : fondu, ou néon qui
+  s'amorce en 3 battements sous 3 Hz ; rien sous mouvement réduit. Tout en CSS (`.ff-win` dans
+  `globals.css`), aucun travail par image côté JS. Seules les fenêtres hors du texte de la pause et
+  de la liste sont attribuées (`pauseZones`), donc l'attribution dépend de la taille d'écran.
+  Survol/toucher = bulle (portail). Mode Spotify : inchangé (rue + fenêtres du lot 8), pour ne pas
+  charger l'écran de session (réplique de la landing). Banc d'essai : `/lab/amis`.
 
 **Organisation (onglets « Aujourd'hui » & « Organisation »)**
 - **Tableau de bord « Aujourd'hui »** (command center) — `components/TodayDashboard.tsx`
@@ -841,6 +855,20 @@ TodoStatusDropdown, callback Twitch) ; build vert ; vitest 33/33 ; e2e 13/13 sur
   rognés selon le cadrage). Les fenêtres mal détectées par `04_masks.py` (panneaux, écrans) peuvent
   être choisies.
 - Perf : uniforms renvoyés seulement quand la clé « id:état » change ; survol regroupé par image.
+
+## Journal de session — 2026-11-24 (lot 8b : « Ta rue »)
+
+- Retour utilisateur : l'effet du lot 8 était trop discret, il voulait « une vraie rue avec des
+  bâtiments et des fenêtres qui s'éteignent et s'allument ». Écran de pause dédié, photo-réaliste.
+- Photo : Commons, « Window Front at Night 374889 » (Matthew Henry, CC0), recadrée en 2400 x 1500.
+  Pas trouvé de façade asiatique aussi lisible (Tokyo Apartment Block, CC BY, écartée : fenêtres
+  dépolies toutes blanches) ; l'API `api.php` de Commons reste bloquée, les catégories se lisent en
+  HTML (`/wiki/Category:...`), la recherche REST limite vite (429).
+- Fenêtres : grille mesurée à la main sur la photo (colonnes lues à la règle, rangées ajustées par
+  colonne), 39 retenues, vérifiées en superposition ; testées (`lib/rue/friendStreet.test.ts`).
+- `components/PauseStreet.tsx` (Ta rue si amis, sinon `RueScene`), `components/FriendStreet.tsx`,
+  `components/lab/FriendStreetLab.tsx` (`/lab/amis`), `components/lab/fakeFriends.ts` (partagé avec
+  `/lab/rue`), e2e `e2e/lab-amis.spec.ts` (ignoré si le build n'a pas `NEXT_PUBLIC_LAB=1`).
 
 ## La landing
 
