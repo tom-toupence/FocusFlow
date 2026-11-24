@@ -8,20 +8,23 @@ const RANK: Record<string, number> = { S: 1, M: 2, L: 3 };
 // avec schémas, est dans docs/features/proposals/index.html.
 export default function Page() {
   if (process.env.NODE_ENV === "production" && process.env.NEXT_PUBLIC_LAB !== "1") notFound();
-  const list = [...MOCKS].sort((a, b) => b.value / RANK[b.effort] - a.value / RANK[a.effort]);
+  const sortFn = (a: (typeof MOCKS)[number], b: (typeof MOCKS)[number]) => b.value / RANK[b.effort] - a.value / RANK[a.effort];
+  const wave2 = MOCKS.filter((m) => m.wave === 2);
+  const kept = MOCKS.filter((m) => m.status === "oui");
+  const list = [...wave2, ...kept.sort(sortFn)];
   return (
     <main className="min-h-screen bg-[#07090d] px-6 py-12 text-white">
       <div className="mx-auto max-w-3xl">
         <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">Lab · propositions</div>
         <h1 className="mt-2 text-3xl font-semibold">Features proposées</h1>
-        <p className="mt-2 text-sm text-white/60">Triées par valeur / effort. Rien n&apos;est branché.</p>
+        <p className="mt-2 text-sm text-white/60">Vague 2 (par audace et valeur), puis les idées retenues de la vague 1. Rien n&apos;est branché.</p>
         <ol className="mt-8 divide-y divide-white/10 border-y border-white/10">
           {list.map((m, i) => (
             <li key={m.slug}>
               <Link href={`/lab/features/${m.slug}`} className="flex items-center gap-4 py-4 hover:bg-white/5">
                 <span className="w-6 font-mono text-xs text-white/40">{i + 1}</span>
                 <span className="flex-1"><span className="block">{m.name}</span><span className="block text-sm text-white/50">{m.pitch}</span></span>
-                <span className="font-mono text-xs text-white/60">{m.effort} · {m.value}/5</span>
+                <span className="font-mono text-xs text-white/60">{m.status === "oui" ? "retenue · " : ""}{m.effort} · {m.value}/5</span>
               </Link>
             </li>
           ))}

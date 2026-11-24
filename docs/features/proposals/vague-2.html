@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Propositions vague 2</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --fg: #16181d; --muted: #5d636e; --line: #e2e3e0; --card: #ffffff;
+    --accent: oklch(0.50 0.13 228); --sodium: oklch(0.62 0.15 62); --chip: #eef0f2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #07090d; --fg: #e9ebef; --muted: #8d939e; --line: #1d2229; --card: #0d1117;
+      --accent: oklch(0.72 0.13 210); --sodium: oklch(0.78 0.15 70); --chip: #161b22;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #07090d; --fg: #e9ebef; --muted: #8d939e; --line: #1d2229; --card: #0d1117;
+    --accent: oklch(0.72 0.13 210); --sodium: oklch(0.78 0.15 70); --chip: #161b22;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 48px 16px 96px; }
+  .eyebrow { font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-size: clamp(28px, 4vw, 40px); margin: 10px 0 8px; letter-spacing: -.01em; }
+  h2 { font-size: 24px; margin: 6px 0 4px; }
+  h3 { font-size: 13px; margin: 22px 0 6px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  p { margin: 0 0 10px; }
+  .lede { color: var(--muted); max-width: 680px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font: 500 10px/1 ui-monospace, Menlo, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  td.num, th.num { text-align: right; font-family: ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  a { color: var(--accent); }
+  .idea { margin-top: 64px; padding-top: 28px; border-top: 1px solid var(--line); }
+  .head { display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  .rank { font: 600 13px ui-monospace, Menlo, monospace; color: var(--muted); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 14px; }
+  .chip { background: var(--chip); border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px; font: 12px ui-monospace, Menlo, monospace; }
+  .chip.v { color: var(--sodium); }
+  .pitch { font-size: 18px; margin: 4px 0 10px; }
+  .shot { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); margin: 8px 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  ol, ul { margin: 0 0 10px; padding-left: 20px; }
+  li { margin: 3px 0; }
+  code { font: 12.5px ui-monospace, Menlo, monospace; background: var(--chip); padding: 1px 5px; border-radius: 5px; }
+  .mermaid { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; overflow-x: auto; }
+  .note { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; padding: 12px 14px; margin: 12px 0; font-size: 14px; }
+  .scroll { overflow-x: auto; }
+  .chip.t { color: var(--accent); }
+  table.ba { margin: 6px 0 12px; font-size: 13.5px; }
+  table.ba th, table.ba td { width: 50%; }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+<div class="eyebrow">FocusFlow · mode proposition · vague 2 · 24 novembre 2026</div>
+<h1>10 idées plus poussées</h1>
+<p class="lede">Rien n'est implémenté. Trois terrains : fonctionnel, ergonomie, design d'expérience. Les maquettes sont statiques (<code>/lab/features</code>). Triées par audace puis par valeur. Nouveauté vérifiée par recherche chez les concurrents, avec l'agent product-lead.</p>
+
+<div class="note"><strong>Retenues de la vague 1 (plan à venir, rien codé) :</strong> FocusFlow dans le système (n°1) et Radio commune (n°10). Les 8 autres sont abandonnées et ne reviendront pas (voir <code>DECISIONS.md</code>).</div>
+
+<h3>Avant les idées : un trou trouvé dans le code</h3>
+<div class="note">
+  <p><strong>Une session en cours ne survit pas à la navigation.</strong> Le minuteur (<code>setInterval(tick)</code>) et le lecteur vivent dans <code>app/session/page.tsx</code>. Si tu en sors, la musique s'arrête et le temps n'est plus décompté. Aucun bouton (nav, accueil, ⌘K) ne ramène à la session en cours. <code>timerStore</code> ne persiste que les réglages, donc un rechargement perd tout. Et « Reprendre » sur l'accueil appelle <code>resetAll()</code>, qui écrase une session en cours.</p>
+  <p>Ce n'est pas une idée « jamais vue » : c'est un correctif, je le sors donc du concours. Mais il conditionne trois des idées ci-dessous, ainsi que la n°1 validée : la Media Session sur téléphone doit continuer quand l'onglet passe en arrière-plan. Il faut donc un minuteur calculé depuis une échéance (<code>endsAt</code>) et non un compteur de tics, parce que Chrome bride les minuteurs des onglets cachés. Je l'intégrerai au plan de la n°1.</p>
+</div>
+
+<h3>Classement</h3>
+<div class="scroll">
+<table>
+  <thead><tr><th>#</th><th>Idée</th><th>Terrain</th><th class="num">Audace</th><th class="num">Valeur</th><th class="num">Effort</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><a href="#cale-video">Calé sur la vidéo</a></td><td>Design</td><td class="num">5</td><td class="num">4,5</td><td class="num">M</td></tr>
+    <tr><td>2</td><td><a href="#passage">Emporter la session sur le téléphone</a></td><td>Ergonomie</td><td class="num">5</td><td class="num">4</td><td class="num">L</td></tr>
+    <tr><td>3</td><td><a href="#agenda">Le minuteur qui connaît ton agenda</a></td><td>Fonctionnel</td><td class="num">4</td><td class="num">4,5</td><td class="num">L</td></tr>
+    <tr><td>4</td><td><a href="#melodie">La mélodie de la journée</a></td><td>Design</td><td class="num">5</td><td class="num">3</td><td class="num">S</td></tr>
+    <tr><td>5</td><td><a href="#telecommande">Téléphone télécommande</a></td><td>Ergonomie</td><td class="num">4</td><td class="num">3,5</td><td class="num">M</td></tr>
+    <tr><td>6</td><td><a href="#comparaison">Estimer par comparaison</a></td><td>Fonctionnel</td><td class="num">4</td><td class="num">3,5</td><td class="num">M</td></tr>
+    <tr><td>7</td><td><a href="#ancrage">Ancrage sonore</a></td><td>Design</td><td class="num">4</td><td class="num">3</td><td class="num">S</td></tr>
+    <tr><td>8</td><td><a href="#une-phrase">Lancer en une phrase</a></td><td>Ergonomie</td><td class="num">3,5</td><td class="num">4</td><td class="num">M</td></tr>
+    <tr><td>9</td><td><a href="#dernier-train">Dernier train</a></td><td>Fonctionnel</td><td class="num">3,5</td><td class="num">4</td><td class="num">S</td></tr>
+    <tr><td>10</td><td><a href="#prevenir-pause">Prévenir à sa pause</a></td><td>Fonctionnel</td><td class="num">3</td><td class="num">3</td><td class="num">M</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="eyebrow" style="margin-top:8px">Répartition : fonctionnel 4 · ergonomie 3 · design 3</p>
+
+<!-- 1 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="cale-video">
+  <div class="head"><span class="rank">01</span><h2>Calé sur la vidéo</h2></div>
+  <div class="chips"><span class="chip t">Design d'expérience</span><span class="chip">Audace 5</span><span class="chip v">Valeur 4,5 / 5</span><span class="chip">Effort M</span><span class="chip">Local</span></div>
+  <p class="pitch">Les vidéos « Study With Me » ont leur propre minuteur incrusté (souvent 50/10, avec une cloche). FocusFlow se synchronise dessus : ta pause tombe pile quand le créateur fait la sienne.</p>
+  <img class="shot" src="shots/cale-video.png" alt="Session calée sur le rythme incrusté de la vidéo">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>Tu lances un « Study with me in Tokyo » de 3 h. La vidéo affiche 31:08 de focus à l'écran, ton minuteur FocusFlow affiche 12:40. Deux horloges qui se contredisent : soit tu ignores l'une, soit tu fais ta pause pendant que le créateur continue de travailler (et inversement). Le body-doubling, qui fait tout l'intérêt de ces vidéos, se casse.</p>
+      <h3>Fonctionnement</h3>
+      <ol>
+        <li>Sur une vidéo compatible, la session propose « Calé sur la vidéo » (activé par défaut).</li>
+        <li>Le minuteur FocusFlow prend le rythme de la vidéo : 50/10, 25/5, etc.</li>
+        <li>Si tu arrives au milieu d'un bloc, deux choix : prendre le bloc en route, ou sauter au début du suivant (la vidéo avance d'elle-même).</li>
+        <li>La cloche du créateur et ta transition sonnent ensemble, et ta pause est celle de la vidéo.</li>
+        <li>Pause ou retour en arrière dans la vidéo : le minuteur suit, au lieu de dériver.</li>
+      </ol>
+      <h3>Pourquoi ça change la session</h3>
+      <p>Le créateur de la vidéo devient un vrai partenaire de travail, au même rythme que toi. C'est le principe du body-doubling (Focusmate le vend pour ça), mais sans rendez-vous ni inconnu à l'écran. Avec une seule horloge, tu n'as plus à arbitrer.</p>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+flowchart TD
+  V["Vidéo choisie"] --> S{"Segments connus ?"}
+  S -- "chapitres YouTube (Focus / Break)" --> P["/api/youtube : parse des chapitres (lib/ytParse.ts)"]
+  S -- "annotation du catalogue" --> A["data/videos.ts : schedule [début, fin, type]"]
+  S -- "aucun" --> N["Minuteur normal (repli)"]
+  P --> M["lib/videoSchedule.ts : segment courant = f(currentTime)"]
+  A --> M
+  M --> T["timerStore piloté (mode, secondes restantes)"]
+  Y["adapter : currentTime, seek, état"] --> M
+  M -- "début de bloc" --> Y
+      </pre>
+      <p>Ce n'est pas de l'affichage : le temps de la vidéo devient la source du minuteur. Le mode (travail ou pause) et les secondes restantes se déduisent de <code>currentTime</code>. FocusFlow peut aussi faire avancer la vidéo au début d'un bloc. Les stats, l'XP et les projets reçoivent les minutes réelles, par le même chemin que Flowtime.</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>Aucune app de focus ne le fait, faute de catalogue curated. Lofidoro joue un flux lofi avec son propre minuteur, Pomofocus n'a pas de lecteur, Focusmate est synchrone et entre inconnus (<a href="https://www.focusmate.com/about/">focusmate.com</a>). Les créateurs « Study With Me » incrustent un minuteur dans la vidéo, mais aucun lecteur ne s'en sert.</p>
+  <h3>Impact technique</h3>
+  <ul>
+    <li><code>data/videos.ts</code> : champ optionnel <code>schedule</code>. Route existante <code>app/api/youtube/*</code> et <code>lib/ytParse.ts</code> : extraire les chapitres de la page watch (déjà parsée pour les mixes). Nouveau <code>lib/videoSchedule.ts</code>, en logique pure testée avec vitest.</li>
+    <li><code>store/timerStore.ts</code> : mode « piloté » (l'état vient de la vidéo, comme le prévoyait la roadmap pour un minuteur contrôlé). <code>lib/playback/youtube.ts</code> : exposer <code>getCurrentTime</code>/<code>seekTo</code>. <code>app/session/page.tsx</code>.</li>
+    <li>Pas de Supabase, pas de clé, pas de dépendance.</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul>
+    <li>Annoter à la main une vingtaine de vidéos du catalogue (Abao in Tokyo, Sean Study…), ou s'appuyer sur les chapitres quand ils existent. Une vidéo remontée par son créateur rend les horodatages faux : il faut vérifier la durée et revenir au minuteur normal en cas d'écart.</li>
+    <li>YouTube seulement (pas Spotify ni Twitch live).</li>
+  </ul>
+</section>
+
+<!-- 2 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="passage">
+  <div class="head"><span class="rank">02</span><h2>Emporter la session sur le téléphone</h2></div>
+  <div class="chips"><span class="chip t">Ergonomie</span><span class="chip">Audace 5</span><span class="chip v">Valeur 4 / 5</span><span class="chip">Effort L</span><span class="chip">Sans compte</span></div>
+  <p class="pitch">Tu dois quitter ton bureau en plein pomodoro. Tu scannes un QR, et la session continue sur ton téléphone : même temps restant, même tâche, même titre à la même seconde. L'ordinateur s'arrête tout seul.</p>
+  <img class="shot" src="shots/passage.png" alt="QR sur l'ordinateur, session reprise sur le téléphone">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>Il est 17:40, tu dois prendre le train mais tu es au milieu d'un pomodoro. Aujourd'hui la session est perdue : il faut tout relancer sur le téléphone, et le temps déjà fait n'est pas compté, ou compté deux fois si l'ordinateur continue.</p>
+      <h3>Avant / après</h3>
+      <table class="ba">
+        <tr><th>Aujourd'hui</th><th>Avec l'idée</th></tr>
+        <tr><td>1. Terminer sur l'ordinateur (pomodoro en cours perdu)<br>2. Ouvrir FocusFlow sur le téléphone<br>3. Écouter, retrouver la vidéo<br>4. Démarrer, passer par /settings<br>5. Démarrer la session, et le minuteur repart de zéro<br>6. Chercher le passage dans la vidéo</td><td>1. Scanner le QR<br><br>Le pomodoro continue au même point, les minutes sont comptées une seule fois.</td></tr>
+        <tr><td><strong>6 actions</strong>, progression perdue</td><td><strong>1 action</strong>, rien de perdu</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+sequenceDiagram
+  participant PC as Ordinateur (/session)
+  participant C as Canal éphémère (code aléatoire)
+  participant T as Téléphone (/handoff/code)
+  PC->>C: ouvre le canal, affiche le QR
+  T->>C: rejoint avec le code
+  PC->>C: état : endsAt, mode, n° pomodoro, tâche, file, titre, position
+  T->>T: hydrate timerStore + sessionStore, charge le titre à la position
+  T->>C: accusé de réception
+  PC->>PC: accumule les minutes faites, s'arrête sans compter la suite
+      </pre>
+      <p>On transfère un état complet, pas une vue. Le téléphone reconstruit la session à partir de l'échéance <code>endsAt</code>, de la file et de la position. L'ordinateur ne s'arrête qu'après l'accusé de réception, donc rien n'est perdu ni compté deux fois.</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>Spotify Connect transfère la musique seule. Des apps de minuteur synchronisent le minuteur seul, via un compte Apple (<a href="https://apps.apple.com/us/app/id975017240">Focus, Timer for Productivity</a>, <a href="https://apps.apple.com/app/id973134470">Be Focused</a>). Les deux ensemble, en un scan et sans compte : jamais vu.</p>
+  <h3>Impact technique</h3>
+  <ul>
+    <li>Canal Supabase Realtime en broadcast avec la clé anon, nommé par un code aléatoire de courte durée : aucune table, aucun compte. Sans Supabase configuré, le bouton est masqué.</li>
+    <li>Prérequis : le minuteur sur <code>endsAt</code> (voir le constat en tête). <code>store/timerStore.ts</code>, <code>store/sessionStore.ts</code>, <code>store/queueStore.ts</code>, <code>lib/playback/*</code> (position, chargement à une position), nouvelle route <code>app/handoff/[code]/page.tsx</code>, QR généré en SVG localement (sans dépendance, ou une petite lib MIT).</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul><li>Spotify : la reprise exige le même compte Premium sur le téléphone. Twitch live : reprise du live, sans position.</li><li>Sur iOS, l'autoplay est bloqué : le téléphone demande un tap pour lancer le son. On ne gagne donc qu'une action sur l'audio, honnêtement.</li><li>Effort L, à cause des cas limites (pause en cours, Flowtime, file maison).</li></ul>
+</section>
+
+<!-- 3 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="agenda">
+  <div class="head"><span class="rank">03</span><h2>Le minuteur qui connaît ton agenda</h2></div>
+  <div class="chips"><span class="chip t">Fonctionnel</span><span class="chip">Audace 4</span><span class="chip v">Valeur 4,5 / 5</span><span class="chip">Effort L</span><span class="chip">Sans compte</span></div>
+  <p class="pitch">Le pomodoro en cours se raccourcit pour finir avant ta prochaine réunion. Aucun cycle n'est lancé s'il la chevauche, et à la fin de la réunion la session reprend là où elle en était.</p>
+  <img class="shot" src="shots/agenda.png" alt="Session raccourcie avant une réunion, après-midi recalculé">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>14:36, tu lances un pomodoro de 25 min, sans penser à la réunion de 15:00. Résultat : soit tu coupes à 14:58 en plein élan et le pomodoro n'est pas compté, soit tu arrives en retard. Un utilisateur de Sunsama le réclame mot pour mot (<a href="https://roadmap.sunsama.com/improvements/p/pomodoro-improvement">roadmap Sunsama</a>).</p>
+      <h3>Fonctionnement</h3>
+      <ol>
+        <li>Une fois pour toutes, dans le profil : coller l'adresse iCal privée de son agenda (Google, Apple, Outlook en proposent une). Elle reste sur l'appareil.</li>
+        <li>Au démarrage d'un pomodoro, si un événement « occupé » tombe avant la fin, FocusFlow propose « 19 min, fin à 14:55 », visible et refusable en un clic (jamais une décision silencieuse).</li>
+        <li>La pause tombe pendant la réunion, et aucun cycle n'est proposé s'il la chevauche.</li>
+        <li>À la fin de la réunion, une invitation « reprendre » relance la même session (titre, tâche, cycle).</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+flowchart LR
+  U["URL iCal (localStorage)"] --> R["app/api/calendar/import (lit, ne stocke ni ne journalise)"]
+  R --> E["événements occupés du jour (RRULE, fuseaux)"]
+  E --> F["lib/agendaFit.ts : prochaine contrainte"]
+  T["timerStore.start"] --> F
+  F -- "chevauchement" --> P["Proposition : durée raccourcie"]
+  P -- "accepté" --> T2["timerStore : durée du cycle ajustée, minutes réelles créditées"]
+  E -- "fin de réunion" --> RS["Invitation à reprendre"]
+      </pre>
+      <p>Le minuteur change de comportement : la durée de chaque cycle devient une fonction de la prochaine contrainte réelle, pas une constante du preset. Les minutes réellement travaillées sont créditées, comme pour Flowtime.</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>Reclaim et Motion placent des tâches autour des réunions, mais leur minuteur ne s'adapte pas (<a href="https://reclaim.ai/pomodoro-timer">reclaim.ai</a>). D'autres lancent un minuteur depuis un événement, sans l'ajuster : <a href="https://chromewebstore.google.com/detail/lbajmocmhedhaaiiammglajpagbdaeeh">Pomodoro Timer for Google Calendar</a>, <a href="https://apps.apple.com/fr/app/calendoro/id1666117276">Calendoro</a>. Session lit l'agenda sans adapter les cycles. Aucun ne raccourcit le pomodoro en cours.</p>
+  <h3>Impact technique</h3>
+  <ul>
+    <li>Route serveur <code>app/api/calendar/import</code> (CORS oblige), sans clé, qui ne stocke ni ne journalise l'URL. Parser ICS local (<code>lib/ics.ts</code> sait déjà écrire, il faut lire : RRULE, EXDATE, fuseaux). <code>lib/agendaFit.ts</code> pur et testé. <code>store/timerStore.ts</code>, <code>app/session/page.tsx</code>, <code>store/prefsStore.ts</code>.</li>
+    <li>Pas de Supabase : l'URL reste en local.</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul><li>Les règles de récurrence et les fuseaux horaires sont le vrai coût, d'où l'effort L. Lot A sans agenda : voir « Dernier train » (n°9), même moteur.</li><li>L'URL iCal secrète donne accès à tout l'agenda : elle transite par notre serveur, à documenter clairement.</li></ul>
+</section>
+
+<!-- 4 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="melodie">
+  <div class="head"><span class="rank">04</span><h2>La mélodie de la journée</h2></div>
+  <div class="chips"><span class="chip t">Design d'expérience</span><span class="chip">Audace 5</span><span class="chip v">Valeur 3 / 5</span><span class="chip">Effort S</span><span class="chip">Local</span></div>
+  <p class="pitch">Le son de fin de pomodoro n'est plus une alarme : chaque fin joue la note suivante d'une phrase musicale. Elle ne se résout qu'au pomodoro qui atteint ton objectif du jour.</p>
+  <img class="shot" src="shots/melodie.png" alt="Cinquième note sur huit en pause">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>Le son de transition est un signal neutre, toujours le même : il ne dit rien de ta journée, et 17 h, quand il reste un pomodoro pour finir l'objectif, est le moment où on lâche. Il manque une tension qui donne envie de « finir la phrase ».</p>
+      <h3>Fonctionnement</h3>
+      <ol>
+        <li>Objectif de 8 pomodoros : la journée devient une phrase de 8 notes (générée en Web Audio, comme les sons actuels).</li>
+        <li>Chaque fin de pomodoro joue la phrase jusqu'à la note atteinte, en 2 secondes, par-dessus la musique baissée.</li>
+        <li>À 7 sur 8, la phrase s'arrête sur une note « suspendue » (la sensible, qui appelle la résolution).</li>
+        <li>Au 8e, elle se résout sur la tonique. Une phrase par jour, jamais la même deux jours de suite.</li>
+      </ol>
+      <h3>Pourquoi ça marche</h3>
+      <p>Une suite musicale qui s'arrête sur la sensible crée une attente de résolution, documentée en psychologie de la musique (Huron, <em>Sweet Anticipation</em>). On la ressent sans y penser. C'est l'effet Zeigarnik, appliqué au son plutôt qu'à une barre de progression qu'on finit par ne plus regarder. Les autres apps signalent la fin d'un cycle. Ici, chaque fin rappelle aussi la journée entière, sans rien afficher.</p>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+flowchart LR
+  G["goalStore (objectif en pomodoros)"] --> PH["lib/melody.ts : phrase du jour (graine = date)"]
+  S["statsStore.days[aujourd'hui].sessions"] --> I["indice de note"]
+  PH --> W["lib/sounds.ts : synthèse Web Audio"]
+  I --> W
+  W --> O["joué à chaque fin de pomodoro, à la place du carillon"]
+      </pre>
+      <p>Le son devient fonction de l'état de la journée (progression vers l'objectif), généré de façon déterministe par la date. Ce n'est pas un nouveau son, c'est un retour d'état qui passe par l'oreille.</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>Aucune app de focus trouvée qui encode la progression de la journée dans le son de transition. Duolingo et Forest jouent des sons de récompense fixes.</p>
+  <h3>Auto-critique honnête</h3>
+  <p>Le product-lead l'aurait écartée : c'est « juste » un son, et tu as supprimé le mixeur d'ambiances. Je la garde parce que ce n'est pas une ambiance : elle remplace un son qui existe déjà, ne coûte presque rien (S), et c'est l'idée la plus inédite de la liste. Si tu trouves que c'est du gadget, c'est un Non facile.</p>
+  <h3>Impact technique</h3>
+  <ul><li><code>lib/sounds.ts</code> (Web Audio existant), nouveau <code>lib/melody.ts</code> (pur), <code>store/goalStore.ts</code>, <code>app/session/page.tsx</code>. Option dans <code>prefsStore</code>. Pas de Supabase ni de dépendance.</li></ul>
+  <h3>Risques</h3>
+  <ul><li>Objectif en minutes : convertir en nombre de pomodoros. Objectif dépassé : petites variations sur la tonique.</li><li>Le son passe par-dessus la musique : 2 secondes maximum, volume mesuré.</li></ul>
+</section>
+
+<!-- 5 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="telecommande">
+  <div class="head"><span class="rank">05</span><h2>Téléphone télécommande</h2></div>
+  <div class="chips"><span class="chip t">Ergonomie</span><span class="chip">Audace 4</span><span class="chip v">Valeur 3,5 / 5</span><span class="chip">Effort M</span><span class="chip">Sans compte</span></div>
+  <p class="pitch">Le téléphone posé à côté du clavier pilote la session de l'ordinateur : pause, distraction, suivant, temps restant. Appairage par QR, sans compte.</p>
+  <img class="shot" src="shots/telecommande.png" alt="QR en session et télécommande sur téléphone">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>Tu travailles dans Figma ou dans ton IDE en plein écran. Le téléphone sonne, il faut mettre en pause, ou un collègue t'interrompt et tu veux noter la distraction. Aujourd'hui, ça veut dire quitter ton outil et retrouver l'onglet : exactement la rupture de contexte que la session devait éviter.</p>
+      <h3>Avant / après</h3>
+      <table class="ba">
+        <tr><th>Aujourd'hui</th><th>Avec l'idée</th></tr>
+        <tr><td>1. Quitter l'app de travail (Alt-Tab)<br>2. Retrouver le navigateur puis l'onglet<br>3. Bouger la souris pour faire réapparaître les contrôles (ils se masquent)<br>4. Cliquer Pause<br>5. Revenir dans l'app de travail</td><td>1. Toucher Pause sur le téléphone posé à côté</td></tr>
+        <tr><td><strong>5 actions</strong>, et le contexte est perdu</td><td><strong>1 action</strong>, sans quitter l'écran de travail</td></tr>
+      </table>
+      <p>La n°1 validée (touches média) couvre le clavier quand il en a. La télécommande couvre la distraction (aucune touche média pour ça), les claviers sans touches média, et le temps restant d'un coup d'œil.</p>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+sequenceDiagram
+  participant PC as Ordinateur (/session)
+  participant C as Canal broadcast (code 2 h)
+  participant T as Téléphone (/remote/code)
+  PC->>C: état toutes les 5 s (endsAt, mode, titre)
+  T->>C: commande pause / distraction / suivant
+  C->>PC: commande
+  PC->>PC: timer.pause, markDistraction, adapter.next
+  PC->>C: nouvel état
+      </pre>
+      <p>Le téléphone envoie de vraies commandes, appliquées par la session de l'ordinateur (les mêmes actions que les raccourcis Espace et D). Le temps est affiché à partir de <code>endsAt</code>, donc sans dérive.</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>Le schéma « code + télécommande » est classique (Spotify Connect, Kahoot) mais absent des apps de focus. Elles se contentent de synchroniser des appareils sous un même compte (<a href="https://apps.apple.com/app/id973134470">Be Focused</a>).</p>
+  <h3>Impact technique</h3>
+  <ul><li>Même canal éphémère que la n°2 (infrastructure partagée : faire les deux ensemble coûte moins cher). Nouvelle route <code>app/remote/[code]/page.tsx</code>. <code>app/session/page.tsx</code> (écoute des commandes), <code>store/timerStore.ts</code>, <code>store/distractionStore.ts</code>.</li><li>Supabase configuré côté app (clé anon), aucun compte utilisateur.</li></ul>
+  <h3>Risques et promesse honnête</h3>
+  <ul><li>Ça marche tant que l'écran du téléphone est allumé. Un téléphone verrouillé suspend la page, et <code>navigator.vibrate</code> n'existe pas sur iPhone. « Vibrer à la fin du pomodoro » demanderait le Web Push, donc une PWA (refusée). Je ne le promets pas.</li><li>Code à durée courte pour éviter qu'un inconnu pilote ta session.</li></ul>
+</section>
+
+<!-- 6 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="comparaison">
+  <div class="head"><span class="rank">06</span><h2>Estimer par comparaison</h2></div>
+  <div class="chips"><span class="chip t">Fonctionnel</span><span class="chip">Audace 4</span><span class="chip v">Valeur 3,5 / 5</span><span class="chip">Effort M</span><span class="chip">Local</span></div>
+  <p class="pitch">On n'estime plus une tâche en pomodoros dans l'absolu. On la place entre deux tâches déjà terminées dont le coût réel a été mesuré, et FocusFlow en déduit l'estimation.</p>
+  <img class="shot" src="shots/comparaison.png" alt="Placer une tâche entre deux tâches mesurées">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>« Combien de pomodoros pour préparer l'oral ? » Personne ne sait répondre, alors on tape 2 et on en fait 5 : c'est l'erreur de planification, systématique. Les estimations faussent ensuite le rythme des projets et les plans de Sprint. En revanche, on sait très bien dire « c'est plus long que les slides, plus court que le rapport ».</p>
+      <h3>Fonctionnement</h3>
+      <ol>
+        <li>Créer une tâche. Au lieu du champ « estimation », une ligne de tâches terminées, rangées par coût réel.</li>
+        <li>Glisser la nouvelle tâche à sa place, ou taper au clavier « plus que Slides ».</li>
+        <li>FocusFlow propose un nombre, interpolé entre les deux voisines.</li>
+        <li>Garder, ou saisir soi-même. Avec moins de 3 tâches terminées, on revient au champ classique.</li>
+      </ol>
+      <h3>Pourquoi ça marche</h3>
+      <p>Le jugement relatif est bien plus fiable que l'absolu : c'est ce qui fonde le planning poker des équipes agiles. Et la référence n'est pas une estimation passée mais un temps réellement mesuré par FocusFlow, ce qui corrige le biais à la source au lieu d'afficher après coup qu'on s'est trompé.</p>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+flowchart LR
+  D["sessionStore : tâches terminées + pomodorosUsed"] --> R["lib/estimate.ts : échelle des coûts réels"]
+  R --> UI["Ligne de référence (glisser)"]
+  UI -- "position" --> I["Interpolation entre voisines"]
+  I --> E["pomodoroEstimate de la tâche"]
+  E --> P["projectStore (rythme / jour) + sprint"]
+      </pre>
+      <p>Le mode de saisie change, et donc la donnée elle-même : l'estimation qui alimente projets et Sprint repose sur des mesures. La précision d'estimation de <code>/insights</code> ne fait que constater l'écart.</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>Focus To-Do et les apps Pomodoro demandent une estimation absolue par tâche (<a href="https://apps.apple.com/us/app/focus-to-do-pomodoro-tasks/id1258530160">Focus To-Do</a>). Le planning poker est relatif mais collectif, et ancré sur des estimations. Une estimation relative ancrée sur ses propres temps mesurés : pas trouvée.</p>
+  <h3>Impact technique</h3>
+  <ul><li><code>store/sessionStore.ts</code> (<code>pomodorosUsed</code> existe), nouveau <code>lib/estimate.ts</code> (pur, testé), saisie dans <code>components/TodoList.tsx</code>, <code>app/settings/page.tsx</code>, <code>components/TaskPlanner.tsx</code>. Pas de Supabase.</li></ul>
+  <h3>Risques</h3>
+  <ul><li>Les tâches terminées doivent avoir un compteur fiable : seulement celles avec <code>pomodorosUsed</code> supérieur à 0.</li><li>Des tâches de natures différentes se comparent mal : filtrer par projet quand c'est possible.</li></ul>
+</section>
+
+<!-- 7 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="ancrage">
+  <div class="head"><span class="rank">07</span><h2>Ancrage sonore</h2></div>
+  <div class="chips"><span class="chip t">Design d'expérience</span><span class="chip">Audace 4</span><span class="chip v">Valeur 3 / 5</span><span class="chip">Effort S</span><span class="chip">Local</span></div>
+  <p class="pitch">Chaque projet a un morceau qui lui est réservé : il ouvre chaque session sur ce projet, et ne joue jamais ailleurs.</p>
+  <img class="shot" src="shots/ancrage.png" alt="Projet avec son morceau d'ancrage">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>Les cinq premières minutes sur un gros projet (mémoire, thèse, roman) sont les pires : il faut « se remettre dedans ». Le contexte mental ne revient pas tout seul.</p>
+      <h3>Fonctionnement</h3>
+      <ol>
+        <li>À la première session sur un projet, le premier titre écouté jusqu'au bout devient son ancrage (modifiable).</li>
+        <li>Chaque session sur ce projet commence par ce morceau, seul, puis ta musique habituelle prend le relais.</li>
+        <li>Le morceau est retiré de toutes les autres files, radios et suggestions. Ajouté ailleurs, FocusFlow prévient.</li>
+      </ol>
+      <h3>Pourquoi ça marche</h3>
+      <p>Un indice constant et exclusif, associé toujours au même contexte, finit par déclencher ce contexte : c'est le principe des habitudes déclenchées par un indice (travaux de Wendy Wood). L'exclusivité est essentielle : un morceau entendu partout perd son pouvoir d'indice. Honnêtement, les preuves sur la mémoire dépendante du contexte musical sont mitigées. L'effet rituel, lui, est solide et ne coûte rien.</p>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+flowchart TD
+  P["projectStore.activeProject"] --> A{"Ancrage défini ?"}
+  A -- "non" --> F["1er titre écouté en entier = ancrage"]
+  A -- "oui" --> Q["File : ancrage en tête, puis musique choisie"]
+  Q --> X["Exclusion : retiré des files, radios, suggestions des autres contextes"]
+      </pre>
+      <p>Le comportement du lecteur change : la file est réécrite au démarrage, et le morceau est exclu partout ailleurs, y compris de la Radio commune validée.</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>Brain.fm conseille « la même musique à chaque session » (<a href="https://www.brain.fm/blog/work-from-home-concentration">brain.fm</a>), sans lien par projet ni exclusivité. Les routines de FocusFlow lancent un média, mais il peut jouer partout. Le product-lead l'aurait remplacée pour cette raison. Je la garde pour l'exclusivité, qui est le cœur du mécanisme.</p>
+  <h3>Impact technique</h3>
+  <ul><li><code>store/projectStore.ts</code> (champ <code>anchorTrack</code>, sync existante), <code>lib/playback/queue.ts</code> et <code>continuation.ts</code> (exclusion), <code>app/session/page.tsx</code>, <code>components/ProjectsSection.tsx</code>. Pas de Supabase en plus.</li></ul>
+  <h3>Risques</h3>
+  <ul><li>Ne marche que si on travaille par projet. Spotify : l'exclusion des suggestions Spotify n'est que partielle.</li></ul>
+</section>
+
+<!-- 8 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="une-phrase">
+  <div class="head"><span class="rank">08</span><h2>Lancer en une phrase</h2></div>
+  <div class="chips"><span class="chip t">Ergonomie</span><span class="chip">Audace 3,5</span><span class="chip v">Valeur 4 / 5</span><span class="chip">Effort M</span><span class="chip">Local</span></div>
+  <p class="pitch">Dans ⌘K, « 50 min rapport lofi kyoto » est compris et la session démarre : durée, tâche existante, musique retrouvée dans ton catalogue ou ton historique. Un lien collé marche aussi.</p>
+  <img class="shot" src="shots/une-phrase.png" alt="Palette de commandes qui comprend une phrase">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>Aujourd'hui, ⌘K ne lance aucune session : « Démarrer une session » ouvre le catalogue. Il faut ensuite choisir la vidéo, passer par <code>/settings</code> et démarrer. Changer de durée, ajouter une tâche, utiliser une playlist de la bibliothèque : chaque variation ajoute des clics. C'est l'entrée en session, le moment où l'on est le plus fragile, qui coûte le plus.</p>
+      <h3>Avant / après</h3>
+      <table class="ba">
+        <tr><th>Aujourd'hui (comptés dans le code)</th><th>Avec l'idée</th></tr>
+        <tr><td>1. « Choisir une ambiance » (accueil)<br>2. Survol de la carte puis « Démarrer » (catalogue, <code>app/page.tsx</code>)<br>3. Choisir le preset (<code>/settings</code>)<br>4. Cocher la tâche<br>5. « Démarrer la session »<br>6. Modale « tâches restantes » si besoin<br>Bibliothèque ou Spotify : +1 à 2</td><td>1. ⌘K, taper la phrase, Entrée<br><br>Ce qui est compris est montré avant de lancer. En cas de doute, Tab pour corriger un élément, jamais un mauvais média lancé en silence.</td></tr>
+        <tr><td><strong>4 à 7 clics</strong>, plus la recherche de la vidéo</td><td><strong>1 action clavier</strong>, 0 clic</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+flowchart LR
+  Q["Texte ⌘K"] --> D["Durée / preset (regex : 25, 50 min, deep, flow)"]
+  Q --> T["Tâche : recherche floue dans sessionStore.todos"]
+  Q --> M["Média : URL, ou recherche floue dans catalogue, biblio, playlists locales, historique (poids = écoutes)"]
+  D --> R["Résolution affichée"]
+  T --> R
+  M --> R
+  R -- "Entrée" --> S["Stores (timer, session) puis /session direct"]
+      </pre>
+      <p>Une analyse locale (fonctions pures dans <code>lib/quickLaunch.ts</code>, testées) qui configure les stores et ouvre directement <code>/session</code>, sans passer par <code>/settings</code>. Lot 0, presque gratuit : les entrées ⌘K « Relancer comme la dernière fois » et « Retour à la session ».</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>Les extensions Pomodoro de Raycast démarrent un minuteur sans résoudre de musique ni de tâche (<a href="https://www.raycast.com/asubbotin/pomodoro">Raycast Pomodoro</a>). Todoist comprend les dates dans une phrase, mais ne lance rien. Composer toute une session de focus (rythme, tâche, musique) en une phrase : pas trouvé.</p>
+  <h3>Impact technique</h3>
+  <ul><li><code>components/CommandPalette.tsx</code>, nouveau <code>lib/quickLaunch.ts</code>, <code>store/sessionStore.ts</code>, <code>store/timerStore.ts</code>, <code>data/videos.ts</code>, <code>store/playHistoryStore.ts</code>, <code>store/localPlaylistStore.ts</code>. Pas de Supabase ni d'IA (repli IA possible plus tard via <code>/api/coach</code>, jamais obligatoire).</li></ul>
+  <h3>Risques</h3>
+  <ul><li>Surtout utile aux habitués du clavier. Sur mobile, la même analyse peut servir dans un champ de l'accueil.</li><li>Ambiguïté (« rapport » correspond à deux tâches) : afficher les choix, ne jamais deviner en silence.</li></ul>
+</section>
+
+<!-- 9 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="dernier-train">
+  <div class="head"><span class="rank">09</span><h2>Dernier train</h2></div>
+  <div class="chips"><span class="chip t">Fonctionnel</span><span class="chip">Audace 3,5</span><span class="chip v">Valeur 4 / 5</span><span class="chip">Effort S</span><span class="chip">Local</span></div>
+  <p class="pitch">Tu dis à quelle heure tu t'arrêtes. FocusFlow recalcule à rebours les cycles qui restent, ajuste le dernier pour finir pile, et dit si l'objectif du jour est encore atteignable.</p>
+  <img class="shot" src="shots/dernier-train.png" alt="Choix de l'heure d'arrêt et cycles recalculés">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>Tu dois partir à 18:30 (train, enfants, cours). Avec des cycles fixes, le dernier pomodoro commence à 18:20 et se termine en catastrophe, ou tu t'arrêtes à 17:50 par prudence. Tu fais le calcul de tête toute l'après-midi, et c'est une charge mentale de plus.</p>
+      <h3>Fonctionnement</h3>
+      <ol>
+        <li>Au démarrage, facultatif : « Tu t'arrêtes à quelle heure ? » (heure suggérée d'après tes jours précédents).</li>
+        <li>FocusFlow répartit le temps : 8 pomodoros, le dernier de 30 min, la longue pause raccourcie.</li>
+        <li>Il dit honnêtement si l'objectif tient (« 10 atteignable si tu t'arrêtes à 19:30 »).</li>
+        <li>En cours de route, une pause qui s'allonge ou une distraction recalculent la suite.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+flowchart LR
+  H["Heure d'arrêt"] --> F["lib/agendaFit.ts (même moteur que l'agenda)"]
+  N["Maintenant + état du cycle"] --> F
+  S["Réglages du preset"] --> F
+  F --> P["Plan : durées des cycles restants"]
+  P --> T["timerStore : chaque cycle prend sa durée du plan"]
+  G["goalStore"] --> F
+  T -- "écart (pause longue)" --> F
+      </pre>
+      <p>Les durées des cycles restants deviennent un plan recalculé en continu. C'est le lot A de l'agenda (n°3), sans serveur ni URL. Je le présente à part parce qu'il sert sans agenda.</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>Aucun minuteur trouvé qui planifie à rebours depuis une heure de fin. Le seul équivalent est le calcul de tête. Les planificateurs (Sunsama, Akiflow) placent des blocs, sans piloter un minuteur.</p>
+  <h3>Impact technique</h3>
+  <ul><li><code>store/timerStore.ts</code> (durée par cycle issue d'un plan), nouveau <code>lib/agendaFit.ts</code> (pur, partagé avec la n°3), <code>app/settings/page.tsx</code>, <code>store/goalStore.ts</code>. Pas de Supabase.</li></ul>
+  <h3>Risques</h3>
+  <ul><li>Touche au contrat du minuteur : stats, XP et projets doivent créditer les minutes réelles (chemin Flowtime).</li><li>Flowtime : sans objet (pas de cycles fixes), l'option est masquée.</li></ul>
+</section>
+
+<!-- 10 ────────────────────────────────────────────────────── -->
+<section class="idea" id="prevenir-pause">
+  <div class="head"><span class="rank">10</span><h2>Prévenir à sa pause</h2></div>
+  <div class="chips"><span class="chip t">Fonctionnel</span><span class="chip">Audace 3</span><span class="chip v">Valeur 3 / 5</span><span class="chip">Effort M</span><span class="chip">En ligne (amis)</span></div>
+  <p class="pitch">Écrire à un ami en focus ne le dérange plus : le message part au début de sa pause. La conversation dit d'elle-même « en focus, pause vers 14:25 ».</p>
+  <img class="shot" src="shots/prevenir-pause.png" alt="Message programmé à la pause d'un ami">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>Le chat entre amis est là, mais écrire à quelqu'un en focus, c'est le sortir de sa concentration. Alors on n'ose pas, ou on le fait quand même et on casse son pomodoro.</p>
+      <h3>Fonctionnement</h3>
+      <ol>
+        <li>Ami en focus : la conversation affiche « pause vers 14:25 », calculé depuis son minuteur.</li>
+        <li>Le bouton d'envoi devient « À sa pause » (« Envoyer maintenant » reste possible).</li>
+        <li>À 14:25, quand sa pause commence, le message part et tu en es averti.</li>
+        <li>Chez lui : rien pendant le focus, le message arrive avec la pause.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+flowchart LR
+  A["Ami : /session publie focus_ends_at"] --> FS["friend_stats (Realtime, RLS existante)"]
+  FS --> C["Ma conversation : pause vers 14:25"]
+  M["Message rédigé"] --> Q["chatStore : file d'envoi locale"]
+  FS -- "activity passe en pause" --> Q
+  Q --> S["sendMessage (existant)"]
+      </pre>
+      <p>L'envoi est déclenché par un événement d'état chez l'autre (sa pause), et non par une heure fixe : si l'ami prolonge ou arrête, l'envoi suit.</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>Les modes « Ne pas déranger » des systèmes retiennent les notifications chez le destinataire. Ici c'est l'émetteur qui sait quand écrire, à partir du minuteur réel de l'autre. Pas vu dans une app de focus. Teams aurait un « me prévenir quand disponible », non vérifié.</p>
+  <h3>Impact technique</h3>
+  <ul><li>Supabase : colonne optionnelle <code>friend_stats.focus_ends_at</code> (RLS existante, <code>add column if not exists</code>). <code>lib/friends.ts</code>, <code>store/chatStore.ts</code>, <code>components/FriendChat.tsx</code>, <code>app/session/page.tsx</code>.</li></ul>
+  <h3>Risques</h3>
+  <ul><li>L'envoi part du navigateur de l'émetteur : s'il est fermé à 14:25, le message attend sa prochaine ouverture (à afficher clairement). Un envoi côté serveur demanderait une fonction planifiée.</li><li>Intérêt limité si on a peu d'amis actifs.</li></ul>
+</section>
+
+<section class="idea">
+  <h2>Auto-critique : ce que j'ai éliminé et pourquoi</h2>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Idée écartée</th><th>Raison</th><th>Remplacée par</th></tr></thead>
+    <tbody>
+      <tr><td>Pad musical (énergie × familiarité)</td><td>Existe depuis 2011 (mood pad Musicovery). Surtout, l'axe « énergie » serait inventé : 55 vidéos, 3 moods, et les audio-features de Spotify sont coupées. Affichage déguisé.</td><td>Calé sur la vidéo</td></tr>
+      <tr><td>Le pomodoro qui commence petit (2 min qui deviennent 25)</td><td>Existe tel quel : <a href="https://apps.apple.com/us/app/2-minutes-beyond-timer/id6740170615">2 Minutes &amp; Beyond</a>, Chrony.</td><td>Dernier train</td></tr>
+      <tr><td>Estimations corrigées automatiquement par le biais mesuré</td><td>Variante de la précision d'estimation de <code>/insights</code>. Une correction invisible se rapproche de « Smart Focus IA ».</td><td>Estimer par comparaison</td></tr>
+      <tr><td>Relais entre amis (chaîne asynchrone)</td><td>Troisième mécanique de pression sociale, après la série à deux et la promesse, toutes deux refusées.</td><td>Emporter la session sur le téléphone</td></tr>
+      <tr><td>Courrier de pause (notifications retenues)</td><td>Variante des modes Focus d'iOS et de macOS, et les notifications internes à FocusFlow sont rares.</td><td>Prévenir à sa pause (on garde le statut « pause vers »)</td></tr>
+      <tr><td>La cloche attend la fin du morceau</td><td>Trop proche de « finir sur la fin du morceau », déjà écartée en vague 1, et de la famille « pauses en musique » refusée.</td><td>(non retenue)</td></tr>
+      <tr><td>La session survit à la navigation (mini-lecteur global)</td><td>Pas inédite (tout lecteur de musique le fait). C'est un correctif, présenté à part en tête de page.</td><td>(correctif, hors concours)</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Aucune idée ne touche aux sujets refusés (ambiances, Mode Strict, détection automatique de distraction, PWA, Focus Rooms, Smart Focus IA, capture rapide). La télécommande et le passage sur téléphone ne partagent aucun minuteur entre personnes : c'est le même utilisateur sur deux appareils.</p>
+</section>
+
+</div>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+  const dark = document.documentElement.dataset.theme === "dark" ||
+    (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+  mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", flowchart: { htmlLabels: true, curve: "basis" } });
+</script>
+
+</body>
+</html>

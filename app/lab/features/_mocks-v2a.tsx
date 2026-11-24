@@ -8,7 +8,7 @@ export function UnePhrase() {
   return (
     <AppFrame title="Aujourd'hui">
       <div className="absolute inset-0 bg-black/60" />
-      <div className="absolute left-1/2 top-24 w-[680px] -translate-x-1/2 overflow-hidden rounded-2xl border border-white/15 bg-[#0f1319] shadow-2xl">
+      <div className="absolute left-1/2 top-24 w-[680px] -translate-x-1/2 rounded-2xl border border-white/15 bg-[#0f1319] shadow-2xl">
         <div className="relative flex items-center gap-3 border-b border-white/10 px-5 py-4">
           <Marker n={1} className="-left-3 -top-3" />
           <span className="font-mono text-xs text-white/40">⌘K</span>
@@ -33,48 +33,7 @@ export function UnePhrase() {
           </div>
         </div>
         <div className="border-t border-white/10 px-5 py-3 font-mono text-[11px] text-white/35">
-          Marche aussi : « 25 min maths », « deep spotify », un lien YouTube collé, « comme hier »
-        </div>
-      </div>
-    </AppFrame>
-  );
-}
-
-/* Pad musical -------------------------------------------------------------- */
-export function PadMusical() {
-  const dots: [number, number, string][] = [
-    [18, 70, "Piano pluie"], [26, 62, "Jeju nuit"], [35, 75, "Ghibli piano"], [55, 40, "Kyoto drive"], [62, 30, "Nujabes"],
-    [78, 22, "Synthwave run"], [84, 55, "Game OST mix"], [44, 58, "Study with me Osaka"], [70, 72, "Découverte : city lights"], [22, 30, "Ambient Fuji"],
-  ];
-  return (
-    <AppFrame title="Écouter">
-      <Label>Écouter · Pad</Label>
-      <h1 className="mt-2 text-2xl font-semibold">De quoi as-tu besoin ?</h1>
-      <div className="relative mt-6 flex gap-8">
-        <div className="relative h-[460px] w-[620px] rounded-2xl border border-white/10 bg-white/[0.03]">
-          <Marker n={1} className="-left-3 -top-3" />
-          <div className="absolute inset-x-0 top-1/2 h-px bg-white/10" /><div className="absolute inset-y-0 left-1/2 w-px bg-white/10" />
-          <span className="absolute left-3 top-1/2 -translate-y-6 font-mono text-[10px] text-white/40">CALME</span>
-          <span className="absolute right-3 top-1/2 -translate-y-6 font-mono text-[10px] text-white/40">ÉNERGIE</span>
-          <span className="absolute left-1/2 top-3 -translate-x-1/2 font-mono text-[10px] text-white/40">CONNU</span>
-          <span className="absolute bottom-3 left-1/2 -translate-x-1/2 font-mono text-[10px] text-white/40">NOUVEAU</span>
-          {dots.map(([x, y, t]) => (
-            <span key={t} className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/35" style={{ left: `${x}%`, top: `${100 - y}%` }} title={t} />
-          ))}
-          <div className="absolute h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full border" style={{ left: "58%", top: "62%", borderColor: CYAN, background: "color-mix(in oklch, " + CYAN + " 12%, transparent)" }} />
-          <span className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-4 ring-black/40" style={{ left: "58%", top: "62%", background: CYAN }} />
-          <Marker n={2} className="left-[62%] top-[48%]" />
-        </div>
-        <div className="relative w-[360px]">
-          <Marker n={3} className="-left-3 -top-3" />
-          <Card>
-            <Label>File construite · 14 titres</Label>
-            {["Kyoto drive, lofi", "Study with me, Osaka", "Nujabes - Aruarian Dance", "Découverte : city lights", "Game OST mix"].map((t, i) => (
-              <div key={t} className="mt-3 flex items-center gap-3 text-sm"><span className="w-4 font-mono text-[10px] text-white/40">{i + 1}</span><span className={i === 3 ? "text-white/60" : ""}>{t}</span></div>
-            ))}
-            <div className="mt-5 text-xs text-white/45">Assez énergique, plutôt connu, 1 découverte sur 4.</div>
-            <div className="mt-4 flex gap-2"><Pill primary>Lancer</Pill><Pill>Remplacer la file</Pill></div>
-          </Card>
+          Marche aussi : « 25 min maths », « deep spotify », un lien YouTube collé, « comme hier », « retour à la session »
         </div>
       </div>
     </AppFrame>
@@ -114,7 +73,7 @@ export function Telecommande() {
         </div>
         <div className="relative mx-5 mt-5 rounded-xl border border-white/10 p-3 text-xs text-white/55">
           <Marker n={3} className="-left-3 -top-3" />
-          Vibre à la fin du pomodoro. Écran éteint, ça marche encore.
+          Sans compte. Code valable 2 h. Marche tant que l&apos;écran du téléphone est allumé.
         </div>
       </div>
     </div>
@@ -156,32 +115,6 @@ export function Ancrage() {
         </div>
       </div>
     </AppFrame>
-  );
-}
-
-/* Le pomodoro qui commence petit ------------------------------------------- */
-export function CommencePetit() {
-  return (
-    <div className="flex w-[1280px] gap-6 bg-[#07090d] p-6 text-white">
-      {[
-        { t: "02:00", sub: "Juste 2 minutes. Ouvre le fichier.", p: 0, n: 1, prog: 0, label: "Engagement" },
-        { t: "00:14", sub: "Tu es toujours là.", p: 1, n: 2, prog: 0.9, label: "Engagement" },
-        { t: "22:46", sub: "Pomodoro 1 · les 2 minutes comptent", p: 2, n: 3, prog: 0.09, label: "Pomodoro 1" },
-      ].map((s) => (
-        <div key={s.n} className="relative h-[420px] flex-1 overflow-hidden rounded-2xl border border-white/10 bg-[url(/rue/ninenzaka/still.webp)] bg-cover">
-          <div className="absolute inset-0 bg-black/55" />
-          <Marker n={s.n} className="left-3 top-3" />
-          <div className="relative flex h-full flex-col items-center justify-center text-center">
-            <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/50">{s.label}</div>
-            <div className="mt-2 font-mono text-6xl tabular-nums" style={{ color: s.p === 2 ? SODIUM : "white" }}>{s.t}</div>
-            <div className="mt-3 h-px w-48 bg-white/15"><div className="h-px" style={{ width: `${s.prog * 100}%`, background: s.p === 2 ? SODIUM : CYAN }} /></div>
-            <div className="mt-4 max-w-[240px] text-sm text-white/70">{s.sub}</div>
-            {s.p === 1 && <div className="mt-6 font-mono text-[10px] text-white/40">Aucun clic. Rien ne s&apos;arrête.</div>}
-            {s.p === 0 && <div className="mt-6 flex gap-2"><Pill primary>Démarrer 2 min</Pill></div>}
-          </div>
-        </div>
-      ))}
-    </div>
   );
 }
 
