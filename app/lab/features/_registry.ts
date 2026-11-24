@@ -5,10 +5,22 @@ import { TitresQuiMarchent, GoBlocs } from "./_mocks-c";
 import { UnePhrase, Telecommande, Ancrage, Melodie } from "./_mocks-v2a";
 import { Agenda } from "./_mocks-v2b";
 import { CaleVideo, DernierTrain, Comparaison, PrevenirPause, Passage } from "./_mocks-v2c";
+import { TelephonePosition, Fenetres, MorceauxMixes, AutreEcran, Seuil, SeuilEnCours, SpotifySansPremium, TitrePourToi, RienPerdu, Coller, OrganisationDeuxVues } from "./_mocks-v3";
 
-export interface MockEntry { slug: string; name: string; pitch: string; effort: "S" | "M" | "L"; value: number; screens: ComponentType[]; wave?: 1 | 2; status?: "oui" | "non" }
+export interface MockEntry { slug: string; name: string; pitch: string; effort: "S" | "M" | "L"; value: number; screens: ComponentType[]; wave?: 1 | 2 | 3; audace?: number; status?: "oui" | "non" }
 
 export const MOCKS: MockEntry[] = [
+  // Vague 3 (en attente de réponse), triée par audace puis valeur
+  { wave: 3, audace: 4.5, slug: "telephone-position", name: "Le téléphone se pilote par sa position", pitch: "Retourné, le focus démarre et l'écran devient noir sans couper la musique ; repris en main, pause.", effort: "M", value: 4, screens: [TelephonePosition] },
+  { wave: 3, audace: 4.5, slug: "fenetres", name: "Les fenêtres allumées", pitch: "Pendant ta pause, chaque ami encore au travail est une fenêtre allumée dans ta rue.", effort: "M", value: 3, screens: [Fenetres] },
+  { wave: 3, audace: 3.5, slug: "morceaux-mixes", name: "Les morceaux dans les mixes", pitch: "Suivant saute au morceau suivant d'un mix d'une heure, et on garde un passage comme un vrai titre.", effort: "M", value: 4, screens: [MorceauxMixes] },
+  { wave: 3, audace: 3.5, slug: "autre-ecran", name: "Sur l'autre écran", pitch: "La session s'ouvre en plein écran sur le second moniteur, d'un clic.", effort: "S", value: 3.5, screens: [AutreEcran] },
+  { wave: 3, audace: 3, slug: "seuil", name: "La session sans antichambre", pitch: "Plus de page Réglages : on choisit ambiance, rythme et tâche dans la session, même en cours.", effort: "L", value: 5, screens: [Seuil, SeuilEnCours] },
+  { wave: 3, audace: 3, slug: "spotify-sans-premium", name: "Ta playlist Spotify, sans Premium", pitch: "Un lien Spotify collé est rejoué titre par titre depuis YouTube.", effort: "M", value: 4.5, screens: [SpotifySansPremium] },
+  { wave: 3, audace: 3, slug: "titre-pour-toi", name: "Un titre pour toi", pitch: "Glisser un morceau dans la file d'un ami, qui passe à la fin de son titre en cours.", effort: "S", value: 3, screens: [TitrePourToi] },
+  { wave: 3, audace: 2.5, slug: "rien-perdu", name: "Rien n'est perdu", pitch: "Commencé il y a 10 min, levé à 14:52, Terminer par erreur : tout se rattrape en un geste.", effort: "S", value: 4, screens: [RienPerdu] },
+  { wave: 3, audace: 2.5, slug: "coller", name: "Coller pour lancer", pitch: "Ctrl V n'importe où avec un lien YouTube, Spotify ou Twitch, et la session part.", effort: "S", value: 4, screens: [Coller] },
+  { wave: 3, audace: 2, slug: "organisation-deux-vues", name: "Organisation en deux vues", pitch: "Cinq sous-onglets deviennent Semaine et Projets et tâches, et les tâches ont enfin une page.", effort: "M", value: 3.5, screens: [OrganisationDeuxVues] },
   { wave: 1, status: "oui", slug: "systeme", name: "FocusFlow dans le système", pitch: "Le minuteur dans l'onglet, l'écran verrouillé et les touches média.", effort: "S", value: 4.5, screens: [EcranVerrouille] },
   { wave: 1, status: "non", slug: "reprise", name: "Reprendre là où tu t'es arrêté", pitch: "Une note de reprise et la vidéo au bon endroit.", effort: "S", value: 4.5, screens: [Reprise, RepriseDashboard] },
   { wave: 1, status: "non", slug: "pauses-en-musique", name: "Pauses en musique", pitch: "Des fondus au lieu de coupures, et une musique à soi pendant les pauses.", effort: "M", value: 4.5, screens: [PausesEnMusique] },

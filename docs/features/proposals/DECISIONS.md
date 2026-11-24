@@ -31,3 +31,7 @@
 | 10 | Prévenir à sa pause | Non, ne pas reproposer |
 
 Feu vert d'implémentation donné le 2026-11-24 pour toutes les idées « Oui » des vagues 1 et 2 (voir `docs/features/PLAN.md`).
+
+## Vague 3 (2026-11-24) : `vague-3.html`
+
+En attente de réponse idée par idée.

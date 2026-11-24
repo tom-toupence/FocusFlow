@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Propositions vague 3</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --fg: #16181d; --muted: #5d636e; --line: #e2e3e0; --card: #ffffff;
+    --accent: oklch(0.50 0.13 228); --sodium: oklch(0.62 0.15 62); --chip: #eef0f2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #07090d; --fg: #e9ebef; --muted: #8d939e; --line: #1d2229; --card: #0d1117;
+      --accent: oklch(0.72 0.13 210); --sodium: oklch(0.78 0.15 70); --chip: #161b22;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #07090d; --fg: #e9ebef; --muted: #8d939e; --line: #1d2229; --card: #0d1117;
+    --accent: oklch(0.72 0.13 210); --sodium: oklch(0.78 0.15 70); --chip: #161b22;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 48px 16px 96px; }
+  .eyebrow { font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-size: clamp(28px, 4vw, 40px); margin: 10px 0 8px; letter-spacing: -.01em; }
+  h2 { font-size: 24px; margin: 6px 0 4px; }
+  h3 { font-size: 13px; margin: 22px 0 6px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  p { margin: 0 0 10px; }
+  .lede { color: var(--muted); max-width: 680px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font: 500 10px/1 ui-monospace, Menlo, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  td.num, th.num { text-align: right; font-family: ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  a { color: var(--accent); }
+  .idea { margin-top: 64px; padding-top: 28px; border-top: 1px solid var(--line); }
+  .head { display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  .rank { font: 600 13px ui-monospace, Menlo, monospace; color: var(--muted); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 14px; }
+  .chip { background: var(--chip); border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px; font: 12px ui-monospace, Menlo, monospace; }
+  .chip.v { color: var(--sodium); }
+  .pitch { font-size: 18px; margin: 4px 0 10px; }
+  .shot { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); margin: 8px 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  ol, ul { margin: 0 0 10px; padding-left: 20px; }
+  li { margin: 3px 0; }
+  code { font: 12.5px ui-monospace, Menlo, monospace; background: var(--chip); padding: 1px 5px; border-radius: 5px; }
+  .mermaid { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; overflow-x: auto; }
+  .note { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; padding: 12px 14px; margin: 12px 0; font-size: 14px; }
+  .scroll { overflow-x: auto; }
+  .chip.t { color: var(--accent); }
+  table.ba { margin: 6px 0 12px; font-size: 13.5px; }
+  table.ba th, table.ba td { width: 50%; }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+<div class="eyebrow">FocusFlow · mode proposition · vague 3 · 24 novembre 2026</div>
+<h1>10 idées, vague 3</h1>
+<p class="lede">Rien n'est implémenté. Fonctionnel, ergonomie, design, amis, téléphone, et deux idées sur l'organisation des pages. Les maquettes sont statiques (<code>/lab/features</code>). Triées par audace puis par valeur. Les clics sont comptés dans le code réel, la nouveauté vérifiée chez les concurrents.</p>
+
+<div class="note"><strong>Ce qui est acquis :</strong> FocusFlow dans le système, Radio commune, Calé sur la vidéo, Emporter la session sur le téléphone, Le minuteur qui connaît ton agenda, Téléphone télécommande, Lancer en une phrase, Dernier train, et le correctif « la session survit à la navigation » (minuteur sur <code>endsAt</code>). Plusieurs idées ci-dessous s'appuient dessus, c'est dit à chaque fois. Rien ne reprend une idée refusée (voir <code>DECISIONS.md</code>).</div>
+
+<h3>Deux constats trouvés dans le code</h3>
+<div class="note">
+  <p><strong>Les tâches n'ont pas de page.</strong> Le Kanban n'existe que dans <code>/settings</code> (avant la session) et dans le panneau de la session. « ＋ Créer › Tâche » (<code>components/CreateMenu.tsx</code>) envoie vers <code>/settings</code>, l'Organisation n'a pas d'onglet Tâches, et un sprint écrit ses tâches dans un Kanban qu'on ne voit qu'en préparant une session. Les idées 05 et 10 en tirent les conséquences.</p>
+  <p><strong>« Fonctionne sans compte » n'est plus vrai en production.</strong> Dès que Supabase est configuré, <code>components/AuthGate.tsx</code> affiche la landing à tout visiteur non connecté : impossible d'essayer l'app sans Google. L'idée 05 propose d'y remédier sans rien perdre (la fusion des données anonymes au premier login existe déjà dans <code>SupabaseProvider</code>).</p>
+</div>
+
+<h3>Classement</h3>
+<div class="scroll">
+<table>
+  <thead><tr><th>#</th><th>Idée</th><th>Terrain</th><th class="num">Audace</th><th class="num">Valeur</th><th class="num">Effort</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><a href="#telephone-position">Le téléphone se pilote par sa position</a></td><td>Téléphone</td><td class="num">4,5</td><td class="num">4</td><td class="num">M</td></tr>
+    <tr><td>2</td><td><a href="#fenetres">Les fenêtres allumées</a></td><td>Amis · design</td><td class="num">4,5</td><td class="num">3</td><td class="num">M</td></tr>
+    <tr><td>3</td><td><a href="#morceaux-mixes">Les morceaux dans les mixes</a></td><td>Lecteur</td><td class="num">3,5</td><td class="num">4</td><td class="num">M</td></tr>
+    <tr><td>4</td><td><a href="#autre-ecran">Sur l'autre écran</a></td><td>Ergonomie</td><td class="num">3,5</td><td class="num">3,5</td><td class="num">S</td></tr>
+    <tr><td>5</td><td><a href="#seuil">La session sans antichambre</a></td><td>Navigation</td><td class="num">3</td><td class="num">5</td><td class="num">L</td></tr>
+    <tr><td>6</td><td><a href="#spotify-sans-premium">Ta playlist Spotify, sans Premium</a></td><td>Lecteur</td><td class="num">3</td><td class="num">4,5</td><td class="num">M</td></tr>
+    <tr><td>7</td><td><a href="#titre-pour-toi">Un titre pour toi</a></td><td>Amis</td><td class="num">3</td><td class="num">3</td><td class="num">S</td></tr>
+    <tr><td>8</td><td><a href="#rien-perdu">Rien n'est perdu</a></td><td>Minuteur</td><td class="num">2,5</td><td class="num">4</td><td class="num">S</td></tr>
+    <tr><td>9</td><td><a href="#coller">Coller pour lancer</a></td><td>Ergonomie</td><td class="num">2,5</td><td class="num">4</td><td class="num">S</td></tr>
+    <tr><td>10</td><td><a href="#organisation-deux-vues">Organisation en deux vues</a></td><td>Navigation</td><td class="num">2</td><td class="num">3,5</td><td class="num">M</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="eyebrow" style="margin-top:8px">Répartition : téléphone 1 · amis 2 · lecteur 2 · minuteur 1 · ergonomie 2 · navigation 2</p>
+
+<!-- 1 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="telephone-position">
+  <div class="head"><span class="rank">01</span><h2>Le téléphone se pilote par sa position</h2></div>
+  <div class="chips"><span class="chip t">Téléphone</span><span class="chip">Audace 4,5</span><span class="chip v">Valeur 4 / 5</span><span class="chip">Effort M</span><span class="chip">Local · appairage optionnel</span></div>
+  <p class="pitch">Retourné face contre la table, le téléphone lance le focus et passe en écran noir sans couper la musique. Repris en main, il met en pause. Couché sur le côté, il montre la vidéo. Appairé à l'ordinateur, il devient l'interrupteur de la session du bureau.</p>
+  <img class="shot" src="shots/telephone-position.png" alt="Trois positions du téléphone et l'ordinateur appairé">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>Sur iPhone, une session FocusFlow meurt dès que l'écran se verrouille : Safari suspend la page, la vidéo YouTube s'arrête, le minuteur aussi. Pour garder la musique, il faut laisser l'écran allumé, en pleine lumière, à portée de main : exactement l'objet qui distrait. Et sur l'ordinateur, mettre en pause quand on se lève demande de revenir à l'onglet.</p>
+      <h3>Fonctionnement</h3>
+      <ol>
+        <li>Premier usage : un tap autorise l'accès aux capteurs d'orientation (obligatoire sur iOS).</li>
+        <li>Téléphone retourné : le focus démarre (ou reprend). L'écran passe au noir complet avec un verrou d'écran actif : il reste allumé, donc la page vit et YouTube joue. Les touches accidentelles sont ignorées.</li>
+        <li>Repris en main : pause du minuteur et de la musique. Rien n'est noté comme distraction, c'est un interrupteur.</li>
+        <li>Couché sur le côté : la vidéo en plein écran. Debout : tâches et contrôles.</li>
+        <li>Si le téléphone est appairé à l'ordinateur (canal de la télécommande validée), les mêmes gestes pilotent la session du bureau : le téléphone posé à l'envers, loin de la main, tient la session.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+flowchart TD
+  O["DeviceOrientation : gravité Z"] --> P{"Position"}
+  P -- "face contre table" --> F["start + écran noir + Wake Lock"]
+  P -- "en main" --> M["pause (pas une distraction)"]
+  P -- "sur le côté" --> L["vue vidéo plein écran"]
+  F --> T["timerStore : endsAt"]
+  M --> T
+  F -- "appairé" --> B["canal broadcast de la télécommande"]
+  M -- "appairé" --> B
+  B --> PC["session de l'ordinateur : start / pause"]
+      </pre>
+      <p>Ce n'est pas un affichage : la position du téléphone est l'entrée de commande du minuteur et du lecteur. L'écran noir n'est pas cosmétique, c'est ce qui permet à YouTube de continuer sur un téléphone, là où le verrouillage le coupe. Une hystérésis (angle franchi pendant 600 ms) évite les déclenchements parasites.</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>Les apps « flip to focus » existent, mais elles chronomètrent sur le téléphone seul : <a href="https://apps.apple.com/app/id6756534301">Focus Flip</a>, <a href="https://apps.apple.com/us/app/id1543547997">Flip Timer</a>, <a href="https://apps.apple.com/app/id6741011418">Flipo</a>. Le cube physique <a href="https://timeular.com/">Timeular</a> pilote un suivi du temps sur ordinateur, mais c'est un objet payant. Aucune ne fait du téléphone l'interrupteur d'une session de bureau, et aucune ne garde une vidéo en lecture écran retourné. Recherche faite : aucun résultat pour un retournement qui pilote un minuteur d'ordinateur.</p>
+  <h3>Impact technique</h3>
+  <ul>
+    <li>Nouveau <code>lib/devicePose.ts</code> (orientation, hystérésis, logique pure testée avec vitest) et un hook dans <code>app/session/page.tsx</code>. <code>navigator.wakeLock</code> (iOS 16.4+, Chrome Android).</li>
+    <li><code>store/timerStore.ts</code> : start/pause existants, sur <code>endsAt</code> (correctif acquis). <code>lib/playback/*</code> : play/pause existants.</li>
+    <li>Appairage : canal Supabase broadcast de la télécommande, rien de plus. Sans Supabase, le mode téléphone seul marche quand même.</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul><li>Écran LCD : le noir ne coupe pas le rétroéclairage, la batterie en souffre. Afficher une estimation et proposer de désactiver.</li><li>Sur iOS, l'autorisation des capteurs demande un geste explicite à chaque nouvelle page chargée : prévoir le bouton.</li><li>« Repris en main = pause » peut gêner (on attrape le téléphone pour voir l'heure) : réglable, et la reprise est aussi un geste (le reposer).</li></ul>
+</section>
+
+<!-- 2 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="fenetres">
+  <div class="head"><span class="rank">02</span><h2>Les fenêtres allumées</h2></div>
+  <div class="chips"><span class="chip t">Amis · design d'expérience</span><span class="chip">Audace 4,5</span><span class="chip v">Valeur 3 / 5</span><span class="chip">Effort M</span><span class="chip">En ligne (amis)</span></div>
+  <p class="pitch">Pendant ta pause, chaque ami encore au travail est une fenêtre allumée dans ta rue de nuit. Toujours la même fenêtre pour le même ami. Pas de nom (sauf au survol), pas de chiffre, rien à répondre. Et ton focus allume ta fenêtre chez eux.</p>
+  <img class="shot" src="shots/fenetres.png" alt="Rue de pause avec deux fenêtres allumées par des amis">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>Le tiroir Amis est masqué sur <code>/session</code>, volontairement. Résultat : pendant une session on est seul, alors que la présence silencieuse des autres (le body-doubling) est justement ce qui aide à tenir. Afficher une liste d'amis, un classement ou une notification casserait la concentration et crée de la pression, ce que tu as refusé.</p>
+      <h3>Fonctionnement</h3>
+      <ol>
+        <li>À la pause, la rue de nuit s'affiche (comme aujourd'hui).</li>
+        <li>Chaque ami en focus allume une fenêtre précise de cette rue, choisie par un calcul sur son identifiant : c'est toujours la même, on finit par savoir « c'est Léa, au deuxième ».</li>
+        <li>Quand un ami finit un pomodoro, sa fenêtre grésille une seconde puis s'éteint pendant sa pause.</li>
+        <li>Survol d'une fenêtre : le prénom. Jamais de minutes, de série ni de rang.</li>
+        <li>Réciproque : ton focus allume ta fenêtre dans la rue de tes amis. Les scènes de jour, sans fenêtres, n'affichent rien.</li>
+      </ol>
+      <h3>Pourquoi ça marche</h3>
+      <p>C'est de la « technologie calme » : l'information est dans le décor, à la périphérie, et ne demande rien. Une fenêtre allumée chez un voisin, c'est exactement le sentiment « je ne suis pas le seul à travailler ce soir », sans l'obligation de répondre ni de comparer.</p>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+flowchart LR
+  FS["friend_stats : in_focus, heartbeat (Realtime existant)"] --> A["lib/rue/friendWindows.ts : ami vers id de fenêtre"]
+  S["scene.json : liste des fenêtres"] --> A
+  A --> U["RueRenderer : uniform uFriendWin[8]"]
+  U --> SH["shader : windowOn() forcé à 1, teinte chaude"]
+  FS -- "in_focus passe à false" --> G["grésillement 1 s"]
+  G --> SH
+      </pre>
+      <p>Le shader de la rue a déjà un identifiant par fenêtre (<code>ids.g</code>, fonction <code>windowOn()</code> dans <code>lib/rue/shaders.ts</code>) et sait déjà les rallumer (événement « objectif atteint »). L'état réel des amis pilote le rendu : ce n'est pas un widget posé par-dessus, c'est la scène qui change.</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>La présence ambiante existe en liste ou en fil : <a href="https://apps.apple.com/us/app/id6759188662">Nook</a>, <a href="https://apps.apple.com/app/id6757416726">Orbit</a>, <a href="https://www.producthunt.com/posts/grindoro">Grindoro</a> (qui cache justement le fil pendant la session). Forest fait pousser des arbres ensemble, avec une mécanique de pression. Lounge (2021) dessinait des petites fenêtres jour/nuit sur des bureaux virtuels (<a href="https://techcrunch.com/2021/09/22/lounges-new-app-aims-to-reimagine-the-office-for-the-remote-work-era">TechCrunch</a>), mais c'était un indicateur d'heure, pas de présence. Des amis rendus comme des fenêtres dans une vraie photo de rue : pas trouvé.</p>
+  <h3>Impact technique</h3>
+  <ul>
+    <li><code>lib/rue/shaders.ts</code>, <code>lib/rue/RueRenderer.ts</code> (uniform et méthode <code>setFriends(ids)</code>), <code>components/RueScene.tsx</code>, <code>store/friendsStore.ts</code> (déjà abonné en Realtime à <code>friend_stats</code>).</li>
+    <li>Lister les identifiants de fenêtres par scène : une passe de plus dans <code>scripts/rue/</code> qui les écrit dans <code>scene.json</code>.</li>
+    <li>Supabase : aucune colonne nouvelle, la RLS existante suffit. Sans compte ni amis, la rue est inchangée.</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul><li>Visible seulement à la pause et en mode Spotify (jamais de rue sous une vidéo), et seulement dans les scènes de nuit.</li><li>Avec un ou deux amis, l'effet est discret : c'est voulu, mais la valeur dépend du réseau.</li></ul>
+</section>
+
+<!-- 3 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="morceaux-mixes">
+  <div class="head"><span class="rank">03</span><h2>Les morceaux dans les mixes</h2></div>
+  <div class="chips"><span class="chip t">Lecteur</span><span class="chip">Audace 3,5</span><span class="chip v">Valeur 4 / 5</span><span class="chip">Effort M</span><span class="chip">Local</span></div>
+  <p class="pitch">Un mix lofi d'une heure devient une vraie liste de morceaux : « Suivant » saute au morceau suivant dans la vidéo, « À venir » liste les titres du mix, et « Garder » enregistre un passage (de 05:48 à 08:30) qui se rejoue plus tard comme un titre normal.</p>
+  <img class="shot" src="shots/morceaux-mixes.png" alt="Session sur un mix d'une heure avec la liste de ses morceaux">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>Le catalogue est fait de longues vidéos : mixes d'une heure, Study With Me de trois heures. Dans une seule vidéo, « Suivant » change de vidéo (ou ne fait rien), « À venir » est vide, et le morceau qu'on adore à la 23e minute est perdu pour toujours : impossible de le retrouver, encore moins de le mettre dans une playlist.</p>
+      <h3>Fonctionnement</h3>
+      <ol>
+        <li>À l'ouverture d'une vidéo, on lit ses chapitres, ou à défaut la liste horodatée de sa description (format très courant dans les mixes).</li>
+        <li>Le titre en cours, « À venir » et la Media Session (écran verrouillé) affichent le morceau, pas la vidéo.</li>
+        <li>« Suivant » et « Précédent » sautent d'un morceau à l'autre à l'intérieur de la vidéo.</li>
+        <li>« Garder » enregistre le passage dans une playlist locale ou la File, comme n'importe quel titre (via le menu ＋ existant).</li>
+        <li>Rejoué, un passage démarre et s'arrête pile, puis la file enchaîne.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+flowchart TD
+  V["Vidéo longue"] --> R["/api/youtube/chapters : ytInitialData ou description"]
+  R --> C["lib/ytChapters.ts : liste de start, fin, titre"]
+  C --> Q["file maison : pistes virtuelles"]
+  Q -- "Suivant" --> SK["seekTo(début du morceau suivant)"]
+  Q -- "Garder" --> LP["localPlaylistStore : videoId + start + end"]
+  LP --> PL["loadVideoById avec startSeconds, endSeconds"]
+  PL -- "ENDED" --> NX["titre suivant de la file"]
+      </pre>
+      <p>Le modèle de piste change : une piste peut être un segment de vidéo. C'est la file maison qui gère, avec <code>startSeconds</code>/<code>endSeconds</code> de l'API IFrame, déjà utilisée pour enchaîner les titres.</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>Des extensions de navigateur sautent des chapitres sur youtube.com (<a href="https://addons.mozilla.org/en-US/firefox/addon/youtube-next-chapter-button">YouTube Next Chapter Button</a>) ou découpent les mixes en titres (<a href="https://addons.mozilla.org/es-ES/firefox/addon/sonara/">Sonara</a>). YouTube lui-même limite ses « clips » à une minute. Aucune app de focus ne traite l'intérieur d'un mix comme une file, et personne ne permet de mettre un passage de mix dans une playlist à côté de vrais titres.</p>
+  <h3>Impact technique</h3>
+  <ul>
+    <li>Nouvelle route <code>app/api/youtube/chapters</code> réutilisant <code>lib/ytParse.ts</code> (même travail que pour Calé sur la vidéo, à mutualiser). <code>lib/ytChapters.ts</code> en logique pure testée.</li>
+    <li><code>lib/playback/types.ts</code> (<code>Track</code> + <code>start?</code>/<code>end?</code>), <code>lib/playback/youtube.ts</code>, <code>lib/playback/queue.ts</code>, <code>store/localPlaylistStore.ts</code> (<code>LocalTrack</code>), <code>components/session/UpNext.tsx</code>, <code>components/AddToMenu.tsx</code>.</li>
+    <li>Pas de Supabase nouveau (les playlists locales sont déjà synchronisées, deux champs en plus dans le jsonb).</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul><li>Toutes les vidéos n'ont pas de chapitres ni de liste horodatée : sans données, rien ne change.</li><li>Une liste de description peut être décalée de quelques secondes. Tolérable.</li></ul>
+</section>
+
+<!-- 4 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="autre-ecran">
+  <div class="head"><span class="rank">04</span><h2>Sur l'autre écran</h2></div>
+  <div class="chips"><span class="chip t">Ergonomie</span><span class="chip">Audace 3,5</span><span class="chip v">Valeur 3,5 / 5</span><span class="chip">Effort S</span><span class="chip">Local · Chrome, Edge</span></div>
+  <p class="pitch">Avec deux écrans, la session s'ouvre d'un clic en plein écran sur le second, et ton travail reste sur le premier. La rue devient une vraie fenêtre posée à côté de toi, avec le minuteur dans le coin de l'œil.</p>
+  <img class="shot" src="shots/autre-ecran.png" alt="Travail sur l'écran principal, session plein écran sur le second">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>Pendant le focus, tu travailles dans une autre application. La session FocusFlow, faite pour être regardée, est cachée derrière. Ceux qui ont deux écrans bricolent à chaque session, et ceux qui ne le font pas ne voient jamais leur minuteur.</p>
+      <h3>Avant / après</h3>
+      <table class="ba">
+        <tr><th>Aujourd'hui</th><th>Avec l'idée</th></tr>
+        <tr><td>1. Glisser l'onglet de la session hors de la fenêtre<br>2. Déplacer la nouvelle fenêtre sur l'autre écran<br>3. Bouton plein écran de la session<br>(à refaire à chaque session)</td><td>1. « Démarrer sur l'autre écran » (une seule fois)<br><br>Les fois suivantes : 0 action, c'est retenu.</td></tr>
+        <tr><td><strong>3 actions</strong> par session</td><td><strong>1 action</strong>, puis 0</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+flowchart TD
+  S["Démarrer"] --> W{"getScreenDetails() disponible ?"}
+  W -- "non (Safari, Firefox)" --> P["comportement actuel + timer PiP existant"]
+  W -- "oui, 1 écran" --> P
+  W -- "oui, 2 écrans" --> F["requestFullscreen avec screen = écran secondaire"]
+  F --> R["prefsStore : écran préféré retenu"]
+  C["screenschange : écran débranché"] --> B["retour sur l'écran principal, session continue"]
+      </pre>
+      <p>On utilise la Window Management API de Chrome : la page choisit l'écran sur lequel elle se met en plein écran. Le comportement de la session change (où elle vit, ce qu'on voit pendant le travail), pas son apparence.</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>L'API existe depuis Chrome 100 (<a href="https://developer.chrome.com/docs/capabilities/web-apis/window-management">documentation Chrome</a>), utilisée surtout par des outils de présentation. Aucune app de focus ne s'en sert : Pomofocus, Lofidoro, LifeAt restent dans leur onglet. Le minuteur flottant (PiP) reste le repli sur un seul écran.</p>
+  <h3>Impact technique</h3>
+  <ul><li><code>app/session/page.tsx</code> (le plein écran existe déjà via <code>requestFullscreen</code>), <code>store/prefsStore.ts</code> (écran préféré), aucune dépendance, pas de Supabase.</li></ul>
+  <h3>Risques</h3>
+  <ul><li>Une permission « gestion des fenêtres » est demandée la première fois. Chrome et Edge seulement : bouton masqué ailleurs.</li><li>Valeur nulle pour les utilisateurs d'un seul écran (pour eux, l'idée 01 en appairage fait office de second écran).</li></ul>
+</section>
+
+<!-- 5 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="seuil">
+  <div class="head"><span class="rank">05</span><h2>La session sans antichambre</h2></div>
+  <div class="chips"><span class="chip t">Navigation · organisation des pages</span><span class="chip">Audace 3</span><span class="chip v">Valeur 5 / 5</span><span class="chip">Effort L</span><span class="chip">Local</span></div>
+  <p class="pitch">La page Réglages disparaît. Choisir une ambiance ouvre directement la session « au seuil » : la vidéo joue déjà, le minuteur attend, et ambiance, rythme et tâche se règlent dans un tiroir de la session. Le même tiroir sert en cours de pomodoro, sans toucher au minuteur.</p>
+  <img class="shot" src="shots/seuil-1.png" alt="Session au seuil, vidéo en lecture, tiroir ambiance rythme tâche">
+  <img class="shot" src="shots/seuil-2.png" alt="Ambiance changée en cours de pomodoro">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>Le parcours actuel est une chaîne de cinq pages : accueil, Écouter, <code>/settings</code>, <code>/session</code>, <code>/summary</code>. On choisit sa vidéo sur une vignette sans l'entendre, et dès que la session tourne, tout est figé : changer de musique ou de rythme oblige à terminer la session, et <code>handleStart</code> appelle <code>resetAll()</code>, donc le pomodoro repart à 25:00.</p>
+      <h3>Fonctionnement</h3>
+      <ol>
+        <li>Toute action « Lire » (vignette du catalogue, bibliothèque, ⌘K, menu ＋, Reprendre) ouvre <code>/session</code> au seuil, la vidéo en lecture.</li>
+        <li>Le tiroir du bas : Ambiance (catalogue, bibliothèque, récents, Spotify, Twitch), Rythme (25/5, 50/10, Flowtime, personnalisé), Tâche.</li>
+        <li>Espace ou « Démarrer » : le minuteur part. Le choix « garder les tâches en cours » devient une option du tiroir, plus une modale.</li>
+        <li>En cours : les boutons « Ambiance » et « Rythme » rouvrent le tiroir. Le média change sans toucher au minuteur ; un nouveau rythme s'applique au pomodoro en cours ou au suivant, au choix.</li>
+        <li>Landing : « Commencer » ouvre le seuil sans compte. Le compte Google arrive plus tard, pour garder sa progression.</li>
+        <li>Nav : « Activité » quitte la barre principale (⌘K, profil) ; quand une session tourne, l'entrée « Session » prend sa place.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Avant / après (comptés dans le code)</h3>
+      <table class="ba">
+        <tr><th>Aujourd'hui</th><th>Avec l'idée</th></tr>
+        <tr><td><strong>Changer d'ambiance en cours :</strong> Terminer, Accueil (<code>/summary</code>), Écouter, sous-onglet, vignette, Démarrer (<code>/settings</code>), « Garder les tâches ». <strong>7 actions</strong>, pomodoro remis à 25:00.</td><td>Ambiance, vignette. <strong>2 actions</strong>, minuteur intact.</td></tr>
+        <tr><td><strong>Passer de 25 à 50 min en cours :</strong> Terminer, Nouvelle session, preset, Démarrer, modale. <strong>5 actions</strong>, compteur de pomodoros remis à zéro.</td><td>Rythme, 50/10. <strong>2 actions</strong>.</td></tr>
+        <tr><td><strong>Démarrer avec une autre ambiance depuis l'accueil :</strong> Autre ambiance, vignette, Démarrer, modale si tâches. <strong>3 à 4 actions</strong>, 3 pages, vidéo choisie sans l'entendre.</td><td>Autre ambiance, vignette, Espace. <strong>3 actions</strong>, 2 pages, la vidéo joue avant de s'engager.</td></tr>
+        <tr><td><strong>Première visite :</strong> splash, Commencer, choix du compte Google, consentement, onboarding (ambiance, rythme, Lancer). <strong>6 à 7 actions</strong> et une redirection OAuth.</td><td>Splash, Commencer, Espace. <strong>3 actions</strong>, sans compte.</td></tr>
+      </table>
+      <pre class="mermaid">
+flowchart LR
+  subgraph AV["Avant"]
+    A1["Accueil"] --> A2["Écouter"] --> A3["/settings"] --> A4["/session"] --> A5["/summary"]
+    A5 -. "changer de musique" .-> A1
+  end
+  subgraph AP["Après"]
+    B1["Accueil ou Écouter ou ⌘K"] --> B2["/session au seuil"]
+    B2 -- "Espace" --> B3["/session en cours"]
+    B3 -- "Ambiance, Rythme" --> B3
+    B3 --> B4["/summary"]
+  end
+      </pre>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>Changer de station en cours de minuteur existe chez les apps lofi tout-en-un (LifeAt, lofi.co : on choisit fond et musique puis on démarre, <a href="https://lifeat.gitbook.io/getting-started/how-to-use-focus-mode">guide LifeAt</a>), mais leur minuteur est un widget à côté de la musique. Ce qui est nouveau ici : essayer l'ambiance en plein écran, en lecture réelle, avant que le minuteur parte, puis changer de rythme sans perdre le pomodoro. L'audace est moyenne, je l'assume : c'est d'abord une réorganisation, et c'est celle qui fait gagner le plus d'actions.</p>
+  <h3>Impact technique</h3>
+  <ul>
+    <li><code>app/settings/page.tsx</code> devient une redirection ; son contenu (presets, Kanban, Coach, « enregistrer comme routine ») passe dans un tiroir de <code>app/session/page.tsx</code>. Les <code>router.push("/settings")</code> de <code>app/page.tsx</code> (lignes 1093 à 1131, 1282), de <code>components/TodayDashboard.tsx</code> (550) et de <code>app/summary/page.tsx</code> pointent vers <code>/session</code>.</li>
+    <li><code>lib/playback/useSessionMedia.ts</code> : changer de source sans démonter la session. <code>store/timerStore.ts</code> : nouvel état « prêt » (pas lancé), changement de rythme sans <code>resetAll()</code>.</li>
+    <li><code>components/AuthGate.tsx</code> : laisser passer <code>/session</code> sans compte. <code>store/navStore.ts</code>, <code>components/AppNav.tsx</code>, <code>components/CommandPalette.tsx</code> (entrée « Réglages »).</li>
+    <li>Pas de Supabase nouveau.</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul><li>Gros chantier sur la page la plus sensible : à faire après le correctif <code>endsAt</code>, avec les e2e existants.</li><li>Le Kanban complet n'a plus de place hors session : l'idée 10 lui en donne une.</li><li>Ouvrir la session sans compte en production est une décision produit (AuthGate) à valider séparément.</li></ul>
+</section>
+
+<!-- 6 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="spotify-sans-premium">
+  <div class="head"><span class="rank">06</span><h2>Ta playlist Spotify, sans Premium</h2></div>
+  <div class="chips"><span class="chip t">Lecteur · fonctionnel</span><span class="chip">Audace 3</span><span class="chip v">Valeur 4,5 / 5</span><span class="chip">Effort M</span><span class="chip">Sans compte</span></div>
+  <p class="pitch">Tu colles le lien d'une playlist Spotify publique. FocusFlow lit sa liste de titres, retrouve chacun sur YouTube en vérifiant la durée, et la joue dans la session. Ni compte Spotify, ni Premium.</p>
+  <img class="shot" src="shots/spotify-sans-premium.png" alt="Playlist Spotify rejouée titre par titre depuis YouTube">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>Le mode Spotify repose sur le Web Playback SDK : Premium obligatoire, et l'app Spotify doit t'avoir ajouté à la main en mode développement. La plupart des gens ont un compte gratuit, et leurs playlists de travail sont sur Spotify. Ils ne peuvent pas les utiliser dans FocusFlow, ni sur téléphone (le SDK ne marche pas dans les navigateurs mobiles).</p>
+      <h3>Fonctionnement</h3>
+      <ol>
+        <li>Coller le lien (champ d'Écouter, ou n'importe où avec l'idée 09).</li>
+        <li>La route serveur lit la liste publique (titre, artistes, durée).</li>
+        <li>Pour chaque titre, recherche « artiste titre » via la route de recherche existante, et on garde le résultat dont la durée colle à quelques secondes près.</li>
+        <li>Les trois premiers sont prêts tout de suite, la session démarre ; le reste arrive pendant l'écoute.</li>
+        <li>Les titres douteux sont signalés, on choisit en un clic. « Mettre en playlist » en fait une playlist locale.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+sequenceDiagram
+  participant U as Utilisateur
+  participant A as /api/spotify/tracks
+  participant S as /api/youtube/search (existant)
+  participant Q as File maison
+  U->>A: lien de playlist publique
+  A-->>U: titres, artistes, durées
+  loop titres 1 à 3, puis le reste en fond
+    U->>S: artiste + titre, min=0
+    S-->>U: candidats avec durée
+    U->>U: lib/trackMatch.ts : écart de durée + titre
+  end
+  U->>Q: file de videoIds
+      </pre>
+      <p>On ne joue pas Spotify : on reconstruit la playlist avec des vidéos YouTube choisies par un appariement durée + titre testable (logique pure). La lecture passe par la file maison, avec tout ce qui existe déjà (À venir, boucle, suite par mix radio).</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>Les convertisseurs existent (<a href="https://www.tunemymusic.com/pt/Spotify-to-YouTube.php">TuneMyMusic</a>, <a href="https://freeyourmusic.com/transfer-spotify-to-youtube">FreeYourMusic</a>, Soundiiz), mais ils créent une playlist sur ton compte YouTube, avec connexion aux deux services et des quotas. Aucune app de focus ne lit une playlist Spotify sans Premium : elles exigent Premium ou se limitent à un lecteur intégré de 30 secondes.</p>
+  <h3>Impact technique</h3>
+  <ul>
+    <li>Nouvelle route <code>app/api/spotify/tracks</code> (page d'intégration publique de la playlist, parsée côté serveur, cache TTL de <code>lib/ytParse.ts</code>). <code>app/api/youtube/search</code> existant (<code>min=0</code>). Nouveau <code>lib/trackMatch.ts</code> testé.</li>
+    <li><code>store/queueStore.ts</code> ou <code>store/localPlaylistStore.ts</code>, <code>lib/playback/youtube.ts</code> inchangé.</li>
+    <li>Aucune clé, aucun compte, pas de Supabase.</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul><li>À vérifier en premier : que la page publique d'intégration expose toujours la liste complète (je n'ai pas pu la charger depuis le conteneur, réseau bloqué). Sinon, repli sur l'API Spotify avec la connexion existante (lecture de playlists permise sans Premium).</li><li>Appariements imparfaits (versions live, remasters) : la durée filtre la plupart, le reste est signalé.</li><li>Une recherche par titre : ~50 requêtes pour 48 titres, d'où le chargement progressif et le cache.</li></ul>
+</section>
+
+<!-- 7 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="titre-pour-toi">
+  <div class="head"><span class="rank">07</span><h2>Un titre pour toi</h2></div>
+  <div class="chips"><span class="chip t">Amis</span><span class="chip">Audace 3</span><span class="chip v">Valeur 3 / 5</span><span class="chip">Effort S</span><span class="chip">En ligne (amis)</span></div>
+  <p class="pitch">Tu glisses un morceau dans la file d'un ami en focus. Il passe à la fin de son titre en cours, marqué « de Tom » dans À venir. Pas de notification, rien à répondre, et il peut le retirer sans que tu le saches.</p>
+  <img class="shot" src="shots/titre-pour-toi.png" alt="Titre glissé dans la file d'une amie">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>Entre amis, l'encouragement existe (une vague de lumière), le chat aussi. Mais le geste le plus naturel entre gens qui travaillent en musique, « écoute ça », n'a pas de forme qui respecte le focus : un lien dans le chat sort l'autre de sa session.</p>
+      <h3>Fonctionnement</h3>
+      <ol>
+        <li>Dans la conversation d'un ami : « Lui glisser un titre », choisi dans tes récents, ta File ou tes playlists.</li>
+        <li>Chez lui, pendant le focus : rien ne s'affiche, rien ne sonne.</li>
+        <li>À la fin de son titre en cours, ton morceau passe. À venir indique « de Tom ».</li>
+        <li>Il peut le retirer d'un geste. Tu ne sais ni s'il l'a écouté ni s'il l'a retiré.</li>
+        <li>Un titre par ami et par jour. Hors session, il attend dans sa File d'attente.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+flowchart LR
+  T["Tom : FriendChat"] --> M["friend_messages : corps réservé ::titre::videoId"]
+  M --> R["Realtime chez Léa (existant)"]
+  R --> C{"Léa en session ?"}
+  C -- "oui" --> E["adapter.enqueue(track, from: Tom)"]
+  C -- "non" --> Q["queueStore : ajout en tête, marqué"]
+  E --> U["UpNext : de Tom"]
+      </pre>
+      <p>Même schéma que l'encouragement (<code>CHEER_BODY</code> dans <code>lib/friends.ts</code>) : un message au corps réservé, donc aucune migration. Côté lecteur, <code>PlayerAdapter.enqueue()</code> existe déjà et place le titre juste après le titre en cours.</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p><a href="https://support.spotify.com/us/article/jam/">Spotify Jam</a> partage une file entre gens qui écoutent ensemble, en direct. Ici chacun a sa session et sa musique ; le titre est un cadeau asynchrone qui attend le bon moment. Ce n'est pas « écouter pareil qu'un ami » (refusé) : on n'écoute jamais en même temps, et aucune réponse n'est attendue.</p>
+  <h3>Impact technique</h3>
+  <ul><li><code>lib/friends.ts</code>, <code>store/chatStore.ts</code>, <code>components/FriendChat.tsx</code>, <code>components/session/UpNext.tsx</code>, <code>lib/playback/types.ts</code> (<code>Track.from?</code>), <code>store/queueStore.ts</code>. Supabase : rien de nouveau (table <code>friend_messages</code> et RLS existantes). Limite d'un par jour côté client, comme l'encouragement.</li></ul>
+  <h3>Risques</h3>
+  <ul><li>YouTube seulement (pas de titre glissé dans une session Spotify ou Twitch : il attend dans la File).</li><li>Peu de valeur avec peu d'amis actifs.</li></ul>
+</section>
+
+<!-- 8 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="rien-perdu">
+  <div class="head"><span class="rank">08</span><h2>Rien n'est perdu</h2></div>
+  <div class="chips"><span class="chip t">Minuteur · ergonomie</span><span class="chip">Audace 2,5</span><span class="chip v">Valeur 4 / 5</span><span class="chip">Effort S</span><span class="chip">Local</span></div>
+  <p class="pitch">Trois rattrapages en un geste. « J'ai commencé il y a 10 min » démarre le pomodoro là où tu en es vraiment. « J'ai arrêté à 14:52 » retire les minutes où tu n'étais plus là. Et « Terminer » s'annule pendant 10 secondes (ou ctrl Z).</p>
+  <img class="shot" src="shots/rien-perdu.png" alt="Démarrage rétroactif, arrêt rétroactif et annulation">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>On commence souvent à travailler avant d'ouvrir le minuteur : ces minutes ne comptent jamais. À l'inverse, on se lève pour un appel et le pomodoro se termine sans nous, compté comme fait. Et un « Terminer » par erreur envoie sur le résumé : la session est perdue.</p>
+      <h3>Avant / après</h3>
+      <table class="ba">
+        <tr><th>Aujourd'hui</th><th>Avec l'idée</th></tr>
+        <tr><td><strong>Commencé il y a 10 min :</strong> impossible, les minutes sont perdues ou il faut un preset personnalisé à 15 min (Réglages, Personnalisé, moins 10, Démarrer : 4 actions).</td><td>« il y a 10 min » : <strong>1 action</strong>, minutes comptées.</td></tr>
+        <tr><td><strong>Parti pendant 8 min :</strong> impossible de corriger, le pomodoro est compté entier.</td><td>« J'ai arrêté à 14:52 » : <strong>2 actions</strong>.</td></tr>
+        <tr><td><strong>Terminer par erreur :</strong> Nouvelle session, Démarrer, « Garder les tâches » : <strong>3 actions</strong>, pomodoro remis à 25:00 et compteur à zéro.</td><td>Annuler : <strong>1 action</strong>, session exactement comme avant.</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+flowchart TD
+  E["timerStore.endsAt (correctif acquis)"] --> A["commencé il y a x : endsAt = maintenant + durée - x"]
+  E --> B["arrêté à h : minutes = h - début ; reprise depuis ce point"]
+  S["Terminer"] --> SN["snapshot : timer, file, position, stats du jour"]
+  SN --> SUM["/summary + bandeau Annuler 10 s"]
+  SUM -- "Annuler" --> RS["restaure le snapshot, retire l'enregistrement"]
+      </pre>
+      <p>Avec un minuteur calculé depuis une échéance, déplacer le début ou la fin est un calcul, pas un hack. L'annulation garde un instantané avant <code>recordSession</code> et le rétablit, statistiques comprises : ce n'est pas un bouton « retour », c'est une transaction qu'on défait.</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>Les outils de suivi du temps permettent de corriger un début (ClickUp le réclame dans sa <a href="https://feedback.clickup.com/feature-requests/p/after-starting-time-tracking-timer-have-ability-to-change-start-time">liste de demandes</a>, <a href="https://help.multitimer.net/how-tos-for-android/how-to-set-the-timer-retroactively">MultiTimer</a> démarre « avec le temps écoulé »). Les minuteurs Pomodoro, non : pas trouvé d'app qui propose « j'ai commencé il y a ». L'audace est faible, la valeur quotidienne élevée.</p>
+  <h3>Impact technique</h3>
+  <ul><li><code>store/timerStore.ts</code>, <code>store/statsStore.ts</code> (<code>recordSession</code> et son inverse), <code>store/playHistoryStore.ts</code>, <code>app/session/page.tsx</code> (<code>handleStop</code>), <code>app/summary/page.tsx</code>, <code>components/Toast.tsx</code>. Pas de Supabase nouveau (la synchro suit les stores).</li></ul>
+  <h3>Risques</h3>
+  <ul><li>Annuler après la synchro distante : il faut repousser la correction (<code>upsertWorkSession</code>), sinon le serveur garde la session.</li><li>Borner le rétroactif (30 min maximum) pour éviter de gonfler ses stats.</li></ul>
+</section>
+
+<!-- 9 ─────────────────────────────────────────────────────── -->
+<section class="idea" id="coller">
+  <div class="head"><span class="rank">09</span><h2>Coller pour lancer</h2></div>
+  <div class="chips"><span class="chip t">Ergonomie</span><span class="chip">Audace 2,5</span><span class="chip v">Valeur 4 / 5</span><span class="chip">Effort S</span><span class="chip">Local</span></div>
+  <p class="pitch">Ctrl V n'importe où dans l'app avec un lien YouTube, Spotify ou Twitch : une carte apparaît avec le titre trouvé tout seul, et « Lancer » démarre. Glisser le lien depuis un autre onglet marche aussi.</p>
+  <img class="shot" src="shots/coller.png" alt="Carte de lien collé avec Lancer, File, Bibliothèque">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>On trouve sa musique ailleurs : sur YouTube, dans un message, sur Spotify. Pour la jouer, il faut traverser l'interface jusqu'au bon formulaire, et la modale d'ajout de vidéo demande même de taper le titre à la main.</p>
+      <h3>Avant / après (comptés dans <code>app/page.tsx</code>)</h3>
+      <table class="ba">
+        <tr><th>Aujourd'hui</th><th>Avec l'idée</th></tr>
+        <tr><td>1. Écouter<br>2. Ma bibliothèque<br>3. Ajouter (vidéo)<br>4. Coller l'URL<br>5. Taper un titre (obligatoire)<br>6. Ajouter<br>7. Cliquer la carte<br>8. Démarrer (<code>/settings</code>)</td><td>1. Ctrl V<br>2. Lancer</td></tr>
+        <tr><td><strong>8 actions</strong>, 2 pages</td><td><strong>2 actions</strong>, depuis n'importe quelle page</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+flowchart LR
+  P["paste ou drop sur la fenêtre, hors champ de saisie"] --> D["lib/linkDetect.ts : type de lien"]
+  D -- "vidéo YouTube" --> O["oEmbed : titre, chaîne (fetchVideoMeta existant)"]
+  D -- "playlist ou mix RD" --> PL["/api/youtube/playlist ou mix"]
+  D -- "playlist Spotify" --> SP["mode Spotify ou idée 06"]
+  D -- "chaîne Twitch" --> TW["twitchStore"]
+  O --> C["carte : Lancer, File, Bibliothèque, Playlist (AddToMenu)"]
+  PL --> C
+  SP --> C
+  TW --> C
+      </pre>
+      <p>Un écouteur global de collage et de dépôt, et un détecteur de liens en logique pure. Les actions réutilisent <code>AddToMenu</code> et les helpers existants : seul le chemin d'entrée change.</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>Coller un lien pour l'intégrer est courant dans les outils de notes (Notion). Dans une app de focus, je ne l'ai vu nulle part : Lofidoro et LifeAt imposent leurs stations, Pomofocus n'a pas de lecteur. Différence avec « Lancer en une phrase » (validée) : ici pas besoin d'ouvrir ⌘K ni de taper, le collage seul suffit, sur toute page, et le dépôt d'un lien marche aussi.</p>
+  <h3>Impact technique</h3>
+  <ul><li>Écouteur monté dans <code>app/layout.tsx</code> (à côté de <code>CommandPalette</code>), nouveau <code>lib/linkDetect.ts</code> testé (réutilise <code>extractYouTubeId</code> de <code>data/videos.ts</code>), <code>store/queueStore.ts</code> (<code>fetchVideoMeta</code>), <code>components/AddToMenu.tsx</code>. Le champ titre de <code>AddVideoModal</code> peut devenir optionnel par la même occasion. Pas de Supabase.</li></ul>
+  <h3>Risques</h3>
+  <ul><li>Ne jamais intercepter un collage dans un champ texte (chat, tâches, post-its).</li><li>Sur téléphone, le collage est moins naturel : le bouton « Coller un lien » de la palette ⌘K couvre ce cas.</li></ul>
+</section>
+
+<!-- 10 ────────────────────────────────────────────────────── -->
+<section class="idea" id="organisation-deux-vues">
+  <div class="head"><span class="rank">10</span><h2>Organisation en deux vues</h2></div>
+  <div class="chips"><span class="chip t">Navigation · organisation des pages</span><span class="chip">Audace 2</span><span class="chip v">Valeur 3,5 / 5</span><span class="chip">Effort M</span><span class="chip">Local</span></div>
+  <p class="pitch">Les cinq sous-onglets d'Organisation (Projets, Planning, Sprint, Routines, Journal) deviennent deux vues : « Semaine », où blocs, sprints, routines et rendez-vous vivent sur la même grille, et « Projets et tâches », où les tâches ont enfin une page.</p>
+  <img class="shot" src="shots/organisation-deux-vues.png" alt="Organisation avec les vues Semaine et Projets et tâches">
+  <div class="grid">
+    <div>
+      <h3>Problème</h3>
+      <p>Un sprint écrit à trois endroits : ses blocs dans Planning, ses tâches dans le Kanban de <code>/settings</code>, son état dans l'onglet Sprint. Une routine est une session récurrente, mais vit à part du planning. Et ajouter une tâche depuis l'accueil fait quitter l'app pour la page de préparation de session.</p>
+      <h3>Avant / après (comptés dans le code)</h3>
+      <table class="ba">
+        <tr><th>Aujourd'hui</th><th>Avec l'idée</th></tr>
+        <tr><td><strong>Ajouter une tâche :</strong> ＋ Créer, Tâche (part sur <code>/settings</code>), taper, Entrée, Retour. <strong>5 actions</strong>, 2 changements de page.</td><td>Organisation, taper + Entrée. <strong>2 actions</strong>, aucune page quittée.</td></tr>
+        <tr><td><strong>Voir ce qu'un sprint a produit :</strong> Sprint, Planning, puis ＋ Créer, Tâche pour voir le Kanban. <strong>4 actions</strong>, 3 endroits.</td><td>Semaine. <strong>1 action</strong>, un seul endroit.</td></tr>
+        <tr><td><strong>Sous-onglets :</strong> 5 (et 3 dans Activité).</td><td>2. Le Journal rejoint Activité, à côté du résumé de session qui l'alimente.</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Le mécanisme</h3>
+      <pre class="mermaid">
+flowchart TD
+  subgraph Semaine
+    PB["planStore : blocs"]
+    SP["sprintStore : blocs de sprint"]
+    RT["routineStore : récurrence"]
+    AG["agenda iCal (validé)"]
+  end
+  subgraph ProjetsTaches["Projets et tâches"]
+    PR["projectStore"]
+    TK["sessionStore.todos (sorti de /settings)"]
+  end
+  PB --> G["grille unique"]
+  SP --> G
+  RT --> G
+  AG --> G
+      </pre>
+      <p>Ce n'est pas un relooking : les données sont déjà reliées (un sprint crée des blocs et des tâches), seule l'interface les sépare. On regroupe selon le temps (Semaine) et selon le contenu (Projets et tâches). Une routine devient un bloc récurrent qu'on peut placer, au lieu d'une liste à part.</p>
+    </div>
+  </div>
+  <h3>Pourquoi c'est novateur</h3>
+  <p>Honnêtement, peu : les agendas de travail (Sunsama, Akiflow) mêlent déjà tâches et blocs. C'est une proposition d'organisation, demandée explicitement, qui corrige un vrai trou (les tâches sans page) et complète l'idée 05.</p>
+  <h3>Impact technique</h3>
+  <ul><li><code>app/page.tsx</code> (lignes 1745 à 1767), <code>store/navStore.ts</code> (<code>OrgTab</code>), <code>components/WeekPlanner.tsx</code>, <code>components/SprintWizard.tsx</code> (devient un formulaire ouvert depuis Semaine), <code>components/RoutinesManager.tsx</code>, <code>components/TodoList.tsx</code>, <code>components/CreateMenu.tsx</code>, <code>components/CommandPalette.tsx</code>. Routines récurrentes : un champ <code>days?</code> dans <code>lib/routines.ts</code>, synchronisé via <code>user_state</code> existant. Pas de table nouvelle.</li></ul>
+  <h3>Risques</h3>
+  <ul><li>Grille plus dense : à tenir à la densité basse voulue pour l'app.</li><li>Faible audace : à prendre seulement si l'idée 05 est retenue, sinon le Kanban de <code>/settings</code> reste en place.</li></ul>
+</section>
+
+<section class="idea">
+  <h2>Auto-critique : ce que j'ai éliminé et pourquoi</h2>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Idée écartée</th><th>Raison</th><th>Remplacée par</th></tr></thead>
+    <tbody>
+      <tr><td>Mixer l'image d'une vidéo et le son de sa playlist</td><td>LifeAt et lofi.co le font déjà (fond visuel + Spotify), et ça frôle les ambiances mixables refusées.</td><td>Ta playlist Spotify, sans Premium</td></tr>
+      <tr><td>Calé sur un live Twitch (pomodoro d'un streamer lu dans le chat)</td><td>Un minuteur partagé avec des inconnus en direct : trop proche des Focus Rooms refusées.</td><td>Les morceaux dans les mixes</td></tr>
+      <tr><td>La rue qui passe du crépuscule à la nuit au fil du pomodoro</td><td>Cosmétique, variante de l'arbre qui pousse de Forest, et la rue n'est jamais sous une vidéo.</td><td>Les fenêtres allumées</td></tr>
+      <tr><td>Le téléphone enceinte de la session</td><td>C'est Spotify Connect appliqué à YouTube, et ça recoupe la télécommande validée.</td><td>Le téléphone se pilote par sa position</td></tr>
+      <tr><td>Retirer le casque met en pause</td><td>Pause automatique sur un signal matériel : trop proche de la détection automatique refusée.</td><td>(non retenue)</td></tr>
+      <tr><td>« La musique ne s'arrête jamais » (repli sur erreur)</td><td>Déjà fait : l'adaptateur YouTube saute les titres illisibles (<code>errorStreak</code>).</td><td>Rien n'est perdu</td></tr>
+      <tr><td>Retrouver un morceau entendu (journal par heure)</td><td>Affichage d'historique déguisé. Le vrai besoin (garder un passage) est couvert par l'idée 03.</td><td>Les morceaux dans les mixes</td></tr>
+      <tr><td>Une tâche se lance d'un ▶</td><td>Trop proche de « Go sur les blocs », refusée.</td><td>(non retenue)</td></tr>
+      <tr><td>Masquer les chiffres du minuteur la première moitié</td><td>Un réglage d'affichage, pas un changement de comportement.</td><td>Sur l'autre écran</td></tr>
+      <tr><td>Écouter ce que tes amis gardent</td><td>Variante de « écouter pareil qu'un ami » et de « tes titres qui marchent », refusées.</td><td>Un titre pour toi</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Contrôles faits sur les dix : aucune ne crée de pression sociale (pas de compteur, pas de réponse attendue, pas de comparaison), aucun gadget sonore, aucune stat. Les idées 05, 08 et 10 sont d'audace modeste ; elles sont là parce que tu as demandé de l'organisation et de la fluidité, et leurs gains sont chiffrés. Les idées 01, 05 et 08 supposent le correctif <code>endsAt</code>, déjà prévu.</p>
+</section>
+
+</div>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+  const dark = document.documentElement.dataset.theme === "dark" ||
+    (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+  mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", flowchart: { htmlLabels: true, curve: "basis" } });
+</script>
+
+</body>
+</html>
