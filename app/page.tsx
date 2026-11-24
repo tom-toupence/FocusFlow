@@ -29,6 +29,7 @@ import Onboarding from "@/components/Onboarding";
 import PlaylistTracksModal from "@/components/PlaylistTracksModal";
 import SpotifyRelatedModal from "@/components/SpotifyRelatedModal";
 import DiscoverPanel from "@/components/DiscoverPanel";
+import RadioPanel from "@/components/RadioPanel";
 import LocalPlaylistModal from "@/components/LocalPlaylistModal";
 import { useLocalPlaylistStore, LocalPlaylist } from "@/store/localPlaylistStore";
 import { playLocalPlaylist } from "@/lib/playback/local";
@@ -1178,6 +1179,7 @@ export default function LandingPage() {
         {/* Sous-sélecteur de sources (section Écouter) */}
         {section === "ecouter" && (
           <div role="tablist" aria-label="Sources" className="mb-7 inline-flex flex-wrap gap-1 rounded-xl border border-foreground/[0.08] bg-foreground/[0.025] p-1">
+            <MediaTab id="radio" label="Radio" />
             <MediaTab id="catalogue" label="Catalogue" />
             <MediaTab id="discover" label="Découvrir" />
             <MediaTab id="library" label="Ma bibliothèque" badge={hasLibraryContent ? `${customVideos.length + playlists.length + localPlaylists.length}` : undefined} />
@@ -1350,6 +1352,7 @@ export default function LandingPage() {
         )}
 
         {/* ── Découvrir — recommandations ─────────────────────────────────────── */}
+        {activeTab === "radio" && <RadioPanel />}
         {activeTab === "discover" && <DiscoverPanel />}
 
         {/* ── Spotify ─────────────────────────────────────────────────────────── */}

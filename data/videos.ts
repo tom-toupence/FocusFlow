@@ -9,6 +9,17 @@ export interface Video {
   color?: string;
   country?: string;
   custom?: boolean;
+  /**
+   * Durée réelle de la vidéo, en secondes, si elle est connue. Lue par la
+   * Radio FocusFlow (lib/radioProgram.ts). Champ volontairement vide pour
+   * l'instant : les durées n'ont pas pu être relevées (YouTube injoignable
+   * depuis l'environnement de développement) et on n'en invente pas. Sans
+   * durée, la radio ne diffuse qu'un extrait sûr de RADIO_SAFE_SEGMENT_SEC
+   * depuis le début de la vidéo. Renseigner ici une valeur relevée sur la page
+   * YouTube (lengthSeconds) change le programme pour tout le monde, de la même
+   * façon : c'est voulu (le programme ne dépend que de ces données statiques).
+   */
+  durationSec?: number;
 }
 
 // Catalogue refondu (2026-07) : uniquement des « Study With Me » scéniques et du

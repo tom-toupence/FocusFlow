@@ -6,16 +6,24 @@ import { test as base, type Page } from "@playwright/test";
  * `window.__yt` et laisse le test simuler la fin d'un titre (`__yt.end()`).
  */
 const FAKE_YT = `
-window.__yt = { loaded: [], lists: [], seeks: [], playing: false, players: 0, end() { this.onState && this.onState({ data: 0 }); } };
+window.__yt = { loaded: [], starts: [], lists: [], seeks: [], playing: false, players: 0,
+  end() { this.onState && this.onState({ data: 0 }); },
+  error(code) { this.onError && this.onError({ data: code }); } };
 window.YT = { Player: function (id, cfg) {
   var y = window.__yt; y.players++;
   if (cfg.videoId) y.loaded.push(cfg.videoId);
   y.onState = cfg.events && cfg.events.onStateChange;
+  y.onError = cfg.events && cfg.events.onError;
   var p = {
     playVideo: function () { y.playing = true; }, pauseVideo: function () { y.playing = false; },
     destroy: function () {}, setPlaybackQuality: function () {}, setVolume: function (v) { y.volume = v; },
     nextVideo: function () {}, previousVideo: function () {}, setLoop: function () {},
-    loadVideoById: function (vid) { y.loaded.push(vid); },
+    // Forme objet { videoId, startSeconds } (radio) ou identifiant seul.
+    loadVideoById: function (vid) {
+      var start = null;
+      if (vid && typeof vid === "object") { start = vid.startSeconds == null ? null : vid.startSeconds; vid = vid.videoId; }
+      y.loaded.push(vid); y.starts.push(start);
+    },
     loadPlaylist: function (o) { y.lists.push(o && o.list ? o.list : o); },
     seekTo: function (s) { y.seeks.push(s); }
   };
@@ -53,6 +61,8 @@ export interface Seed {
   localPlaylists?: { id: string; name: string; tracks: { youtubeId: string; title: string }[] }[];
   /** Live Twitch sélectionné. */
   twitchChannel?: string;
+  /** Radio FocusFlow sélectionnée pour la session. */
+  radio?: boolean;
 }
 
 const st = (state: object) => JSON.stringify({ state, version: 0 });
@@ -74,6 +84,9 @@ export async function prepare(page: Page, seed: Seed = {}) {
     }
     if (seed.localPlaylists) {
       localStorage.setItem("focusflow-local-playlists", st({ playlists: seed.localPlaylists.map((p) => ({ ...p, createdAt: 1, updatedAt: 1 })) }));
+    }
+    if (seed.radio) {
+      localStorage.setItem("focusflow-session", st({ selectedVideoId: null, selectedPlaylistId: null, playQueue: false, playRadio: true, customVideos: [], todos: [] }));
     }
     if (seed.twitchChannel) {
       localStorage.setItem("focusflow-twitch", st({ selectedChannel: seed.twitchChannel, selectedVodId: null }));

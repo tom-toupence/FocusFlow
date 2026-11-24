@@ -31,6 +31,7 @@ interface SessionState {
   selectedVideoId: string | null;
   selectedPlaylistId: string | null;
   playQueue: boolean;          // true = lit la file FocusFlow (voir queueStore)
+  playRadio: boolean;          // true = Radio FocusFlow (programme commun, lib/radioProgram)
   customVideos: Video[];
   todos: Todo[];
 
@@ -38,6 +39,8 @@ interface SessionState {
   selectVideo: (id: string) => void;
   selectPlaylist: (id: string) => void;
   selectQueue: () => void;
+  /** Radio FocusFlow : exclusive avec les autres sélections YouTube. */
+  selectRadio: () => void;
   addCustomVideo: (video: Video) => void;
   removeCustomVideo: (id: string) => void;
   getAllVideos: () => Video[];
@@ -63,12 +66,14 @@ export const useSessionStore = create<SessionState>()(
       selectedVideoId: defaultVideos[0].id,
       selectedPlaylistId: null,
       playQueue: false,
+      playRadio: false,
       customVideos: [],
       todos: [],
 
-      selectVideo: (id) => set({ selectedVideoId: id, selectedPlaylistId: null, playQueue: false }),
-      selectPlaylist: (id) => set({ selectedPlaylistId: id, selectedVideoId: null, playQueue: false }),
-      selectQueue: () => set({ playQueue: true, selectedVideoId: null, selectedPlaylistId: null }),
+      selectVideo: (id) => set({ selectedVideoId: id, selectedPlaylistId: null, playQueue: false, playRadio: false }),
+      selectPlaylist: (id) => set({ selectedPlaylistId: id, selectedVideoId: null, playQueue: false, playRadio: false }),
+      selectQueue: () => set({ playQueue: true, selectedVideoId: null, selectedPlaylistId: null, playRadio: false }),
+      selectRadio: () => set({ playRadio: true, playQueue: false, selectedVideoId: null, selectedPlaylistId: null }),
 
       addCustomVideo: (video) => {
         const { customVideos } = get();
@@ -167,6 +172,7 @@ export const useSessionStore = create<SessionState>()(
         selectedVideoId: state.selectedVideoId,
         selectedPlaylistId: state.selectedPlaylistId,
         playQueue: state.playQueue,
+        playRadio: state.playRadio,
         customVideos: state.customVideos,
         todos: state.todos,
       }),

@@ -6,7 +6,7 @@ import { create } from "zustand";
 // « Écouter » regroupe les sources média (catalogue / bibliothèque / découvrir /
 // Spotify / Twitch) derrière un sous-sélecteur, pour réduire la charge cognitive.
 export type NavSection = "accueil" | "ecouter" | "organisation" | "activite";
-export type MediaSource = "catalogue" | "library" | "discover" | "spotify" | "twitch";
+export type MediaSource = "radio" | "catalogue" | "library" | "discover" | "spotify" | "twitch";
 export type OrgTab = "projets" | "planning" | "sprint" | "routines" | "journal";
 export type ActivityTab = "apercu" | "stats" | "wrapped";
 /** Nature de l'élément à créer, posé par le bouton global « ＋ Créer ».

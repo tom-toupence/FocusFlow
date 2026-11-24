@@ -18,6 +18,7 @@ import { toast } from "@/components/Toast";
 import { localToday } from "@/store/statsStore";
 import type { SourceKind } from "./types";
 import type { YouTubeSource } from "./youtube";
+import { RADIO_NAME } from "@/lib/radioProgram";
 
 type Tracks = { id: string; title: string }[];
 
@@ -31,12 +32,14 @@ export interface SessionMedia {
   external: { href: string; label: string } | null;
   /** Ambiance de la vidéo du catalogue (vidéo seule), pour l'égaliseur. */
   mood?: Mood;
+  /** Radio FocusFlow (programme commun) : marque l'activité publiée aux amis. */
+  radio: boolean;
   /** Entrée d'historique de lecture pour `minutes` écoutées. */
   playEntry: (minutes: number) => Omit<PlayEntry, "id">;
 }
 
 export function useSessionMedia(): SessionMedia {
-  const { selectedVideoId, selectedPlaylistId, playQueue, getAllVideos } = useSessionStore();
+  const { selectedVideoId, selectedPlaylistId, playQueue, playRadio, getAllVideos } = useSessionStore();
   const { playlists } = usePlaylistStore();
   const { items: queueItems } = useQueueStore();
   const { selectedPlaylistUri, accessToken, playlists: spotifyPlaylists } = useSpotifyStore();
@@ -45,8 +48,10 @@ export function useSessionMedia(): SessionMedia {
   const allVideos = getAllVideos();
   const video = allVideos.find((v) => v.id === selectedVideoId) ?? allVideos[0];
   const selectedPlaylist = playlists.find((p) => p.id === selectedPlaylistId) ?? null;
-  const isQueue = playQueue && queueItems.length > 0;
-  const isPlaylist = !isQueue && !!selectedPlaylist;
+  // Radio : sélection exclusive (sessionStore.selectRadio), prioritaire sur le reste de YouTube.
+  const isRadio = playRadio;
+  const isQueue = !isRadio && playQueue && queueItems.length > 0;
+  const isPlaylist = !isRadio && !isQueue && !!selectedPlaylist;
   const isMix = isPlaylist && isRadioMix(selectedPlaylist.playlistId);
   const kind: SourceKind = selectedPlaylistUri && accessToken ? "spotify" : selectedChannel || selectedVodId ? "twitch" : "youtube";
 
@@ -84,6 +89,7 @@ export function useSessionMedia(): SessionMedia {
 
   const youtube: YouTubeSource | null = (() => {
     if (kind !== "youtube") return null;
+    if (isRadio) return { type: "radio" };
     if (isQueue) return { type: "queue", subtitle: "File FocusFlow", tracks: queueItems.map((i) => ({ id: i.youtubeId, title: i.title })) };
     if (isPlaylist) {
       const tracks = isMix ? mixTracks : playlistTracks;
@@ -106,6 +112,7 @@ export function useSessionMedia(): SessionMedia {
       if (selectedVodId) return { ...base, type: "twitch-vod", title: `VOD ${selectedVodId}`, subtitle: "Twitch VOD", mediaKey: `vod:${selectedVodId}` };
       return { ...base, type: "twitch-live", title: selectedChannel ?? "Twitch", subtitle: "Live Twitch", mediaKey: `live:${selectedChannel}` };
     }
+    if (isRadio) return { ...base, type: "playlist", title: RADIO_NAME, subtitle: "Programme commun", mediaKey: "radio" };
     if (isQueue) return { ...base, type: "playlist", title: "File FocusFlow", subtitle: `${queueItems.length} titre${queueItems.length > 1 ? "s" : ""}`, thumbnailUrl: queueItems[0]?.thumbnailUrl, mediaKey: "queue" };
     if (isPlaylist) return { ...base, type: "playlist", title: selectedPlaylist.title, subtitle: selectedPlaylist.channelName ?? "YouTube Playlist", thumbnailUrl: selectedPlaylist.thumbnailUrl, mediaKey: `pl:${selectedPlaylist.playlistId}` };
     return { ...base, type: "youtube", title: video.title, subtitle: video.channel, thumbnailUrl: `https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`, mediaKey: video.youtubeId };
@@ -117,7 +124,8 @@ export function useSessionMedia(): SessionMedia {
     spotify: kind === "spotify" ? { playlistUri: selectedPlaylistUri! } : null,
     twitch: kind === "twitch" ? { channel: selectedChannel ?? undefined, vodId: selectedVodId ?? undefined, token: twitchToken ?? undefined } : null,
     external: kind === "twitch" ? { href: twitchHref, label: "Ouvrir sur Twitch" } : null,
-    mood: kind === "youtube" && !isQueue && !isPlaylist ? video?.mood : undefined,
+    mood: kind === "youtube" && !isRadio && !isQueue && !isPlaylist ? video?.mood : undefined,
+    radio: kind === "youtube" && isRadio,
     playEntry,
   };
 }

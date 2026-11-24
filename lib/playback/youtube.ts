@@ -10,6 +10,8 @@
 import { fetchMixVideos } from "@/store/playlistStore";
 import { TrackQueue } from "./queue";
 import { continuePlaylist, type ContinuationTrack } from "./continuation";
+import type { Radio } from "@/lib/radio";
+import { catalogueRadio, clockLabel, newCursor, radioTarget, radioUpcoming, sessionDeadIds, RADIO_NAME, type RadioCursor, type RadioTarget } from "@/lib/radioProgram";
 import { NO_CAPS, Observable, type ExtendedEvent, type PlaybackState, type PlayerAdapter, type Track } from "./types";
 
 interface YTPlayer {
@@ -20,7 +22,7 @@ interface YTPlayer {
   setVolume: (v: number) => void;
   nextVideo: () => void;
   previousVideo: () => void;
-  loadVideoById: (id: string) => void;
+  loadVideoById: (id: string | { videoId: string; startSeconds?: number }) => void;
   loadPlaylist: (opts: string[] | { list: string; listType: string; index?: number; startSeconds?: number }) => void;
   setLoop: (loop: boolean) => void;
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
@@ -38,7 +40,9 @@ export type YouTubeSource =
   /** File maison : File FocusFlow, mix radio résolu, playlist résolue. */
   | { type: "queue"; tracks: { id: string; title: string }[]; subtitle?: string }
   /** Repli : vraie playlist que l'on n'a pas pu résoudre côté serveur. */
-  | { type: "native"; listId: string; title: string };
+  | { type: "native"; listId: string; title: string }
+  /** Radio FocusFlow : programme commun calculé depuis l'heure (lib/radioProgram). */
+  | { type: "radio" };
 
 export interface YouTubeOptions {
   volume: number;
@@ -49,7 +53,16 @@ export interface YouTubeOptions {
   onExtended?: (e: ExtendedEvent) => void;
   /** Recommandations pour une graine (injectable pour les tests). */
   recommend?: (seed: string) => Promise<ContinuationTrack[]>;
+  /** Radio : programme et horloge (injectables pour les tests). */
+  radio?: Radio;
+  now?: () => number;
+  radioCursor?: RadioCursor;
 }
+
+/** Erreurs IFrame « vidéo indisponible » : supprimée, privée, non embarquable. */
+const UNAVAILABLE_ERRORS = new Set([100, 101, 150]);
+/** ENDED à moins de 3 s de la fin du créneau : fin normale, pas prématurée. */
+const END_TOLERANCE_MS = 3000;
 
 const thumb = (id: string) => `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
 
@@ -96,20 +109,36 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
   private raceTimer: ReturnType<typeof setTimeout> | null = null;
   /** Titres ajoutés par la lecture continue ou une suggestion acceptée. */
   private suggested = new Set<string>();
+  // ── Radio ──
+  private radio: Radio | null = null;
+  private cursor: RadioCursor | null = null;
+  private now: () => number;
+  private onAir: RadioTarget | null = null;
+  private loadedId: string | null = null;
+  private switchTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private elementId: string, private source: YouTubeSource, private opts: YouTubeOptions) {
     const queued = source.type === "queue";
+    const radio = source.type === "radio";
     super({
       kind: "youtube", ready: false, playing: false, track: null,
       caps: {
-        ...NO_CAPS, volume: true, seek: true,
+        ...NO_CAPS, volume: true,
+        // Radio : comme un live, ni suivant, ni précédent, ni avance dans la piste.
+        seek: !radio,
         skip: queued || source.type === "native", shuffle: queued, loop: queued,
-        suggestions: source.type !== "native", removeUpcoming: queued,
+        suggestions: source.type !== "native" && !radio, removeUpcoming: queued,
       },
       shuffle: queued && opts.shuffle, loop: opts.loop, extending: false, upcoming: [], error: null,
     });
     this.wantPlay = opts.playing;
     this.volume = opts.volume;
+    this.now = opts.now ?? (() => Date.now());
+    if (radio) {
+      this.radio = opts.radio ?? catalogueRadio();
+      this.cursor = opts.radioCursor ?? newCursor(sessionDeadIds);
+      this.onAir = radioTarget(this.radio, this.now(), this.cursor);
+    }
     if (source.type === "queue") {
       this.titles = Object.fromEntries(source.tracks.map((t) => [t.id, t.title]));
       this.queue = new TrackQueue(source.tracks.map((t) => t.id), { shuffle: opts.shuffle });
@@ -134,6 +163,10 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     const s = this.source;
     if (s.type === "video") return { id: s.id, title: s.title, subtitle: s.subtitle, artwork: thumb(s.id), source: "youtube" as const };
     if (s.type === "native") return { id: s.listId, title: s.title, subtitle: "Playlist YouTube", source: "youtube" as const };
+    if (s.type === "radio") {
+      const t = this.onAir?.slot.track;
+      return t ? { id: t.youtubeId, title: t.title, subtitle: RADIO_NAME, artwork: thumb(t.youtubeId), durationSec: this.onAir!.slot.segmentSec, source: "youtube" as const } : null;
+    }
     const q = this.queue!;
     const id = q.current;
     if (!id) return null;
@@ -141,6 +174,13 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
   }
 
   private upcomingInfo(): Track[] {
+    if (this.radio && this.onAir) {
+      // « À venir » d'une radio = le programme, avec l'heure de passage.
+      return radioUpcoming(this.radio, this.onAir.slot.index, 10, this.cursor?.dead).map((s) => ({
+        id: s.track.youtubeId, title: s.track.title, subtitle: `${clockLabel(s.startsAt)} · ${s.track.channel}`,
+        artwork: thumb(s.track.youtubeId), durationSec: s.segmentSec, source: "youtube" as const,
+      }));
+    }
     if (!this.queue || this.source.type !== "queue") return [];
     const sub = this.source.subtitle;
     return this.queue.upcoming(10).map((id) => this.toTrack(id, sub));
@@ -196,6 +236,26 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
             e.target.setLoop(true);
             this.onReady(e.target);
           },
+        },
+      });
+    } else if (s.type === "radio") {
+      // Pas de videoId au constructeur : la piste et sa seconde se calculent
+      // au moment où le lecteur est prêt (le chargement de l'API prend du temps).
+      this.player = new window.YT.Player(target, {
+        playerVars: vars,
+        events: {
+          onReady: (e: { target: YTPlayer }) => {
+            this.ready = true;
+            e.target.setPlaybackQuality("hd1080");
+            e.target.setVolume(Math.round(this.volume * 100));
+            this.set({ ready: true, playing: this.wantPlay, error: null });
+            this.resync();
+          },
+          onStateChange: (e: { data: number }) => {
+            if (e.data === 1) this.errorStreak = 0;
+            if (e.data === 0) this.onRadioEnded();
+          },
+          onError: (e: { data: number }) => this.onRadioError(e?.data),
         },
       });
     } else {
@@ -274,8 +334,70 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     }
   }
 
+  // ── Radio ────────────────────────────────────────────────────────────────
+
+  /**
+   * Se recale sur le programme : recalcule la piste à l'heure `at` (par défaut
+   * maintenant) et la charge à la bonne seconde. Appelé au démarrage, à la fin
+   * de chaque créneau, après une fin prématurée ou une erreur, et à chaque
+   * reprise de la lecture (une radio, on la rejoint en direct).
+   */
+  private resync(at?: number) {
+    if (!this.radio || !this.cursor || this.destroyed) return;
+    if (this.switchTimer) { clearTimeout(this.switchTimer); this.switchTimer = null; }
+    const now = this.now();
+    const t = radioTarget(this.radio, Math.max(now, at ?? now), this.cursor);
+    this.onAir = t;
+    if (!t) { this.sync({ error: "Aucune vidéo de la radio n'est lisible ici." }); return; }
+    const id = t.slot.track.youtubeId;
+    // En pause, on ne touche pas au lecteur (sauf premier chargement, pour
+    // avoir l'image) : la reprise se recalera de toute façon.
+    if (this.ready && this.player && (this.wantPlay || this.loadedId === null)) {
+      if (this.loadedId === id) {
+        this.player.seekTo(t.offsetSec, true);
+        this.player.playVideo();
+      } else {
+        this.player.loadVideoById({ videoId: id, startSeconds: t.offsetSec });
+        this.loadedId = id;
+      }
+      if (!this.wantPlay) this.player.pauseVideo();
+    }
+    // Fin du créneau : on recalcule (resynchro), pas un simple « suivant ».
+    this.switchTimer = setTimeout(() => this.resync(t.switchAt), Math.max(0, t.switchAt - now) + 20);
+    this.sync({ error: null });
+  }
+
+  private onRadioEnded() {
+    const cur = this.onAir;
+    if (!cur) return;
+    const now = this.now();
+    this.loadedId = null;
+    // Fin normale (à la tolérance près) : piste suivante du programme, calculée
+    // à l'heure de fin du créneau.
+    if (now >= cur.switchAt - END_TOLERANCE_MS) { this.resync(cur.switchAt); return; }
+    // Vidéo plus courte que prévu : on ne la rejoue pas dans ce créneau.
+    this.cursor!.skipped.add(cur.slot.index);
+    this.resync();
+  }
+
+  private onRadioError(code: number | undefined) {
+    const cur = this.onAir;
+    if (!cur || !this.radio) return;
+    if (code !== undefined && UNAVAILABLE_ERRORS.has(code)) this.cursor!.dead.add(cur.slot.track.youtubeId);
+    else this.cursor!.skipped.add(cur.slot.index);
+    this.errorStreak++;
+    if (this.errorStreak > this.radio.size) { this.set({ error: "Aucune vidéo de la radio n'est lisible ici." }); return; }
+    this.loadedId = null;
+    this.resync();
+  }
+
   play() {
     this.wantPlay = true;
+    if (this.radio) {
+      this.set({ playing: true });
+      if (this.ready) this.resync();
+      return;
+    }
     if (this.ready) this.player?.playVideo();
     this.set({ playing: true });
   }
@@ -285,6 +407,7 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     this.set({ playing: false });
   }
   next() {
+    if (this.radio) return;
     if (this.source.type === "native") { this.player?.nextVideo(); return; }
     const q = this.queue;
     if (!q || this.fetchingMore) return;
@@ -293,6 +416,7 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     if (r.kind === "track") this.load(r.id); else void this.extend();
   }
   previous() {
+    if (this.radio) return;
     if (this.source.type === "native") { this.player?.previousVideo(); return; }
     const r = this.queue?.previous();
     if (r?.kind === "track") this.load(r.id);
@@ -307,12 +431,12 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     this.sync({ shuffle: on });
   }
   setLoop(on: boolean) { this.set({ loop: on }); }
-  seek(sec: number) { if (this.ready) this.player?.seekTo(Math.max(0, sec), true); }
+  seek(sec: number) { if (this.ready && !this.radio) this.player?.seekTo(Math.max(0, sec), true); }
 
   /** Titres proches : mix radio de graines réparties sur toute la file. */
   async getSuggestions(seeds?: string[], limit = 10): Promise<Track[]> {
     const s = this.source;
-    if (s.type === "native") return [];
+    if (s.type === "native" || s.type === "radio") return [];
     const pool = this.queue ? [...this.queue.order] : [s.type === "video" ? s.id : ""];
     const res = await continuePlaylist(
       seeds?.length ? seeds : pool, seeds?.length ? null : (this.queue?.current ?? pool[0]),
@@ -348,6 +472,7 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
     this.destroyed = true;
     if (this.watchdog) clearTimeout(this.watchdog);
     if (this.raceTimer) clearTimeout(this.raceTimer);
+    if (this.switchTimer) clearTimeout(this.switchTimer);
     try { this.player?.destroy(); } catch { /* déjà détruit */ }
     if (this.host) this.host.replaceChildren();
     this.player = null;
