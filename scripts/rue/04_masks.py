@@ -89,6 +89,13 @@ sign_ids = cv2.dilate(sign_ids, np.ones((5, 5), np.uint8))
 sky = ((depth < 0.06) & (yy < 300)).astype(np.float32)
 sky = cv2.GaussianBlur(sky, (0, 0), 8)
 
+# Photo de jour (scene.json "day") : pas d'enseignes allumées ni de fenêtres
+# qui s'éteignent ; le soleil sur une façade n'est pas un néon.
+if scene().get("day"):
+    emissive[:] = 0
+    windows[:] = 0
+    sign_ids[:] = 0
+
 masks = np.dstack([emissive, windows, floor_soft, sky])
 masks8 = np.clip(masks * 255 + 0.5, 0, 255).astype(np.uint8)
 cv2.imwrite(str(OUT / "masks.webp"), cv2.cvtColor(masks8[..., :3], cv2.COLOR_RGB2BGR), [cv2.IMWRITE_WEBP_QUALITY, 90])

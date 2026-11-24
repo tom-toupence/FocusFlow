@@ -98,7 +98,7 @@ const RueScene = forwardRef<RueHandle, Props>(function RueScene(
     let disposed = false;
     const iv: [number, number] = interval ? interval : [1e9, 1e9];
     createRue(canvas.current, {
-      scenes: chosen.map((s) => ({ base: rueBase(s.id), style: s.style, frameY: s.frameY })),
+      scenes: chosen.map((s) => ({ base: rueBase(s.id), style: s.style, frameY: s.frameY, rain: s.day ? 0 : undefined })),
       interval: iv,
       onScene: (i) => { currentRef.current = i; setCurrent(i); onSceneRef.current?.(chosen[i]); },
       reducedMotion: false,

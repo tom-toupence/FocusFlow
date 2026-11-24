@@ -45,7 +45,7 @@ export default function RueLab() {
     const every = Number(params.get("every")) || 0;           // durée imposée (captures)
     let disposed = false;
     createRue(canvas.current, {
-      scenes: scenes.map((s) => ({ base: `/rue/${s.id}`, style: s.style, frameY: s.frameY })),
+      scenes: scenes.map((s) => ({ base: `/rue/${s.id}`, style: s.style, frameY: s.frameY, rain: s.day ? 0 : undefined })),
       interval: every ? [every, every] : [15, 20],
       onScene: (i) => { setCurrent(i); setStyle(null); },
       reducedMotion: reduce,

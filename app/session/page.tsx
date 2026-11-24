@@ -14,14 +14,13 @@ import { useNotesStore } from "@/store/notesStore";
 import { usePlayHistoryStore } from "@/store/playHistoryStore";
 import StickyNote from "@/components/StickyNote";
 import SessionMedia, { TwitchGlyph } from "@/components/session/SessionMedia";
-import UpNext from "@/components/session/UpNext";
+import UpNext, { hasUpNext } from "@/components/session/UpNext";
 import PipTimer from "@/components/PipTimer";
 import BreathingExercise from "@/components/BreathingExercise";
 import RueScene, { type RueHandle } from "@/components/RueScene";
 import { usePlayback, type PlayerAdapter } from "@/lib/playback/types";
 import { useSessionMedia } from "@/lib/playback/useSessionMedia";
 import type { ExtendedEvent, SourceKind } from "@/lib/playback/types";
-import Equalizer from "@/components/Equalizer";
 import { useIdleHide } from "@/lib/useIdleHide";
 import { usePrefsStore } from "@/store/prefsStore";
 import { useDistractionStore } from "@/store/distractionStore";
@@ -80,7 +79,9 @@ export default function SessionPage() {
   // La ville (halte + mode Spotify) : événements de ville déclenchés par la session.
   const city = useRef<RueHandle>(null);
   const isRunningRef = useRef(isRunning);
-  const [showTodos, setShowTodos] = useState(true);
+  // Tâches repliées et « À venir » ouvert : l'écran de la landing.
+  const [showTodos, setShowTodos] = useState(false);
+  const [showUpNext, setShowUpNext] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [volume, setVolumeState] = useState(0.8);
   const [showVolume, setShowVolume] = useState(false);
@@ -95,6 +96,13 @@ export default function SessionPage() {
   const pb = usePlayback(adapter);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
+  // Téléphone : « À venir » replié au départ (la place est comptée).
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { if (window.matchMedia("(max-width: 767px)").matches) setShowUpNext(false); }, []);
+  // Sur téléphone, les deux panneaux occupent la même place : l'un ferme l'autre.
+  const small = () => window.matchMedia("(max-width: 767px)").matches;
+  const toggleUpNext = () => { const next = !showUpNext; setShowUpNext(next); if (next && small()) setShowTodos(false); };
+  const toggleTodos = () => { const next = !showTodos; setShowTodos(next); if (next && small()) setShowUpNext(false); };
 
   const isBreak = mode !== "work";
 
@@ -200,7 +208,7 @@ export default function SessionPage() {
       if (progress.reached) {
         goalCelebratedRef.current = true;
         playWorkChime();
-        toast({ title: "Objectif du jour atteint", description: "Une vague de lumière traverse la rue.", accent: "emerald" });
+        toast({ title: "Objectif du jour atteint", description: "Bien joué.", accent: "emerald" });
         // Événement de ville : une vague de lumière part de la tour, une fois la halte installée.
         setTimeout(() => city.current?.goal(), 3200);
       }
@@ -455,7 +463,7 @@ export default function SessionPage() {
                 <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-focus">{breakLabel[mode]}</p>
                 <h1 className="mt-2 font-semibold tracking-tight text-[clamp(2.75rem,7vw,5rem)] leading-[0.95]">Pause</h1>
                 <p className="mt-3 text-[15px] text-white/75">
-                  {sessionsCompleted > 0 ? `Pomodoro ${sessionsCompleted} terminé. ` : ""}La rue continue sans toi un moment. Lève les yeux de l&apos;écran.
+                  {sessionsCompleted > 0 ? `Pomodoro ${sessionsCompleted} terminé. ` : ""}Lève les yeux de l&apos;écran.
                 </p>
               </div>
               <div>
@@ -507,7 +515,7 @@ export default function SessionPage() {
           <button
             onClick={addNote}
             title="Ajouter un post-it"
-            className="fixed bottom-20 md:bottom-6 left-3 md:left-6 z-[100] flex items-center gap-2 px-3 py-2 rounded-xl bg-black/70 backdrop-blur-sm border border-white/25 text-white/75 hover:text-white hover:bg-black/80 text-xs font-medium transition-all"
+            className="fixed top-[4.75rem] left-3 md:top-[5.25rem] md:left-5 z-[100] flex h-9 items-center gap-1.5 px-3 rounded-lg border border-white/15 bg-black/50 backdrop-blur-sm text-white/75 hover:text-white hover:bg-black/70 text-xs transition-colors"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round" />
@@ -522,309 +530,219 @@ export default function SessionPage() {
       {/* ── Work screen overlay ─────────────────────────────────────────────── */}
       {!isBreak && (
         <>
-          {/* Top bar — sur mobile le timer n'est plus centré en absolu (il
-              passerait sous les autres blocs) : il devient le 2e élément flex,
-              aligné à droite, et les contrôles migrent en barre basse. */}
-          <div className="absolute top-0 left-0 right-0 flex items-start justify-between gap-2 px-3 md:px-5 py-3 md:py-4 z-10">
-            {/* Terminer + Now Playing */}
-            <div className={cn("flex flex-col items-start gap-2 max-w-[calc(100%-9rem)] md:max-w-[42%] anim-cascade", chromeHideCls)}>
-              <button
-                onClick={handleStop}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white/75 hover:text-rose-300 hover:border-rose-400/50 hover:bg-rose-500/10 text-xs font-medium transition-all"
-              >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="6" y="6" width="12" height="12" rx="1.5" />
-                </svg>
-                Terminer
-              </button>
+          {/* L'écran annoncé sur la landing (SessionReplica) : en cours en haut
+              à gauche, minuteur en haut à droite, « À venir » en bas à droite,
+              une rangée de boutons en bas au centre. Garder les deux identiques. */}
+          <div className="absolute top-0 inset-x-0 z-10 flex items-start justify-between gap-3 p-3 md:p-5">
+            {/* En cours */}
+            <div className={cn("min-w-0 max-w-[calc(100%-8.5rem)] md:max-w-[42%] anim-cascade", chromeHideCls)}>
               {nowPlaying && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/50 backdrop-blur-sm border border-white/10 max-w-full">
-                  <Equalizer
-                    playing={isRunning}
-                    mood={media.mood}
-                  />
-                  {/* key = index de piste → le titre glisse à chaque changement */}
+                <div className="flex items-center gap-2.5 rounded-lg border border-white/10 bg-black/55 px-3 py-2 backdrop-blur-sm">
+                  <span aria-hidden className={cn("h-1.5 w-1.5 shrink-0 rounded-full transition-colors", isRunning ? "bg-focus" : "bg-white/30")} />
+                  {/* key = piste → le titre glisse à chaque changement */}
                   <div key={pb.track?.id ?? ""} className="min-w-0 anim-track-in">
-                    <p className="text-white/85 text-xs font-medium truncate">{nowPlaying.title}</p>
-                    <p className="text-white/60 text-[10px] truncate">{pb.extending ? "Recherche de titres proches de ta playlist…" : nowPlaying.sub}</p>
-                    {pb.error && <p role="status" className="text-rose-300 text-[10px] mt-0.5">{pb.error}</p>}
+                    <p className="truncate text-xs text-white">{nowPlaying.title}</p>
+                    <p className="truncate font-mono text-[9px] uppercase tracking-[0.14em] text-white/45">
+                      {pb.extending ? "Recherche de titres proches…" : nowPlaying.sub || sourceName}
+                    </p>
+                    {pb.error && <p role="status" className="mt-0.5 text-[10px] text-rose-300">{pb.error}</p>}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Minuteur : un panneau d'affichage de quai (plaque sombre, chiffres
-                à points Doto en sodium), centré sur desktop, à droite sur mobile.
-                Lisible sur n'importe quelle vidéo grâce à la plaque. */}
-            <div className="flex-shrink-0 md:absolute md:left-1/2 md:-translate-x-1/2 anim-cascade [animation-delay:80ms]">
-              <div className="flex flex-col items-center gap-1 rounded-lg bg-night/80 backdrop-blur-sm border border-white/10 px-3 md:px-4 pt-1.5 pb-1.5 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.8)]">
+            {/* Minuteur : chiffres sodium et filet de progression. */}
+            <div className="shrink-0 anim-cascade [animation-delay:80ms]">
+              <div className="rounded-lg border border-white/10 bg-night/80 px-3 md:px-4 py-1.5 text-center backdrop-blur-sm shadow-[0_8px_30px_-12px_rgba(0,0,0,0.8)]">
                 <span
                   role="timer"
                   aria-label={`${isFlowtime ? "Flowtime" : "Temps restant"} : ${formatTime(isFlowtime ? flowSeconds : secondsLeft)}`}
-                  className="font-mono tabular-nums text-[26px] md:text-[34px] leading-none text-sodium [text-shadow:0_0_14px_color-mix(in_oklab,var(--sodium)_55%,transparent)]"
+                  className="block font-mono tabular-nums text-[26px] md:text-[34px] leading-none text-sodium [text-shadow:0_0_14px_color-mix(in_oklab,var(--sodium)_55%,transparent)]"
                 >
                   {formatTime(isFlowtime ? flowSeconds : secondsLeft)}
                 </span>
-                {/* Jauge : une rangée de 25 points qui s'allument, comme le panneau. */}
-                {!isFlowtime && (
-                  <span aria-hidden className="flex gap-[3px]">
-                    {Array.from({ length: 25 }, (_, i) => (
-                      <span key={i} className={cn("w-[3px] h-[3px] rounded-full", i < Math.round(progress * 25) ? "bg-sodium" : "bg-white/15")} />
-                    ))}
-                  </span>
-                )}
-                <span className="text-white/60 text-[10px] font-mono uppercase tracking-[0.14em] whitespace-nowrap">
-                  {isFlowtime
-                    ? `Flow · pause méritée ${earnedBreakMin} min`
-                    : `Pomodoro ${sessionsCompleted + 1}`}
-                </span>
+                <div aria-hidden className="mt-1.5 h-[2px] w-full overflow-hidden bg-white/10">
+                  {!isFlowtime && <div className="h-full origin-left bg-sodium transition-transform duration-1000 ease-linear" style={{ transform: `scaleX(${progress})` }} />}
+                </div>
+                <p className="mt-1 whitespace-nowrap font-mono text-[9px] uppercase tracking-[0.14em] text-white/45">
+                  {isFlowtime ? `Flow · pause ${earnedBreakMin} min` : `Pomodoro ${sessionsCompleted + 1}`}
+                </p>
               </div>
             </div>
+          </div>
 
-            {/* Contrôles — à droite de la top bar sur desktop, barre fixe en bas
-                du viewport sur mobile (atteignable au pouce, safe-area iOS). */}
-            <div
-              className={cn(
-                "fixed bottom-0 inset-x-0 z-20 flex items-center gap-2 px-3 py-2 bg-black/60 backdrop-blur-md border-t border-white/10 pb-[max(0.5rem,env(safe-area-inset-bottom))]",
-                "md:static md:z-auto md:bg-transparent md:backdrop-blur-none md:border-0 md:p-0 md:pb-0",
-                "anim-cascade [animation-delay:160ms]",
-                chromeHideCls
+          {/* À venir : en bas à droite, visible sans ouvrir de menu. */}
+          <UpNext
+            adapter={adapter}
+            pb={pb}
+            open={showUpNext}
+            className={cn(
+              "absolute z-10 inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:inset-x-auto md:right-5 md:bottom-20 md:w-[300px]",
+              chromeHideCls,
+            )}
+          />
+
+          {/* Contrôles : une rangée en bas au centre (barre fixe sur mobile). */}
+          <div
+            className={cn(
+              "fixed bottom-0 inset-x-0 z-20 flex items-center gap-1.5 overflow-x-auto px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] bg-black/60 backdrop-blur-md border-t border-white/10",
+              "md:absolute md:inset-x-0 md:bottom-5 md:justify-center md:overflow-visible md:bg-transparent md:backdrop-blur-none md:border-0 md:p-0",
+              "anim-cascade [animation-delay:160ms]",
+              chromeHideCls,
+            )}
+          >
+            {/* Pause / Reprendre : l'action principale (Espace). */}
+            <Pill primary onClick={isRunning ? pause : start} title={isRunning ? "Mettre en pause · Espace" : "Reprendre · Espace"}>
+              {isRunning ? (
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+              ) : (
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M8 5v14l11-7z" /></svg>
               )}
-            >
-              {/* Utility cluster — icônes uniformes ; scroll horizontal sur mobile
-                  pour que Pause/Tâches restent toujours accessibles. */}
-              <div className="flex-1 min-w-0 overflow-x-auto md:flex-none md:overflow-visible flex items-center gap-1 p-1 rounded-2xl bg-black/50 backdrop-blur-sm border border-white/15">
-                {/* Playlist skip controls (YouTube playlists, mixes & file FocusFlow) */}
-                {pb.caps.skip && (
-                  <>
-                    <button
-                      onClick={() => skipTrack("prev")}
-                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
-                      title="Titre précédent"
-                    >
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M6 6h2v12H6zM9.5 12l8.5 6V6z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => skipTrack("next")}
-                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
-                      title="Titre suivant"
-                    >
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M16 6h2v12h-2zM6 6v12l8.5-6z" />
-                      </svg>
-                    </button>
-                    {/* Lecture aléatoire (file maison uniquement ; `mounted`
-                        évite le flash avant réhydratation du store persisté) */}
-                    {mounted && pb.caps.shuffle && (
-                      <button
-                        onClick={() => usePlaybackPrefsStore.getState().toggleShuffle()}
-                        className={cn(
-                          "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl transition-all",
-                          shuffle ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
-                        )}
-                        title={shuffle ? "Lecture aléatoire activée" : "Activer la lecture aléatoire"}
-                      >
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                          <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                    )}
-                    {/* Boucle : off = fin de liste → titres similaires. Masqué en
-                        repli lecteur natif (setLoop(true) câblé, non pilotable). */}
-                    {mounted && pb.caps.loop && (
-                    <button
-                      onClick={() => usePlaybackPrefsStore.getState().toggleLoop()}
-                      className={cn(
-                        "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl transition-all",
-                        loop ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
-                      )}
-                      title={loop ? "Boucle activée" : "Boucle désactivée : la fin de liste continue avec des titres proches de toute la playlist"}
-                    >
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                        <path d="M17 1l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M21 13v2a4 4 0 0 1-4 4H3" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                    )}
-                  </>
-                )}
-                {/* Distraction marker (shortcut: D) */}
-                <button
-                  onClick={handleDistraction}
-                  className="relative w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-rose-300 hover:bg-rose-500/10 transition-all"
-                  title="Marquer une distraction · touche D"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                    <path d="M12 9v4M12 17h.01" strokeLinecap="round" />
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  {distractionCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center tabular-nums">
-                      {distractionCount}
-                    </span>
-                  )}
-                  {/* Flash feedback: a floating +1 on each mark */}
-                  {distractionFlash > 0 && (
-                    <span
-                      key={distractionFlash}
-                      className="absolute inset-0 flex items-center justify-center pointer-events-none text-rose-300 text-xs font-bold animate-[distractionPop_0.7s_ease-out_forwards]"
-                    >
-                      +1
-                    </span>
-                  )}
-                </button>
+              {isRunning ? "Pause" : "Reprendre"}
+            </Pill>
 
-                {/* Floating always-on-top mini timer (Document PiP) */}
-                <PipTimer onDistraction={handleDistraction} onFlowBreak={handleFlowBreak} />
+            {/* Flowtime : finir l'élan et prendre la pause méritée. */}
+            {isFlowtime && (
+              <Pill onClick={handleFlowBreak} title={`Terminer ce flow et prendre ${earnedBreakMin} min de pause`} className="border-focus/45 text-white">
+                Pause méritée · {earnedBreakMin} min
+              </Pill>
+            )}
 
-                {/* Volume : toutes les sources qui le déclarent (Spotify compris). */}
-                {pb.caps.volume && (
-                  <div className="relative flex items-center flex-shrink-0">
-                    {/* Panneau vertical — toujours monté pour une vraie transition
-                        CSS, auto-masqué après 2,5 s. S'ouvre VERS LE HAUT sur
-                        mobile (la barre de contrôles est en bas de l'écran). */}
-                    <div
-                      onPointerMove={armVolumeHide}
-                      className={cn(
-                        "absolute bottom-full mb-2 md:bottom-auto md:top-full md:mb-0 md:mt-2 right-0 w-9 h-28 flex items-center justify-center rounded-xl bg-black/70 backdrop-blur-sm border border-white/15 shadow-lg shadow-black/40 transition-[opacity,transform] duration-300",
-                        showVolume
-                          ? "opacity-100 translate-y-0"
-                          : "opacity-0 translate-y-1 md:-translate-y-1 pointer-events-none"
-                      )}
-                    >
-                      <input
-                        type="range"
-                        min={0} max={1} step={0.05}
-                        value={volume}
-                        onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                        tabIndex={showVolume ? 0 : -1}
-                        aria-label="Volume de la vidéo"
-                        className="h-20 accent-white cursor-pointer"
-                        style={{ writingMode: "vertical-lr", direction: "rtl" }}
-                      />
-                    </div>
-                    <button
-                      onClick={() => setShowVolume((v) => { const next = !v; if (next) armVolumeHide(); return next; })}
-                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all"
-                      title="Volume de la vidéo"
-                    >
-                      {volume === 0 ? (
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                          <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
-                          <line x1="23" y1="9" x2="17" y2="15" strokeLinecap="round" />
-                          <line x1="17" y1="9" x2="23" y2="15" strokeLinecap="round" />
-                        </svg>
-                      ) : (
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                          <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
-                          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" strokeLinecap="round" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                )}
-
-                {/* À venir : file, suggestions marquées, titres proches. */}
-                <UpNext adapter={adapter} pb={pb} />
-
-                {/* Ouvrir chez la source (Twitch). */}
-                {media.external && (
-                  <a
-                    href={media.external.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl text-white/75 hover:text-[#9146ff] hover:bg-[#9146ff]/10 transition-all"
-                    title={media.external.label}
-                    aria-label={media.external.label}
-                  >
-                    <TwitchGlyph className="w-4 h-4" />
-                  </a>
-                )}
-
-                {/* Help / info */}
-                <button
-                  onClick={() => setShowHelp((v) => !v)}
-                  className={cn(
-                    "w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl transition-all",
-                    showHelp ? "bg-white/20 text-white" : "text-white/75 hover:text-white hover:bg-white/10"
-                  )}
-                  title="Aide & raccourcis"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.7M12 17h.01" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Flowtime: end the stretch and take the earned break */}
-              {isFlowtime && (
-                <button
-                  onClick={handleFlowBreak}
-                  className="flex-shrink-0 flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg bg-focus/15 backdrop-blur-md border border-focus/45 text-white text-xs font-semibold transition-all hover:bg-focus/25 shadow-lg shadow-black/30"
-                  title={`Terminer ce flow et prendre ${earnedBreakMin} min de pause`}
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                    <path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" strokeLinecap="round" strokeLinejoin="round" />
-                    <line x1="6" y1="1" x2="6" y2="4" strokeLinecap="round" /><line x1="10" y1="1" x2="10" y2="4" strokeLinecap="round" /><line x1="14" y1="1" x2="14" y2="4" strokeLinecap="round" />
-                  </svg>
-                  <span className="hidden sm:inline">Pause méritée ({earnedBreakMin} min)</span>
-                  <span className="sm:hidden">{earnedBreakMin} min</span>
-                </button>
+            {/* Distraction (D) */}
+            <Pill onClick={handleDistraction} title="Marquer une distraction · touche D" className="relative hover:text-rose-300">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                <path d="M12 9v4M12 17h.01" strokeLinecap="round" />
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="hidden sm:inline">Distraction</span>
+              {distractionCount > 0 && <span className="font-mono tabular-nums text-rose-300">{distractionCount}</span>}
+              {distractionFlash > 0 && (
+                <span key={distractionFlash} className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-bold text-rose-300 animate-[distractionPop_0.7s_ease-out_forwards]">+1</span>
               )}
+            </Pill>
 
-              {/* Pause / Resume — primary (shortcut: Espace) */}
-              <button
-                onClick={isRunning ? pause : start}
-                className="flex-shrink-0 flex items-center gap-2 px-4 md:px-5 py-2.5 md:py-2 rounded-full bg-white/20 backdrop-blur-md border border-white/40 text-white text-sm font-semibold transition-all hover:bg-white/30 shadow-lg shadow-black/30"
-                title={isRunning ? "Mettre en pause · Espace" : "Reprendre · Espace"}
-              >
-                {isRunning ? (
-                  <>
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                      <rect x="6" y="4" width="4" height="16" rx="1" />
-                      <rect x="14" y="4" width="4" height="16" rx="1" />
-                    </svg>
-                    Pause
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                    Reprendre
-                  </>
-                )}
-              </button>
+            {/* Titres : précédent / suivant (files et playlists). */}
+            {pb.caps.skip && (
+              <>
+                <Pill icon onClick={() => skipTrack("prev")} title="Titre précédent" aria-label="Titre précédent">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M6 6h2v12H6zM9.5 12l8.5 6V6z" /></svg>
+                </Pill>
+                <Pill onClick={() => skipTrack("next")} title="Titre suivant">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M16 6h2v12h-2zM6 6v12l8.5-6z" /></svg>
+                  <span className="hidden sm:inline">Suivant</span>
+                </Pill>
+              </>
+            )}
 
-              {/* Tâches — primary */}
-              <button
-                onClick={() => setShowTodos((v) => !v)}
-                className="flex-shrink-0 relative flex items-center gap-1.5 px-3 md:px-4 py-2.5 md:py-2 rounded-full bg-white/15 backdrop-blur-sm border border-white/30 text-white text-xs font-semibold transition-all hover:bg-white/25"
-                title="Afficher / masquer les tâches"
-              >
-                <svg className="w-4 h-4 md:w-3.5 md:h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" strokeLinecap="round" />
-                  <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+            {/* À venir : bascule le panneau du bas à droite. */}
+            {hasUpNext(adapter, pb) && (
+              <Pill active={showUpNext} onClick={() => toggleUpNext()} title="À venir" aria-pressed={showUpNext}>
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden><path d="M4 6h11M4 12h11M4 18h7M18 15v6M15 18h6" strokeLinecap="round" /></svg>
+                <span className="hidden sm:inline">À venir</span>
+              </Pill>
+            )}
+
+            {/* Tâches */}
+            <Pill active={showTodos} onClick={() => toggleTodos()} title="Afficher / masquer les tâches" aria-pressed={showTodos}>
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" strokeLinecap="round" />
+                <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="hidden sm:inline">Tâches</span>
+              {pendingTodos.length > 0 && <span className="font-mono tabular-nums text-white/60">{pendingTodos.length}</span>}
+            </Pill>
+
+            <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-white/15" />
+
+            {/* Réglages de lecture, en boutons carrés du même style. */}
+            {mounted && pb.caps.skip && pb.caps.shuffle && (
+              <Pill icon active={shuffle} onClick={() => usePlaybackPrefsStore.getState().toggleShuffle()} title={shuffle ? "Lecture aléatoire activée" : "Activer la lecture aléatoire"} aria-pressed={shuffle}>
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </Pill>
+            )}
+            {/* Boucle : coupée, la fin de liste continue avec des titres proches. */}
+            {mounted && pb.caps.skip && pb.caps.loop && (
+              <Pill icon active={loop} onClick={() => usePlaybackPrefsStore.getState().toggleLoop()} title={loop ? "Boucle activée" : "Boucle désactivée : la fin de liste continue avec des titres proches de toute la playlist"} aria-pressed={loop}>
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                  <path d="M17 1l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M21 13v2a4 4 0 0 1-4 4H3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                {/* Libellé complet sur desktop ; sur mobile un simple compteur
-                    (la place est réservée à Pause, l'action primaire). */}
-                <span className="hidden md:inline">
-                  {pendingTodos.length > 0 ? `${pendingTodos.length} tâche${pendingTodos.length > 1 ? "s" : ""}` : "Tâches"}
-                </span>
-                {pendingTodos.length > 0 && (
-                  <span className="md:hidden tabular-nums">{pendingTodos.length}</span>
-                )}
-              </button>
-            </div>
+              </Pill>
+            )}
+
+            {/* Volume : le curseur s'ouvre au-dessus de la rangée. */}
+            {pb.caps.volume && (
+              <div className="relative shrink-0">
+                <div
+                  onPointerMove={armVolumeHide}
+                  className={cn(
+                    "absolute bottom-full right-0 mb-2 flex h-28 w-9 items-center justify-center rounded-lg border border-white/15 bg-black/70 backdrop-blur-sm shadow-lg shadow-black/40 transition-[opacity,transform] duration-300",
+                    showVolume ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-1 opacity-0",
+                  )}
+                >
+                  <input
+                    type="range"
+                    min={0} max={1} step={0.05}
+                    value={volume}
+                    onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                    tabIndex={showVolume ? 0 : -1}
+                    aria-label="Volume de la vidéo"
+                    className="h-20 cursor-pointer accent-white"
+                    style={{ writingMode: "vertical-lr", direction: "rtl" }}
+                  />
+                </div>
+                <Pill icon active={showVolume} onClick={() => setShowVolume((v) => { const next = !v; if (next) armVolumeHide(); return next; })} title="Volume de la vidéo" aria-label="Volume de la vidéo">
+                  {volume === 0 ? (
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                      <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
+                      <line x1="23" y1="9" x2="17" y2="15" strokeLinecap="round" /><line x1="17" y1="9" x2="23" y2="15" strokeLinecap="round" />
+                    </svg>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                      <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" strokeLinecap="round" />
+                    </svg>
+                  )}
+                </Pill>
+              </div>
+            )}
+
+            {/* Mini-minuteur toujours au premier plan (Document PiP). */}
+            <PipTimer onDistraction={handleDistraction} onFlowBreak={handleFlowBreak} />
+
+            {/* Ouvrir chez la source (Twitch). */}
+            {media.external && (
+              <a
+                href={media.external.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(PILL_BASE, PILL_ICON, PILL_IDLE, "hover:text-[#9146ff]")}
+                title={media.external.label}
+                aria-label={media.external.label}
+              >
+                <TwitchGlyph className="w-3.5 h-3.5" />
+              </a>
+            )}
+
+            {/* Aide & raccourcis */}
+            <Pill icon active={showHelp} onClick={() => setShowHelp((v) => !v)} title="Aide & raccourcis" aria-label="Aide & raccourcis">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+                <circle cx="12" cy="12" r="9" />
+                <path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.7M12 17h.01" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </Pill>
+
+            {/* Terminer la session */}
+            <Pill onClick={handleStop} title="Terminer la session" className="hover:text-rose-300 hover:border-rose-400/50">
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden><rect x="6" y="6" width="12" height="12" rx="1.5" /></svg>
+              Terminer
+            </Pill>
           </div>
 
           {/* ── Help panel ─────────────────────────────────────────────────── */}
           {showHelp && (
-            <div className="absolute top-20 right-3 md:right-5 w-80 max-w-[calc(100vw-1.5rem)] max-h-[60vh] overflow-y-auto bg-black/85 backdrop-blur-xl rounded-2xl border border-white/15 shadow-2xl shadow-black/80 z-30">
+            <div className="absolute top-24 md:top-28 right-3 md:right-5 w-80 max-w-[calc(100vw-1.5rem)] max-h-[60vh] overflow-y-auto bg-night/90 backdrop-blur-sm rounded-xl border border-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.9)] z-30">
               <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
                 <span className="text-xs font-semibold text-white/70 font-mono uppercase tracking-[0.14em]">Comment ça marche</span>
                 <button onClick={() => setShowHelp(false)} className="text-white/40 hover:text-white transition-colors">
@@ -860,9 +778,9 @@ export default function SessionPage() {
           {showTodos && (
             <div className={cn(
               // Mobile : pleine largeur au-dessus de la barre de contrôles.
-              "absolute inset-x-3 bottom-[4.5rem] max-h-[55vh] overflow-y-auto",
-              "md:inset-x-auto md:right-6 md:bottom-6 md:w-[32rem] md:max-w-[calc(100vw-3rem)] md:max-h-none md:overflow-visible",
-              "bg-black/85 backdrop-blur-xl rounded-2xl border border-white/15 shadow-2xl shadow-black/80 z-10 p-4",
+              "absolute inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] max-h-[55vh] overflow-y-auto",
+              "md:inset-x-auto md:left-5 md:bottom-20 md:w-[30rem] md:max-w-[calc(100vw-22rem)] md:max-h-[60vh] md:overflow-y-auto",
+              "bg-night/85 backdrop-blur-sm rounded-xl border border-white/10 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.9)] z-10 p-4",
               chromeHideCls
             )}>
               <TodoList />
@@ -871,6 +789,32 @@ export default function SessionPage() {
         </>
       )}
     </div>
+  );
+}
+
+// ─── Boutons de la rangée du bas (mêmes que l'image de la landing) ────────────
+
+const PILL_BASE = "inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border text-xs transition-colors";
+const PILL_ICON = "w-9";
+const PILL_IDLE = "border-white/15 bg-black/50 text-white/75 backdrop-blur-sm hover:bg-black/70 hover:text-white";
+
+function Pill({
+  primary, active, icon, className, children, ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { primary?: boolean; active?: boolean; icon?: boolean }) {
+  return (
+    <button
+      {...props}
+      className={cn(
+        PILL_BASE,
+        icon ? PILL_ICON : "px-3.5",
+        primary ? "border-white bg-white font-medium text-black hover:bg-white/90"
+          : active ? "border-white/30 bg-white/20 text-white backdrop-blur-sm"
+          : PILL_IDLE,
+        className,
+      )}
+    >
+      {children}
+    </button>
   );
 }
 

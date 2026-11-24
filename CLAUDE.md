@@ -52,7 +52,10 @@ ambiances mixables dans une seule expérience bien maintenue.
   le serveur de dev sature la mémoire). Les tests coupent le splash via `focusflow-splash=off`.
 - **Rue de nuit (`lib/rue/`, `components/RueScene.tsx`) :** photos préparées par `scripts/rue/`
   (profondeur Depth Anything V2 Small, SAM, LaMa : tous Apache 2.0) en 4 plans + masques, servies
-  depuis `public/rue/<id>/` ; manifeste `lib/rue/scenes.ts` (11 rues, crédits). Rendu WebGL2 brut :
+  depuis `public/rue/<id>/` ; manifeste `lib/rue/scenes.ts` (34 scènes, crédits : les 11 rues de nuit d'origine + 23 points de vue
+  ajoutés le 2026-11-23, de jour et de nuit, Vietnam, Indonésie, Japon, États-Unis, Norvège ;
+  **photos de jour** : `day: true` côté manifeste = pas de pluie, `"day": true` dans scene.json =
+  pas d'enseignes ni de fenêtres animées). Rendu WebGL2 brut :
   maillage déplacé, pluie, néons, brume, bloom ; événements `pomodoroDone`/`goal`/`next`,
   `setScroll`/`setPaused`. Utilisée par la landing (en **boucle vidéo pré-rendue**, `RueLoop`), la **pause** de session et le **mode
   Spotify** (jamais sous une vidéo). Banc d'essai : `/lab/rue`.
@@ -751,25 +754,42 @@ Session autonome (l'utilisateur dormait, toutes les décisions prises seul).
 `tsc` 0 erreur ; lint au niveau baseline (4 erreurs pré-existantes : summary, StatsSection,
 TodoStatusDropdown, callback Twitch) ; build vert ; vitest 33/33 ; e2e 13/13 sur build de prod.
 
+## Journal de session — 2026-11-23 (suite : 23 nouvelles scènes)
+
+- Demande : une vingtaine de photos en plus, points de vue et belles vues (rues, ruelles, paysages),
+  **jamais un plan centré sur une personne ni un bâtiment en gros plan sans vue**.
+- Source : Wikimedia Commons (licences CC0, CC BY, CC BY-SA ; les dérivés des photos CC BY-SA sont
+  sous la même licence, noté dans `docs/redesign/ASSETS.md`). L'API `api.php` est limitée depuis le
+  conteneur : passer par `w/rest.php/v1/search/page` + `w/rest.php/v1/file/…`, télécharger via
+  `Special:FilePath/<nom>?width=…` (si 429, réessayer plus tard ou en 1920). Openverse est bloqué.
+- Traitement : `scripts/rue/` habituel, sources ramenées à 2880 px puis sorties à 2400 px (3 à 6 Mo
+  par scène), effet `dessin` sur les photos de jour, étalonnage néon bas (0,12) sur les nouvelles
+  scènes de nuit (à 0,5 les lumières chaudes viraient au vert). `still.webp` = image rendue par le
+  moteur (lab `?record`).
+- Retour utilisateur : pas de rails (rue du train, Chicago retirées), des **rizières en terrasses**
+  (Sapa, Tegallalang, Batad, Banaue) et des **ruelles plus belles** (Hoi An, Kanazawa, Ninenzaka).
+- Toutes les scènes sont dans la boucle vidéo de la landing (ordre alterné nuit/jour, `RUE_LOOP_ORDER`)
+  et dans l'app (rue du jour en fond, pause de session, mode Spotify), et sur `/lab/rue`.
+
 ## La landing
 
 > Section unique et à jour : décrit `components/LandingPage.tsx` tel qu'il est (2026-11-23).
 
 ### L'idée : « Une rue de plus »
 
-Derrière toute la page, une **boucle vidéo continue des onze rues** (`components/RueLoop.tsx`,
+Derrière toute la page, une **boucle vidéo continue des 34 scènes** (`components/RueLoop.tsx`,
 `public/rue/loop/rue-{1080,720}.{webm,mp4}`) : chaque rue rendue à l'avance par le moteur
-`lib/rue/` (pluie, néons, caméra qui respire), 6 s par rue, fondus de 1,5 s, raccord de boucle
+`lib/rue/` (pluie, néons, caméra qui respire), 4,5 s par scène, fondus de 1,2 s (≈ 2 min 30), raccord de boucle
 invisible. Produite par `scripts/rue/loop_record.cjs` + `scripts/rue/loop.sh` (ordre =
 `RUE_LOOP_ORDER`, le crédit affiché suit le temps de la vidéo). Pourquoi une vidéo et pas le
 WebGL en direct (2026-11-23, retour utilisateur : transitions « bizarres », il voulait la vidéo
 en fond) : même rendu partout, aucune coupure, une fraction du coût batterie.
-- le **défilement** fait entrer doucement dans l'image (`setScroll` = zoom de 8 %) ;
+- le fond reste **fixe** au défilement (le zoom de 8 % faisait trembler la vidéo, retiré) ;
 - chaque **chapitre** (`data-chapter`) règle la densité du voile (`data-veil`), sans couper la vidéo ;
 - la section **« Le rythme »** (épinglée) baisse la lumière quand le curseur du cycle traverse une pause.
 Par-dessus, le contenu a ses propres couches de photos (`Plate`, `data-speed`).
 
-Chapitres : premier écran (titre néon « La ville ne dort pas. ») · **coupure de courant**
+Chapitres : premier écran (titre néon « Travaille en musique. ») · **coupure de courant**
 (`data-blackout` : les néons grésillent, tout s'éteint, la session se rallume ; événement joué
 d'un coup, pas un fondu scrubé ; coupure brève en remontant) · la session (réplique fidèle de
 `/session`) · le rythme (cycle 25/5 épinglé, horloge 21:00 →) · la musique : **5 vitrines dans
@@ -781,6 +801,21 @@ le temps ») et le titre qui s'efface en glissant au premier écran. Ne pas y re
 Piège : les sections épinglées allongent la page après la création des déclencheurs de
 chapitre ; `ScrollTrigger.sort()` + `refresh()` en fin de configuration, sinon le voile se trompe. **« Commencer » à trois endroits seulement** (bandeau,
 hero, fin). Crédits des photos CC BY affichés (rue courante en bas à gauche + pied de page).
+
+**Session = réplique de la landing (2026-11-23, demande utilisateur « uniformise »).**
+`app/session/page.tsx` reprend exactement `SessionReplica` : en cours en haut à gauche (point
+cyan + titre + sous-titre mono), minuteur sodium en haut à droite (filet de progression +
+« Pomodoro N »), panneau « À venir » docké en bas à droite (`UpNext`, ouvert d'office sur
+grand écran, replié sur téléphone, 3 titres puis « voir la suite »), rangée de boutons
+`Pill` en bas au centre (Pause en blanc, Distraction, Suivant, À venir, Tâches, puis
+icônes carrées et Terminer). Tâches repliées par défaut, panneau en bas à gauche. Toute
+modification de l'un se reporte sur l'autre.
+
+**Textes : le minimum, simple et naturel (2026-11-23, demande utilisateur).** Pas de slogan,
+pas de formule poétique (« La ville ne dort pas », « Ce soir, une rue de plus »… retirés),
+pas de phrase qui a l'air générée. Dire ce que fait la fonction, en une phrase courte, comme on le dirait à voix haute
+(« Travaille en musique. », pas « Pomodoro et musique, sur le même écran. »).
+Vaut pour la landing ET l'app (toasts, écran de pause).
 
 ### Le système
 
