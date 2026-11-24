@@ -84,26 +84,31 @@ async function loadBitmap(url: string): Promise<ImageBitmap> {
   return createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
 }
 
-// Fenêtres d'une scène : lues une seule fois par scène (et par page), avec la
-// disparité à leur centre (pour les placer à l'écran au survol).
+// Fenêtres d'une scène : ids.webp lu une seule fois par scène (et par page),
+// au quart de la résolution, sans lissage (un lissage mélangerait les
+// numéros), quand le navigateur est libre. La profondeur de chaque fenêtre
+// est lue ensuite dans les textures du moteur (voir windowDepths).
 const windowCache = new Map<string, Promise<RueWindow[]>>();
+const SCAN_STEP = 4;
+const whenIdle = () => new Promise<void>((res) => {
+  const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+  if (w.requestIdleCallback) w.requestIdleCallback(() => res(), { timeout: 1500 }); else setTimeout(res, 150);
+});
 function sceneWindows(base: string): Promise<RueWindow[]> {
   let p = windowCache.get(base);
   if (!p) {
     p = (async () => {
-      const [ids, depth] = await Promise.all([loadBitmap(`${base}/ids.webp`), loadBitmap(`${base}/depth.webp`)]);
+      await whenIdle();
+      const ids = await loadBitmap(`${base}/ids.webp`);
       const c = document.createElement("canvas");
-      c.width = ids.width; c.height = ids.height;
+      c.width = Math.max(1, Math.round(ids.width / SCAN_STEP));
+      c.height = Math.max(1, Math.round(ids.height / SCAN_STEP));
       const ctx = c.getContext("2d", { willReadFrequently: true })!;
-      ctx.drawImage(ids, 0, 0);
-      const list = scanWindowIds(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
-      ctx.drawImage(depth, 0, 0, c.width, c.height);
-      for (const w of list) {
-        const d = ctx.getImageData(Math.min(c.width - 1, Math.floor(w.cx * c.width)), Math.min(c.height - 1, Math.floor(w.cy * c.height)), 1, 1).data;
-        w.depth = Math.max(d[0], d[1], d[2], d[3]) / 255;
-      }
-      ids.close(); depth.close();
-      return list;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(ids, 0, 0, c.width, c.height);
+      const scale = (ids.width / c.width) * (ids.height / c.height);
+      ids.close();
+      return scanWindowIds(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height, scale);
     })();
     p.catch(() => windowCache.delete(base));
     windowCache.set(base, p);
@@ -159,10 +164,11 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
 
   // ── Une scène = 7 textures + une grille au format de la photo ──────────
   const names = ["layer0", "layer1", "layer2", "layer3", "depth", "masks", "ids"] as const;
-  interface Loaded { tex: Record<string, WebGLTexture>; aspect: number; texW: number; vao: WebGLVertexArrayObject; vb: WebGLBuffer; ib: WebGLBuffer; count: number; spec: RueScene }
+  interface Loaded { tex: Record<string, WebGLTexture>; size: Record<string, [number, number]>; aspect: number; texW: number; vao: WebGLVertexArrayObject; vb: WebGLBuffer; ib: WebGLBuffer; count: number; spec: RueScene }
   const loadScene = async (spec: RueScene): Promise<Loaded> => {
     const bitmaps = await Promise.all(names.map((n) => loadBitmap(`${spec.base}/${n}.webp`)));
     const tex: Record<string, WebGLTexture> = {};
+    const size: Record<string, [number, number]> = {};
     bitmaps.forEach((bmp, i) => {
       const t = gl.createTexture()!;
       gl.bindTexture(gl.TEXTURE_2D, t);
@@ -175,6 +181,7 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       tex[names[i]] = t;
+      size[names[i]] = [bmp.width, bmp.height];
     });
     const aspect = bitmaps[0].width / bitmaps[0].height || 1.5;
     const texW = bitmaps[0].width || 1920;
@@ -199,7 +206,7 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
     gl.bindVertexArray(null);
-    return { tex, aspect, texW, vao, vb, ib, count: idx.length, spec };
+    return { tex, size, aspect, texW, vao, vb, ib, count: idx.length, spec };
   };
   const freeScene = (sc: Loaded) => {
     Object.values(sc.tex).forEach((t) => gl.deleteTexture(t));
@@ -287,6 +294,29 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
   // Dernière caméra dessinée (pour placer les fenêtres au survol).
   let lastProj: M4 | null = null, lastView: M4 | null = null, lastTanX = 1;
   let known: { base: string; windows: RueWindow[] } | null = null;
+  // Profondeur de chaque fenêtre, lue dans les textures déjà chargées (valeurs
+  // brutes, sans alpha prémultiplié) : le plan visible au centre de la
+  // fenêtre est le plus proche dont le pixel est opaque (les plans sont
+  // dessinés du fond vers l'avant), et seul son canal de depth.webp compte.
+  const windowDepths = (sc: Loaded, list: RueWindow[]): RueWindow[] => {
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    const px = new Uint8Array(4);
+    const read = (name: string, u: number, v: number) => {
+      const [w, h] = sc.size[name];
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, sc.tex[name], 0);
+      gl.readPixels(Math.min(w - 1, Math.floor(u * w)), Math.min(h - 1, Math.floor(v * h)), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      return px;
+    };
+    const out = list.map((win) => {
+      let layer = 0;
+      for (let l = 3; l > 0; l--) if (read(`layer${l}`, win.cx, win.cy)[3] > 127) { layer = l; break; }
+      return { ...win, depth: read("depth", win.cx, win.cy)[layer] / 255 };
+    });
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.deleteFramebuffer(fb);
+    return out;
+  };
   let style = specs[0].style ?? 1;
   // Relais des scènes : `fade` = lumière de la rue (0 = éteinte), `phase` =
   // « off » (on éteint), « swap » (dans le noir), « on » (on rallume).
@@ -459,10 +489,13 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     setScroll(v) { target.scroll = Math.min(1, Math.max(0, v)); },
     setPaused(v) { paused = v; },
     async windows() {
-      const base = cur.spec.base;
-      const res = { base, windows: await sceneWindows(base) };
-      known = res;
-      return res;
+      const sc = cur;
+      const base = sc.spec.base;
+      const list = await sceneWindows(base);
+      if (known?.base === base) return known;
+      if (disposed || sc !== cur) return { base, windows: list };
+      known = { base, windows: windowDepths(sc, list) };
+      return known;
     },
     setFriendWindows(list) {
       friendWin.fill(0);
@@ -471,14 +504,14 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
       kept.forEach((f, i) => {
         friendWin[i * 4] = f.windowId;
         friendWin[i * 4 + 1] = f.state === "focus" ? 2 : f.state === "on" ? 1 : 0;
-        friendWin[i * 4 + 2] = f.flickerAt ? t + (f.flickerAt - wall) / 1000 : -100;
+        friendWin[i * 4 + 2] = f.flickerAt && !reduce ? t + (f.flickerAt - wall) / 1000 : -100;
       });
       friendN = kept.length;
       friendIds = kept.map((f) => f.windowId);
       redraw();
     },
     highlightWindow(id) {
-      friendHi = id ? [id, now()] : [0, 0];
+      friendHi = id ? [id, reduce ? -1 : now()] : [0, 0];
       redraw();
     },
     locateFriendWindows() {

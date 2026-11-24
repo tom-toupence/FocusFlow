@@ -137,16 +137,18 @@ void main() {
       if (abs(fw.x - wid) > 0.5) continue;
       if (fw.y < 0.5) { w = 0.0; forcedOff = 1.0; }
       else { w = 1.0; warm = fw.y > 1.5 ? 1.0 : 0.6; }
-      // Passage de focus à pause : la fenêtre grésille une seconde.
+      // Passage de focus à pause : la fenêtre grésille une seconde, à 2,5 Hz
+      // (sous le seuil de 3 éclats par seconde, photosensibilité).
       float ft = uTime - fw.z;
-      if (ft >= 0.0 && ft < 1.1) {
-        float on = step(0.42, noise(vec2(ft * 24.0, wid * 3.1)));
+      if (ft >= 0.0 && ft < 1.2) {
+        float on = step(0.5, fract(ft * 2.5));
         w = mix(0.1, 1.0, on);
         warm *= on;
       }
       if (uFriendHi.x > 0.5 && abs(uFriendHi.x - wid) < 0.5) {
+        // Pulsation lente ; fixe si le mouvement est réduit (y < 0).
         float ht = uTime - uFriendHi.y;
-        warm += (0.5 - 0.5 * cos(ht * 5.0)) * 1.2;
+        warm += (uFriendHi.y < 0.0 ? 0.7 : 0.5 - 0.5 * cos(ht * 5.0)) * 1.2;
         w = max(w, 0.6);
       }
       break;

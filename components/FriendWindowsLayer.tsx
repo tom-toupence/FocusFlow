@@ -48,35 +48,52 @@ export default function FriendWindowsLayer({ renderer, scene }: Props) {
     return () => { off = true; };
   }, [renderer, sceneId, has]);
 
-  const street = useMemo(() => (has ? friendsForStreet(friends, now) : []), [friends, now, has]);
+  // Clé d'état stable : « id:état » des amis retenus pour la rue. Tant
+  // qu'elle ne change pas (battements Realtime, horloge de 20 s), rien n'est
+  // recalculé ni renvoyé au moteur.
+  const stateKey = useMemo(
+    () => (has ? friendsForStreet(friends, now).map((f) => `${f.userId}:${friendWindowState(f.stats, now)}`).sort().join("|") : ""),
+    [friends, now, has],
+  );
+  const idsKey = useMemo(() => stateKey.split("|").filter(Boolean).map((e) => e.slice(0, e.lastIndexOf(":"))).join("|"), [stateKey]);
   const assignment = useMemo(() => {
-    if (!sceneId || !windows || windows.sceneId !== sceneId) return new Map<string, number>();
-    return assignFriendWindows(street.map((f) => f.userId), windows.list, sceneId);
-  }, [street, windows, sceneId]);
+    if (!idsKey || !sceneId || !windows || windows.sceneId !== sceneId) return new Map<string, number>();
+    return assignFriendWindows(idsKey.split("|"), windows.list, sceneId);
+  }, [idsKey, windows, sceneId]);
 
-  // État de chaque ami -> uniforms du moteur, seulement quand il change.
+  // Grésillement daté au vrai changement d'état (focus -> pause ou hors ligne).
   const prev = useRef(new Map<string, FriendWindowState>());
   const flicker = useRef(new Map<string, number>());
+  useEffect(() => {
+    const t = Date.now();
+    for (const e of stateKey.split("|").filter(Boolean)) {
+      const i = e.lastIndexOf(":");
+      const id = e.slice(0, i), st = e.slice(i + 1) as FriendWindowState;
+      if (prev.current.get(id) === "focus" && st !== "focus") flicker.current.set(id, t);
+      prev.current.set(id, st);
+    }
+  }, [stateKey]);
+
+  // État de chaque ami -> uniforms du moteur, seulement quand la clé change.
   const sent = useRef(false);
   useEffect(() => {
     if (!renderer) return;
     const t = Date.now();
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const list: FriendWindow[] = [];
-    for (const f of street) {
-      const st = friendWindowState(f.stats, now);
-      const before = prev.current.get(f.userId);
-      if (before === "focus" && st !== "focus") flicker.current.set(f.userId, t);
-      prev.current.set(f.userId, st);
-      const id = assignment.get(f.userId);
+    for (const e of stateKey.split("|").filter(Boolean)) {
+      const i = e.lastIndexOf(":");
+      const uid = e.slice(0, i), st = e.slice(i + 1) as FriendWindowState;
+      const id = assignment.get(uid);
       if (!id) continue;
-      const fa = flicker.current.get(f.userId);
-      list.push({ windowId: id, state: st, flickerAt: fa && t - fa < FLICKER_MS ? fa : undefined });
+      const fa = flicker.current.get(uid);
+      list.push({ windowId: id, state: st, flickerAt: !calm && fa && t - fa < FLICKER_MS ? fa : undefined });
     }
     // Sans ami ni fenêtre, on ne touche pas au moteur (sauf pour vider un état précédent).
     if (!list.length && !sent.current) return;
     renderer.setFriendWindows(list);
     sent.current = list.length > 0;
-  }, [renderer, street, assignment, now]);
+  }, [renderer, stateKey, assignment]);
 
   // Survol d'une ligne de la liste : la fenêtre de cet ami pulse.
   useEffect(() => {
@@ -91,30 +108,43 @@ export default function FriendWindowsLayer({ renderer, scene }: Props) {
     if (!renderer || !assignment.size) return;
     const owner = new Map([...assignment].map(([u, w]) => [w, u]));
     let clear: ReturnType<typeof setTimeout> | null = null;
-    const pick = (e: PointerEvent) => {
-      const el = box.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const px = e.clientX - rect.left, py = e.clientY - rect.top;
+    // Rectangle mis en cache (recalculé au redimensionnement) ; un seul calcul
+    // par image, quel que soit le nombre d'événements du pointeur.
+    let rect = box.current?.getBoundingClientRect() ?? null;
+    const onResize = () => { rect = box.current?.getBoundingClientRect() ?? null; };
+    let raf = 0;
+    let last: { x: number; y: number; touch: boolean } | null = null;
+    const pick = () => {
+      raf = 0;
+      if (!last || !rect) return;
+      const { touch } = last;
+      const px = last.x - rect.left, py = last.y - rect.top;
       let best: { userId: string; x: number; y: number; d: number } | null = null;
       for (const w of renderer.locateFriendWindows()) {
         const d = Math.hypot(w.x - px, w.y - py);
         const userId = owner.get(w.id);
         if (userId && d < Math.max(16, w.r * 1.8) && (!best || d < best.d)) best = { userId, x: w.x, y: w.y - Math.max(8, w.r), d };
       }
-      setHover((h) => (best ? (h?.userId === best.userId ? h : { userId: best.userId, x: best.x, y: best.y }) : h && e.pointerType !== "touch" ? null : h));
-      if (e.pointerType === "touch") {
+      setHover((h) => (best ? (h?.userId === best.userId ? h : { userId: best.userId, x: best.x, y: best.y }) : h && !touch ? null : h));
+      if (touch) {
         if (clear) clearTimeout(clear);
         clear = setTimeout(() => setHover(null), 3000);
       }
     };
-    const move = (e: PointerEvent) => { if (e.pointerType !== "touch") pick(e); };
-    const down = (e: PointerEvent) => { if (e.pointerType === "touch") pick(e); };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerdown", down);
+    const queue = (e: PointerEvent) => {
+      last = { x: e.clientX, y: e.clientY, touch: e.pointerType === "touch" };
+      if (!raf) raf = requestAnimationFrame(pick);
+    };
+    const move = (e: PointerEvent) => { if (e.pointerType !== "touch") queue(e); };
+    const down = (e: PointerEvent) => { if (e.pointerType === "touch") queue(e); };
+    window.addEventListener("pointermove", move, { passive: true });
+    window.addEventListener("pointerdown", down, { passive: true });
+    window.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerdown", down);
+      window.removeEventListener("resize", onResize);
+      if (raf) cancelAnimationFrame(raf);
       if (clear) clearTimeout(clear);
     };
   }, [renderer, assignment]);

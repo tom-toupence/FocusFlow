@@ -2,6 +2,10 @@
 // Logique pure (testée) : lecture des fenêtres d'une scène dans la texture
 // ids (canal G = numéro de fenêtre, voir scripts/rue/04_masks.py), choix
 // déterministe d'une fenêtre par ami, état allumée / vive / éteinte.
+//
+// Limite : 16 amis au plus dans la rue (MAX_FRIEND_WINDOWS), car le shader
+// reçoit leurs fenêtres dans un tableau d'uniforms de taille fixe. Au-delà,
+// les allumés passent d'abord ; la liste, elle, montre tous les amis.
 import { isActivelyFocusing, isOnline, type FriendStats } from "@/lib/friends";
 
 /** Une fenêtre de la scène, lue dans ids.webp. */
@@ -13,6 +17,8 @@ export interface RueWindow {
   /** Centre, en coordonnées de texture (0..1, y vers le bas). */
   cx: number;
   cy: number;
+  /** Part de ciel (canal B de ids.webp, 0..1) : une « fenêtre » dans le ciel est un nuage éclairé. */
+  sky?: number;
   /** Disparité au centre (0 = loin, 1 = proche), remplie par le moteur. */
   depth?: number;
 }
@@ -32,25 +38,26 @@ export const MAX_FRIEND_WINDOWS = 16;
 /** Une fenêtre plus petite que ça ne se voit pas à l'écran. */
 export const MIN_WINDOW_AREA = 80;
 /** Durée du grésillement quand un ami passe de focus à pause (ms). */
-export const FLICKER_MS = 1100;
+export const FLICKER_MS = 1200;
 
 /**
  * Parcourt les pixels RGBA de ids.webp et rassemble les fenêtres (canal G).
- * Une seule passe, faite une fois par scène.
+ * Une seule passe, faite une fois par scène. `areaScale` ramène la surface
+ * en pixels de la photo quand on lit une version réduite.
  */
-export function scanWindowIds(data: ArrayLike<number>, width: number, height: number): RueWindow[] {
-  const area = new Float64Array(256), sx = new Float64Array(256), sy = new Float64Array(256);
+export function scanWindowIds(data: ArrayLike<number>, width: number, height: number, areaScale = 1): RueWindow[] {
+  const area = new Float64Array(256), sx = new Float64Array(256), sy = new Float64Array(256), sk = new Float64Array(256);
   for (let y = 0, i = 1; y < height; y++) {
     for (let x = 0; x < width; x++, i += 4) {
       const g = data[i];
       if (g === 0) continue;
-      area[g]++; sx[g] += x; sy[g] += y;
+      area[g]++; sx[g] += x; sy[g] += y; sk[g] += data[i + 1];
     }
   }
   const out: RueWindow[] = [];
   for (let g = 1; g < 256; g++) {
     if (!area[g]) continue;
-    out.push({ id: g, area: area[g], cx: (sx[g] / area[g] + 0.5) / width, cy: (sy[g] / area[g] + 0.5) / height });
+    out.push({ id: g, area: area[g] * areaScale, cx: (sx[g] / area[g] + 0.5) / width, cy: (sy[g] / area[g] + 0.5) / height, sky: sk[g] / area[g] / 255 });
   }
   return out;
 }
@@ -77,7 +84,7 @@ export function assignFriendWindows(friendIds: string[], windows: RueWindow[], s
   const need = Math.min(friendIds.length, MAX_FRIEND_WINDOWS);
   // De préférence : assez grandes, et dans la partie de la photo qui reste
   // à l'écran quel que soit le cadrage (les bords sont souvent rognés).
-  const big = windows.filter((w) => w.area >= MIN_WINDOW_AREA);
+  const big = windows.filter((w) => w.area >= MIN_WINDOW_AREA && (w.sky ?? 0) < 0.08);
   const central = big.filter((w) => w.cx >= 0.1 && w.cx <= 0.9 && w.cy >= 0.22 && w.cy <= 0.8);
   const pool = (central.length >= need ? central : big.length >= need ? big : windows)
     .map((w) => w.id)

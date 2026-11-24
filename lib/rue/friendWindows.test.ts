@@ -19,11 +19,20 @@ describe("scanWindowIds", () => {
     const px = new Uint8ClampedArray(4 * 2 * 4);
     const set = (x: number, y: number, g: number) => { px[(y * 4 + x) * 4 + 1] = g; };
     set(0, 0, 3); set(1, 0, 3); set(3, 1, 7);
+    px[(1 * 4 + 3) * 4 + 2] = 255; // ciel sous la fenêtre 7
     const w = scanWindowIds(px, 4, 2);
     expect(w.map((x) => [x.id, x.area])).toEqual([[3, 2], [7, 1]]);
     expect(w[0].cx).toBeCloseTo(1 / 4);
     expect(w[0].cy).toBeCloseTo(0.25);
     expect(w[1].cx).toBeCloseTo(3.5 / 4);
+    expect(w[0].sky).toBe(0);
+    expect(w[1].sky).toBe(1);
+  });
+
+  it("ramène la surface à la photo quand on lit une version réduite", () => {
+    const px = new Uint8ClampedArray(2 * 2 * 4);
+    px[1] = 9; px[5] = 9;
+    expect(scanWindowIds(px, 2, 2, 16)[0].area).toBe(32);
   });
 });
 
@@ -51,6 +60,12 @@ describe("assignFriendWindows", () => {
     const mid = Array.from({ length: 20 }, (_, i) => ({ ...win(i + 21), cy: 0.5 }));
     const m = assignFriendWindows(["a", "b", "c"], [...edge, ...mid], "ruelle");
     for (const id of m.values()) expect(id).toBeGreaterThan(20);
+  });
+
+  it("écarte les « fenêtres » dans le ciel (nuages éclairés)", () => {
+    const sky = Array.from({ length: 20 }, (_, i) => ({ ...win(i + 1), sky: 0.6 }));
+    const m = assignFriendWindows(["a", "b"], [...sky, win(30), win(31)], "seattle");
+    expect([...m.values()].sort()).toEqual([30, 31]);
   });
 
   it("s'arrête à 16 amis et au nombre de fenêtres", () => {

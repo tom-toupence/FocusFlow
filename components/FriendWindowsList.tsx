@@ -28,12 +28,13 @@ export default function FriendWindowsList({ className }: { className?: string })
   const setHighlight = useFriendWindowsStore((s) => s.setHighlight);
   const has = friends.length > 0;
   const now = useNowTick(has);
-  const [open, setOpen] = useState(true);
-  // Repliée sur téléphone (lu au montage : pas de mismatch d'hydratation).
+  const [open, setOpen] = useState(false);
+  // Repliée par défaut (téléphone), ouverte au montage sur grand écran : pas
+  // de mismatch d'hydratation, pas d'ouverture puis fermeture visible.
   useEffect(() => {
-    if (window.matchMedia("(max-width: 767px)").matches) {
+    if (!window.matchMedia("(max-width: 767px)").matches) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setOpen(false);
+      setOpen(true);
     }
   }, []);
   useEffect(() => () => setHighlight(null), [setHighlight]);
@@ -56,7 +57,7 @@ export default function FriendWindowsList({ className }: { className?: string })
         <WindowGlyph state={lit ? "on" : "off"} />
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/55">Amis</span>
         <span className="ml-auto font-mono text-[10px] tabular-nums text-white/45">{lit} en ligne</span>
-        <svg viewBox="0 0 24 24" className={cn("h-3 w-3 text-white/45 transition-transform", open && "rotate-180")} fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+        <svg viewBox="0 0 24 24" className={cn("h-3 w-3 text-white/45 motion-safe:transition-transform", open && "rotate-180")} fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
           <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
