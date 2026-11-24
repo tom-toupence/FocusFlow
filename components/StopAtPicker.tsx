@@ -16,16 +16,18 @@ import { usePlayHistoryStore } from "@/store/playHistoryStore";
  * Montre les cycles que FocusFlow en déduit, et dit si l'objectif du jour tient.
  * Contrôlé : la valeur (epoch ms ou null) vit dans la page de réglages.
  */
-export default function StopAtPicker({
+function StopAtPickerInner({
   settings,
   value,
   onChange,
+  initialNow,
 }: {
+  initialNow: number;
   settings: StopSettings;
   value: number | null;
   onChange: (stopAt: number | null) => void;
 }) {
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(initialNow);
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
@@ -54,9 +56,15 @@ export default function StopAtPicker({
 
   const onFree = (text: string) => {
     setFreeText(text);
-    if (!text) return;
-    const ms = parseHM(text, now);
+    if (!text) {
+      setError(null);
+      onChange(null);
+      return;
+    }
+    let ms = parseHM(text, now);
     if (ms == null) return;
+    // Tôt le matin, une heure passée vise demain (travailler tard, arrêt à 00:30).
+    if (ms <= now && new Date(ms).getHours() < 6) ms += 24 * 60 * 60_000;
     if (ms <= now) {
       setError("Cette heure est déjà passée.");
       return;
@@ -75,7 +83,7 @@ export default function StopAtPicker({
 
   let sentence = "";
   if (plan) {
-    if (work.length === 0) sentence = "Pas assez de temps pour un pomodoro.";
+    if (work.length === 0) sentence = "Pas assez de temps pour un pomodoro. La session démarrera sans heure d'arrêt.";
     else {
       sentence = `${work.length} pomodoro${work.length > 1 ? "s" : ""} possible${work.length > 1 ? "s" : ""}.`;
       if (lastMin !== settings.workDuration) sentence += ` Le dernier dure ${lastMin} min pour finir pile à ${formatHM(value!)}.`;
@@ -173,4 +181,26 @@ export default function StopAtPicker({
       )}
     </div>
   );
+}
+
+export default function StopAtPicker(props: {
+  settings: StopSettings;
+  value: number | null;
+  onChange: (stopAt: number | null) => void;
+}) {
+  // L'heure et l'historique n'existent qu'au montage : le rendu serveur (autre fuseau,
+  // stores non relus) ne doit pas servir de base à l'hydratation.
+  const [now, setNow] = useState<number | null>(null);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setNow(Date.now()), []);
+  if (now == null) {
+    return (
+      <div data-testid="stop-at">
+        <p className="text-xs font-semibold text-foreground/30 font-mono uppercase tracking-[0.14em] mb-3">Heure d&apos;arrêt</p>
+        <p className="text-sm font-medium text-foreground mb-3">Tu t&apos;arrêtes à quelle heure ?</p>
+        <div className="h-9" />
+      </div>
+    );
+  }
+  return <StopAtPickerInner {...props} initialNow={now} />;
 }

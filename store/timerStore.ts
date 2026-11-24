@@ -231,7 +231,7 @@ export const useTimerStore = create<TimerState>()(
 
       setMode: (mode) => {
         const { settings } = get();
-        set({ mode, secondsLeft: getDuration(mode, settings), cycleSeconds: getDuration(mode, settings), isRunning: false, flowSeconds: 0, ...CLEARED });
+        set({ mode, secondsLeft: getDuration(mode, settings), cycleSeconds: getDuration(mode, settings), isRunning: false, flowSeconds: 0, stopReached: false, ...CLEARED });
       },
 
       // Recalcule depuis l'horloge (idempotent : appelable à tout moment, en retard ou non).
@@ -417,7 +417,15 @@ export const useTimerStore = create<TimerState>()(
       },
 
       // Une heure déjà passée est ignorée (rien à planifier).
-      setStopAt: (stopAt) => set({ stopAt: stopAt != null && stopAt > Date.now() ? stopAt : null, stopReached: false }),
+      // Une heure déjà passée, ou trop proche pour un seul pomodoro, équivaut à « pas d'heure ».
+      setStopAt: (stopAt) => {
+        const { settings } = get();
+        const now = Date.now();
+        const ok =
+          stopAt != null && stopAt > now && settings.preset !== "flowtime" &&
+          nextCycleSeconds({ stopAt, now, mode: "work", settings, sessionsCompleted: 0 }) != null;
+        set({ stopAt: ok ? stopAt : null, stopReached: false });
+      },
 
       continueAfterStop: () => {
         const { settings } = get();

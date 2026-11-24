@@ -89,10 +89,27 @@ describe("heure d'arrêt : durée des cycles", () => {
   });
 
   it("démarrer quand l'heure est déjà (presque) là : heure d'arrêt atteinte", () => {
-    st().setStopAt(T0 + min(6));
+    useTimerStore.setState({ stopAt: T0 + min(6) });
     st().start();
     expect(st().stopReached).toBe(true);
     expect(st().isRunning).toBe(false);
+  });
+
+  it("une heure trop proche pour un pomodoro équivaut à « pas d'heure »", () => {
+    st().setStopAt(T0 + min(6));
+    expect(st().stopAt).toBeNull();
+    st().setStopAt(T0 - min(5));
+    expect(st().stopAt).toBeNull();
+  });
+
+  it("setMode remet stopReached à false", () => {
+    st().setStopAt(T0 + min(30));
+    st().start();
+    vi.setSystemTime(T0 + min(30));
+    st().nextSession(true);
+    expect(st().stopReached).toBe(true);
+    st().setMode("work");
+    expect(st().stopReached).toBe(false);
   });
 
   it("encore un pomodoro : efface l'heure et lance un cycle normal", () => {

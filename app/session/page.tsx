@@ -34,6 +34,7 @@ import { playBreakChime, playWorkChime } from "@/lib/sounds";
 import { upsertMyFriendStats } from "@/lib/friends";
 import { formatHM, pomodorosLeft } from "@/lib/stopPlan";
 import { CHEER_EVENT } from "@/store/chatStore";
+import { RADIO_NAME } from "@/lib/radioProgram";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -224,18 +225,13 @@ export default function SessionPage() {
 
   // ── Session end ───────────────────────────────────────────────────────────
   const handleSessionEnd = useCallback((autoStart = true) => {
-    if (typeof window !== "undefined" && Notification.permission === "granted") {
-      new Notification("FocusFlow", {
-        body: mode === "work" ? "Session terminée ! Pause en cours." : "Pause terminée ! C'est reparti.",
-        icon: "/favicon.ico",
-      });
-    }
     if (mode === "work") {
       if (!sessionEndedRef.current) {
         sessionEndedRef.current = true;
         // Durée réelle du cycle (le plan « Dernier train » peut l'avoir étiré ou raccourci).
         const cycleMinutes = Math.max(1, Math.round(useTimerStore.getState().cycleSeconds / 60));
         recordSession(cycleMinutes);
+        useSessionSummaryStore.getState().addFocusMinutes(cycleMinutes);
         recordPlay(buildPlayEntry(cycleMinutes));
         useProjectStore.getState().logPomodoro(); // advance the active project, if any
         celebrateProgress();
@@ -244,6 +240,20 @@ export default function SessionPage() {
       sessionEndedRef.current = false;
     }
     nextSession(autoStart);
+    // Fin de plan « Dernier train » : rien ne s'enchaîne, on le dit (son, lueur, notification).
+    const reached = useTimerStore.getState().stopReached;
+    if (reached) {
+      playBreakChime();
+      setTimeout(() => setBloomKey((k) => k + 1), 0);
+    }
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+      new Notification("FocusFlow", {
+        body: reached
+          ? "Heure d'arrêt atteinte."
+          : mode === "work" ? "Session terminée ! Pause en cours." : "Pause terminée ! C'est reparti.",
+        icon: "/favicon.ico",
+      });
+    }
   }, [mode, nextSession, recordSession, recordPlay]);
 
   // Tant que l'init (démarrage ou rattrapage) n'est pas faite, on suit juste la valeur :
@@ -300,6 +310,7 @@ export default function SessionPage() {
         : Math.round((useTimerStore.getState().cycleSeconds - secondsLeft) / 60);
       if (minutesWorked >= 1) {
         recordSession(minutesWorked);
+        if (!isFlowtime) useSessionSummaryStore.getState().addFocusMinutes(minutesWorked, false);
         recordPlay(buildPlayEntry(minutesWorked));
       }
     }
@@ -388,7 +399,8 @@ export default function SessionPage() {
   // publiée dans friend_stats.activity ; effacée à la sortie de session.
   const activityKind = mode !== "work" ? "En pause" : isFlowtime ? "Flowtime" : "En focus";
   const sourceName = SOURCE_NAME[media.kind];
-  const activityMedia = nowPlaying ? [nowPlaying.title, sourceName].filter(Boolean).join(" · ") : sourceName;
+  // Radio : « En focus · Radio FocusFlow · <titre> » (compté par l'onglet Radio des amis).
+  const activityMedia = nowPlaying ? [media.radio ? RADIO_NAME : "", nowPlaying.title, sourceName].filter(Boolean).join(" · ") : sourceName;
   const activityLabel = activityMedia ? `${activityKind} · ${activityMedia}` : activityKind;
   useEffect(() => {
     upsertMyFriendStats({ activity: activityLabel });

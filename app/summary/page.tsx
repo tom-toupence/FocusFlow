@@ -87,7 +87,7 @@ export default function SummaryPage() {
   const { sessionsCompleted, settings, flowMinutesTotal, resetAll } = useTimerStore();
   const { todos } = useSessionStore();
   const { days } = useStatsStore();
-  const { startedAt, focusMinutesPerSession, todoDoneIdsAtStart, clearSession } = useSessionSummaryStore();
+  const { startedAt, focusMinutesPerSession, todoDoneIdsAtStart, clearSession, focusMinutes, cycleMinutes } = useSessionSummaryStore();
   const { unit: goalUnit, target: goalTarget } = useGoalStore();
   const { sessionCount: distractionCount } = useDistractionStore();
 
@@ -95,7 +95,8 @@ export default function SummaryPage() {
   const sessionDurationMs = startedAt ? Date.now() - startedAt : 0;
   const focusMinutesThisSession = settings.preset === "flowtime"
     ? flowMinutesTotal
-    : sessionsCompleted * focusMinutesPerSession;
+    : focusMinutes > 0 ? focusMinutes : sessionsCompleted * focusMinutesPerSession;
+  const sameLength = cycleMinutes.every((m) => m === cycleMinutes[0]);
   const doneIdsAtStart = new Set(todoDoneIdsAtStart);
   const todosCompletedThisSession = todos.filter((t) => t.status === "done" && !doneIdsAtStart.has(t.id));
   const totalTodos = todos.length;
@@ -176,7 +177,7 @@ export default function SummaryPage() {
             <StatCard
               label="Pomodoros"
               num={sessionsCompleted}
-              sub={`× ${focusMinutesPerSession} min`}
+              sub={cycleMinutes.length > 0 && !sameLength ? "durées adaptées" : `× ${cycleMinutes[0] ?? focusMinutesPerSession} min`}
               accent="text-orange-300"
             />
             <StatCard
@@ -222,7 +223,7 @@ export default function SummaryPage() {
                 <div
                   key={i}
                   className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/25 flex items-center justify-center"
-                  title={`Session ${i + 1} · ${focusMinutesPerSession} min`}
+                  title={`Session ${i + 1} · ${cycleMinutes[i] ?? focusMinutesPerSession} min`}
                 >
                   <svg className="w-3.5 h-3.5 text-orange-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" strokeLinecap="round" strokeLinejoin="round" />

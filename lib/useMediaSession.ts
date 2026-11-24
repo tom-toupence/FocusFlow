@@ -35,7 +35,8 @@ interface ClockView {
   total: number;
 }
 
-function cycleTotal(mode: TimerMode, settings: TimerSettings, flowBreakTotal: number): number {
+function cycleTotal(mode: TimerMode, settings: TimerSettings, flowBreakTotal: number, cycleSeconds: number): number {
+  if (settings.preset !== "flowtime" && cycleSeconds > 0) return cycleSeconds;
   if (mode === "work") return settings.workDuration * 60;
   if (settings.preset === "flowtime") return flowBreakTotal || settings.shortBreakDuration * 60;
   return (mode === "short-break" ? settings.shortBreakDuration : settings.longBreakDuration) * 60;
@@ -50,7 +51,7 @@ function readClock(now: number): ClockView {
     return { mode: s.mode, running: s.isRunning, flow, seconds, total: 0 };
   }
   const seconds = s.isRunning && s.endsAt != null ? remainingSeconds(s.endsAt, now) : s.secondsLeft;
-  return { mode: s.mode, running: s.isRunning, flow, seconds, total: cycleTotal(s.mode, s.settings, s.flowBreakTotal) };
+  return { mode: s.mode, running: s.isRunning, flow, seconds, total: cycleTotal(s.mode, s.settings, s.flowBreakTotal, s.cycleSeconds) };
 }
 
 /** « 18:42 · Focus », « 04:12 · Pause », « Flow 32:10 », « En pause · 18:42 ». */
