@@ -121,6 +121,27 @@ choisir le média, qui enchaîne sur `/settings`. Les **routines** appliquent le
   `flowSeconds` / `finishFlow()` / `accumulateFlow()` dans `store/timerStore.ts`
 - **Timer flottant** Picture-in-Picture (Document PiP, Chrome/Edge ; bouton masqué ailleurs) :
   mini-fenêtre toujours au premier plan avec pause / distraction / fin de flow — `components/PipTimer.tsx`
+- **Téléphone télécommande** (lot 7) : bouton « Télécommande » (icône téléphone) dans la rangée de la
+  session → panneau QR (SVG généré localement, `lib/remote/qr.ts`, sans dépendance) + code de 6 caractères
+  + URL `/remote/<code>`. Le téléphone (sans compte, hors AuthGate) affiche le temps restant en sodium
+  (depuis `endsAt`, corrigé du décalage d'horloge) et envoie Pause/Reprendre, Distraction, Suivant : mêmes
+  chemins que les boutons, la touche D et la Media Session. « Téléphone connecté » si un message < 15 s.
+  Promesse honnête : marche tant que l'écran du téléphone est allumé (Wake Lock demandé), pas de vibration,
+  pas de Web Push. Fermer le panneau ne coupe rien ; « Déconnecter » ferme le canal.
+- **Emporter la session sur le téléphone** (lot 7, même panneau, onglet « Continuer sur le téléphone » →
+  `/handoff/<code>`) : l'ordinateur envoie l'état complet (réglages, mode, `endsAt`, pomodoro, heure
+  d'arrêt, tâches bornées, média : vidéo + position, file maison ids + piste en cours, radio, Spotify si
+  le téléphone y est connecté, Twitch), le téléphone hydrate ses stores (`lib/remote/handoffApply.ts`,
+  `closeActiveSession` d'abord sauf si c'est la même session), accuse réception, ouvre `/session` avec
+  « Toucher pour reprendre » (autoplay iOS ; la seconde est recalculée au toucher). À l'accusé,
+  l'ordinateur crédite son partiel par le chemin de « Terminer » (`finishSession`) et s'arrête ;
+  sans accusé il continue. **Crédit unique** : le téléphone reçoit `cycleSeconds` = restant à l'envoi
+  (Flowtime : tout est crédité sur l'ordinateur, le flow repart à zéro). Un code = un seul téléphone.
+  Session reprise sans compte : `/session` et `/summary` passent l'AuthGate dans cet onglet
+  (`focusflow-handoff-guest`, sessionStorage).
+  **Realtime broadcast requis, aucune table** : canal `ff-remote-<code>` (Supabase Realtime en broadcast,
+  clé anon, rien en base, pas de `lib/db.ts`) ; sans Supabase, bouton masqué en production,
+  BroadcastChannel en dev ou build `NEXT_PUBLIC_LAB=1` (forçable par `focusflow-remote-transport=local`).
 - **Le minuteur qui connaît ton agenda** (lot 4) : adresse iCal privée collée dans le profil
   (section « Agenda », `components/AgendaSettings.tsx`, Tester / Retirer). Au démarrage d'un pomodoro, une
   réunion « occupée » avant sa fin le **raccourcit par défaut** (marge 5 min), ligne visible sous le
@@ -993,3 +1014,24 @@ contenu animé sont peu fiables ; valider avec `npm run dev` sur une vraie machi
   résultat périmé ignoré) ; `STOP_REACHED` remet l'état agenda à zéro ; `agendaMeeting` persisté
   **sans le titre** ; l'import d'une sauvegarde garde l'adresse iCal locale ; `refitAgenda` ne rallonge
   jamais une pause déjà commencée (seul `nextSession` le fait, au début de la pause).
+
+## Journal de session — 2026-11-24 (lot 7 : télécommande et « Emporter la session »)
+
+- `lib/remote/` : `protocol.ts` (pur : code 6 car. alphabet sans I/L/O/0/1 tiré par rejet sur
+  `crypto.getRandomValues`, valable 2 h, régénéré à chaque ouverture sans téléphone connecté ; messages
+  `{v:1, n, t, type…}` hello/state/cmd/handoff/ack/refused/bye validés en forme stricte, clés exactes,
+  tailles bornées ; `ReplayGuard` : nonce déjà vu ou âge > 30 s = ignoré), `transport.ts` (Supabase
+  broadcast `self:false` ou BroadcastChannel), `handoff.ts` (sérialisation, patch du minuteur du
+  téléphone, `splitCredit`, `isSameSession`, fusion des tâches par id), `handoffApply.ts`, `qr.ts`
+  (mode octet, correction M, versions 1 à 10, décodage vérifié avec OpenCV), `useRemoteHost.ts` (monté
+  en une ligne dans `/session`, avec `RemoteButton`/`RemoteLayer` de `components/remote/RemoteHostUI.tsx`).
+- `/session` : `handleStop` devient `finishSession({to, leftSeconds})` (même crédit), « Ta rue » intacte.
+  Routes `app/remote/[code]` et `app/handoff/[code]` (params = Promise, `referrer: no-referrer`, hors
+  AuthGate, pas de splash ni de pastille de retour).
+- Limites connues : une horloge de téléphone décalée de plus de 30 s fait ignorer les messages
+  (anti-rejeu) ; le code est le seul secret du canal (≈ 8,9e8 codes, 2 h) ; les textes de tâches
+  transitent par Realtime (non stockés). Le tiroir Amis peut apparaître sur `/remote` pour un compte
+  connecté (fichiers Amis non modifiés volontairement).
+- Tests : vitest `lib/remote/{protocol,handoff,qr}.test.ts` ; e2e `e2e/remote.spec.ts` (deux pages du
+  même contexte, BroadcastChannel ; ignoré si le build n'a ni Supabase ni `NEXT_PUBLIC_LAB=1`).
+  **À vérifier sur de vrais téléphones avec Supabase** (Realtime, iOS autoplay, Wake Lock).
