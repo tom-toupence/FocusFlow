@@ -10,6 +10,7 @@ import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
+import { isHandoffGuest } from "@/lib/remote/handoffApply";
 
 // Lazy-load : la landing (photo plein écran + motion) n'est chargée QUE pour les
 // visiteurs NON connectés → le bundle in-app (session/dashboard) n'en paie pas
@@ -25,13 +26,20 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const isCallbackRoute = pathname === "/auth/callback"
     || pathname === "/auth/spotify/callback"
     || pathname === "/auth/twitch/callback";
-  if (!supabase || isCallbackRoute) return <>{children}</>;
+  // Télécommande et reprise sur le téléphone (lot 7) : sans compte.
+  const isPhoneRoute = pathname?.startsWith("/remote/") || pathname?.startsWith("/handoff/");
+  if (!supabase || isCallbackRoute || isPhoneRoute) return <>{children}</>;
 
-  return <AuthGateInner>{children}</AuthGateInner>;
+  return <AuthGateInner pathname={pathname}>{children}</AuthGateInner>;
 }
 
-function AuthGateInner({ children }: { children: React.ReactNode }) {
+function AuthGateInner({ children, pathname }: { children: React.ReactNode; pathname: string | null }) {
   const [user, setUser] = useState<User | null | "loading">("loading");
+  // Session reprise depuis un ordinateur sans compte sur ce téléphone : la
+  // session et son résumé restent ouverts dans cet onglet (local seulement).
+  const [guest, setGuest] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setGuest(isHandoffGuest()), []);
 
   useEffect(() => {
     // Get current session
@@ -53,7 +61,7 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user) return <LandingPage />;
+  if (!user && !(guest && (pathname === "/session" || pathname === "/summary"))) return <LandingPage />;
 
   return <>{children}</>;
 }

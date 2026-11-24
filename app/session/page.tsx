@@ -19,6 +19,7 @@ import PipTimer from "@/components/PipTimer";
 import BreathingExercise from "@/components/BreathingExercise";
 import RueScene, { type RueHandle } from "@/components/RueScene";
 import FriendWindowsList from "@/components/FriendWindowsList";
+import PauseStreet from "@/components/PauseStreet";
 import { usePlayback, type PlayerAdapter } from "@/lib/playback/types";
 import { useSessionMedia } from "@/lib/playback/useSessionMedia";
 import type { ExtendedEvent, SourceKind } from "@/lib/playback/types";
@@ -41,6 +42,8 @@ import { arrivalChoice, scheduleEnd, MIN_CREDIT_SEC } from "@/lib/videoSync";
 import { nextWorkStart } from "@/lib/videoSchedule";
 import { useAgendaStore, AGENDA_REFRESH_MS } from "@/store/agendaStore";
 import { eventLabel, type AgendaNotice } from "@/lib/agendaTimer";
+import { useRemoteHost } from "@/lib/remote/useRemoteHost";
+import { RemoteButton, RemoteLayer } from "@/components/remote/RemoteHostUI";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -484,13 +487,15 @@ export default function SessionPage() {
   };
 
   // ── Stop → Summary ────────────────────────────────────────────────────────
-  const handleStop = () => {
+  // `leftSeconds` : restant à retenir (session emportée sur le téléphone : celui
+  // de l'envoi, le téléphone crédite la suite) ; `to` : où aller ensuite.
+  const finishSession = ({ to = "/summary", leftSeconds }: { to?: string; leftSeconds?: number } = {}) => {
     pause();
     // Record partial work time if we were mid-session
     if (mode === "work") {
       const minutesWorked = isFlowtime
         ? accumulateFlow()
-        : Math.round((useTimerStore.getState().cycleSeconds - secondsLeft) / 60);
+        : Math.round((useTimerStore.getState().cycleSeconds - (leftSeconds ?? secondsLeft)) / 60);
       if (minutesWorked >= 1) {
         recordSession(minutesWorked);
         if (!isFlowtime) useSessionSummaryStore.getState().addFocusMinutes(minutesWorked, false);
@@ -502,8 +507,9 @@ export default function SessionPage() {
     // Sync achievements so the summary reflects anything just unlocked.
     useAchievementsStore.getState().sync();
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    router.push("/summary");
+    router.push(to);
   };
+  const handleStop = () => finishSession();
 
   // ── Distraction tracking ──────────────────────────────────────────────────
   // Faithful to the original Pomodoro Technique: mark every interruption.
@@ -513,6 +519,15 @@ export default function SessionPage() {
     setDistractionFlash((n) => n + 1); // trigger a brief visual feedback
     city.current?.next(); // Spotify : chaque titre a sa rue
   }, [markDistraction]);
+
+  // Téléphone télécommande et « Emporter la session » (lot 7) : mêmes actions que les boutons.
+  const remote = useRemoteHost({
+    adapter, pb, media, onPlay: start, onPause: pause, onDistraction: handleDistraction,
+    onHandedOff: (left) => {
+      finishSession({ to: "/", leftSeconds: left ?? undefined });
+      toast({ title: "Session continuée sur le téléphone", description: "Le temps fait ici est compté, la suite le sera sur le téléphone.", accent: "sky" });
+    },
+  });
 
   // Keyboard shortcuts (ignored while typing in a field):
   //  • D — mark a distraction   • Space — pause / resume
@@ -695,11 +710,10 @@ export default function SessionPage() {
       {/* ── La halte (pause) : la ville s'éteint, la vue se brouille ───────── */}
       {showHalte && (
         <div className="absolute inset-0 z-20 bg-[#07090d]">
-          <RueScene
+          <PauseStreet
             ref={city}
             mode="break"
             interval={[40, 60]}
-            friends
             className="absolute inset-0"
             label={stopReached ? "La halte : une rue de nuit, l'heure d'arrêt est atteinte." : `La halte : une rue de nuit, il reste ${formatTime(secondsLeft)} de pause.`}
           />
@@ -1035,6 +1049,9 @@ export default function SessionPage() {
             {/* Mini-minuteur toujours au premier plan (Document PiP). */}
             <PipTimer onDistraction={handleDistraction} onFlowBreak={handleFlowBreak} onPlay={start} onPause={pause} />
 
+            {/* Téléphone : télécommande et « Continuer sur le téléphone » (lot 7). */}
+            <RemoteButton remote={remote} />
+
             {/* Ouvrir chez la source (Twitch). */}
             {media.external && (
               <a
@@ -1112,6 +1129,9 @@ export default function SessionPage() {
           )}
         </>
       )}
+
+      {/* Panneau QR du téléphone et « Toucher pour reprendre » (lot 7), en portail. */}
+      <RemoteLayer remote={remote} />
     </div>
   );
 }

@@ -51,20 +51,39 @@ describe("cadrage", () => {
 
 describe("attribution", () => {
   const pool = Array.from({ length: 20 }, (_, i) => i + 1);
+  const f = (id: string, rank = 1) => ({ id, rank });
   it("ta fenêtre d'abord, puis une par ami, sans doublon, stable", () => {
-    const a = assignStreet("me", ["lea", "tom", "zoe"], pool, "facade");
-    const b = assignStreet("me", ["zoe", "lea", "tom"], pool, "facade");
+    const a = assignStreet("me", [f("lea"), f("tom"), f("zoe")], pool, "facade");
+    const b = assignStreet("me", [f("zoe"), f("lea", 0), f("tom", 2)], [...pool].reverse(), "facade");
     expect(a.me).not.toBeNull();
     expect([...a.friends.entries()].sort()).toEqual([...b.friends.entries()].sort());
-    const all = [a.me, ...a.friends.values()];
-    expect(new Set(all).size).toBe(4);
+    expect(new Set([a.me, ...a.friends.values()]).size).toBe(4);
   });
 
-  it("plus d'amis que de fenêtres : les suivants n'en ont pas", () => {
-    const ids = Array.from({ length: 30 }, (_, i) => `ami-${i}`);
-    const r = assignStreet("me", ids, pool, "facade");
+  it("même fenêtre quelle que soit la taille de l'écran (attribution sur toute la façade)", () => {
+    const ids = facade.windows.map((x) => x.id);
+    const amis = Array.from({ length: 8 }, (_, i) => f(`ami-${i}`));
+    const ref = assignStreet("me", amis, ids, facade.id);
+    for (const [w, h] of [[1440, 900], [390, 844], [1280, 800], [2560, 1080]]) {
+      const img = coverLayout(w, h, facade.width, facade.height, facade.focusX);
+      const z = pauseZones(w, h, w >= 768);
+      const visible = new Set(usableWindows(facade.windows, img, z.zone, z.avoid));
+      expect(visible.size).toBeGreaterThan(0);
+      // L'écran ne change que ce qui est masqué, jamais l'attribution.
+      expect(assignStreet("me", amis, ids, facade.id)).toEqual(ref);
+    }
+  });
+
+  it("plus d'amis que de fenêtres : les allumés d'abord", () => {
+    const amis = [
+      ...Array.from({ length: 25 }, (_, i) => f(`off-${i}`, 2)),
+      ...Array.from({ length: 3 }, (_, i) => f(`focus-${i}`, 0)),
+      ...Array.from({ length: 2 }, (_, i) => f(`on-${i}`, 1)),
+    ];
+    const r = assignStreet("me", amis, pool, "facade");
     expect(r.friends.size).toBe(19);
-    expect(assignStreet(null, ids, [], "facade").friends.size).toBe(0);
+    for (const id of ["focus-0", "focus-1", "focus-2", "on-0", "on-1"]) expect(r.friends.has(id)).toBe(true);
+    expect(assignStreet(null, amis, [], "facade").friends.size).toBe(0);
   });
 
   it("lumière et store stables par ami, et variés", () => {

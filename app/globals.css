@@ -341,10 +341,20 @@
    intérieure, rideau ou store, lueur d'écran (en focus), cadre. Tout est en
    CSS : aucun travail par image côté JS. */
 .ff-street-photo { filter: brightness(0.5) saturate(0.8) contrast(1.06); user-select: none; }
-.ff-win { position: absolute; border-radius: 1px; transition: box-shadow 0.6s ease-out; --ff-on: 1; }
+.ff-layer { opacity: 0; transition: opacity 0.6s ease-out; }
+.ff-layer.is-on { opacity: 1; }
+.ff-win { position: absolute; z-index: 0; border-radius: 1px; --ff-on: 1; }
 .ff-win[data-me="1"] { --ff-on: 0.6; }
-.ff-win[data-lit="1"] { box-shadow: 0 0 calc(var(--ff-on) * 26px) calc(var(--ff-on) * 4px) var(--ff-glow); }
-.ff-win[data-state="focus"] { box-shadow: 0 0 38px 8px var(--ff-glow), 0 0 14px 2px rgba(140,195,255,0.25); }
+/* Halo : un dégradé radial derrière la fenêtre, animé en opacité seulement. */
+.ff-win::before {
+  content: ""; position: absolute; inset: -70% -45%; z-index: -1; pointer-events: none;
+  background: radial-gradient(closest-side, var(--ff-glow), transparent);
+  opacity: 0; transition: opacity 0.12s linear;
+}
+.ff-win[data-lit="1"]::before { opacity: calc(var(--ff-on) * 0.85); transition: opacity 0.7s ease-out; }
+.ff-win[data-state="focus"]::before { opacity: 1; }
+@media (max-width: 767px) { .ff-win::before { inset: -45% -25%; } }
+.ff-win:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .ff-win > span:not(.ff-plate) { position: absolute; inset: 0; pointer-events: none; }
 /* Éteinte : verre sombre, reflet de biais, un peu de lumière de la rue en bas. */
 .ff-win__glass {
@@ -357,7 +367,7 @@
 .ff-win[data-lit="1"] .ff-win__light { opacity: var(--ff-on); transition: opacity 0.7s ease-out; }
 .ff-win[data-state="focus"] .ff-win__light { filter: brightness(1.18) saturate(1.05); }
 /* Néon froid : s'amorce en trois battements (1,2 s, moins de 3 par seconde). */
-.ff-win[data-light="neon"][data-lit="1"] .ff-win__light { animation: ff-neon-start 1.2s linear both; }
+.ff-win[data-light="neon"][data-lit="1"] .ff-win__light { animation: ff-neon-start 1.2s linear var(--ff-delay, 0s) both; }
 @keyframes ff-neon-start {
   0% { opacity: 0; } 10% { opacity: 0.85; } 20% { opacity: 0.08; } 45% { opacity: 0.9; }
   56% { opacity: 0.12; } 82%, 100% { opacity: var(--ff-on); }
@@ -401,5 +411,5 @@
 }
 .ff-win[data-lit="0"] .ff-plate { color: rgba(255,255,255,0.5); }
 @media (prefers-reduced-motion: reduce) {
-  .ff-win, .ff-win * { animation: none !important; transition: none !important; }
+  .ff-win, .ff-win *, .ff-win::before, .ff-layer { animation: none !important; transition: none !important; }
 }

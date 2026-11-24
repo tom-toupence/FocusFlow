@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 function WindowGlyph({ state }: { state: FriendWindowState }) {
   const lit = state !== "off";
   return (
-    <svg viewBox="0 0 16 16" className={cn("h-4 w-4 shrink-0", lit ? "text-sodium" : "text-white/30")} aria-hidden>
+    <svg viewBox="0 0 16 16" className={cn("h-4 w-4 shrink-0", lit ? "text-focus" : "text-white/30")} aria-hidden>
       <rect x="2" y="1.5" width="12" height="13" rx="1" fill={lit ? "currentColor" : "none"} fillOpacity={state === "focus" ? 0.95 : 0.6} stroke="currentColor" strokeWidth="1.2" />
       <path d="M8 1.5v13M2 8h12" stroke={lit ? "rgba(7,9,13,0.55)" : "currentColor"} strokeWidth="1.1" />
     </svg>
@@ -26,6 +26,7 @@ function WindowGlyph({ state }: { state: FriendWindowState }) {
 export default function FriendWindowsList({ className }: { className?: string }) {
   const friends = useFriendsStore((s) => s.friends);
   const setHighlight = useFriendWindowsStore((s) => s.setHighlight);
+  const offFrame = useFriendWindowsStore((s) => s.offFrame);
   const has = friends.length > 0;
   const now = useNowTick(has);
   const [open, setOpen] = useState(false);
@@ -78,7 +79,7 @@ export default function FriendWindowsList({ className }: { className?: string })
                 <WindowGlyph state={st} />
                 <div className="min-w-0">
                   <p className={cn("truncate text-xs", st === "off" ? "text-white/45" : "text-white/90")}>{firstName(f.displayName)}</p>
-                  <p className={cn("truncate text-[11px]", st === "off" ? "text-white/30" : "text-white/55")}>{friendActivityLine(f.stats, now)}</p>
+                  <p className={cn("truncate text-[11px]", st === "off" ? "text-white/30" : "text-white/55")}>{friendActivityLine(f.stats, now)}{offFrame.includes(f.userId) ? " · hors cadre" : ""}</p>
                 </div>
               </li>
             );

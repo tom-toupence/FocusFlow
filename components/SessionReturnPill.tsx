@@ -33,7 +33,8 @@ export default function SessionReturnPill() {
   const flowStartedAt = useTimerStore((s) => s.flowStartedAt);
   const flowtime = useTimerStore((s) => s.settings.preset === "flowtime");
 
-  const visible = mounted && active && !HIDDEN_ON.includes(pathname);
+  const visible = mounted && active && !HIDDEN_ON.includes(pathname)
+    && !pathname.startsWith("/remote/") && !pathname.startsWith("/handoff/");
 
   // Rafraîchi chaque seconde, seulement quand la pastille est affichée.
   const [now, setNow] = useState(() => Date.now());

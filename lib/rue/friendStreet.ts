@@ -82,17 +82,28 @@ export function fullZones(cw: number, ch: number, listOpen: boolean): { zone: Re
 }
 
 /**
+ * Attribution sur TOUTES les fenêtres de la façade (triées par numéro), jamais
+ * sur celles qui se voient : le même ami garde la même fenêtre quelle que
+ * soit la taille de l'écran (celles qui tombent sous le texte ou la liste
+ * sont masquées à l'affichage, l'ami est alors « hors cadre »).
  * Ta fenêtre d'abord (clé « toi »), puis une par ami, dans l'ordre de leurs
- * identifiants. Même façade, même écran : toujours les mêmes fenêtres.
+ * identifiants. S'il y a plus d'amis que de fenêtres, les allumés passent
+ * d'abord (rang 0 = en focus, 1 = en ligne, 2 = hors ligne).
  */
-export function assignStreet(meId: string | null, friendIds: string[], pool: number[], key: string): { me: number | null; friends: Map<string, number> } {
+export function assignStreet(
+  meId: string | null,
+  friends: { id: string; rank: number }[],
+  windowIds: number[],
+  key: string,
+): { me: number | null; friends: Map<string, number> } {
+  const pool = [...new Set(windowIds)].sort((a, b) => a - b);
   const out = new Map<string, number>();
   let me: number | null = null;
-  if (meId && pool.length) {
-    me = pickSlots([`toi:${meId}`], pool, key).values().next().value ?? null;
-  }
-  const taken = new Set<number>(me ? [me] : []);
-  pickSlots([...new Set(friendIds)].sort(), pool, key, out, taken);
+  if (meId && pool.length) me = pickSlots([`toi:${meId}`], pool, key).values().next().value ?? null;
+  const slots = pool.length - (me ? 1 : 0);
+  const uniq = [...new Map(friends.map((f) => [f.id, f])).values()];
+  const chosen = uniq.length <= slots ? uniq : [...uniq].sort((a, b) => a.rank - b.rank || (a.id < b.id ? -1 : 1)).slice(0, slots);
+  pickSlots(chosen.map((f) => f.id).sort(), pool, key, out, new Set(me ? [me] : []));
   return { me, friends: out };
 }
 

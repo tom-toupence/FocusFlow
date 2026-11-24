@@ -57,47 +57,65 @@ interface Win {
   userId: string | null;
 }
 
+const RANK: Record<FriendWindowState, number> = { focus: 0, on: 1, off: 2 };
+const STATE_WORD: Record<FriendWindowState, string> = { focus: "en focus", on: "en ligne", off: "hors ligne" };
+const INTERACTIVE = 'button, a, input, textarea, select, label, summary, [role="button"], [role="dialog"], [contenteditable="true"]';
+
 export default function FriendStreet({ layout = "pause", className, label }: Props) {
   const facade = FACADES[0];
   const friends = useFriendsStore((s) => s.friends);
+  const myName = useFriendsStore((s) => s.myInvite?.username ?? null);
   const highlight = useFriendWindowsStore((s) => s.highlight);
+  const setOffFrame = useFriendWindowsStore((s) => s.setOffFrame);
   const now = useNowTick(friends.length > 0);
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
+  // Taille du conteneur, regroupée par image (un seul rendu par redimensionnement).
   useEffect(() => {
     const el = box.current;
     if (!el) return;
-    const ro = new ResizeObserver(([e]) => {
-      const w = Math.round(e.contentRect.width), h = Math.round(e.contentRect.height);
-      setSize((s) => (s && s.w === w && s.h === h ? s : { w, h }));
+    let raf = 0;
+    const ro = new ResizeObserver(() => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const w = Math.round(el.clientWidth), h = Math.round(el.clientHeight);
+        setSize((s) => (s && s.w === w && s.h === h ? s : { w, h }));
+      });
     });
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => { ro.disconnect(); if (raf) cancelAnimationFrame(raf); };
   }, []);
 
   const img: Rect | null = size ? coverLayout(size.w, size.h, facade.width, facade.height, facade.focusX) : null;
-  const poolKey = useMemo(() => {
+  // Fenêtres visibles (hors texte de la pause et liste) : sert à MASQUER, jamais à attribuer.
+  const visibleKey = useMemo(() => {
     if (!size || !img) return "";
     const z = layout === "pause" ? pauseZones(size.w, size.h, size.w >= 768) : fullZones(size.w, size.h, size.w >= 768);
     return usableWindows(facade.windows, img, z.zone, z.avoid).join(",");
     // img dérive de size.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [size, layout, facade]);
+  const visible = useMemo(() => new Set(visibleKey ? visibleKey.split(",").map(Number) : []), [visibleKey]);
 
   // Clé d'état stable : rien n'est recalculé tant qu'aucun ami ne change d'état.
   const stateKey = useMemo(
     () => friends.map((f) => `${f.userId}:${friendWindowState(f.stats, now)}`).sort().join("|"),
     [friends, now],
   );
-  const meId = getCurrentUserId() ?? "toi";
+  const meId = myName ?? getCurrentUserId() ?? "toi";
   const assignment = useMemo(() => {
-    const pool = poolKey ? poolKey.split(",").map(Number) : [];
-    const ids = stateKey ? stateKey.split("|").map((e) => e.slice(0, e.lastIndexOf(":"))) : [];
-    return assignStreet(meId, ids, pool, facade.id);
-  }, [poolKey, stateKey, meId, facade.id]);
+    const list = stateKey ? stateKey.split("|").map((e) => {
+      const i = e.lastIndexOf(":");
+      const st = e.slice(i + 1) as FriendWindowState;
+      return { id: e.slice(0, i), rank: RANK[st] };
+    }) : [];
+    return assignStreet(meId, list, facade.windows.map((w) => w.id), facade.id);
+  }, [stateKey, meId, facade]);
 
-  const wins = useMemo<Win[]>(() => {
+  const all = useMemo<Win[]>(() => {
     const out: Win[] = [];
     if (assignment.me) out.push({ key: "toi", windowId: assignment.me, name: "Toi", state: "on", me: true, light: "tungstene", blind: "rideau", userId: null });
     for (const f of friends) {
@@ -112,11 +130,20 @@ export default function FriendStreet({ layout = "pause", className, label }: Pro
     // Les états viennent de stateKey (stable) ; `now` seul ne doit pas tout relancer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assignment, friends, stateKey]);
+  const wins = useMemo(() => all.filter((w) => visible.has(w.windowId)), [all, visible]);
 
-  // Survol (souris) ou toucher d'une fenêtre : bulle avec le prénom et l'activité.
-  // Position de la bulle en coordonnées de la fenêtre du navigateur : elle est
-  // rendue dans un portail, au-dessus du texte de la pause et de la liste.
+  // Amis dont la fenêtre est masquée : « hors cadre » dans la liste.
+  useEffect(() => {
+    if (!size) return;
+    setOffFrame(all.filter((w) => w.userId && !visible.has(w.windowId)).map((w) => w.userId!).sort());
+  }, [all, visible, size, setOffFrame]);
+  useEffect(() => () => setOffFrame([]), [setOffFrame]);
+
+  // Survol (souris), toucher ou focus clavier d'une fenêtre : bulle avec le
+  // prénom et l'activité, dans un portail (au-dessus du texte et de la liste).
   const [hover, setHover] = useState<{ key: string; x: number; y: number } | null>(null);
+  const bubbleAt = (key: string, r: { left: number; top: number; width: number }) =>
+    ({ key, x: Math.min(window.innerWidth - 110, Math.max(110, r.left + r.width / 2)), y: r.top - 8 });
   useEffect(() => {
     const el = box.current;
     if (!el || !img || !wins.length) return;
@@ -132,10 +159,9 @@ export default function FriendStreet({ layout = "pause", className, label }: Pro
       const hit = rects.find(({ r }) => px >= r.x - 4 && px <= r.x + r.w + 4 && py >= r.y - 4 && py <= r.y + r.h + 20);
       const touch = last.touch;
       setHover((h) => {
-        if (!hit) return touch ? h : null;
+        if (!hit) return touch ? h : null;     // la souris sort de la fenêtre : la bulle se ferme
         if (h?.key === hit.key) return h;
-        const x = Math.min(window.innerWidth - 110, Math.max(110, rect.left + hit.r.x + hit.r.w / 2));
-        return { key: hit.key, x, y: rect.top + hit.r.y - 8 };
+        return bubbleAt(hit.key, { left: rect.left + hit.r.x, top: rect.top + hit.r.y, width: hit.r.w });
       });
       if (touch) {
         if (clear) clearTimeout(clear);
@@ -147,14 +173,22 @@ export default function FriendStreet({ layout = "pause", className, label }: Pro
       if (!raf) raf = requestAnimationFrame(pick);
     };
     const move = (e: PointerEvent) => { if (e.pointerType !== "touch") queue(e); };
-    const down = (e: PointerEvent) => { if (e.pointerType === "touch") queue(e); };
+    // Un toucher sur un bouton, un lien, un champ ou un dialogue n'ouvre pas de bulle.
+    const down = (e: PointerEvent) => {
+      if (e.pointerType !== "touch") return;
+      if ((e.target as Element | null)?.closest?.(INTERACTIVE)) return;
+      queue(e);
+    };
+    const leave = () => setHover((h) => (h && !last?.touch ? null : h));
     window.addEventListener("pointermove", move, { passive: true });
     window.addEventListener("pointerdown", down, { passive: true });
+    document.documentElement.addEventListener("pointerleave", leave);
     window.addEventListener("resize", onResize);
     window.addEventListener("scroll", onResize, true);
     return () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerdown", down);
+      document.documentElement.removeEventListener("pointerleave", leave);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("scroll", onResize, true);
       if (raf) cancelAnimationFrame(raf);
@@ -165,14 +199,24 @@ export default function FriendStreet({ layout = "pause", className, label }: Pro
   }, [wins, size, facade]);
 
   const hovered = hover ? wins.find((w) => w.key === hover.key) : null;
-  const hoveredFriend = hovered?.userId ? friends.find((f) => f.userId === hovered.userId) : null;
+  const activityOf = (w: Win) => (w.me ? "En pause" : friendActivityLine(friends.find((f) => f.userId === w.userId)?.stats ?? null, now));
+  // Résumé complet pour les lecteurs d'écran (les fenêtres masquées comprises).
+  const summary = all.map((w) => {
+    const act = activityOf(w);
+    const st = w.me ? "en pause" : STATE_WORD[w.state];
+    return `${w.name}, ${st}${act && act.toLowerCase() !== st ? ` : ${act}` : ""}${visible.has(w.windowId) ? "" : " (hors cadre)"}`;
+  }).join(" ; ");
+  let neon = 0;
 
   return (
-    <div ref={box} className={cn("overflow-hidden bg-night", className)} role="img" aria-label={label} data-testid="friend-street">
+    <div ref={box} className={cn("overflow-hidden bg-night", className)} role="group" aria-label={label} data-testid="friend-street">
+      <p className="sr-only">{summary ? `Fenêtres de la façade. ${summary}.` : "Fenêtres de la façade."}</p>
       {img && (
         <div className="absolute" style={{ left: img.x, top: img.y, width: img.w, height: img.h }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
+            ref={(el) => { if (el?.complete && el.naturalWidth && !loaded) setLoaded(true); }}
+            onLoad={() => setLoaded(true)}
             src={facadePhoto(facade.id)}
             srcSet={`${facadePhoto(facade.id, true)} 1200w, ${facadePhoto(facade.id)} 2400w`}
             sizes={`${Math.round(img.w)}px`}
@@ -180,32 +224,42 @@ export default function FriendStreet({ layout = "pause", className, label }: Pro
             className="ff-street-photo absolute inset-0 h-full w-full"
             draggable={false}
           />
-          {wins.map((w) => {
-            const b = quadBox(facade.windows.find((x) => x.id === w.windowId)!.quad);
-            const lit = w.state !== "off";
-            return (
-              <div
-                key={w.key}
-                className="ff-win"
-                data-testid="ff-win"
-                data-state={w.state}
-                data-lit={lit ? "1" : "0"}
-                data-light={w.light}
-                data-blind={w.blind}
-                data-me={w.me ? "1" : undefined}
-                data-hi={(w.userId && w.userId === highlight) || w.key === hover?.key ? "1" : undefined}
-                aria-hidden
-                style={{ left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.w * 100}%`, height: `${b.h * 100}%`, ...LIGHT_STYLE[w.light] }}
-              >
-                <span className="ff-win__glass" />
-                <span className="ff-win__light" />
-                <span className="ff-win__blind" />
-                <span className="ff-win__screen" />
-                <span className="ff-win__frame" />
-                <span className="ff-plate" data-testid="ff-plate">{w.name}</span>
-              </div>
-            );
-          })}
+          {/* Les fenêtres n'apparaissent qu'une fois la photo chargée (fondu). */}
+          <div role="list" aria-label="Fenêtres de tes amis" className={cn("ff-layer absolute inset-0", loaded && "is-on")} data-loaded={loaded ? "1" : "0"}>
+            {wins.map((w) => {
+              const b = quadBox(facade.windows.find((x) => x.id === w.windowId)!.quad);
+              const lit = w.state !== "off";
+              // Néons décalés : jamais deux qui battent en même temps.
+              const delay = w.light === "neon" ? neon++ * 0.45 : 0;
+              return (
+                <div
+                  key={w.key}
+                  role="listitem"
+                  tabIndex={0}
+                  aria-label={`${w.name}, ${w.me ? "en pause" : STATE_WORD[w.state]}. ${activityOf(w)}`}
+                  onFocus={(e) => setHover(bubbleAt(w.key, e.currentTarget.getBoundingClientRect()))}
+                  onBlur={() => setHover((h) => (h?.key === w.key ? null : h))}
+                  className="ff-win"
+                  data-testid="ff-win"
+                  data-window={w.windowId}
+                  data-state={w.state}
+                  data-lit={lit ? "1" : "0"}
+                  data-light={w.light}
+                  data-blind={w.blind}
+                  data-me={w.me ? "1" : undefined}
+                  data-hi={(w.userId && w.userId === highlight) || w.key === hover?.key ? "1" : undefined}
+                  style={{ left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.w * 100}%`, height: `${b.h * 100}%`, ...LIGHT_STYLE[w.light], ["--ff-delay" as string]: `${delay}s` }}
+                >
+                  <span className="ff-win__glass" />
+                  <span className="ff-win__light" />
+                  <span className="ff-win__blind" />
+                  <span className="ff-win__screen" />
+                  <span className="ff-win__frame" />
+                  <span className="ff-plate" data-testid="ff-plate" aria-hidden>{w.name}</span>
+                </div>
+              );
+            })}
+          </div>
           <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_60%_45%,transparent_45%,rgba(4,6,10,0.55)_100%)]" />
         </div>
       )}
@@ -216,7 +270,7 @@ export default function FriendStreet({ layout = "pause", className, label }: Pro
           style={{ left: hover.x, top: hover.y }}
         >
           <p className="truncate text-xs font-medium">{hovered.name}</p>
-          <p className="truncate text-[11px] text-white/60">{hovered.me ? "En pause" : friendActivityLine(hoveredFriend?.stats ?? null, now)}</p>
+          <p className="truncate text-[11px] text-white/60">{activityOf(hovered)}</p>
         </div>,
         document.body,
       )}
