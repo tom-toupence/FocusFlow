@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { create } from "zustand";
 import { useRouter } from "next/navigation";
@@ -8,8 +8,8 @@ import { useNavStore, NavSection, MediaSource, OrgTab, ActivityTab } from "@/sto
 import { useFriendsDrawer } from "@/store/friendsDrawerStore";
 import { useTimerStore } from "@/store/timerStore";
 import { cn } from "@/lib/utils";
-import { parseQuickLaunch, type QuickLaunch, type QuickPreset } from "@/lib/quickLaunch";
-import { resolveLaunch, provenanceOf, PRESET_LABEL, type LaunchContext, type LaunchMedia, type LaunchPlan } from "@/lib/launchPlan";
+import { parseQuickLaunch, type QuickLaunch } from "@/lib/quickLaunch";
+import { resolveLaunch, provenanceOf, applyOverrides, isConfirmed, PRESET_LABEL, type LaunchContext, type LaunchMedia, type LaunchPlan, type Overrides } from "@/lib/launchPlan";
 import { buildQuickContext, launchFromQuick, RELAUNCH_LAST } from "@/lib/launch";
 import { PRESETS } from "@/store/timerStore";
 
@@ -32,31 +32,6 @@ interface Command {
 
 type PillId = "duration" | "todo" | "media";
 const PILLS: PillId[] = ["duration", "todo", "media"];
-
-/** Corrections faites par Tab sur les pastilles (undefined : rien de touché). */
-interface Overrides {
-  duration?: { minutes?: number; preset?: QuickPreset } | "current";
-  todo?: string | null;
-  media?: string | null;
-}
-
-function applyOverrides(r: QuickLaunch, o: Overrides): QuickLaunch {
-  const e: QuickLaunch = { ...r };
-  const touched = o.duration !== undefined || o.todo !== undefined || o.media !== undefined;
-  if (o.duration === "current") { e.minutes = undefined; e.preset = undefined; }
-  else if (o.duration) { e.minutes = o.duration.minutes; e.preset = o.duration.preset; }
-  if (o.todo !== undefined) { e.todoId = o.todo ?? undefined; e.todoAlternatives = undefined; }
-  if (o.media !== undefined) {
-    e.mediaKey = o.media ?? undefined;
-    e.mediaAlternatives = undefined;
-    e.url = undefined;
-    e.youtubeId = undefined;
-    e.source = undefined;
-    if (e.intent === "relaunch-last") e.intent = "launch";
-  }
-  if (touched && (!e.intent || e.intent === "resume-session")) e.intent = "launch";
-  return e;
-}
 
 /**
  * La phrase contient une durée, un lien, un preset ou un média : on montre ce
@@ -109,7 +84,16 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
   const [launchError, setLaunchError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Annulation du lancement en cours (boîte stable, lue seulement dans les gestionnaires).
+  const [canceller] = useState(() => {
+    let ac: AbortController | null = null;
+    return { start: () => (ac = new AbortController()).signal, abort: () => ac?.abort() };
+  });
+  const baseId = useId();
+
   useEffect(() => { inputRef.current?.focus(); }, []);
+  // Palette fermée pendant un lancement : on l'annule (rien n'est appliqué).
+  useEffect(() => () => canceller.abort(), [canceller]);
 
   const goSection = (s: NavSection) => () => { useNavStore.getState().setSection(s); router.push("/"); onClose(); };
   const goMedia = (m: MediaSource) => () => { useNavStore.getState().openMedia(m); router.push("/"); onClose(); };
@@ -123,7 +107,9 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
     if (launching) return;
     setLaunching(true);
     setLaunchError(null);
-    const out = await launchFromQuick(r, router, ctx);
+    const signal = canceller.start();
+    const out = await launchFromQuick(r, router, ctx, signal);
+    if (signal.aborted) return;
     if (out.ok) onClose();
     else { setLaunchError(out.message); setLaunching(false); }
   };
@@ -173,7 +159,7 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
   const effective = parsed ? applyOverrides(parsed, overrides) : null;
   const plan: LaunchPlan | null = effective?.intent ? resolveLaunch(effective, ctx) : null;
   const showCompris = !!plan && !!parsed && (filtered.length === 0 || isStrong(parsed) || touched);
-  const confident = !!effective && (effective.confidence >= 0.6 || touched);
+  const confident = !!parsed && isConfirmed(parsed, overrides);
 
   const pickMedia = (key: string | null) => { setOverrides((o) => ({ ...o, media: key })); setIndex(0); setLaunchError(null); };
   const pickTodo = (id: string | null) => { setOverrides((o) => ({ ...o, todo: id })); setIndex(0); };
@@ -266,6 +252,16 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const rid = (i: number) => `${baseId}-r${i}`;
+  const oid = (i: number) => `${baseId}-o${i}`;
+  const ids = { choices: `${baseId}-choices`, launch: `${baseId}-launch`, actions: `${baseId}-actions`, options: `${baseId}-options` };
+  const activeDescendant = editing ? (options.length ? oid(safeOpt) : undefined) : rows.length ? rid(safeIndex) : undefined;
+  const choiceCount = rows.filter((r) => r.kind === "choice").length;
+  const controls = editing
+    ? ids.options
+    : [choiceCount ? ids.choices : "", launchRow ? ids.launch : "", commandRows.length ? ids.actions : ""].filter(Boolean).join(" ") || undefined;
+  const expanded = editing ? options.length > 0 : rows.length > 0;
+
   const microLabel = "font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/35";
   const choiceRows = rows.filter((r) => r.kind === "choice");
 
@@ -273,6 +269,7 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[8vh] sm:pt-[15vh] px-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
       <div
         role="dialog"
+        aria-modal="true"
         aria-label="Palette de commandes"
         className="w-full max-w-lg max-h-[84vh] flex flex-col bg-card border border-foreground/10 rounded-2xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -286,6 +283,11 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
             value={query}
             onChange={(e) => { setQuery(e.target.value); setIndex(0); setOverrides({}); setEditing(null); setLaunchError(null); }}
             onKeyDown={onListKey}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={expanded}
+            aria-controls={controls}
+            aria-activedescendant={activeDescendant}
             placeholder="Une action, ou 50 min rapport lofi"
             aria-label="Rechercher une action ou décrire une session"
             className="flex-1 min-w-0 bg-transparent py-3.5 text-base sm:text-sm text-foreground placeholder:text-foreground/30 focus:outline-none"
@@ -294,6 +296,7 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto">
+          <div aria-live="polite">
           {showCompris && plan && (
             <motion.section
               aria-label="Compris"
@@ -320,6 +323,7 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
                     <PillButton
                       label="Tâche"
                       value={plan.todo ? plan.todo.text : plan.todoChoices.length ? "À choisir" : "Aucune"}
+                      note={plan.todo ? "marquée en cours" : undefined}
                       pending={plan.todoChoices.length > 0}
                       dim={!plan.todo && !plan.todoChoices.length}
                       active={editing === "todo"}
@@ -363,17 +367,19 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
               {editing ? (
                 <div className="mt-3">
                   <p className={microLabel}>{editing === "duration" ? "Changer la durée" : editing === "todo" ? "Changer la tâche" : "Changer la musique"}</p>
-                  <ul role="listbox" aria-label="Choix" className="mt-1.5 max-h-56 overflow-y-auto -mx-1">
+                  <ul id={ids.options} role="listbox" aria-label="Choix" className="mt-1.5 max-h-56 overflow-y-auto -mx-1">
                     {options.map((o, i) => (
-                      <li key={o.id} role="option" aria-selected={i === safeOpt}>
-                        <button
-                          onClick={() => chooseOption(o)}
-                          onMouseEnter={() => setOptIndex(i)}
-                          className={cn("w-full flex items-center justify-between gap-3 px-2.5 py-2 rounded-lg text-left transition-colors", i === safeOpt ? "bg-foreground/[0.08]" : "hover:bg-foreground/[0.04]")}
-                        >
-                          <span className="text-sm text-foreground/85 truncate">{o.label}</span>
-                          {o.hint && <span className="font-mono text-[11px] text-foreground/40 flex-shrink-0 truncate max-w-[45%]">{o.hint}</span>}
-                        </button>
+                      <li
+                        key={o.id}
+                        id={oid(i)}
+                        role="option"
+                        aria-selected={i === safeOpt}
+                        onClick={() => chooseOption(o)}
+                        onMouseEnter={() => setOptIndex(i)}
+                        className={cn("cursor-pointer flex items-center justify-between gap-3 px-2.5 py-2 rounded-lg transition-colors", i === safeOpt ? "bg-foreground/[0.08]" : "hover:bg-foreground/[0.04]")}
+                      >
+                        <span className="text-sm text-foreground/85 truncate">{o.label}</span>
+                        {o.hint && <span className="font-mono text-[11px] text-foreground/40 flex-shrink-0 truncate max-w-[45%]">{o.hint}</span>}
                       </li>
                     ))}
                   </ul>
@@ -381,19 +387,21 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
               ) : choiceRows.length > 0 ? (
                 <div className="mt-3">
                   <p className={microLabel}>{choiceRows[0].kind === "choice" && choiceRows[0].group === "media" ? "Quelle musique ?" : "Quelle tâche ?"}</p>
-                  <ul role="listbox" aria-label="Plusieurs correspondances" className="mt-1.5 -mx-1">
+                  <ul id={ids.choices} role="listbox" aria-label="Plusieurs correspondances" className="mt-1.5 -mx-1">
                     {choiceRows.map((r) => {
                       const i = rows.indexOf(r);
                       return (
-                        <li key={r.id} role="option" aria-selected={r.id === selectedId}>
-                          <button
-                            onClick={r.run}
-                            onMouseEnter={() => setIndex(i)}
-                            className={cn("w-full flex items-center justify-between gap-3 px-2.5 py-2 rounded-lg text-left transition-colors", r.id === selectedId ? "bg-foreground/[0.08]" : "hover:bg-foreground/[0.04]")}
-                          >
-                            <span className="text-sm text-foreground/85 truncate">{r.label}</span>
-                            {r.kind === "choice" && r.hint && <span className="font-mono text-[11px] text-foreground/40 flex-shrink-0 truncate max-w-[45%]">{r.hint}</span>}
-                          </button>
+                        <li
+                          key={r.id}
+                          id={rid(i)}
+                          role="option"
+                          aria-selected={r.id === selectedId}
+                          onClick={r.run}
+                          onMouseEnter={() => setIndex(i)}
+                          className={cn("cursor-pointer flex items-center justify-between gap-3 px-2.5 py-2 rounded-lg transition-colors", r.id === selectedId ? "bg-foreground/[0.08]" : "hover:bg-foreground/[0.04]")}
+                        >
+                          <span className="text-sm text-foreground/85 truncate">{r.label}</span>
+                          {r.kind === "choice" && r.hint && <span className="font-mono text-[11px] text-foreground/40 flex-shrink-0 truncate max-w-[45%]">{r.hint}</span>}
                         </li>
                       );
                     })}
@@ -406,6 +414,7 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
               )}
 
               <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
                 <p className="font-mono text-[11px] text-foreground/40">
                   {editing
                     ? "Entrée : choisir · Échap : retour"
@@ -415,8 +424,16 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
                     ? "Entrée : revenir"
                     : "Entrée : démarrer · Tab : modifier un élément"}
                 </p>
+                {launchRow && sessionActive && plan.intent !== "resume-session" && (
+                  <p className="mt-1 font-mono text-[11px] text-foreground/60">Remplace la session en cours</p>
+                )}
+                </div>
                 {launchRow && (
+                  <div id={ids.launch} role="listbox" aria-label="Lancer" className="flex-shrink-0">
                   <button
+                    id={rid(rows.indexOf(launchRow))}
+                    role="option"
+                    aria-selected={selectedId === "launch" && !editing}
                     onClick={launchRow.run}
                     onMouseEnter={() => setIndex(rows.indexOf(launchRow))}
                     disabled={launching}
@@ -428,33 +445,40 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
                   >
                     {launching ? "Lancement…" : launchRow.label}
                   </button>
+                  </div>
                 )}
               </div>
             </motion.section>
           )}
+          </div>
 
           {(commandRows.length > 0 || !showCompris) && <div className="py-2">
             {showCompris && commandRows.length > 0 && <p className={cn(microLabel, "px-4 pt-1 pb-1.5")}>Actions</p>}
             {commandRows.length === 0 && !showCompris ? (
               <p className="px-4 py-6 text-sm text-foreground/30 text-center">Aucune action</p>
             ) : (
-              commandRows.map((c) => {
+              <div id={ids.actions} role="listbox" aria-label="Actions">
+              {commandRows.map((c) => {
                 const i = rows.indexOf(c);
                 return (
-                  <button
+                  <div
                     key={c.id}
+                    id={rid(i)}
+                    role="option"
+                    aria-selected={c.id === selectedId && !editing}
                     onClick={c.run}
                     onMouseEnter={() => setIndex(i)}
                     className={cn(
-                      "w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors",
+                      "cursor-pointer flex items-center justify-between gap-3 px-4 py-2.5 transition-colors",
                       c.id === selectedId && !editing ? "bg-foreground/[0.08]" : "hover:bg-foreground/[0.04]"
                     )}
                   >
                     <span className="text-sm text-foreground/85 truncate">{c.label}</span>
                     {c.kind === "command" && c.hint && <span className="text-xs text-foreground/35 flex-shrink-0 truncate max-w-[45%]">{c.hint}</span>}
-                  </button>
+                  </div>
                 );
-              })
+              })}
+              </div>
             )}
           </div>}
         </div>
@@ -472,8 +496,8 @@ function mediaOption(m: LaunchMedia): Option {
 }
 
 function PillButton({
-  label, value, active, pending, dim, onClick, reduce,
-}: { label: string; value: string; active: boolean; pending?: boolean; dim?: boolean; onClick: () => void; reduce: boolean }) {
+  label, value, note, active, pending, dim, onClick, reduce,
+}: { label: string; value: string; note?: string; active: boolean; pending?: boolean; dim?: boolean; onClick: () => void; reduce: boolean }) {
   return (
     <motion.button
       type="button"
@@ -487,6 +511,7 @@ function PillButton({
     >
       <span className="text-foreground/45 flex-shrink-0">{label}</span>
       <span className={cn("truncate", pending ? "text-focus" : dim ? "text-foreground/55" : "text-foreground")}>{value}</span>
+      {note && <span className="font-mono text-[10px] text-foreground/45 flex-shrink-0">{note}</span>}
     </motion.button>
   );
 }

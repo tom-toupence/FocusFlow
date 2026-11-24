@@ -64,6 +64,8 @@ export interface ContextSnapshot {
 
 // --- Contexte -----------------------------------------------------------------
 
+const SPOTIFY_LOGIN = "Connecte Spotify d'abord (Écouter, Spotify).";
+
 export const ytThumb = (id: string) => `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
 
 /** Construit le contexte d'analyse : tâches et médias avec des clés stables `kind:id`. */
@@ -249,7 +251,7 @@ export function mediaFromUrl(r: QuickLaunch, ctx: LaunchContext): MediaPlan | { 
     const m = url.match(/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(playlist|album|track|artist|show|episode)\/([A-Za-z0-9]+)/) ?? url.match(/^spotify:([a-z]+):([A-Za-z0-9]+)/);
     if (!m) return { error: "Lien Spotify non reconnu." };
     if (m[1] !== "playlist" && m[1] !== "album") return { error: "Spotify : colle un lien de playlist ou d'album." };
-    if (!ctx.env.spotify.connected) return { error: "Connecte Spotify d'abord (Écouter, Spotify)." };
+    if (!ctx.env.spotify.connected) return { error: SPOTIFY_LOGIN };
     const uri = `spotify:${m[1]}:${m[2]}`;
     const pl = ctx.env.spotify.playlists.find((p) => p.uri === uri);
     return { ref: { type: "spotify", uri }, title: pl?.name ?? (m[1] === "album" ? "Album Spotify" : "Playlist Spotify"), subtitle: "Spotify", provenance: "lien collé", thumbnailUrl: pl?.imageUrl };
@@ -266,15 +268,27 @@ export function mediaFromUrl(r: QuickLaunch, ctx: LaunchContext): MediaPlan | { 
   return { error: "Lien non pris en charge." };
 }
 
+/**
+ * Média connu → plan. Un média qui n'existe plus que dans l'historique doit
+ * repasser par la bibliothèque (la session ne lit que ce qui y est) : on le dit.
+ */
 function mediaPlanOf(m: LaunchMedia, provenance = provenanceOf(m)): MediaPlan {
-  return { ref: m.ref, key: m.key, title: m.title, subtitle: m.subtitle, provenance, thumbnailUrl: m.thumbnailUrl };
+  const readded = m.ref.type === "youtube" || m.ref.type === "yt-playlist-url";
+  return {
+    ref: m.ref,
+    key: m.key,
+    title: m.title,
+    subtitle: m.subtitle,
+    provenance: readded ? `${provenance}, sera ajoutée à ta bibliothèque` : provenance,
+    thumbnailUrl: m.thumbnailUrl,
+  };
 }
 
 /** Source citée seule (« deep spotify ») : la sélection courante, sinon la dernière écoutée. */
 function mediaFromSource(source: NonNullable<QuickLaunch["source"]>, ctx: LaunchContext): MediaPlan | { error: string } {
   const { env } = ctx;
   if (source === "spotify") {
-    if (!env.spotify.connected) return { error: "Connecte Spotify d'abord (Écouter, Spotify)." };
+    if (!env.spotify.connected) return { error: SPOTIFY_LOGIN };
     const uri = env.spotify.selectedUri ?? env.history.find((h) => h.type === "spotify")?.mediaKey ?? env.spotify.playlists[0]?.uri;
     if (!uri) return { error: "Aucune playlist Spotify trouvée." };
     const pl = env.spotify.playlists.find((p) => p.uri === uri);
@@ -346,10 +360,53 @@ export function resolveLaunch(r: QuickLaunch, ctx: LaunchContext): LaunchPlan {
     if ("error" in m) error = m.error;
     else media = m;
   }
+  // Sans connexion, la session retomberait sur une vidéo sans rapport.
+  if (media?.ref?.type === "spotify" && !ctx.env.spotify.connected) {
+    media = null;
+    error = SPOTIFY_LOGIN;
+  }
   if (!media && !error && !mediaChoices.length) {
     media = { ref: null, title: ctx.env.currentMediaTitle ?? "Sélection actuelle", provenance: "sélection actuelle" };
   }
 
   const launchable = !!r.intent && !error && !todoChoices.length && !mediaChoices.length;
   return { ...base, media, error, launchable };
+}
+
+// --- Corrections de l'utilisateur (palette) --------------------------------------
+
+/** Corrections faites sur les pastilles (undefined : rien de touché). */
+export interface Overrides {
+  duration?: { minutes?: number; preset?: QuickLaunch["preset"] } | "current";
+  todo?: string | null;
+  media?: string | null;
+}
+
+export function applyOverrides(r: QuickLaunch, o: Overrides): QuickLaunch {
+  const e: QuickLaunch = { ...r };
+  const touched = o.duration !== undefined || o.todo !== undefined || o.media !== undefined;
+  if (o.duration === "current") { e.minutes = undefined; e.preset = undefined; }
+  else if (o.duration) { e.minutes = o.duration.minutes; e.preset = o.duration.preset; }
+  if (o.todo !== undefined) { e.todoId = o.todo ?? undefined; e.todoAlternatives = undefined; }
+  if (o.media !== undefined) {
+    e.mediaKey = o.media ?? undefined;
+    e.mediaAlternatives = undefined;
+    e.url = undefined;
+    e.youtubeId = undefined;
+    e.source = undefined;
+    if (e.intent === "relaunch-last") e.intent = "launch";
+  }
+  if (touched && (!e.intent || e.intent === "resume-session")) e.intent = "launch";
+  return e;
+}
+
+/**
+ * Entrée peut lancer : analyse assez sûre, ou choix explicite du média (et de
+ * la tâche si elle était ambiguë). Changer seulement la durée ne confirme pas
+ * un média trouvé à l'aveugle.
+ */
+export function isConfirmed(parsed: QuickLaunch, o: Overrides): boolean {
+  if (parsed.confidence >= 0.6) return true;
+  const todoOk = !parsed.todoAlternatives?.length || o.todo !== undefined;
+  return o.media !== undefined && todoOk;
 }

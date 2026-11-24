@@ -80,7 +80,9 @@ pour sauter à toute section/action au clavier. **Lancer en une phrase** (2026-1
 « 50 min rapport lofi kyoto », un lien YouTube/Spotify/Twitch collé, « deep spotify », « comme hier »
 (analyse `lib/quickLaunch.ts`, plan pur `lib/launchPlan.ts`, application `lib/launch.ts` →
 `/session` direct, sans `/settings`). Bloc « Compris » (pastilles Durée/Tâche/Musique, Tab pour
-corriger) ; ambiguïté = choix listés, jamais de lancement silencieux. `selectMedia()` (lib/launch.ts)
+corriger ; seul un choix explicite du média confirme une analyse peu sûre) ; ambiguïté = choix listés,
+jamais de lancement silencieux ; fermer la palette annule un lancement en cours ; Spotify sans connexion =
+message, jamais de vidéo de repli. `selectMedia()` (lib/launch.ts)
 est partagé avec les routines et le « Go » du sprint. `app/page.tsx` dérive l'ancien `activeTab` de `navStore`
 (blocs de contenu inchangés).
 
@@ -775,6 +777,25 @@ TodoStatusDropdown, callback Twitch) ; build vert ; vitest 33/33 ; e2e 13/13 sur
   (Sapa, Tegallalang, Batad, Banaue) et des **ruelles plus belles** (Hoi An, Kanazawa, Ninenzaka).
 - Toutes les scènes sont dans la boucle vidéo de la landing (ordre alterné nuit/jour, `RUE_LOOP_ORDER`)
   et dans l'app (rue du jour en fond, pause de session, mode Spotify), et sur `/lab/rue`.
+
+## Journal de session — 2026-11-24 (lot 6 : Radio FocusFlow)
+
+- **Radio commune** : onglet **Radio** en tête de Écouter (`navStore.mediaSource="radio"`, défaut
+  inchangé = catalogue), `components/RadioPanel.tsx` (en direct + progression, programme des 4
+  suivants avec heure, « Rejoindre et lancer un focus » = `lib/radioSession.ts::joinRadio`, preset
+  courant). Pas d'« Écouter seulement » : l'app n'a pas de lecture sans minuteur.
+- **Programme** : `lib/radio.ts` (pur) + `lib/radioProgram.ts` (catalogue intégré SEUL, jamais les
+  vidéos perso ; resynchro `radioTarget`). **Durées** : `Video.durationSec` optionnel, vide (YouTube
+  injoignable depuis le conteneur, rien d'inventé) → extraits de 30 min depuis 0 ; une vidéo qui
+  finit plus tôt (ENDED) passe à la suivante, jouée depuis son début, retour au direct ensuite.
+- **Session** : `sessionStore.playRadio` (exclusif, `selectRadio()`), source YouTube `{type:"radio"}`
+  dans `YouTubeAdapter` : `loadVideoById({videoId,startSeconds})` à `onReady`, minuteur à `endsAt`
+  → recalcul (pas un « suivant »), reprise = recalage sur le direct, erreurs 100/101/150 → ID mort
+  pour la session (`sessionDeadIds`), `caps.skip=false`, « À venir » = programme. Activité amis :
+  « En focus · Radio FocusFlow · <titre> » ; l'onglet compte les amis en ligne dont l'activité
+  contient la radio (hors « En pause »), rien sans Supabase.
+- Tests : `lib/radioProgram.test.ts`, `lib/playback/youtubeRadio.test.ts`, `store/sessionRadio.test.ts`,
+  `e2e/radio.spec.ts` (page.clock ; deux contextes = même vidéo, même seconde).
 
 ## La landing
 

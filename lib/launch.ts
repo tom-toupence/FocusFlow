@@ -105,19 +105,22 @@ export function selectMedia(ref: SelectableMedia): void {
   }
 }
 
-const withTimeout = <T,>(p: Promise<T>, ms: number, fallback: T) =>
-  Promise.race([p, new Promise<T>((r) => setTimeout(() => r(fallback), ms))]);
+/** Délai de l'oEmbed, combiné à l'annulation du lancement : la requête est vraiment abandonnée. */
+function metaSignal(cancel?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(2500);
+  return cancel && typeof AbortSignal.any === "function" ? AbortSignal.any([timeout, cancel]) : timeout;
+}
 
 /** Ajoute à la bibliothèque ce qui vient d'un lien collé ou de l'historique seul. */
-async function materialize(ref: MediaRef): Promise<SelectableMedia> {
+async function materialize(ref: MediaRef, cancel?: AbortSignal): Promise<SelectableMedia | null> {
   if (ref.type === "youtube") {
-    const session = useSessionStore.getState();
-    const existing = session.getAllVideos().find((v) => v.youtubeId === ref.youtubeId);
+    const byYoutubeId = () => useSessionStore.getState().getAllVideos().find((v) => v.youtubeId === ref.youtubeId);
+    const existing = byYoutubeId();
     if (existing) return { type: "video", id: existing.id };
-    const meta = ref.title ? {} : await withTimeout(fetchVideoMeta(ref.youtubeId), 2500, {});
-    const id = `custom-${Date.now()}`;
-    session.addCustomVideo({
-      id,
+    const meta = ref.title ? {} : await fetchVideoMeta(ref.youtubeId, metaSignal(cancel));
+    if (cancel?.aborted) return null;
+    useSessionStore.getState().addCustomVideo({
+      id: `custom-${Date.now()}`,
       title: ref.title ?? meta.title ?? "Vidéo YouTube",
       channel: ref.channel ?? meta.channelName ?? "Ma vidéo",
       youtubeId: ref.youtubeId,
@@ -125,13 +128,16 @@ async function materialize(ref: MediaRef): Promise<SelectableMedia> {
       color: "#1a1a2e",
       custom: true,
     });
-    return { type: "video", id };
+    // addCustomVideo ignore les doublons : on relit l'id réellement enregistré.
+    const saved = byYoutubeId();
+    return saved ? { type: "video", id: saved.id } : null;
   }
   if (ref.type === "yt-playlist-url") {
     const find = () => usePlaylistStore.getState().playlists.find((p) => p.playlistId === ref.listId);
     if (!find()) {
       const url = `https://www.youtube.com/playlist?list=${ref.listId}`;
-      const meta = ref.title ? {} : await withTimeout(fetchPlaylistMeta(url), 2500, {});
+      const meta = ref.title ? {} : await fetchPlaylistMeta(url, metaSignal(cancel));
+      if (cancel?.aborted) return null;
       usePlaylistStore.getState().addPlaylist({
         playlistId: ref.listId,
         startVideoId: ref.startVideoId,
@@ -141,7 +147,7 @@ async function materialize(ref: MediaRef): Promise<SelectableMedia> {
       });
     }
     const saved = find();
-    return saved ? { type: "yt-playlist", id: saved.id } : { type: "current-youtube" };
+    return saved ? { type: "yt-playlist", id: saved.id } : null;
   }
   return ref;
 }
@@ -156,6 +162,8 @@ export async function launchFromQuick(
   result: QuickLaunch,
   router: { push: (href: string) => void },
   ctx: LaunchContext = buildQuickContext(),
+  /** Palette fermée pendant le lancement : rien n'est appliqué. */
+  signal?: AbortSignal,
 ): Promise<LaunchOutcome> {
   const plan = resolveLaunch(result, ctx);
   if (plan.error) return { ok: false, message: plan.error };
@@ -167,7 +175,9 @@ export async function launchFromQuick(
   }
 
   // Média d'abord : un lien qui échoue ne doit pas couper la session en cours.
-  const media = plan.media?.ref ? await materialize(plan.media.ref) : null;
+  const media = plan.media?.ref ? await materialize(plan.media.ref, signal) : null;
+  if (signal?.aborted) return { ok: false, message: "Lancement annulé." };
+  if (plan.media?.ref && !media) return { ok: false, message: "Ce média n'a pas pu être ajouté à ta bibliothèque." };
 
   closeActiveSession();
   const timer = useTimerStore.getState();

@@ -49,7 +49,7 @@ export const useQueueStore = create<QueueState>()(
 );
 
 // Récupère titre/chaîne/miniature d'une vidéo via oEmbed YouTube (pas de clé API).
-export async function fetchVideoMeta(youtubeId: string): Promise<{
+export async function fetchVideoMeta(youtubeId: string, signal?: AbortSignal): Promise<{
   title?: string;
   channelName?: string;
   thumbnailUrl?: string;
@@ -58,7 +58,8 @@ export async function fetchVideoMeta(youtubeId: string): Promise<{
     const res = await fetch(
       `https://www.youtube.com/oembed?url=${encodeURIComponent(
         `https://www.youtube.com/watch?v=${youtubeId}`
-      )}&format=json`
+      )}&format=json`,
+      { signal }
     );
     if (!res.ok) return {};
     const data = await res.json();

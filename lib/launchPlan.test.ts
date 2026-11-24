@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseQuickLaunch } from "./quickLaunch";
-import { buildContextFrom, resolveLaunch, timerPlan, type ContextSnapshot } from "./launchPlan";
+import { applyOverrides, buildContextFrom, isConfirmed, resolveLaunch, timerPlan, type ContextSnapshot } from "./launchPlan";
 import { PRESETS } from "@/store/timerStore";
 import type { Video } from "@/data/videos";
 
@@ -124,5 +124,34 @@ describe("resolveLaunch", () => {
     expect(p.todo?.id).toBe("t2");
     expect(p.media?.ref).toBeNull();
     expect(p.launchable).toBe(true);
+  });
+
+  it("Spotify de l'historique sans connexion : erreur, jamais une vidéo de repli", () => {
+    const p = plan("mes favoris");
+    expect(p.media).toBeNull();
+    expect(p.error).toBe("Connecte Spotify d'abord (Écouter, Spotify).");
+    expect(p.launchable).toBe(false);
+    const sp = buildContextFrom(snap({ env: { ...snap().env, spotify: { connected: true, selectedUri: null, playlists: [] } } }));
+    expect(plan("mes favoris", sp).media?.ref).toEqual({ type: "spotify", uri: "spotify:playlist:42" });
+  });
+
+  it("vidéo de l'historique seul : la provenance annonce l'ajout à la bibliothèque", () => {
+    expect(plan("video oubliee").media?.provenance).toBe("trouvé dans ton historique (1 écoute), sera ajoutée à ta bibliothèque");
+  });
+});
+
+describe("isConfirmed", () => {
+  const ctx = buildContextFrom(snap());
+  it("changer seulement la durée ne confirme pas un média flou", () => {
+    const low = { ...parseQuickLaunch("osaka xyzzy plugh frobnitz", ctx), confidence: 0.4 };
+    expect(isConfirmed(low, {})).toBe(false);
+    expect(isConfirmed(low, { duration: { preset: "deep" } })).toBe(false);
+    expect(isConfirmed(low, { media: "cat:osaka-1" })).toBe(true);
+  });
+  it("tâche ambiguë : il faut aussi la choisir", () => {
+    const amb = { ...parseQuickLaunch("osaka", ctx), todoAlternatives: ["t1", "t2"], confidence: 0.2 };
+    expect(isConfirmed(amb, { media: "cat:osaka-1" })).toBe(false);
+    expect(isConfirmed(amb, { media: "cat:osaka-1", todo: "t1" })).toBe(true);
+    expect(applyOverrides(amb, { media: "cat:osaka-1", todo: "t1" })).toMatchObject({ mediaKey: "cat:osaka-1", todoId: "t1", intent: "launch" });
   });
 });

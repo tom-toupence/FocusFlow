@@ -142,14 +142,15 @@ export function extractFirstVideoId(url: string): string | null {
 }
 
 // Fetche les métadonnées via oEmbed YouTube (pas besoin de clé API)
-export async function fetchPlaylistMeta(url: string): Promise<{
+export async function fetchPlaylistMeta(url: string, signal?: AbortSignal): Promise<{
   title?: string;
   channelName?: string;
   thumbnailUrl?: string;
 }> {
   try {
     const res = await fetch(
-      `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`
+      `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`,
+      { signal }
     );
     if (!res.ok) return {};
     const data = await res.json();
