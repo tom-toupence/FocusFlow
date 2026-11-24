@@ -107,6 +107,21 @@ describe("YouTubeAdapter", async () => {
     expect(FakePlayer.last.playing).toBe(false);
     a.destroy();
   });
+
+  it("calé sur la vidéo : position et durée lues sur le lecteur, null avant qu'il soit prêt", async () => {
+    const a = new YouTubeAdapter("el", { type: "video", id: "v", title: "V" }, { volume: 1, shuffle: false, loop: true, playing: true });
+    expect(a.getCurrentTime()).toBeNull();
+    await tick();
+    const p = FakePlayer.last as FakePlayer & { getCurrentTime?: () => number; getDuration?: () => number };
+    p.getCurrentTime = () => 1234.5;
+    p.getDuration = () => 0; // durée pas encore connue
+    expect(a.getCurrentTime()).toBe(1234.5);
+    expect(a.getDuration()).toBeNull();
+    p.getDuration = () => 10800;
+    expect(a.getDuration()).toBe(10800);
+    a.destroy();
+    expect(a.getCurrentTime()).toBeNull();
+  });
 });
 
 describe("YouTubeAdapter : file à venir et suggestions", async () => {

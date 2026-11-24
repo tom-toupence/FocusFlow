@@ -1,0 +1,126 @@
+{
+ "initialData": {
+  "contents": {
+   "twoColumnWatchNextResults": {
+    "results": {
+     "results": {
+      "contents": [
+       {
+        "videoSecondaryInfoRenderer": {
+         "description": {
+          "runs": [
+           {
+            "text": "25/5 pomodoro, 2 hours"
+           }
+          ]
+         }
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  "engagementPanels": [
+   {
+    "engagementPanelSectionListRenderer": {
+     "panelIdentifier": "engagement-panel-macro-markers-description-chapters",
+     "content": {
+      "macroMarkersListRenderer": {
+       "contents": [
+        {
+         "macroMarkersListItemRenderer": {
+          "title": {
+           "simpleText": "Pomodoro 1"
+          },
+          "timeDescription": {
+           "simpleText": "0:00"
+          },
+          "onTap": {
+           "commandMetadata": {},
+           "watchEndpoint": {
+            "videoId": "abcdefghijk",
+            "startTimeSeconds": 0
+           }
+          },
+          "layout": "MACRO_MARKERS_LIST_ITEM_RENDERER_LAYOUT_VERTICAL"
+         }
+        },
+        {
+         "macroMarkersListItemRenderer": {
+          "title": {
+           "simpleText": "Short break"
+          },
+          "timeDescription": {
+           "simpleText": "25:00"
+          },
+          "onTap": {
+           "commandMetadata": {},
+           "watchEndpoint": {
+            "videoId": "abcdefghijk",
+            "startTimeSeconds": 1500
+           }
+          },
+          "layout": "MACRO_MARKERS_LIST_ITEM_RENDERER_LAYOUT_VERTICAL"
+         }
+        },
+        {
+         "macroMarkersListItemRenderer": {
+          "title": {
+           "simpleText": "Pomodoro 2"
+          },
+          "timeDescription": {
+           "simpleText": "30:00"
+          },
+          "onTap": {
+           "commandMetadata": {},
+           "watchEndpoint": {
+            "videoId": "abcdefghijk",
+            "startTimeSeconds": 1800
+           }
+          },
+          "layout": "MACRO_MARKERS_LIST_ITEM_RENDERER_LAYOUT_VERTICAL"
+         }
+        },
+        {
+         "macroMarkersListItemRenderer": {
+          "title": {
+           "simpleText": "Short break"
+          },
+          "timeDescription": {
+           "simpleText": "55:00"
+          },
+          "onTap": {
+           "commandMetadata": {},
+           "watchEndpoint": {
+            "videoId": "abcdefghijk",
+            "startTimeSeconds": 3300
+           }
+          },
+          "layout": "MACRO_MARKERS_LIST_ITEM_RENDERER_LAYOUT_VERTICAL"
+         }
+        },
+        {
+         "macroMarkersListItemRenderer": {
+          "title": {
+           "simpleText": "Pomodoro 3"
+          },
+          "timeDescription": {
+           "simpleText": "1:00:00"
+          }
+         }
+        }
+       ]
+      }
+     }
+    }
+   }
+  ]
+ },
+ "playerResponse": {
+  "videoDetails": {
+   "videoId": "abcdefghijk",
+   "lengthSeconds": "5400"
+  }
+ }
+}

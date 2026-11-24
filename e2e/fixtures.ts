@@ -7,6 +7,11 @@ import { test as base, type Page } from "@playwright/test";
  */
 const FAKE_YT = `
 window.__yt = { loaded: [], starts: [], cued: [], current: null, lists: [], seeks: [], playing: false, players: 0,
+  // Position de la vidéo, qui avance en temps réel pendant la lecture (« Calé sur la vidéo »).
+  base: window.__ytStart || 0, since: Date.now(), duration: window.__ytDuration || 0,
+  time() { return this.base + (this.playing ? (Date.now() - this.since) / 1000 : 0); },
+  setTime(t) { this.base = t; this.since = Date.now(); },
+  setPlaying(on) { this.base = this.time(); this.since = Date.now(); this.playing = on; },
   end() { this.onState && this.onState({ data: 0 }); },
   error(code) { this.onError && this.onError({ data: code }); } };
 window.YT = { Player: function (id, cfg) {
@@ -15,7 +20,9 @@ window.YT = { Player: function (id, cfg) {
   y.onState = cfg.events && cfg.events.onStateChange;
   y.onError = cfg.events && cfg.events.onError;
   var p = {
-    playVideo: function () { y.playing = true; }, pauseVideo: function () { y.playing = false; },
+    playVideo: function () { y.setPlaying(true); }, pauseVideo: function () { y.setPlaying(false); },
+    getCurrentTime: function () { return y.time(); }, getDuration: function () { return y.duration; },
+    getPlayerState: function () { return y.playing ? 1 : 2; },
     destroy: function () {}, setPlaybackQuality: function () {}, setVolume: function (v) { y.volume = v; },
     nextVideo: function () {}, previousVideo: function () {}, setLoop: function () {},
     // Forme objet { videoId, startSeconds } (radio) ou identifiant seul.
@@ -27,7 +34,7 @@ window.YT = { Player: function (id, cfg) {
     cueVideoById: function (o) { y.cued.push({ id: o.videoId, start: o.startSeconds == null ? null : o.startSeconds }); y.current = o.videoId; },
     getVideoData: function () { return { video_id: y.current }; },
     loadPlaylist: function (o) { y.lists.push(o && o.list ? o.list : o); },
-    seekTo: function (s) { y.seeks.push(s); }
+    seekTo: function (s) { y.seeks.push(s); y.setTime(s); }
   };
   setTimeout(function () { cfg.events && cfg.events.onReady && cfg.events.onReady({ target: p }); }, 50);
   return p;
@@ -65,6 +72,9 @@ export interface Seed {
   twitchChannel?: string;
   /** Radio FocusFlow sélectionnée pour la session. */
   radio?: boolean;
+  /** Faux lecteur : position de départ et durée de la vidéo (s). */
+  videoStart?: number;
+  videoDuration?: number;
 }
 
 const st = (state: object) => JSON.stringify({ state, version: 0 });
@@ -74,6 +84,9 @@ export async function prepare(page: Page, seed: Seed = {}) {
     const st = (s: object) => JSON.stringify({ state: s, version: 0 });
     void st0;
     localStorage.setItem("focusflow-splash", "off");
+    const w = window as unknown as { __ytStart?: number; __ytDuration?: number };
+    w.__ytStart = seed.videoStart ?? 0;
+    w.__ytDuration = seed.videoDuration ?? 0;
     localStorage.setItem("focusflow-prefs", st({ onboarded: true, breathingEnabled: true, sceneEffects: false }));
     localStorage.setItem("focusflow-theme", st({ theme: seed.theme ?? "dark" }));
     if (seed.queue) {

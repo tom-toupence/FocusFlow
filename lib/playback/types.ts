@@ -73,6 +73,11 @@ export interface PlayerAdapter {
   enqueue(track: Track): Promise<boolean>;
   /** Retire un titre à venir (sans effet si `caps.removeUpcoming` est faux). */
   removeUpcoming(id: string): void;
+  /** Position dans la piste (s), si la source la connaît (YouTube). null si pas prêt. */
+  getCurrentTime?(): number | null;
+  getDuration?(): number | null;
+  /** État brut du lecteur (YouTube : 0 fin, 1 lecture, 2 pause, 3 chargement). */
+  getPlayerState?(): number | null;
   destroy(): void;
 }
 

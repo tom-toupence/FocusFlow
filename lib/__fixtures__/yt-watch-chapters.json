@@ -1,0 +1,249 @@
+{
+ "initialData": {
+  "responseContext": {
+   "serviceTrackingParams": []
+  },
+  "contents": {
+   "twoColumnWatchNextResults": {
+    "results": {
+     "results": {
+      "contents": [
+       {
+        "videoPrimaryInfoRenderer": {
+         "title": {
+          "runs": [
+           {
+            "text": "3-HOUR STUDY WITH ME | Rainy Tokyo | 50/10 Pomodoro"
+           }
+          ]
+         }
+        }
+       },
+       {
+        "videoSecondaryInfoRenderer": {
+         "owner": {
+          "videoOwnerRenderer": {
+           "title": {
+            "runs": [
+             {
+              "text": "Channel"
+             }
+            ]
+           }
+          }
+         },
+         "attributedDescription": {
+          "content": "Let's study together.\n\n0:00 Intro\n2:00 Focus 1\n52:00 Break\n"
+         }
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  "playerOverlays": {
+   "playerOverlayRenderer": {
+    "decoratedPlayerBarRenderer": {
+     "decoratedPlayerBarRenderer": {
+      "playerBar": {
+       "multiMarkersPlayerBarRenderer": {
+        "visibleOnLoad": {
+         "key": "DESCRIPTION_CHAPTERS"
+        },
+        "markersMap": [
+         {
+          "key": "DESCRIPTION_CHAPTERS",
+          "value": {
+           "chapters": [
+            {
+             "chapterRenderer": {
+              "title": {
+               "simpleText": "Intro"
+              },
+              "timeRangeStartMillis": 0,
+              "onActiveCommand": {
+               "clickTrackingParams": "x"
+              },
+              "thumbnail": {
+               "thumbnails": [
+                {
+                 "url": "https://i.ytimg.com/vi/x/default.jpg",
+                 "width": 120,
+                 "height": 90
+                }
+               ]
+              }
+             }
+            },
+            {
+             "chapterRenderer": {
+              "title": {
+               "simpleText": "Focus 1"
+              },
+              "timeRangeStartMillis": 120000,
+              "onActiveCommand": {
+               "clickTrackingParams": "x"
+              },
+              "thumbnail": {
+               "thumbnails": [
+                {
+                 "url": "https://i.ytimg.com/vi/x/default.jpg",
+                 "width": 120,
+                 "height": 90
+                }
+               ]
+              }
+             }
+            },
+            {
+             "chapterRenderer": {
+              "title": {
+               "simpleText": "Break"
+              },
+              "timeRangeStartMillis": 3120000,
+              "onActiveCommand": {
+               "clickTrackingParams": "x"
+              },
+              "thumbnail": {
+               "thumbnails": [
+                {
+                 "url": "https://i.ytimg.com/vi/x/default.jpg",
+                 "width": 120,
+                 "height": 90
+                }
+               ]
+              }
+             }
+            },
+            {
+             "chapterRenderer": {
+              "title": {
+               "simpleText": "Focus 2"
+              },
+              "timeRangeStartMillis": 3720000,
+              "onActiveCommand": {
+               "clickTrackingParams": "x"
+              },
+              "thumbnail": {
+               "thumbnails": [
+                {
+                 "url": "https://i.ytimg.com/vi/x/default.jpg",
+                 "width": 120,
+                 "height": 90
+                }
+               ]
+              }
+             }
+            },
+            {
+             "chapterRenderer": {
+              "title": {
+               "simpleText": "Break"
+              },
+              "timeRangeStartMillis": 6720000,
+              "onActiveCommand": {
+               "clickTrackingParams": "x"
+              },
+              "thumbnail": {
+               "thumbnails": [
+                {
+                 "url": "https://i.ytimg.com/vi/x/default.jpg",
+                 "width": 120,
+                 "height": 90
+                }
+               ]
+              }
+             }
+            },
+            {
+             "chapterRenderer": {
+              "title": {
+               "simpleText": "Focus 3"
+              },
+              "timeRangeStartMillis": 7320000,
+              "onActiveCommand": {
+               "clickTrackingParams": "x"
+              },
+              "thumbnail": {
+               "thumbnails": [
+                {
+                 "url": "https://i.ytimg.com/vi/x/default.jpg",
+                 "width": 120,
+                 "height": 90
+                }
+               ]
+              }
+             }
+            },
+            {
+             "chapterRenderer": {
+              "title": {
+               "simpleText": "Break"
+              },
+              "timeRangeStartMillis": 10320000,
+              "onActiveCommand": {
+               "clickTrackingParams": "x"
+              },
+              "thumbnail": {
+               "thumbnails": [
+                {
+                 "url": "https://i.ytimg.com/vi/x/default.jpg",
+                 "width": 120,
+                 "height": 90
+                }
+               ]
+              }
+             }
+            },
+            {
+             "chapterRenderer": {
+              "title": {
+               "simpleText": "Outro"
+              },
+              "timeRangeStartMillis": 10920000,
+              "onActiveCommand": {
+               "clickTrackingParams": "x"
+              },
+              "thumbnail": {
+               "thumbnails": [
+                {
+                 "url": "https://i.ytimg.com/vi/x/default.jpg",
+                 "width": 120,
+                 "height": 90
+                }
+               ]
+              }
+             }
+            }
+           ],
+           "trackingParams": "y"
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "engagementPanels": []
+ },
+ "playerResponse": {
+  "playabilityStatus": {
+   "status": "OK"
+  },
+  "videoDetails": {
+   "videoId": "abcdefghijk",
+   "title": "3-HOUR STUDY WITH ME",
+   "lengthSeconds": "11040",
+   "channelId": "UCx",
+   "shortDescription": "ignored"
+  },
+  "microformat": {
+   "playerMicroformatRenderer": {
+    "lengthSeconds": "11040"
+   }
+  }
+ }
+}

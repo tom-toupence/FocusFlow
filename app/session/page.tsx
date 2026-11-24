@@ -18,6 +18,7 @@ import UpNext, { hasUpNext } from "@/components/session/UpNext";
 import PipTimer from "@/components/PipTimer";
 import BreathingExercise from "@/components/BreathingExercise";
 import RueScene, { type RueHandle } from "@/components/RueScene";
+import FriendWindowsList from "@/components/FriendWindowsList";
 import { usePlayback, type PlayerAdapter } from "@/lib/playback/types";
 import { useSessionMedia } from "@/lib/playback/useSessionMedia";
 import type { ExtendedEvent, SourceKind } from "@/lib/playback/types";
@@ -35,6 +36,9 @@ import { upsertMyFriendStats } from "@/lib/friends";
 import { formatHM, pomodorosLeft } from "@/lib/stopPlan";
 import { CHEER_EVENT } from "@/store/chatStore";
 import { RADIO_NAME } from "@/lib/radioProgram";
+import { useVideoSchedule } from "@/lib/playback/videoScheduleClient";
+import { arrivalChoice, scheduleEnd } from "@/lib/videoSync";
+import { nextWorkStart } from "@/lib/videoSchedule";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -60,6 +64,7 @@ export default function SessionPage() {
   const {
     mode, secondsLeft, isRunning, sessionsCompleted, settings,
     flowSeconds, flowBreakTotal, hydrated, stopAt, stopReached, cycleSeconds,
+    videoSync, videoSyncView,
     tick, start, pause, nextSession, finishFlow, accumulateFlow,
   } = useTimerStore();
   const isFlowtime = settings.preset === "flowtime";
@@ -112,6 +117,23 @@ export default function SessionPage() {
   const toggleTodos = () => { const next = !showTodos; setShowTodos(next); if (next && small()) setShowUpNext(false); };
 
   const isBreak = mode !== "work";
+
+  // ── « Calé sur la vidéo » : le minuteur suit le rythme de la vidéo ─────────
+  // Seulement une vidéo YouTube simple, hors Flowtime et sans heure d'arrêt
+  // (radio, playlists, file, Spotify et Twitch : le bouton n'apparaît pas).
+  const caleVideoId = media.kind === "youtube" && media.youtube?.type === "video" ? media.youtube.id : null;
+  const caleAllowed = !isFlowtime && stopAt == null && caleVideoId != null;
+  const caleResolved = useVideoSchedule(caleAllowed ? caleVideoId : null);
+  // Vidéo remontée (durée différente) : on oublie son rythme pour cette session.
+  const [caleRejected, setCaleRejected] = useState<string | null>(null);
+  const caleAvailable = caleAllowed && caleResolved != null && caleRejected !== caleVideoId;
+  // Activé par défaut ; un clic sur le bouton le coupe.
+  const [caleWanted, setCaleWanted] = useState(true);
+  const caleOn = videoSync != null;
+  // Arrivée en plein bloc : prendre en route (par défaut) ou début du bloc suivant.
+  const [arrival, setArrival] = useState<{ preferNext: boolean; nextStart: number | null; block: number } | null>(null);
+  const caleOnRef = useRef(caleOn);
+  useEffect(() => { caleOnRef.current = caleOn; }, [caleOn]);
 
   // Keep refs in sync for use inside IFrame API callbacks
   useEffect(() => { isBreakRef.current = isBreak; }, [isBreak]);
@@ -172,10 +194,11 @@ export default function SessionPage() {
   // ── Pilotage commun à toutes les sources ──────────────────────────────────
   // Une seule règle : la musique joue pendant le travail minuteur en marche,
   // s'arrête en pause et pendant la halte (Twitch compris, ce qui manquait).
+  // Calé sur la vidéo : la pause est celle du créateur, la vidéo continue.
   useEffect(() => {
     if (!adapter) return;
-    if (!isBreak && isRunning) adapter.play(); else adapter.pause();
-  }, [adapter, isBreak, isRunning]);
+    if (isRunning && (!isBreak || caleOn)) adapter.play(); else adapter.pause();
+  }, [adapter, isBreak, isRunning, caleOn]);
   useEffect(() => { adapter?.setShuffle(shuffle); }, [adapter, shuffle]);
   useEffect(() => { adapter?.setLoop(loop); }, [adapter, loop]);
 
@@ -288,6 +311,116 @@ export default function SessionPage() {
     start();
   }, [hydrated, tick, handleSessionEnd]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Calé sur la vidéo : activation, pilotage, transitions ─────────────────
+  useEffect(() => {
+    if (!hydrated || !adapter) return;
+    const st = useTimerStore.getState();
+    if (st.videoSync) {
+      if (!caleAvailable || !caleWanted || st.videoSync.videoId !== caleVideoId) {
+        // Retour au minuteur normal : on continue le décompte (un trou repart à neuf).
+        st.stopVideoSync(st.videoSyncView?.phase === "gap");
+      }
+    } else if (caleAvailable && caleWanted && caleVideoId && caleResolved) {
+      st.startVideoSync(caleVideoId, caleResolved.schedule);
+    }
+  }, [hydrated, adapter, caleAvailable, caleWanted, caleVideoId, caleResolved]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { if (!caleOn) setArrival(null); }, [caleOn]);
+
+  // Fin d'un bloc de la vidéo : le même chemin qu'une fin de cycle (crédit, XP,
+  // projet, objectif ; les sons et la lueur suivent le changement de mode).
+  const creditVideoBlock = (sec: number, completedCycle: boolean) => {
+    const minutes = Math.round(sec / 60);
+    if (minutes < 1) return;
+    recordSession(minutes);
+    useSessionSummaryStore.getState().addFocusMinutes(minutes, completedCycle);
+    recordPlay(buildPlayEntry(minutes));
+    if (completedCycle) {
+      useProjectStore.getState().logPomodoro();
+      celebrateProgress();
+      if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+        new Notification("FocusFlow", { body: "Bloc terminé. Pause de la vidéo.", icon: "/favicon.ico" });
+      }
+    }
+  };
+
+  // Une lecture de la vidéo par seconde : mode, temps restant, transitions.
+  const pausedStreak = useRef(0);
+  const playingStreak = useRef(0);
+  const caleStep = () => {
+    if (!adapter || !caleResolved) return;
+    const st = useTimerStore.getState();
+    if (!st.videoSync) return;
+    const t = adapter.getCurrentTime?.();
+    if (t == null) return;
+    // Vidéo remontée par son créateur : les horodatages ne valent plus rien.
+    const d = adapter.getDuration?.();
+    const expected = caleResolved.durationSec;
+    if (d && ((expected && Math.abs(d - expected) > 10) || scheduleEnd(st.videoSync.schedule) > d + 5)) {
+      st.stopVideoSync();
+      setCaleRejected(st.videoSync.videoId);
+      toast({ title: "Rythme de la vidéo introuvable", description: "Retour au minuteur normal.", accent: "amber" });
+      return;
+    }
+    const first = st.videoSync.cursor.lastT == null;
+    const schedule = st.videoSync.schedule;
+    const events = st.syncVideo(t);
+    if (first) {
+      const a = arrivalChoice(schedule, t);
+      const block = useTimerStore.getState().videoSyncView?.block ?? 1;
+      if (a) {
+        const nextStart = nextWorkStart(schedule, t);
+        setArrival({ preferNext: a.preferNext && nextStart != null, nextStart, block });
+      }
+    }
+    for (const e of events) {
+      if (e.type === "work-end") creditVideoBlock(e.creditSec, true);
+      else if (e.type === "work-partial") creditVideoBlock(e.creditSec, false);
+      else {
+        useTimerStore.getState().stopVideoSync(true);
+        setCaleWanted(false);
+        toast({ title: "Fin du rythme de la vidéo", description: "Le minuteur normal reprend.", accent: "emerald" });
+        return;
+      }
+    }
+    // Pause depuis la vidéo (touches média, lecteur) : le minuteur suit, et inversement.
+    const ps = adapter.getPlayerState?.();
+    const now = useTimerStore.getState();
+    pausedStreak.current = ps === 2 && now.isRunning ? pausedStreak.current + 1 : 0;
+    playingStreak.current = ps === 1 && !now.isRunning ? playingStreak.current + 1 : 0;
+    if (pausedStreak.current >= 2) { pausedStreak.current = 0; pause(); }
+    if (playingStreak.current >= 2) { playingStreak.current = 0; start(); }
+  };
+  const caleStepRef = useRef(caleStep);
+  useEffect(() => { caleStepRef.current = caleStep; });
+  useEffect(() => {
+    if (!caleOn || !adapter) return;
+    caleStepRef.current();
+    const id = setInterval(() => caleStepRef.current(), 1000);
+    return () => clearInterval(id);
+  }, [caleOn, adapter]);
+  // L'invitation à choisir disparaît d'elle-même : sans action, on prend en route.
+  useEffect(() => {
+    if (!arrival) return;
+    const id = setTimeout(() => setArrival(null), 20_000);
+    return () => clearTimeout(id);
+  }, [arrival]);
+  const jumpToNextBlock = () => {
+    if (arrival?.nextStart != null) adapter?.seek(arrival.nextStart);
+    setArrival(null);
+  };
+
+  const caleLabel = caleOn && videoSyncView
+    ? videoSyncView.phase === "work"
+      ? `Calé sur la vidéo · bloc ${videoSyncView.block} / ${videoSyncView.blocks}`
+      : videoSyncView.phase === "break"
+        ? "Calé sur la vidéo · pause"
+        : `Calé sur la vidéo · avant le bloc ${videoSyncView.block}`
+    : null;
+  // La halte (rue, minuteur de pause) n'apparaît pas en mode calé : la vidéo continue.
+  const showHalte = (isBreak && !caleOn) || stopReached;
+  const showWork = !stopReached && (!isBreak || caleOn);
+
   // ── Flowtime: end the stretch and start the earned break ────────────────
   const handleFlowBreak = () => {
     const minutes = Math.round(useTimerStore.getState().flowSeconds / 60);
@@ -345,7 +478,7 @@ export default function SessionPage() {
         setZenHidden((v) => !v);
       } else if (e.code === "Space") {
         e.preventDefault();
-        if (!isBreakRef.current) {
+        if (!isBreakRef.current || caleOnRef.current) {
           if (isRunningRef.current) pause(); else start();
         }
       }
@@ -469,8 +602,8 @@ export default function SessionPage() {
       {/* Le lecteur, quelle que soit la source (seul endroit qui les distingue). */}
       <SessionMedia
         media={media}
-        playing={!isBreak && isRunning}
-        isBreak={isBreak}
+        playing={isRunning && (!isBreak || caleOn)}
+        isBreak={isBreak && !caleOn}
         volume={volume}
         trackId={pb.track?.id}
         onAdapter={setAdapter}
@@ -479,6 +612,7 @@ export default function SessionPage() {
           <RueScene
             ref={city}
             mode="work"
+            friends
             className="absolute inset-0"
             label="Une rue de nuit sous la pluie, décor de la session quand aucune vidéo ne joue."
           />
@@ -509,15 +643,17 @@ export default function SessionPage() {
       )}
 
       {/* ── La halte (pause) : la ville s'éteint, la vue se brouille ───────── */}
-      {(isBreak || stopReached) && (
+      {showHalte && (
         <div className="absolute inset-0 z-20 bg-[#07090d]">
           <RueScene
             ref={city}
             mode="break"
             interval={[40, 60]}
+            friends
             className="absolute inset-0"
             label={stopReached ? "La halte : une rue de nuit, l'heure d'arrêt est atteinte." : `La halte : une rue de nuit, il reste ${formatTime(secondsLeft)} de pause.`}
           />
+          <FriendWindowsList className="absolute z-20 top-3 right-3 md:top-5 md:right-5" />
           {/* Voile de lecture : à gauche sur grand écran, en bas sur mobile. */}
           <div aria-hidden className="absolute inset-0 pointer-events-none bg-[linear-gradient(90deg,#07090d_0%,rgba(7,9,13,0.86)_32%,rgba(7,9,13,0.15)_62%,transparent_80%)] max-md:bg-[linear-gradient(0deg,#07090d_0%,rgba(7,9,13,0.9)_45%,rgba(7,9,13,0.2)_70%,transparent_85%)]" />
           <div className="relative z-10 h-full overflow-y-auto flex items-end md:items-center px-5 sm:px-10 lg:px-16 py-8">
@@ -623,7 +759,7 @@ export default function SessionPage() {
       )}
 
       {/* ── Work screen overlay ─────────────────────────────────────────────── */}
-      {!isBreak && !stopReached && (
+      {showWork && (
         <>
           {/* L'écran annoncé sur la landing (SessionReplica) : en cours en haut
               à gauche, minuteur en haut à droite, « À venir » en bas à droite,
@@ -659,8 +795,8 @@ export default function SessionPage() {
                 <div aria-hidden className="mt-1.5 h-[2px] w-full overflow-hidden bg-white/10">
                   {!isFlowtime && <div className="h-full origin-left bg-sodium transition-transform duration-1000 ease-linear" style={{ transform: `scaleX(${progress})` }} />}
                 </div>
-                <p className="mt-1 whitespace-nowrap font-mono text-[9px] uppercase tracking-[0.14em] text-white/45">
-                  {isFlowtime ? `Flow · pause ${earnedBreakMin} min` : `Pomodoro ${sessionsCompleted + 1}`}
+                <p data-testid="timer-label" className="mt-1 whitespace-nowrap font-mono text-[9px] uppercase tracking-[0.14em] text-white/45">
+                  {caleLabel ?? (isFlowtime ? `Flow · pause ${earnedBreakMin} min` : `Pomodoro ${sessionsCompleted + 1}`)}
                 </p>
                 {stopLine && (
                   <p data-testid="stop-line" className="mt-0.5 whitespace-nowrap font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">
@@ -668,6 +804,18 @@ export default function SessionPage() {
                   </p>
                 )}
               </div>
+              {/* Arrivée en plein bloc : sans action, on prend en route. */}
+              {arrival && (
+                <div role="dialog" aria-label="Arrivée en plein bloc" className="mt-2 w-[min(18rem,calc(100vw-1.5rem))] rounded-lg border border-white/10 bg-night/90 p-3 text-left backdrop-blur-sm">
+                  <p className="text-xs text-white/80">Tu arrives au milieu du bloc {arrival.block}.</p>
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    <Pill primary={!arrival.preferNext} onClick={() => setArrival(null)}>Prendre en route</Pill>
+                    {arrival.nextStart != null && (
+                      <Pill primary={arrival.preferNext} onClick={jumpToNextBlock}>Début du bloc suivant</Pill>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -720,6 +868,18 @@ export default function SessionPage() {
                 <span key={distractionFlash} className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-bold text-rose-300 animate-[distractionPop_0.7s_ease-out_forwards]">+1</span>
               )}
             </Pill>
+
+            {/* Calé sur la vidéo : activé par défaut quand la vidéo a un rythme connu. */}
+            {caleAvailable && (
+              <Pill
+                active={caleOn}
+                aria-pressed={caleOn}
+                onClick={() => setCaleWanted(!caleOn)}
+                title={caleOn ? "Le minuteur suit le rythme de la vidéo. Cliquer pour revenir au minuteur normal." : "Suivre le rythme de la vidéo"}
+              >
+                Calé sur la vidéo
+              </Pill>
+            )}
 
             {/* Titres : précédent / suivant (files et playlists). */}
             {pb.caps.skip && (

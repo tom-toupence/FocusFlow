@@ -1,0 +1,20 @@
+{
+ "initialData": {
+  "contents": {
+   "twoColumnWatchNextResults": {
+    "results": {
+     "results": {
+      "contents": []
+     }
+    }
+   }
+  }
+ },
+ "playerResponse": {
+  "videoDetails": {
+   "videoId": "abcdefghijk",
+   "lengthSeconds": "3600",
+   "shortDescription": "Lofi beats to relax\n\n00:00 Track one\n03:12 Track two\n06:40 Track three"
+  }
+ }
+}

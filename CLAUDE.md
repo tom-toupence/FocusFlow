@@ -35,6 +35,11 @@ ambiances mixables dans une seule expérience bien maintenue.
   - **File maison** (mixes radio + **File FocusFlow**) : YouTube n'enchaîne pas de façon fiable une liste
     d'IDs arbitraires en embed → on gère la progression nous-mêmes (`onStateChange` ENDED → `loadVideoById`
     du suivant ; `queueRef`). Skip via cette file ou `nextVideo()`/`previousVideo()` (vraies playlists).
+  - **« Calé sur la vidéo »** (vidéo simple seulement) : route `app/api/youtube/schedule` (chapitres
+    `chapterRenderer`/`macroMarkersListItemRenderer`, sinon description, + `lengthSeconds` ; parse dans
+    `lib/ytSchedule.ts`), annotation manuelle `schedule` de `data/videos.ts` prioritaire ; le minuteur est
+    piloté par `currentTime` (`timerStore.videoSync`, pas pur `lib/videoSync.ts`, lu chaque seconde dans
+    `/session`). Incompatible Flowtime, Dernier train, radio, playlists, file, Spotify, Twitch.
 - **File FocusFlow :** liste ORDONNÉE de vidéos YouTube choisies par l'utilisateur (titres exacts,
   contrôle total), seule façon fiable d'avoir SES morceaux (les radios `RD…` étant personnalisées).
   `store/queueStore.ts` (+ `fetchVideoMeta` oEmbed), UI `components/QueuePanel.tsx` (onglet Bibliothèque),
@@ -866,3 +871,27 @@ Vaut pour la landing ET l'app (toasts, écran de pause).
 Pas de GPU dans le conteneur : le 60 fps réel n'est pas mesurable, les vidéos sont rendues image
 par image (Playwright + SwiftShader, `?record` sur `/lab/rue`). Les captures « temps réel » de
 contenu animé sont peu fiables ; valider avec `npm run dev` sur une vraie machine.
+
+## Journal de session — 2026-11-24 (lot 5 : « Calé sur la vidéo »)
+
+- **Rythme d'une vidéo** : `app/api/youtube/schedule?v=` lit la page watch (chapitres structurés, sinon
+  horodatages de la description via `parseChaptersFromDescription`, + `lengthSeconds` de
+  `ytInitialPlayerResponse` ; `extractYtPlayerResponse` ajouté à `lib/ytParse.ts`). Cache mémoire 6 h +
+  `Cache-Control s-maxage=21600`. Fixtures `lib/__fixtures__/yt-watch-*.json`, tests sans réseau.
+  Client : `lib/playback/videoScheduleClient.ts` (`useVideoSchedule`, cache mémoire ; `schedule` du
+  catalogue prioritaire, aucun horodatage inventé, toutes les vidéos sont encore sans annotation).
+- **Pilotage** : `lib/videoSync.ts` (pur) déduit mode, secondes restantes et `cycleSeconds` = secondes
+  réellement jouées + restantes (un pas n'est « joué » que si la vidéo avance d'au plus le temps
+  d'horloge + 2 s ; sinon c'est un seek, recalage sans crédit). Événements `work-end` (crédit complet,
+  pomodoro, projet, objectif), `work-partial` (seek hors d'un bloc, crédit partiel), `exhausted`.
+  `timerStore` : `videoSync`/`videoSyncView` (non persistés), `startVideoSync`/`syncVideo`/`stopVideoSync`
+  ; `tick` ignoré et pas d'`endsAt` tant que c'est calé.
+- **Session** : bouton « Calé sur la vidéo » (activé par défaut), micro-label « Calé sur la vidéo · bloc
+  1 / 3 », choix d'arrivée en plein bloc (« Prendre en route » / « Début du bloc suivant », 20 s, sans
+  action = en route). En pause de la vidéo : pas de halte ni de coupure, la vidéo continue. Pause du
+  minuteur = pause de la vidéo, et une pause venue du lecteur (2 lectures d'affilée) met le minuteur en
+  pause. Vidéo remontée (durée ≠ de plus de 10 s) ou fin du rythme : retour au minuteur normal + toast.
+  Adaptateur YouTube : `getCurrentTime`/`getDuration`/`getPlayerState` (optionnels dans `PlayerAdapter`).
+- Tests : vitest `lib/ytSchedule.test.ts`, `lib/videoSync.test.ts`, `store/timerVideoSync.test.ts` ;
+  e2e `e2e/cale-video.spec.ts` (faux lecteur à currentTime réel dans `e2e/fixtures.ts`).
+  **À vérifier en prod** (youtube.com bloqué dans le conteneur) : l'extraction sur de vraies pages.

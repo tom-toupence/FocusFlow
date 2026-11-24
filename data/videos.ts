@@ -1,3 +1,5 @@
+import type { VideoSchedule } from "@/lib/videoSchedule";
+
 export type VideoMood = "lofi" | "jazz" | "ambience" | "nature" | "synthwave" | "classical";
 
 export interface Video {
@@ -20,6 +22,25 @@ export interface Video {
    * façon : c'est voulu (le programme ne dépend que de ces données statiques).
    */
   durationSec?: number;
+  /**
+   * « Calé sur la vidéo » : rythme travail/pause d'une vidéo Study With Me,
+   * prioritaire sur les chapitres YouTube. Vide pour toutes les vidéos tant
+   * que personne ne l'a relevé à la main : n'invente jamais d'horodatage.
+   *
+   * Pour annoter une vidéo : la regarder sur YouTube, noter le début et la fin
+   * (en secondes depuis le début de la vidéo) de chaque bloc de focus et de
+   * chaque pause du minuteur incrusté, intro et outro exclues. Exemple d'un
+   * 50/10 qui démarre après 2 min d'intro :
+   *   schedule: [
+   *     { start: 120,  end: 3120, kind: "work" },
+   *     { start: 3120, end: 3720, kind: "break" },
+   *     { start: 3720, end: 6720, kind: "work" },
+   *   ],
+   * Il faut au moins un bloc de travail ET une pause. Renseigner aussi
+   * `durationSec` (lengthSeconds de la page) : si la vidéo a été remontée et
+   * ne fait plus cette durée, la session revient au minuteur normal.
+   */
+  schedule?: VideoSchedule;
 }
 
 // Catalogue refondu (2026-07) : uniquement des « Study With Me » scéniques et du

@@ -1,0 +1,32 @@
+{
+ "initialData": {
+  "contents": {
+   "twoColumnWatchNextResults": {
+    "results": {
+     "results": {
+      "contents": [
+       {
+        "videoPrimaryInfoRenderer": {}
+       },
+       {
+        "videoSecondaryInfoRenderer": {
+         "attributedDescription": {
+          "content": "Study with me in Seoul\n\nTimestamps\n00:00 Focus session 1\n50:00 Break time\n1:00:00 Focus session 2\n1:50:00 Break time\n\nMusic by somebody\n#studywithme"
+         }
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  "engagementPanels": []
+ },
+ "playerResponse": {
+  "videoDetails": {
+   "videoId": "abcdefghijk",
+   "lengthSeconds": "7200",
+   "shortDescription": "short"
+  }
+ }
+}

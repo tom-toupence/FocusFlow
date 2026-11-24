@@ -30,6 +30,10 @@ interface YTPlayer {
   loadPlaylist: (opts: string[] | { list: string; listType: string; index?: number; startSeconds?: number }) => void;
   setLoop: (loop: boolean) => void;
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
+  /** « Calé sur la vidéo » : position, durée et état (0 fin, 1 lecture, 2 pause, 3 chargement). */
+  getCurrentTime?: () => number;
+  getDuration?: () => number;
+  getPlayerState?: () => number;
 }
 
 declare global {
@@ -445,6 +449,15 @@ export class YouTubeAdapter extends Observable<PlaybackState> implements PlayerA
   }
   setLoop(on: boolean) { this.set({ loop: on }); }
   seek(sec: number) { if (this.ready && !this.radio) this.player?.seekTo(Math.max(0, sec), true); }
+
+  // « Calé sur la vidéo » : lus chaque seconde par la session (null tant que le lecteur n'est pas prêt).
+  getCurrentTime(): number | null { return this.read((p) => p.getCurrentTime?.()); }
+  getDuration(): number | null { const d = this.read((p) => p.getDuration?.()); return d && d > 0 ? d : null; }
+  getPlayerState(): number | null { return this.read((p) => p.getPlayerState?.()); }
+  private read(f: (p: YTPlayer) => number | undefined): number | null {
+    if (!this.ready || !this.player) return null;
+    try { const v = f(this.player); return typeof v === "number" && Number.isFinite(v) ? v : null; } catch { return null; }
+  }
 
   /** Titres proches : mix radio de graines réparties sur toute la file. */
   async getSuggestions(seeds?: string[], limit = 10): Promise<Track[]> {

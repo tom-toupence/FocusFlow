@@ -15,7 +15,16 @@ export const YT_FETCH_HEADERS = {
 // YouTube embarque: var ytInitialData = {...};  (ou window["ytInitialData"] = {...};)
 // Découpe équilibrée des accolades pour isoler l'objet JSON.
 export function extractYtInitialData(html: string): unknown | null {
-  const markers = ['var ytInitialData = ', 'window["ytInitialData"] = '];
+  return extractJsonAssignment(html, ['var ytInitialData = ', 'window["ytInitialData"] = ']);
+}
+
+// Même découpe pour `ytInitialPlayerResponse` (videoDetails : durée, description).
+export function extractYtPlayerResponse(html: string): unknown | null {
+  return extractJsonAssignment(html, ['var ytInitialPlayerResponse = ', 'window["ytInitialPlayerResponse"] = ', 'ytInitialPlayerResponse = ']);
+}
+
+/** Premier objet JSON affecté après l'un des `markers` (accolades équilibrées). */
+export function extractJsonAssignment(html: string, markers: string[]): unknown | null {
   for (const marker of markers) {
     const start = html.indexOf(marker);
     if (start === -1) continue;

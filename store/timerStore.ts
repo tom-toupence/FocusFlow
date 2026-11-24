@@ -4,6 +4,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { remainingSeconds, elapsedSeconds, isAbandoned } from "@/lib/timerClock";
 import { nextCycleSeconds } from "@/lib/stopPlan";
+import { freshCursor, stepVideoSync, type VideoSyncEvent, type VideoSyncState, type VideoSyncView } from "@/lib/videoSync";
+import type { VideoSchedule } from "@/lib/videoSchedule";
 
 export type TimerMode = "work" | "short-break" | "long-break";
 
@@ -62,6 +64,12 @@ interface TimerState {
   // Vrai une fois l'état persisté relu (skipHydration + TimerHydrator) : tant que
   // c'est faux, le store porte les valeurs par défaut et ne doit pas être ré-écrit.
   hydrated: boolean;
+  // « Calé sur la vidéo » : le minuteur est piloté par le temps de la vidéo
+  // (mode et secondes viennent de syncVideo, plus de endsAt). Non persisté :
+  // au rechargement, la session repart en minuteur normal puis se recale.
+  videoSync: VideoSyncState | null;
+  // Dernier état calculé (bloc n / total, phase) pour l'affichage.
+  videoSyncView: VideoSyncView | null;
 
   applyPreset: (preset: TimerPreset) => void;
   updateSettings: (settings: Partial<TimerSettings>) => void;
@@ -79,6 +87,12 @@ interface TimerState {
   continueAfterStop: () => void;
   // Fin de session : désactive sans effacer sessionsCompleted/flowMinutesTotal (lus par /summary).
   endSession: () => void;
+  /** Active le pilotage par la vidéo (le premier syncVideo pose mode et secondes). */
+  startVideoSync: (videoId: string, schedule: VideoSchedule) => void;
+  /** La vidéo est à `t` s : recale le minuteur, rend les transitions à traiter. */
+  syncVideo: (t: number, wallMs?: number) => VideoSyncEvent[];
+  /** Retour au minuteur normal : `fresh` = nouveau cycle de travail, sinon on continue le décompte en cours. */
+  stopVideoSync: (fresh?: boolean) => void;
 }
 
 const defaultSettings: TimerSettings = {
@@ -116,6 +130,7 @@ const STOP_REACHED = (settings: TimerSettings, now: number) => ({
 });
 
 const CLEARED = { endsAt: null, flowStartedAt: null } as const;
+const NO_SYNC = { videoSync: null, videoSyncView: null } as const;
 
 /** Heure d'arrêt applicable (pas en Flowtime). */
 const stopAtOf = (s: Pick<TimerState, "stopAt" | "settings">): number | null =>
@@ -216,11 +231,13 @@ export const useTimerStore = create<TimerState>()(
       cycleSeconds: defaultSettings.workDuration * 60,
       stopReached: false,
       hydrated: false,
+      videoSync: null,
+      videoSyncView: null,
 
       applyPreset: (preset) => {
         const values = PRESETS[preset];
         const merged: TimerSettings = { preset, ...values };
-        set({ settings: merged, mode: "work", secondsLeft: values.workDuration * 60, cycleSeconds: values.workDuration * 60, isRunning: false, flowSeconds: 0, stopReached: false, ...CLEARED });
+        set({ settings: merged, mode: "work", secondsLeft: values.workDuration * 60, cycleSeconds: values.workDuration * 60, isRunning: false, flowSeconds: 0, stopReached: false, ...CLEARED, ...NO_SYNC });
       },
 
       updateSettings: (newSettings) => {
@@ -237,7 +254,7 @@ export const useTimerStore = create<TimerState>()(
       // Recalcule depuis l'horloge (idempotent : appelable à tout moment, en retard ou non).
       tick: () => {
         const s = get();
-        if (!s.isRunning) return;
+        if (!s.isRunning || s.videoSync) return; // calé : c'est la vidéo qui fait avancer
         const now = Date.now();
         if (isFlowWork(s)) {
           const flow = liveFlowSeconds(s, now);
@@ -256,6 +273,10 @@ export const useTimerStore = create<TimerState>()(
       start: () => {
         const s = get();
         const now = Date.now();
+        if (s.videoSync) {
+          set({ isRunning: true, endsAt: null, flowStartedAt: null, active: true, updatedAt: now });
+          return;
+        }
         if (isFlowWork(s)) {
           set({
             isRunning: true,
@@ -297,6 +318,10 @@ export const useTimerStore = create<TimerState>()(
         const s = get();
         const now = Date.now();
         if (!s.isRunning) return;
+        if (s.videoSync) {
+          set({ isRunning: false, ...CLEARED, updatedAt: now });
+          return;
+        }
         if (isFlowWork(s)) {
           set({ isRunning: false, flowSeconds: liveFlowSeconds(s, now), ...CLEARED, updatedAt: now });
         } else {
@@ -394,7 +419,7 @@ export const useTimerStore = create<TimerState>()(
       },
 
       endSession: () => {
-        set({ active: false, isRunning: false, endsAt: null, flowStartedAt: null, updatedAt: null, stopAt: null, stopReached: false });
+        set({ active: false, isRunning: false, endsAt: null, flowStartedAt: null, updatedAt: null, stopAt: null, stopReached: false, ...NO_SYNC });
       },
 
       resetAll: () => {
@@ -413,6 +438,7 @@ export const useTimerStore = create<TimerState>()(
           updatedAt: null,
           stopAt: null,
           stopReached: false,
+          ...NO_SYNC,
         });
       },
 
@@ -443,6 +469,49 @@ export const useTimerStore = create<TimerState>()(
           active: true,
           updatedAt: now,
         });
+      },
+
+      startVideoSync: (videoId, schedule) => {
+        // Flowtime et heure d'arrêt ont leur propre horloge : incompatibles.
+        const s = get();
+        if (s.settings.preset === "flowtime" || s.stopAt != null || schedule.length === 0) return;
+        set({ videoSync: { videoId, schedule, cursor: freshCursor() }, videoSyncView: null, ...CLEARED, stopReached: false });
+      },
+
+      syncVideo: (t, wallMs = Date.now()) => {
+        const s = get();
+        if (!s.videoSync) return [];
+        const r = stepVideoSync(s.videoSync, t, wallMs);
+        const completed = r.events.filter((e) => e.type === "work-end" && e.creditSec >= 60).length;
+        const patch: Partial<TimerState> = {
+          videoSync: { ...s.videoSync, cursor: r.cursor },
+          videoSyncView: r.view,
+          sessionsCompleted: s.sessionsCompleted + completed,
+          updatedAt: wallMs,
+        };
+        if (r.view) {
+          patch.mode = r.view.mode;
+          patch.secondsLeft = r.view.secondsLeft;
+          patch.cycleSeconds = r.view.cycleSeconds;
+        }
+        set(patch);
+        return r.events;
+      },
+
+      stopVideoSync: (fresh = false) => {
+        const s = get();
+        if (!s.videoSync) return;
+        const now = Date.now();
+        if (fresh) {
+          const duration = s.settings.workDuration * 60;
+          set({
+            ...NO_SYNC, mode: "work", secondsLeft: duration, cycleSeconds: duration,
+            endsAt: s.isRunning ? now + duration * 1000 : null, flowStartedAt: null, updatedAt: now,
+          });
+        } else {
+          // Le décompte en cours continue à l'horloge (crédit : cycleSeconds reste « joué + restant »).
+          set({ ...NO_SYNC, endsAt: s.isRunning ? now + s.secondsLeft * 1000 : null, flowStartedAt: null, updatedAt: now });
+        }
       },
     }),
     {
