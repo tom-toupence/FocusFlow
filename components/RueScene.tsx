@@ -10,6 +10,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { createRue, supportsRue, type RueMode, type RueRenderer } from "@/lib/rue/RueRenderer";
 import { RUE_SCENES, rueBase, rueStill, type RueSceneInfo } from "@/lib/rue/scenes";
 import { cn } from "@/lib/utils";
+import FriendWindowsLayer from "@/components/FriendWindowsLayer";
 
 export interface RueHandle {
   /** Fin de pomodoro : la rue se coupe puis se rallume. */
@@ -35,16 +36,19 @@ interface Props {
   /** Le pointeur fait bouger légèrement la caméra. */
   pointer?: boolean;
   onScene?: (scene: RueSceneInfo) => void;
+  /** Les fenêtres allumées : chaque ami a sa fenêtre (no-op sans amis). */
+  friends?: boolean;
   className?: string;
   label: string;
 }
 
 const RueScene = forwardRef<RueHandle, Props>(function RueScene(
-  { scenes, mode = "work", night = 0, interval = [15, 20], paused = false, pointer = true, onScene, className, label },
+  { scenes, mode = "work", night = 0, interval = [15, 20], paused = false, pointer = true, onScene, friends = false, className, label },
   ref,
 ) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const r = useRef<RueRenderer | null>(null);
+  const [renderer, setRenderer] = useState<RueRenderer | null>(null);
   const [fallback, setFallback] = useState(false);
   const [current, setCurrent] = useState(0);
   // Image fixe : la photo précédente reste DESSOUS pendant le fondu (sinon
@@ -106,6 +110,7 @@ const RueScene = forwardRef<RueHandle, Props>(function RueScene(
       .then((x) => {
         if (disposed) { x.dispose(); return; }
         r.current = x;
+        setRenderer(x);
         x.setMode(modeRef.current);
         x.setNight(nightRef.current);
         x.setScroll(scrollRef.current);
@@ -118,7 +123,7 @@ const RueScene = forwardRef<RueHandle, Props>(function RueScene(
         canvas.current?.getContext("webgl2")?.getExtension("WEBGL_lose_context")?.loseContext();
         setFallback(true);
       });
-    return () => { disposed = true; r.current?.dispose(); r.current = null; };
+    return () => { disposed = true; r.current?.dispose(); r.current = null; setRenderer(null); };
     // L'intervalle est lu à la création seulement.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ids]);
@@ -137,6 +142,8 @@ const RueScene = forwardRef<RueHandle, Props>(function RueScene(
   const still = list.current[current] ?? RUE_SCENES.find((s) => s.id === ids.split(",")[0]) ?? RUE_SCENES[0];
   const under = prev !== null && prev !== current ? list.current[prev] : null;
 
+  const sceneInfo = RUE_SCENES.find((s) => s.id === ids.split(",")[current]) ?? null;
+
   return (
     <div className={cn("overflow-hidden bg-night", className)} role="img" aria-label={label}>
       {fallback ? (
@@ -149,6 +156,7 @@ const RueScene = forwardRef<RueHandle, Props>(function RueScene(
       ) : (
         <canvas ref={canvas} aria-hidden className="absolute inset-0 w-full h-full block" />
       )}
+      {friends && !fallback && <FriendWindowsLayer renderer={renderer} scene={sceneInfo} />}
     </div>
   );
 });

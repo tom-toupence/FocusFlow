@@ -4,12 +4,47 @@
 import { useEffect, useRef, useState } from "react";
 import { createRue, supportsRue, type RueRenderer } from "@/lib/rue/RueRenderer";
 import { RUE_SCENES, type RueSceneInfo } from "@/lib/rue/scenes";
+import type { Friend, FriendStats } from "@/lib/friends";
+import { useFriendsStore } from "@/store/friendsStore";
+import FriendWindowsLayer from "@/components/FriendWindowsLayer";
+import FriendWindowsList from "@/components/FriendWindowsList";
+
+// Amis simulés (sans Supabase) : 3 en focus, 2 en ligne, 3 hors ligne.
+const FAKE: [string, "focus" | "on" | "off", string | null][] = [
+  ["Léa Martin", "focus", "En focus · Kyoto Rain Lofi"],
+  ["Tom", "focus", "Radio FocusFlow · Nuit calme"],
+  ["Inès", "focus", "En focus · Spotify"],
+  ["Hugo", "on", "En pause"],
+  ["Maya", "on", null],
+  ["Noé", "off", null],
+  ["Sacha", "off", null],
+  ["Jade", "off", null],
+];
+function fakeFriends(): Friend[] {
+  const now = Date.now();
+  return FAKE.map(([name, st, activity], i): Friend => {
+    const stats: FriendStats = {
+      weekMinutes: 0, weekSessions: 0, streak: 0, level: 1, xp: 0, badges: 0,
+      inFocus: st === "focus", focusStartedAt: now, focusHeartbeat: st === "focus" ? now : 0,
+      online: st !== "off", onlineHeartbeat: st !== "off" ? now : 0, activity,
+    };
+    return { friendshipId: `f${i}`, userId: `lab-ami-${i}`, username: name.toLowerCase(), displayName: name, avatarUrl: null, stats };
+  });
+}
 
 type SceneInfo = RueSceneInfo;
 
 export default function RueLab() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const r = useRef<RueRenderer | null>(null);
+  const [renderer, setRenderer] = useState<RueRenderer | null>(null);
+  const simulated = useFriendsStore((s) => s.friends.length > 0);
+  const simulate = (on: boolean) => useFriendsStore.setState({ friends: on ? fakeFriends() : [] });
+  // ?friends : amis simulés dès l'ouverture (captures).
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("friends")) simulate(true);
+    return () => simulate(false);
+  }, []);
   const [scenes, setScenes] = useState<SceneInfo[] | null>(null);
   const [current, setCurrent] = useState(0);
   const [fallback, setFallback] = useState(false);
@@ -54,12 +89,13 @@ export default function RueLab() {
       .then((x) => {
         if (disposed) { x.dispose(); return; }
         r.current = x;
+        setRenderer(x);
         if (record) (window as unknown as { __rue?: RueRenderer }).__rue = x;
       })
       .catch((e) => { console.warn("[rue] repli :", e); setFallback(true); });
     const move = (e: PointerEvent) => r.current?.pointer((e.clientX / window.innerWidth) * 2 - 1, (e.clientY / window.innerHeight) * 2 - 1);
     window.addEventListener("pointermove", move);
-    return () => { disposed = true; window.removeEventListener("pointermove", move); r.current?.dispose(); r.current = null; };
+    return () => { disposed = true; window.removeEventListener("pointermove", move); r.current?.dispose(); r.current = null; setRenderer(null); };
   }, [scenes]);
 
   useEffect(() => { r.current?.setMode(mode); }, [mode]);
@@ -77,6 +113,8 @@ export default function RueLab() {
       ) : (
         <canvas ref={canvas} className="absolute inset-0 w-full h-full block" aria-label="Rue de nuit sous la pluie, enseignes lumineuses" role="img" />
       )}
+      {!fallback && <FriendWindowsLayer renderer={renderer} scene={scene ?? null} />}
+      <FriendWindowsList className="absolute top-3 right-3 z-10" />
 
       <div className="absolute top-3 left-3 z-10 text-xs">
         <button onClick={() => setPanel((v) => !v)} className="px-2 py-1 rounded bg-black/60 border border-white/15">
@@ -105,6 +143,19 @@ export default function RueLab() {
             <div className="flex gap-2">
               <button onClick={() => r.current?.pomodoroDone()} className="flex-1 py-1 rounded border border-white/20">Fin de pomodoro</button>
               <button onClick={() => r.current?.goal()} className="flex-1 py-1 rounded border border-white/20">Objectif</button>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => simulate(!simulated)} className={`flex-1 py-1 rounded border ${simulated ? "bg-white text-black border-white" : "border-white/20"}`}>
+                {simulated ? "Retirer les amis" : "Simuler 8 amis"}
+              </button>
+              {simulated && (
+                <button
+                  onClick={() => useFriendsStore.setState((s) => ({ friends: s.friends.map((f, i) => (i === 0 && f.stats ? { ...f, stats: { ...f.stats, inFocus: !f.stats.inFocus, activity: f.stats.inFocus ? "En pause" : "En focus · Kyoto Rain Lofi" } } : f)) }))}
+                  className="flex-1 py-1 rounded border border-white/20"
+                >
+                  Léa : focus / pause
+                </button>
+              )}
             </div>
             {fallback && <p className="text-amber-300/80">Image fixe : WebGL2 matériel indisponible (ou mouvement réduit).</p>}
           </div>

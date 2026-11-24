@@ -5,6 +5,7 @@
 // sources : la page ne pilote qu'un `PlayerAdapter`.
 import { useEffect, useRef, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import SpotifyPlayer from "@/components/SpotifyPlayer";
+import FriendWindowsList from "@/components/FriendWindowsList";
 import TwitchPlayer from "@/components/TwitchPlayer";
 import { usePlaybackPrefsStore } from "@/store/playbackPrefsStore";
 import type { ExtendedEvent, PlayerAdapter } from "@/lib/playback/types";
@@ -58,6 +59,7 @@ export default function SessionMedia({ media, playing, isBreak, volume, trackId,
           {/* Aucune image avec Spotify : la ville sert de décor. Démontée
               pendant la halte (qui a la sienne) : jamais deux scènes. */}
           {!isBreak && backdrop}
+          {!isBreak && <FriendWindowsList className="absolute z-10 top-[6.5rem] right-3 md:top-[8.5rem] md:right-5" />}
           <SpotifyPlayer
             shouldPlay={playing}
             playlistUri={media.spotify.playlistUri}

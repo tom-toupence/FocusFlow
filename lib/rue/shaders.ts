@@ -40,6 +40,11 @@ uniform sampler2D uColor, uMasks, uIds;
 uniform float uTime, uNight, uBreak, uRain, uMotion;
 uniform float uTexW;        // largeur de la photo en pixels
 uniform vec3 uEvent;        // x = type (1 fin de pomodoro, 2 objectif), y = début (s)
+// Fenêtres des amis : x = numéro de fenêtre, y = état (0 éteinte, 1 allumée,
+// 2 en focus), z = début du grésillement (s). w inutilisé.
+uniform vec4 uFriendWin[16];
+uniform int uFriendN;
+uniform vec2 uFriendHi;     // fenêtre qui pulse (survol de la liste) : numéro, début (s)
 
 float hash(float n) { return fract(sin(n * 127.1) * 43758.5453); }
 float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -120,14 +125,42 @@ void main() {
   f *= 1.0 - 0.95 * cut;
   col *= 1.0 - emissive * (1.0 - f) * 0.9;
 
-  float w = windowOn(floor(ids.g + 0.5));
-  col *= 1.0 - win * (1.0 - w) * 0.85;
+  float wid = floor(ids.g + 0.5);
+  float w = windowOn(wid);
+  // Fenêtre d'un ami : allumée et chaude (en ligne), plus vive (en focus),
+  // éteinte (hors ligne), quoi que dise l'animation normale de la rue.
+  float warm = 0.0, forcedOff = 0.0;
+  if (uFriendN > 0 && wid > 0.5 && win > 0.002) {
+    for (int i = 0; i < 16; i++) {
+      if (i >= uFriendN) break;
+      vec4 fw = uFriendWin[i];
+      if (abs(fw.x - wid) > 0.5) continue;
+      if (fw.y < 0.5) { w = 0.0; forcedOff = 1.0; }
+      else { w = 1.0; warm = fw.y > 1.5 ? 1.0 : 0.6; }
+      // Passage de focus à pause : la fenêtre grésille une seconde.
+      float ft = uTime - fw.z;
+      if (ft >= 0.0 && ft < 1.1) {
+        float on = step(0.42, noise(vec2(ft * 24.0, wid * 3.1)));
+        w = mix(0.1, 1.0, on);
+        warm *= on;
+      }
+      if (uFriendHi.x > 0.5 && abs(uFriendHi.x - wid) < 0.5) {
+        float ht = uTime - uFriendHi.y;
+        warm += (0.5 - 0.5 * cos(ht * 5.0)) * 1.2;
+        w = max(w, 0.6);
+      }
+      break;
+    }
+  }
+  col *= 1.0 - win * (1.0 - w) * (0.85 + 0.08 * forcedOff);
+  float lit = clamp(win * 1.6, 0.0, 1.0) * warm;
+  col = mix(col, max(col, vec3(0.35)) * vec3(1.35, 1.05, 0.7), clamp(lit, 0.0, 1.0) * 0.7) + lit * vec3(1.0, 0.72, 0.42) * 0.4;
 
   // Objectif atteint : les fenêtres se rallument, une onde monte le long des façades.
   float glow = 0.0;
   if (uEvent.x > 1.5 && et >= 0.0 && et < 5.0) {
     glow = exp(-pow(vUv.y - (1.0 - et * 0.35), 2.0) * 90.0) * (emissive + win) * 0.9 * (1.0 - et / 5.0);
-    col *= 1.0 + win * (1.0 - w) * 0.85 * smoothstep(0.0, 0.6, et);
+    col *= 1.0 + win * (1.0 - w) * 0.85 * smoothstep(0.0, 0.6, et) * (1.0 - forcedOff);
   }
 
   // Sol : les reflets scintillent sous la pluie et baissent pendant la coupure.

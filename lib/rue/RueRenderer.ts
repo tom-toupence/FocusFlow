@@ -4,6 +4,7 @@
 // la scène redonne exactement la photo ; dès que la caméra avance ou tourne,
 // la perspective est vraie (le proche grossit et glisse plus que le loin).
 import { MESH_FRAG, MESH_VERT, POST, QUAD_VERT } from "./shaders";
+import { MAX_FRIEND_WINDOWS, scanWindowIds, type FriendWindow, type RueWindow } from "./friendWindows";
 
 export type RueMode = "work" | "break";
 
@@ -49,6 +50,14 @@ export interface RueRenderer {
   setScroll(v: number): void;
   /** Suspend le rendu (vidéo par-dessus, section hors écran). */
   setPaused(v: boolean): void;
+  /** Les fenêtres de la scène courante (lues une fois dans ids.webp, puis en cache). */
+  windows(): Promise<{ base: string; windows: RueWindow[] }>;
+  /** Fenêtres des amis (16 au plus). Vidé à chaque changement de scène. */
+  setFriendWindows(list: FriendWindow[]): void;
+  /** Fait pulser une fenêtre (survol de la liste des amis) ; `null` arrête. */
+  highlightWindow(id: number | null): void;
+  /** Position à l'écran (px CSS, relatifs au canvas) des fenêtres des amis. */
+  locateFriendWindows(): { id: number; x: number; y: number; r: number }[];
   dispose(): void;
 }
 
@@ -73,6 +82,33 @@ export function supportsRue(): boolean {
 async function loadBitmap(url: string): Promise<ImageBitmap> {
   const blob = await (await fetch(url)).blob();
   return createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
+}
+
+// Fenêtres d'une scène : lues une seule fois par scène (et par page), avec la
+// disparité à leur centre (pour les placer à l'écran au survol).
+const windowCache = new Map<string, Promise<RueWindow[]>>();
+function sceneWindows(base: string): Promise<RueWindow[]> {
+  let p = windowCache.get(base);
+  if (!p) {
+    p = (async () => {
+      const [ids, depth] = await Promise.all([loadBitmap(`${base}/ids.webp`), loadBitmap(`${base}/depth.webp`)]);
+      const c = document.createElement("canvas");
+      c.width = ids.width; c.height = ids.height;
+      const ctx = c.getContext("2d", { willReadFrequently: true })!;
+      ctx.drawImage(ids, 0, 0);
+      const list = scanWindowIds(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+      ctx.drawImage(depth, 0, 0, c.width, c.height);
+      for (const w of list) {
+        const d = ctx.getImageData(Math.min(c.width - 1, Math.floor(w.cx * c.width)), Math.min(c.height - 1, Math.floor(w.cy * c.height)), 1, 1).data;
+        w.depth = Math.max(d[0], d[1], d[2], d[3]) / 255;
+      }
+      ids.close(); depth.close();
+      return list;
+    })();
+    p.catch(() => windowCache.delete(base));
+    windowCache.set(base, p);
+  }
+  return p;
 }
 
 // ── Matrices (colonnes, comme WebGL) ─────────────────────────────────────────
@@ -227,7 +263,7 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
   resize();
 
   const U = (p: WebGLProgram, n: string) => gl.getUniformLocation(p, n);
-  const mu = Object.fromEntries(["uDepth", "uLayer", "uProj", "uView", "uTan", "uZ", "uColor", "uMasks", "uIds", "uTime", "uNight", "uBreak", "uRain", "uMotion", "uEvent", "uTexW"].map((n) => [n, U(meshProg, n)]));
+  const mu = Object.fromEntries(["uDepth", "uLayer", "uProj", "uView", "uTan", "uZ", "uColor", "uMasks", "uIds", "uTime", "uNight", "uBreak", "uRain", "uMotion", "uEvent", "uTexW", "uFriendWin", "uFriendN", "uFriendHi"].map((n) => [n, U(meshProg, n)]));
   const pu = Object.fromEntries(["uScene", "uBright", "uDepthTex", "uRes", "uTime", "uNight", "uBreak", "uRain", "uMotion", "uRainDrift", "uStyle", "uFade"].map((n) => [n, U(postProg, n)]));
 
   // Optique de la photo : champ vertical supposé de 50 degrés.
@@ -242,6 +278,15 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
   const target = { night: 0, brk: 0, rain: specs[0].rain ?? RAIN, px: 0, py: 0, scroll: 0 };
   let paused = false;
   let event: [number, number] = [0, -100];
+  // Fenêtres des amis : mises à jour seulement quand leur état change.
+  const friendWin = new Float32Array(MAX_FRIEND_WINDOWS * 4);
+  let friendN = 0;
+  let friendHi: [number, number] = [0, 0];
+  let friendIds: number[] = [];
+  const now = () => (clock() - start) / 1000;
+  // Dernière caméra dessinée (pour placer les fenêtres au survol).
+  let lastProj: M4 | null = null, lastView: M4 | null = null, lastTanX = 1;
+  let known: { base: string; windows: RueWindow[] } | null = null;
   let style = specs[0].style ?? 1;
   // Relais des scènes : `fade` = lumière de la rue (0 = éteinte), `phase` =
   // « off » (on éteint), « swap » (dans le noir), « on » (on rallume).
@@ -293,6 +338,7 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
         cur = pending; curIndex = pendingIndex; pending = null; pendingIndex = -1;
         style = cur.spec.style ?? 1;
         state.rain = target.rain = (cur.spec.rain ?? RAIN) * (target.brk > 0.5 ? BREAK_RAIN : 1);   // changé dans le noir
+        friendN = 0; friendIds = []; friendHi = [0, 0];   // autres fenêtres : RueScene réattribue
         opts.onScene?.(curIndex);
         phase = "on"; phaseT = t;
         event = [1, t - 0.6];            // les enseignes se rallument en vague
@@ -330,6 +376,7 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     const spareY = Math.max(0, TAN_Y - ty) / ty;                 // en unités NDC
     const proj = projection(tx, ty, 0.05, 50, -spareY * Math.min(1, Math.max(-1, cur.spec.frameY ?? 0)) * 0.85);
     const vw = view(pos, yaw, pitch);
+    lastProj = proj; lastView = vw; lastTanX = TAN_X;
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.viewport(0, 0, W, H);
@@ -357,6 +404,9 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     gl.uniform1f(mu.uMotion, m);
     gl.uniform3f(mu.uEvent, event[0], event[1], 0);
     gl.uniform1f(mu.uTexW, cur.texW);
+    gl.uniform4fv(mu.uFriendWin, friendWin);
+    gl.uniform1i(mu.uFriendN, friendN);
+    gl.uniform2f(mu.uFriendHi, friendHi[0], friendHi[1]);
     // Du fond vers l'avant, chaque plan PAR-DESSUS le précédent : le tampon
     // de profondeur est vidé entre deux plans (il ne sert qu'à l'intérieur
     // d'un plan). Sinon un plan arrière, qui garde loin des silhouettes la
@@ -408,6 +458,44 @@ export async function createRue(canvas: HTMLCanvasElement, opts: RueOptions = {}
     pointer(x, y) { target.px = x; target.py = y; },
     setScroll(v) { target.scroll = Math.min(1, Math.max(0, v)); },
     setPaused(v) { paused = v; },
+    async windows() {
+      const base = cur.spec.base;
+      const res = { base, windows: await sceneWindows(base) };
+      known = res;
+      return res;
+    },
+    setFriendWindows(list) {
+      friendWin.fill(0);
+      const t = now(), wall = Date.now();
+      const kept = list.slice(0, MAX_FRIEND_WINDOWS);
+      kept.forEach((f, i) => {
+        friendWin[i * 4] = f.windowId;
+        friendWin[i * 4 + 1] = f.state === "focus" ? 2 : f.state === "on" ? 1 : 0;
+        friendWin[i * 4 + 2] = f.flickerAt ? t + (f.flickerAt - wall) / 1000 : -100;
+      });
+      friendN = kept.length;
+      friendIds = kept.map((f) => f.windowId);
+      redraw();
+    },
+    highlightWindow(id) {
+      friendHi = id ? [id, now()] : [0, 0];
+      redraw();
+    },
+    locateFriendWindows() {
+      if (!lastProj || !lastView || !friendIds.length) return [];
+      if (!known || known.base !== cur.spec.base) return [];
+      const m = mul(lastProj, lastView);
+      const cw = canvas.clientWidth, ch = canvas.clientHeight;
+      return known.windows.filter((w) => friendIds.includes(w.id)).map((w) => {
+        const z = 1 / ((1 / Z_FAR) + (1 / Z_NEAR - 1 / Z_FAR) * (w.depth ?? 0.3));
+        const p = [(w.cx - 0.5) * 2 * lastTanX * z, -(w.cy - 0.5) * 2 * TAN_Y * z, -z, 1];
+        const c = [0, 1, 2, 3].map((r) => m[r] * p[0] + m[4 + r] * p[1] + m[8 + r] * p[2] + m[12 + r] * p[3]);
+        const x = (c[0] / c[3] * 0.5 + 0.5) * cw, y = (0.5 - c[1] / c[3] * 0.5) * ch;
+        // Rayon : la taille de la fenêtre ramenée à l'écran (grossièrement).
+        const r = Math.sqrt(w.area / Math.PI) * (cw / cur.texW) / 0.9;
+        return { id: w.id, x, y, r };
+      });
+    },
     step(dt) { virtual += dt * 1000; draw(virtual); },
     setStyle(v) { style = Math.min(1, Math.max(0, v)); redraw(); },
     nextScene(index) {
