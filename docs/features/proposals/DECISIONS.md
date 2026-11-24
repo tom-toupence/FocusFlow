@@ -17,4 +17,17 @@
 
 ## Vague 2 (2026-11-24) : `vague-2.html`
 
-En attente de réponse idée par idée.
+| # | Idée | Décision |
+|---|------|----------|
+| 1 | Calé sur la vidéo | **Oui**, implémentation lancée |
+| 2 | Emporter la session sur le téléphone | **Oui**, implémentation lancée |
+| 3 | Le minuteur qui connaît ton agenda | **Oui**, implémentation lancée |
+| 5 | Téléphone télécommande | **Oui**, implémentation lancée |
+| 8 | Lancer en une phrase | **Oui**, implémentation lancée |
+| 9 | Dernier train | **Oui**, implémentation lancée |
+| 4 | La mélodie de la journée | Non, ne pas reproposer |
+| 6 | Estimer par comparaison | Non, ne pas reproposer |
+| 7 | Ancrage sonore | Non, ne pas reproposer |
+| 10 | Prévenir à sa pause | Non, ne pas reproposer |
+
+Feu vert d'implémentation donné le 2026-11-24 pour toutes les idées « Oui » des vagues 1 et 2 (voir `docs/features/PLAN.md`).
