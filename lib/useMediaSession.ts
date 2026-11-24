@@ -101,8 +101,9 @@ function artworkFor(track: PlaybackState["track"], kind: SourceKind): MediaImage
 //     contrôles média. Généré en mémoire (WAV 8 kHz 8 bits, ~80 Ko, Blob URL)
 //     plutôt qu'écrit en dur : un data URI de quelques centaines d'octets
 //     durerait bien moins de 5 s ;
-//   . il joue tant que le minuteur tourne (halte comprise, pour que l'écran
-//     verrouillé affiche « Pause · 04:12 ») et s'arrête avec lui ;
+//   . il joue tant que la session est active, minuteur en pause compris : le
+//     bouton « Reprendre » de l'écran verrouillé reste ainsi disponible (le
+//     bouton affiché suit `playbackState`, posé explicitement) ;
 //   . `play()` exige un geste utilisateur : on tente au démarrage (la session
 //     est lancée par un clic, l'activation est encore là après la navigation
 //     côté client), puis, en cas de refus (rechargement de /session), au
@@ -126,6 +127,7 @@ function silentWavUrl(seconds = 10, rate = 8000): string {
 function useSilentAudio(shouldPlay: boolean) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const wantRef = useRef(shouldPlay);
+  const tryPlayRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!SILENT_AUDIO_WORKAROUND || typeof Audio === "undefined") return;
@@ -137,14 +139,34 @@ function useSilentAudio(shouldPlay: boolean) {
     audio.setAttribute("playsinline", "");
     audio.dataset.focusflowSilent = "";
     audioRef.current = audio;
-    // Refus de lecture (pas encore de geste) : nouvel essai au prochain geste.
-    const retry = () => { if (wantRef.current && audio.paused) audio.play().catch(() => {}); };
-    window.addEventListener("pointerdown", retry, true);
-    window.addEventListener("keydown", retry, true);
-    if (wantRef.current) audio.play().catch(() => {});
+
+    // Refus de lecture (pas encore de geste) : nouvel essai au prochain geste,
+    // écouteurs retirés dès que la lecture a réussi.
+    const onGesture = () => tryPlay();
+    const listenGestures = (on: boolean) => {
+      for (const type of ["pointerdown", "keydown"] as const) {
+        if (on) window.addEventListener(type, onGesture, true);
+        else window.removeEventListener(type, onGesture, true);
+      }
+    };
+    const tryPlay = () => {
+      if (!wantRef.current || !audio.paused) return;
+      audio.play().then(() => listenGestures(false), () => listenGestures(true));
+    };
+    tryPlayRef.current = tryPlay;
+    // Mis en pause par le système (autre média, coupure audio) alors qu'on le
+    // veut encore : relance si l'onglet est visible, sinon au retour sur l'onglet.
+    const onPaused = () => { if (wantRef.current && document.visibilityState === "visible") tryPlay(); };
+    const onVisible = () => { if (document.visibilityState === "visible") tryPlay(); };
+    audio.addEventListener("pause", onPaused);
+    document.addEventListener("visibilitychange", onVisible);
+    tryPlay();
     return () => {
-      window.removeEventListener("pointerdown", retry, true);
-      window.removeEventListener("keydown", retry, true);
+      wantRef.current = false;
+      tryPlayRef.current = () => {};
+      listenGestures(false);
+      audio.removeEventListener("pause", onPaused);
+      document.removeEventListener("visibilitychange", onVisible);
       audio.pause();
       audio.removeAttribute("src");
       audio.load();
@@ -155,11 +177,20 @@ function useSilentAudio(shouldPlay: boolean) {
 
   useEffect(() => {
     wantRef.current = shouldPlay;
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (shouldPlay) audio.play().catch(() => {});
-    else audio.pause();
+    if (shouldPlay) tryPlayRef.current();
+    else audioRef.current?.pause();
   }, [shouldPlay]);
+}
+
+/**
+ * Titre suivant / précédent sans réveiller la musique : si le minuteur est en
+ * pause ou en halte, le titre change mais le son reste coupé.
+ */
+export function skipTrack(adapter: PlayerAdapter | null, dir: "next" | "prev") {
+  if (!adapter) return;
+  if (dir === "next") adapter.next(); else adapter.previous();
+  const s = useTimerStore.getState();
+  if (!s.isRunning || s.mode !== "work") adapter.pause();
 }
 
 // ─── Le hook ──────────────────────────────────────────────────────────────────
@@ -179,31 +210,35 @@ export function useMediaSession({ adapter, pb, onPlay, onPause }: MediaSessionOp
   const endsAt = useTimerStore((s) => s.endsAt);
   const flowStartedAt = useTimerStore((s) => s.flowStartedAt);
   const hydrated = useTimerStore((s) => s.hydrated);
+  const active = useTimerStore((s) => s.active);
 
-  useSilentAudio(hydrated && isRunning);
+  useSilentAudio(hydrated && active);
 
   // Derniers callbacks et état de lecture, lus par les handlers (posés une fois).
   const latest = useRef({ adapter, pb, onPlay, onPause });
   useEffect(() => { latest.current = { adapter, pb, onPlay, onPause }; });
 
-  // ── Titre d'onglet : chaque seconde, restauré au démontage ──────────────────
+  // ── Titre d'onglet : restauré au démontage ─────────────────────────────────
   useEffect(() => {
     if (!hydrated) return;
     const original = document.title;
+    return () => { document.title = original; };
+  }, [hydrated]);
+  // À chaque changement d'état (pause, cycle suivant), puis chaque seconde tant
+  // que le minuteur tourne (à l'arrêt, le titre ne bouge pas).
+  useEffect(() => {
+    if (!hydrated) return;
     const update = () => { document.title = tabTitle(readClock(Date.now())); };
     update();
+    if (!isRunning) return;
     const id = setInterval(update, 1000);
-    return () => { clearInterval(id); document.title = original; };
-  }, [hydrated]);
-  // Changement d'état (pause, cycle suivant) : titre à jour sans attendre la seconde.
-  useEffect(() => {
-    if (hydrated) document.title = tabTitle(readClock(Date.now()));
+    return () => clearInterval(id);
   }, [hydrated, isRunning, mode, endsAt, flowStartedAt]);
 
-  // ── Handlers : posés une fois, nettoyés au démontage ────────────────────────
+  // ── Handlers : posés une fois le minuteur relu, nettoyés au démontage ───────
   const canSkip = pb.caps.skip;
   useEffect(() => {
-    if (!("mediaSession" in navigator)) return;
+    if (!hydrated || !("mediaSession" in navigator)) return;
     const ms = navigator.mediaSession;
     const set = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
       try { ms.setActionHandler(action, handler); } catch { /* action inconnue de ce navigateur */ }
@@ -214,12 +249,13 @@ export function useMediaSession({ adapter, pb, onPlay, onPause }: MediaSessionOp
     set("seekbackward", null);
     set("seekforward", null);
     set("seekto", null);
-    set("nexttrack", canSkip ? () => latest.current.adapter?.next() : null);
-    set("previoustrack", canSkip ? () => latest.current.adapter?.previous() : null);
+    // Minuteur en pause ou halte : le titre change, la musique reste coupée.
+    set("nexttrack", canSkip ? () => skipTrack(latest.current.adapter, "next") : null);
+    set("previoustrack", canSkip ? () => skipTrack(latest.current.adapter, "prev") : null);
     return () => {
       for (const a of ["play", "pause", "stop", "seekbackward", "seekforward", "seekto", "nexttrack", "previoustrack"] as MediaSessionAction[]) set(a, null);
     };
-  }, [canSkip]);
+  }, [hydrated, canSkip]);
 
   // ── Métadonnées, état et position : toutes les 15 s, et à chaque changement ─
   const trackId = pb.track?.id ?? "";
@@ -252,6 +288,8 @@ export function useMediaSession({ adapter, pb, onPlay, onPause }: MediaSessionOp
       } catch { /* position incohérente ou non gérée */ }
     };
     push();
+    // À l'arrêt, rien ne bouge : l'effet ne repasse qu'au prochain changement.
+    if (!isRunning) return;
     const id = setInterval(push, METADATA_REFRESH_MS);
     return () => clearInterval(id);
   }, [hydrated, isRunning, mode, endsAt, flowStartedAt, trackId, trackTitle, pb.kind]);

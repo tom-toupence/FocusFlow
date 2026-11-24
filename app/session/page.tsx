@@ -22,7 +22,7 @@ import { usePlayback, type PlayerAdapter } from "@/lib/playback/types";
 import { useSessionMedia } from "@/lib/playback/useSessionMedia";
 import type { ExtendedEvent, SourceKind } from "@/lib/playback/types";
 import { useIdleHide } from "@/lib/useIdleHide";
-import { useMediaSession } from "@/lib/useMediaSession";
+import { useMediaSession, skipTrack as skipWithoutWaking } from "@/lib/useMediaSession";
 import { usePrefsStore } from "@/store/prefsStore";
 import { useDistractionStore } from "@/store/distractionStore";
 import { useAchievementsStore } from "@/store/achievementsStore";
@@ -366,7 +366,8 @@ export default function SessionPage() {
     city.current?.next();
   };
 
-  const skipTrack = (dir: "next" | "prev") => { if (dir === "next") adapter?.next(); else adapter?.previous(); };
+  // Minuteur en pause : le titre change sans relancer la musique (comme depuis l'OS).
+  const skipTrack = (dir: "next" | "prev") => skipWithoutWaking(adapter, dir);
 
   // « Now Playing » unifié : la piste que l'adaptateur déclare, quelle que soit la source.
   const nowPlaying: { title: string; sub: string } | null = pb.track

@@ -37,3 +37,27 @@ test("session : temps restant dans l'onglet et métadonnées média", async ({ p
   await page.waitForFunction(() => navigator.mediaSession.playbackState === "paused");
   await page.waitForFunction(() => (window as unknown as W).__yt?.playing === false);
 });
+
+test("Terminer : titre d'onglet restauré et métadonnées média effacées", async ({ page }) => {
+  await prepare(page, { queue: QUEUE, loop: true });
+  await open(page, "/session");
+  await expect(page).toHaveTitle(/ · Focus$/);
+  await page.waitForFunction(() => navigator.mediaSession?.metadata != null);
+  await page.getByRole("button", { name: "Terminer", exact: true }).click();
+  await page.waitForURL(/\/summary/);
+  await expect(page).toHaveTitle(/^FocusFlow/);
+  await page.waitForFunction(() => navigator.mediaSession.metadata === null);
+});
+
+test("titre suivant pendant la pause : le titre change, la musique reste coupée", async ({ page }) => {
+  await prepare(page, { queue: QUEUE, loop: true });
+  await open(page, "/session");
+  await page.waitForFunction(() => (window as unknown as W).__yt?.playing === true);
+  await page.getByRole("button", { name: /Pause/ }).first().click();
+  await page.waitForFunction(() => (window as unknown as W).__yt?.playing === false);
+  await page.getByTitle("Titre suivant").click();
+  await expect(page.getByText("Deuxième titre")).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => (window as unknown as W).__yt?.playing)).toBe(false);
+  await expect(page).toHaveTitle(/^En pause · /);
+});
