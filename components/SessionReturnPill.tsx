@@ -55,6 +55,9 @@ export default function SessionReturnPill() {
     shown = isRunning && endsAt != null ? remainingSeconds(endsAt, now) : secondsLeft;
   }
 
+  // Cycle fini pendant qu'on était ailleurs : /session fait le rattrapage au clic.
+  const finished = !isFlowWork && isRunning && endsAt != null && now >= endsAt;
+
   return (
     <motion.div
       initial={reduce ? false : { opacity: 0, y: 8 }}
@@ -69,12 +72,12 @@ export default function SessionReturnPill() {
       >
         <span
           aria-hidden
-          className={cn("h-1.5 w-1.5 shrink-0 rounded-full bg-focus", isRunning && "motion-safe:animate-pulse")}
+          className={cn("h-1.5 w-1.5 shrink-0 rounded-full bg-focus", isRunning && !finished && "motion-safe:animate-pulse")}
         />
         <span className="flex flex-col leading-tight">
-          <span className="text-[13px] font-medium text-foreground">Session en cours</span>
+          <span className="text-[13px] font-medium text-foreground">{finished ? "Cycle terminé" : "Session en cours"}</span>
           <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-foreground/35">
-            {isRunning ? MODE_LABEL[mode] : `${MODE_LABEL[mode]}, en pause`}
+            {finished ? "Terminé" : isRunning ? MODE_LABEL[mode] : `${MODE_LABEL[mode]}, en pause`}
           </span>
         </span>
         <span className="font-mono text-[15px] tabular-nums text-focus">{formatClock(shown)}</span>

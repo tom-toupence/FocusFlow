@@ -1,4 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+// localStorage factice, posé avant la création du store (sinon persist est inactif).
+const memory = vi.hoisted(() => {
+  const data = new Map<string, string>();
+  const ls = {
+    getItem: (k: string) => data.get(k) ?? null,
+    setItem: (k: string, v: string) => void data.set(k, v),
+    removeItem: (k: string) => void data.delete(k),
+  };
+  const g = globalThis as unknown as Record<string, unknown>;
+  g.localStorage = ls;
+  g.window = { localStorage: ls }; // zustand lit window.localStorage
+  return data;
+});
+
 import {
   useTimerStore,
   PRESETS,
@@ -188,5 +202,62 @@ describe("formatClock", () => {
   it("formate mm:ss et h:mm:ss", () => {
     expect(formatClock(65)).toBe("01:05");
     expect(formatClock(3725)).toBe("1:02:05");
+  });
+});
+
+describe("endSession", () => {
+  it("désactive la session mais garde les compteurs pour le résumé", () => {
+    const st = useTimerStore.getState();
+    st.start();
+    vi.setSystemTime(T0 + min(25));
+    useTimerStore.getState().nextSession(true);
+    useTimerStore.getState().endSession();
+    const s = useTimerStore.getState();
+    expect(s.active).toBe(false);
+    expect(s.isRunning).toBe(false);
+    expect(s.endsAt).toBeNull();
+    expect(s.flowStartedAt).toBeNull();
+    expect(s.updatedAt).toBeNull();
+    expect(s.sessionsCompleted).toBe(1);
+  });
+
+  it("garde flowMinutesTotal en flowtime", () => {
+    useTimerStore.getState().applyPreset("flowtime");
+    useTimerStore.getState().start();
+    vi.setSystemTime(T0 + min(30));
+    useTimerStore.getState().pause();
+    useTimerStore.getState().accumulateFlow();
+    useTimerStore.getState().endSession();
+    expect(useTimerStore.getState().flowMinutesTotal).toBe(30);
+    expect(useTimerStore.getState().active).toBe(false);
+  });
+});
+
+describe("réhydratation", () => {
+  it("relit une session en cours, rattrape l'horloge et passe hydrated à true", async () => {
+    const settings = { preset: "classic", ...PRESETS.classic };
+    useTimerStore.setState({ hydrated: false }); // avant : setState réécrit le stockage
+    memory.set("focusflow-timer", JSON.stringify({
+      version: 1,
+      state: { settings, mode: "work", secondsLeft: 1500, endsAt: T0 + min(25), isRunning: true, active: true, sessionsCompleted: 2, updatedAt: T0 },
+    }));
+    vi.setSystemTime(T0 + min(10));
+    await useTimerStore.persist.rehydrate();
+    const s = useTimerStore.getState();
+    expect(s.hydrated).toBe(true);
+    expect(s.active).toBe(true);
+    expect(s.secondsLeft).toBe(15 * 60);
+    expect(s.sessionsCompleted).toBe(2);
+  });
+
+  it("relit un ancien état (settings seul, version 0)", async () => {
+    const settings = { preset: "deep", ...PRESETS.deep };
+    useTimerStore.setState({ hydrated: false });
+    memory.set("focusflow-timer", JSON.stringify({ version: 0, state: { settings } }));
+    await useTimerStore.persist.rehydrate();
+    const s = useTimerStore.getState();
+    expect(s.hydrated).toBe(true);
+    expect(s.settings.preset).toBe("deep");
+    expect(s.active).toBe(false);
   });
 });

@@ -88,6 +88,14 @@ export default function PipTimer({
     }
   }, []);
 
+  // L'onglet principal caché est bridé : la fenêtre PiP garde son propre battement
+  // (tick recalcule depuis l'horloge, donc sans risque de double décompte).
+  useEffect(() => {
+    if (!pipWindow) return;
+    const id = pipWindow.setInterval(() => useTimerStore.getState().tick(), 1000);
+    return () => pipWindow.clearInterval(id);
+  }, [pipWindow]);
+
   // Close the PiP window when leaving the session page
   useEffect(() => () => { pipWindow?.close(); }, [pipWindow]);
 

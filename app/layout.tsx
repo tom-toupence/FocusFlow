@@ -5,6 +5,7 @@ import SupabaseProvider from "@/components/SupabaseProvider";
 import AuthGate from "@/components/AuthGate";
 import ToastHost from "@/components/Toast";
 import CommandPalette from "@/components/CommandPalette";
+import TimerHydrator from "@/components/TimerHydrator";
 import SessionReturnPill from "@/components/SessionReturnPill";
 import AmbientProvider from "@/components/AmbientProvider";
 import SplashIntro from "@/components/SplashIntro";
@@ -47,6 +48,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: `try{var t=JSON.parse(localStorage.getItem('focusflow-theme')||'{}').state?.theme;if(t==='light')document.documentElement.classList.remove('dark');else document.documentElement.classList.add('dark');}catch(e){}` }} />
       </head>
       <body className="min-h-full antialiased">
+        <TimerHydrator />
         <SupabaseProvider>
           <AuthGate>
             <FriendsLayoutShell>{children}</FriendsLayoutShell>

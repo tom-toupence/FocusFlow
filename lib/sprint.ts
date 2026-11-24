@@ -10,6 +10,7 @@ import { localToday } from "@/store/statsStore";
 import { usePlanStore } from "@/store/planStore";
 import { useSessionStore } from "@/store/sessionStore";
 import { useTimerStore } from "@/store/timerStore";
+import { closeActiveSession } from "@/lib/sessionEnd";
 import { useSpotifyStore } from "@/store/spotifyStore";
 import { useTwitchStore } from "@/store/twitchStore";
 import { useNotesStore } from "@/store/notesStore";
@@ -172,6 +173,7 @@ export function launchSprintSession(sprint: Sprint, blockDurationMin?: number): 
   useSessionStore.getState().selectVideo(video.id);
 
   // Timer: deep blocks get the 50/10 preset, shorter ones the classic 25/5
+  closeActiveSession();
   const timer = useTimerStore.getState();
   timer.applyPreset((blockDurationMin ?? 50) >= 50 ? "deep" : "classic");
   timer.resetAll();

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { defaultVideos, moodLabels, VideoMood } from "@/data/videos";
 import { useSessionStore } from "@/store/sessionStore";
+import { closeActiveSession } from "@/lib/sessionEnd";
 import { useTimerStore, TimerPreset } from "@/store/timerStore";
 import { usePrefsStore } from "@/store/prefsStore";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,7 @@ export default function Onboarding() {
     if (launch) {
       const video = (mood && defaultVideos.find((v) => v.mood === mood)) || defaultVideos[0];
       useSessionStore.getState().selectVideo(video.id);
+      closeActiveSession();
       useTimerStore.getState().applyPreset(preset);
       router.push("/session");
     }

@@ -2,6 +2,7 @@
 
 import { useState, useRef, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
+import { closeActiveSession } from "@/lib/sessionEnd";
 import { useTimerStore, TimerPreset, PRESETS } from "@/store/timerStore";
 import { useSessionStore, Todo, TodoPriority } from "@/store/sessionStore";
 import { usePlaylistStore } from "@/store/playlistStore";
@@ -268,7 +269,15 @@ function KanbanColumn({
   );
 }
 
+// Attend la relecture du minuteur persisté : les champs du formulaire s'initialisent
+// depuis `settings` et seraient sinon ceux par défaut (puis ré-écrits au démarrage).
 export default function SettingsPage() {
+  const hydrated = useTimerStore((s) => s.hydrated);
+  if (!hydrated) return null;
+  return <SettingsPageInner />;
+}
+
+function SettingsPageInner() {
   const router = useRouter();
   const expandTo = useExpandNavigate();
   const previewRef = useRef<HTMLDivElement>(null);
@@ -329,6 +338,7 @@ export default function SettingsPage() {
   };
 
   const applyTimerSettings = () => {
+    closeActiveSession();
     if (preset !== "custom") {
       applyPreset(preset);
     } else {

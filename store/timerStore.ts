@@ -50,6 +50,9 @@ interface TimerState {
   // Une session a été démarrée et pas terminée (survit à la navigation et au rechargement).
   active: boolean;
   updatedAt: number | null;
+  // Vrai une fois l'état persisté relu (skipHydration + TimerHydrator) : tant que
+  // c'est faux, le store porte les valeurs par défaut et ne doit pas être ré-écrit.
+  hydrated: boolean;
 
   applyPreset: (preset: TimerPreset) => void;
   updateSettings: (settings: Partial<TimerSettings>) => void;
@@ -62,6 +65,8 @@ interface TimerState {
   finishFlow: () => void;
   accumulateFlow: () => number;
   resetAll: () => void;
+  // Fin de session : désactive sans effacer sessionsCompleted/flowMinutesTotal (lus par /summary).
+  endSession: () => void;
 }
 
 const defaultSettings: TimerSettings = {
@@ -171,6 +176,7 @@ export const useTimerStore = create<TimerState>()(
       flowStartedAt: null,
       active: false,
       updatedAt: null,
+      hydrated: false,
 
       applyPreset: (preset) => {
         const values = PRESETS[preset];
@@ -316,6 +322,10 @@ export const useTimerStore = create<TimerState>()(
         return minutes;
       },
 
+      endSession: () => {
+        set({ active: false, isRunning: false, endsAt: null, flowStartedAt: null, updatedAt: null });
+      },
+
       resetAll: () => {
         const { settings } = get();
         set({
@@ -351,6 +361,12 @@ export const useTimerStore = create<TimerState>()(
         updatedAt: state.updatedAt,
       }),
       merge: (persisted, current) => mergeTimerState(persisted, current),
+      // Relu au montage par <TimerHydrator /> : le SSR et le 1er rendu client
+      // partent tous deux des valeurs par défaut (pas de mismatch d'hydratation).
+      skipHydration: true,
+      onRehydrateStorage: () => () => {
+        useTimerStore.setState({ hydrated: true });
+      },
     }
   )
 );

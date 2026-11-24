@@ -1,6 +1,7 @@
 "use client";
 
 import { useTimerStore } from "@/store/timerStore";
+import { closeActiveSession } from "@/lib/sessionEnd";
 import { useSessionStore } from "@/store/sessionStore";
 import { useSpotifyStore } from "@/store/spotifyStore";
 import { useTwitchStore } from "@/store/twitchStore";
@@ -14,6 +15,7 @@ import type { Routine } from "@/store/routineStore";
  */
 export function applyRoutine(r: Routine) {
   // Timer
+  closeActiveSession();
   const timer = useTimerStore.getState();
   if (r.preset !== "custom") {
     timer.applyPreset(r.preset);

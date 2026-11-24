@@ -56,7 +56,7 @@ export default function SessionPage() {
   const router = useRouter();
   const {
     mode, secondsLeft, isRunning, sessionsCompleted, settings,
-    flowSeconds, flowBreakTotal,
+    flowSeconds, flowBreakTotal, hydrated,
     tick, start, pause, nextSession, finishFlow, accumulateFlow,
   } = useTimerStore();
   const isFlowtime = settings.preset === "flowtime";
@@ -74,6 +74,7 @@ export default function SessionPage() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevSecondsRef = useRef(secondsLeft);
   const sessionEndedRef = useRef(false);
+  const initDoneRef = useRef(false);
   const goalCelebratedRef = useRef(false);
   const isBreakRef = useRef(mode !== "work");
   // La ville (halte + mode Spotify) : événements de ville déclenchés par la session.
@@ -116,6 +117,7 @@ export default function SessionPage() {
   const [bloomKey, setBloomKey] = useState(0);
   const prevModeRef = useRef(mode);
   useEffect(() => {
+    if (!initDoneRef.current) { prevModeRef.current = mode; return; }
     if (prevModeRef.current === mode) return;
     if (mode !== "work") {
       playBreakChime();
@@ -130,20 +132,6 @@ export default function SessionPage() {
   }, [mode]);
 
   // ── Record session start ─────────────────────────────────────────────────
-  // Retour sur une session déjà en cours (navigation ou rechargement) : on ne la
-  // réinitialise pas, on la reprend telle quelle (en pause, elle reste en pause).
-  const resumedRef = useRef(false);
-  useEffect(() => {
-    if (useTimerStore.getState().active) {
-      resumedRef.current = true;
-      return;
-    }
-    const doneTodoIds = todos.filter((t) => t.status === "done").map((t) => t.id);
-    startSession(settings.workDuration, doneTodoIds);
-    resetDistractions();
-    start();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   // ── Présence « en focus » pour les amis (online-only, no-op sans compte) ──
   // in_focus=true au montage + heartbeat toutes les 60 s ; cleanup au démontage
   // (couvre Terminer/navigation). Les amis voient le statut via Realtime.
@@ -251,25 +239,34 @@ export default function SessionPage() {
     nextSession(autoStart);
   }, [mode, nextSession, recordSession, recordPlay, settings.workDuration]);
 
+  // Tant que l'init (démarrage ou rattrapage) n'est pas faite, on suit juste la valeur :
+  // le passage des défauts à l'état relu ne doit pas passer pour une fin de cycle.
   useEffect(() => {
-    if (prevSecondsRef.current > 0 && secondsLeft === 0) handleSessionEnd();
+    if (initDoneRef.current && prevSecondsRef.current > 0 && secondsLeft === 0) handleSessionEnd();
     prevSecondsRef.current = secondsLeft;
   }, [secondsLeft, handleSessionEnd]);
 
-  // ── Rattrapage au retour : un cycle a pu finir pendant qu'on était ailleurs ──
-  // Traité une seule fois, au montage, et un seul cycle est crédité même si
-  // plusieurs se seraient écoulés. On reste ensuite en attente (pas d'enchaînement).
-  // Le rendu initial lit un secondsLeft périmé : la transition passe donc par cet
-  // effet, qui change le mode dans la même passe (le rendu ne voit jamais 0).
-  const catchUpDoneRef = useRef(false);
+  // ── Démarrage ou reprise (une seule fois, une fois le minuteur relu) ─────────
+  // Session déjà active (navigation, rechargement) : on la reprend telle quelle (en
+  // pause, elle reste en pause) et on rattrape un cycle fini pendant l'absence, une
+  // seule fois, un seul cycle crédité, puis on reste en attente (pas d'enchaînement).
+  // Sinon : départ neuf (resetAll évite de repartir d'un état périmé).
   useEffect(() => {
-    if (catchUpDoneRef.current || !resumedRef.current) return;
-    catchUpDoneRef.current = true;
-    tick();
-    const st = useTimerStore.getState();
-    const flowWork = st.settings.preset === "flowtime" && st.mode === "work";
-    if (st.isRunning && !flowWork && st.secondsLeft === 0) handleSessionEnd(false);
-  }, [tick, handleSessionEnd]);
+    if (!hydrated || initDoneRef.current) return;
+    initDoneRef.current = true;
+    if (useTimerStore.getState().active) {
+      tick();
+      const st = useTimerStore.getState();
+      const flowWork = st.settings.preset === "flowtime" && st.mode === "work";
+      if (st.isRunning && !flowWork && st.secondsLeft === 0) handleSessionEnd(false);
+      return;
+    }
+    useTimerStore.getState().resetAll();
+    const doneTodoIds = todos.filter((t) => t.status === "done").map((t) => t.id);
+    startSession(settings.workDuration, doneTodoIds);
+    resetDistractions();
+    start();
+  }, [hydrated, tick, handleSessionEnd]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Flowtime: end the stretch and start the earned break ────────────────
   const handleFlowBreak = () => {
@@ -296,6 +293,8 @@ export default function SessionPage() {
         recordPlay(buildPlayEntry(minutesWorked));
       }
     }
+    // Session terminée : plus « active » (pastille, retour), compteurs gardés pour /summary.
+    useTimerStore.getState().endSession();
     // Sync achievements so the summary reflects anything just unlocked.
     useAchievementsStore.getState().sync();
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
