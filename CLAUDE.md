@@ -122,25 +122,37 @@ choisir le média, qui enchaîne sur `/settings`. Les **routines** appliquent le
 - **Timer flottant** Picture-in-Picture (Document PiP, Chrome/Edge ; bouton masqué ailleurs) :
   mini-fenêtre toujours au premier plan avec pause / distraction / fin de flow — `components/PipTimer.tsx`
 - **Téléphone télécommande** (lot 7) : bouton « Télécommande » (icône téléphone) dans la rangée de la
-  session → panneau QR (SVG généré localement, `lib/remote/qr.ts`, sans dépendance) + code de 6 caractères
-  + URL `/remote/<code>`. Le téléphone (sans compte, hors AuthGate) affiche le temps restant en sodium
+  session → panneau QR (SVG généré localement, `lib/remote/qr.ts`, sans dépendance) + code de 6 caractères,
+  lien `/remote#c=<code>&k=<secret>`. Le téléphone doit être **autorisé sur l'ordinateur** (« Un téléphone
+  veut se connecter. Autoriser ? ») ; seules les commandes d'un appareil appairé (id d'appareil gardé
+  dans son stockage) sont appliquées. Le téléphone (sans compte, hors AuthGate) affiche le temps restant en sodium
   (depuis `endsAt`, corrigé du décalage d'horloge) et envoie Pause/Reprendre, Distraction, Suivant : mêmes
   chemins que les boutons, la touche D et la Media Session. « Téléphone connecté » si un message < 15 s.
   Promesse honnête : marche tant que l'écran du téléphone est allumé (Wake Lock demandé), pas de vibration,
   pas de Web Push. Fermer le panneau ne coupe rien ; « Déconnecter » ferme le canal.
 - **Emporter la session sur le téléphone** (lot 7, même panneau, onglet « Continuer sur le téléphone » →
-  `/handoff/<code>`) : l'ordinateur envoie l'état complet (réglages, mode, `endsAt`, pomodoro, heure
+  `/handoff#c=…&k=…`) : rien ne part avant « Un téléphone demande la session. Autoriser ? » sur
+  l'ordinateur ; l'ordinateur envoie alors l'état complet, figé (même restant si le téléphone redemande) (réglages, mode, `endsAt`, pomodoro, heure
   d'arrêt, tâches bornées, média : vidéo + position, file maison ids + piste en cours, radio, Spotify si
   le téléphone y est connecté, Twitch), le téléphone hydrate ses stores (`lib/remote/handoffApply.ts`,
-  `closeActiveSession` d'abord sauf si c'est la même session), accuse réception, ouvre `/session` avec
+  `closeActiveSession` d'abord sauf si c'est la même session) seulement après le « bye handed-off » de
+  l'ordinateur ; il renvoie l'accusé (avec le nonce reçu dans le handoff) toutes les 1,5 s, 10 s au plus,
+  sinon « Transfert incertain » ; puis ouvre `/session` avec
   « Toucher pour reprendre » (autoplay iOS ; la seconde est recalculée au toucher). À l'accusé,
   l'ordinateur crédite son partiel par le chemin de « Terminer » (`finishSession`) et s'arrête ;
-  sans accusé il continue. **Crédit unique** : le téléphone reçoit `cycleSeconds` = restant à l'envoi
+  sans accusé il continue ; un accusé est refusé si le mode ou le nombre de pomodoros a changé depuis
+  l'envoi. **Crédit unique** : le téléphone reçoit `cycleSeconds` = restant à l'envoi
   (Flowtime : tout est crédité sur l'ordinateur, le flow repart à zéro). Un code = un seul téléphone.
+  La file reprise est une **file de session non persistée** (`queueStore.sessionItems`, effacée par
+  toute sélection) : la File d'attente de l'utilisateur n'est jamais écrasée. Tâches de la session
+  seulement ; une tâche déjà connue du téléphone ne prend que le statut.
   Session reprise sans compte : `/session` et `/summary` passent l'AuthGate dans cet onglet
-  (`focusflow-handoff-guest`, sessionStorage).
-  **Realtime broadcast requis, aucune table** : canal `ff-remote-<code>` (Supabase Realtime en broadcast,
-  clé anon, rien en base, pas de `lib/db.ts`) ; sans Supabase, bouton masqué en production,
+  (`focusflow-handoff-guest`, sessionStorage, effacé à la connexion et dès qu'on quitte ces pages,
+  `lib/remote/paths.ts`).
+  **Realtime broadcast requis, aucune table** : canal `ff-remote-<SHA-256 tronqué de code+secret>`
+  (Supabase Realtime en broadcast, clé anon, rien en base, pas de `lib/db.ts`), messages signés
+  HMAC-SHA256 (WebCrypto, clé dérivée du secret ; non signé ou mal signé = ignoré, `lib/remote/crypto.ts`,
+  `channel.ts`) ; WebCrypto exige https (ou localhost) ; sans Supabase, bouton masqué en production,
   BroadcastChannel en dev ou build `NEXT_PUBLIC_LAB=1` (forçable par `focusflow-remote-transport=local`).
 - **Le minuteur qui connaît ton agenda** (lot 4) : adresse iCal privée collée dans le profil
   (section « Agenda », `components/AgendaSettings.tsx`, Tester / Retirer). Au démarrage d'un pomodoro, une
@@ -1040,12 +1052,24 @@ contenu animé sont peu fiables ; valider avec `npm run dev` sur une vraie machi
   (mode octet, correction M, versions 1 à 10, décodage vérifié avec OpenCV), `useRemoteHost.ts` (monté
   en une ligne dans `/session`, avec `RemoteButton`/`RemoteLayer` de `components/remote/RemoteHostUI.tsx`).
 - `/session` : `handleStop` devient `finishSession({to, leftSeconds})` (même crédit), « Ta rue » intacte.
-  Routes `app/remote/[code]` et `app/handoff/[code]` (params = Promise, `referrer: no-referrer`, hors
+  Routes `app/remote` et `app/handoff` (code et secret dans le fragment, `referrer: no-referrer`, hors
   AuthGate, pas de splash ni de pastille de retour).
-- Limites connues : une horloge de téléphone décalée de plus de 30 s fait ignorer les messages
-  (anti-rejeu) ; le code est le seul secret du canal (≈ 8,9e8 codes, 2 h) ; les textes de tâches
-  transitent par Realtime (non stockés). Le tiroir Amis peut apparaître sur `/remote` pour un compte
+- **Relecture sécurité (NO-GO) corrigée** : secret de 128 bits dans le FRAGMENT du lien
+  (`/remote#c=…&k=…`, `/handoff#…` : jamais dans un chemin ni un journal ; routes `[code]` supprimées),
+  canal dérivé de code+secret, messages HMAC-SHA256, autorisation sur l'ordinateur pour chaque appareil
+  et pour chaque reprise (logique pure `lib/remote/host.ts`), accusé portant un nonce signé, accusé renvoyé
+  et navigation seulement après le bye, état figé au pending, accusé refusé si le cycle a changé, file de
+  session non persistée, transport Supabase qui vérifie « joined » à chaque envoi (attente bornée,
+  `send` rend un booléen), décalage d'horloge estimé sur le premier message signé (le téléphone date ses
+  messages à l'heure de l'ordinateur et affiche « Horloge du téléphone décalée »), URI Spotify limitées à
+  `spotify:(playlist|album):<22>`, Wake Lock libéré avant d'être redemandé, `pagehide` ferme le canal.
+- **Limite de sécurité** : quiconque voit le QR (ou le lien) a le secret ; il ne peut quand même rien
+  faire sans un « Autoriser » sur l'ordinateur. La saisie manuelle du code a été **retirée** (un code
+  seul ne permettrait pas de dériver le canal ni la clé). Un appareil autorisé le reste pour la durée
+  du code (2 h) ou jusqu'à « Déconnecter ». Les textes de tâches transitent par Realtime (signés, non
+  chiffrés, non stockés). Le tiroir Amis peut apparaître sur `/remote` pour un compte
   connecté (fichiers Amis non modifiés volontairement).
-- Tests : vitest `lib/remote/{protocol,handoff,qr}.test.ts` ; e2e `e2e/remote.spec.ts` (deux pages du
+- Tests : vitest `lib/remote/{protocol,handoff,qr,crypto,host}.test.ts` (QR comparé module à module à
+  des matrices de python-qrcode, `lib/__fixtures__/qr-reference.json`) ; e2e `e2e/remote.spec.ts` (deux pages du
   même contexte, BroadcastChannel ; ignoré si le build n'a ni Supabase ni `NEXT_PUBLIC_LAB=1`).
   **À vérifier sur de vrais téléphones avec Supabase** (Realtime, iOS autoplay, Wake Lock).

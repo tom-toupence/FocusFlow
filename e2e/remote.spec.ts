@@ -24,6 +24,7 @@ async function forceLocal(p: Page) {
 /** mm:ss → secondes. */
 const secs = (t: string) => { const [m, s] = t.trim().split(":").map(Number); return m * 60 + s; };
 
+/** Ouvre le panneau et rend le lien du QR (code et secret dans le fragment). */
 async function openPanel(pc: Page) {
   const button = pc.getByRole("button", { name: "Télécommande" });
   // Build de production sans Supabase ni NEXT_PUBLIC_LAB=1 : pas de transport, pas de bouton.
@@ -31,7 +32,23 @@ async function openPanel(pc: Page) {
   await button.click();
   const code = (await pc.getByTestId("remote-code").textContent())!.trim();
   expect(code).toMatch(/^[A-Z2-9]{6}$/);
-  return code;
+  return linkOf(pc, code);
+}
+
+async function linkOf(pc: Page, code: string) {
+  const url = (await pc.getByTestId("remote-qr").getAttribute("data-url"))!;
+  const u = new URL(url);
+  expect(u.pathname === "/remote" || u.pathname === "/handoff").toBe(true);
+  expect(u.hash).toMatch(new RegExp(`^#c=${code}&k=[A-Za-z0-9_-]{22}$`));
+  return url;
+}
+
+/** « Autoriser » sur l'ordinateur. */
+async function allow(pc: Page, text: RegExp) {
+  const ask = pc.getByTestId("remote-ask");
+  await expect(ask).toContainText(text);
+  await ask.getByRole("button", { name: "Autoriser" }).click();
+  await expect(ask).toHaveCount(0);
 }
 
 async function phonePage(context: BrowserContext) {
@@ -46,10 +63,14 @@ test("télécommande : temps et titre de l'ordinateur, pause, distraction, suiva
   await forceLocal(pc);
   await open(pc, "/session");
   await pc.waitForFunction(() => (window as unknown as W).__yt?.playing === true);
-  const code = await openPanel(pc);
+  const link = await openPanel(pc);
 
   const phone = await phonePage(context);
-  await phone.goto(`/remote/${code}`);
+  await phone.goto(link);
+  // Rien sans « Autoriser » sur l'ordinateur.
+  await expect(phone.getByTestId("remote-status")).toHaveText("Autorise ce téléphone");
+  await expect(pc.getByTestId("remote-panel").getByRole("status")).toHaveText("En attente du téléphone");
+  await allow(pc, /veut se connecter/);
   await expect(phone.getByTestId("remote-title")).toHaveText("Premier titre");
   const hostTime = secs((await pc.getByRole("timer").first().textContent())!);
   const phoneTime = secs((await phone.getByTestId("remote-time").textContent())!);
@@ -106,12 +127,17 @@ test("emporter la session : même temps restant, même titre, l'ordinateur s'arr
   await pc.getByTitle("Titre suivant").click();
   await expect(pc.getByText("Deuxième titre").first()).toBeVisible();
 
-  const code = await openPanel(pc);
+  await openPanel(pc);
   await pc.getByRole("tab", { name: "Continuer sur le téléphone" }).click();
   await expect(pc.getByRole("img", { name: "QR code pour continuer sur le téléphone" })).toBeVisible();
+  const link = await linkOf(pc, (await pc.getByTestId("remote-code").textContent())!.trim());
 
   const phone = await phonePage(context);
-  await phone.goto(`/handoff/${code}`);
+  await phone.goto(link);
+  await expect(phone.getByTestId("handoff-status")).toHaveText("Autorise sur l'ordinateur");
+  // Avant Autoriser, la session tourne toujours sur l'ordinateur.
+  expect(new URL(pc.url()).pathname).toBe("/session");
+  await allow(pc, /demande la session/);
   await phone.waitForURL(/\/session$/);
 
   // L'ordinateur s'arrête, prévient, et ne compte que ses 3 min.
@@ -142,12 +168,27 @@ test("emporter la session : même temps restant, même titre, l'ordinateur s'arr
   expect(await stats()).toBe(3);
 });
 
-test("code invalide, puis ordinateur introuvable", async ({ context }) => {
+test("refuser un téléphone : il ne commande rien", async ({ page: pc, context }) => {
+  await prepare(pc, { queue: QUEUE, loop: true });
+  await forceLocal(pc);
+  await open(pc, "/session");
+  const link = await openPanel(pc);
   const phone = await phonePage(context);
-  await phone.goto("/remote/abc");
-  await expect(phone.getByTestId("remote-status")).toHaveText("Code invalide");
-  await phone.goto("/remote/ZZZZ22");
-  await expect(phone.getByTestId("remote-status")).not.toHaveText("Code invalide");
+  await phone.goto(link);
+  const ask = pc.getByTestId("remote-ask");
+  await expect(ask).toBeVisible();
+  await ask.getByRole("button", { name: "Refuser" }).click();
+  await expect(phone.getByTestId("remote-status")).toHaveText("Connexion refusée");
+  await expect(pc).toHaveTitle(/ · Focus$/);
+});
+
+test("lien invalide, puis ordinateur introuvable", async ({ context }) => {
+  const phone = await phonePage(context);
+  await phone.goto("/remote");
+  await expect(phone.getByTestId("remote-status")).toHaveText("Lien invalide");
+  await phone.goto("/remote#c=ZZZZ22&k=AAAAAAAAAAAAAAAAAAAAAA");
+  await phone.reload(); // un changement de fragment seul ne recharge pas la page
+  await expect(phone.getByTestId("remote-status")).not.toHaveText("Lien invalide");
   test.skip((await phone.getByTestId("remote-status").textContent()) === "Télécommande indisponible", "transport local absent (build sans NEXT_PUBLIC_LAB=1)");
   await expect(phone.getByTestId("remote-status")).toHaveText("Connexion à l'ordinateur…");
   await expect(phone.getByTestId("remote-status")).toHaveText("Ordinateur introuvable", { timeout: 15_000 });
