@@ -10,7 +10,17 @@ import { useTimerStore } from "@/store/timerStore";
  */
 export default function TimerHydrator() {
   useEffect(() => {
-    void useTimerStore.persist.rehydrate();
+    // Sans stockage (navigation privée, stockage bloqué), persist sort avant
+    // onRehydrateStorage : on marque quand même le store comme relu, sinon
+    // /session et /settings attendraient indéfiniment.
+    const markHydrated = () => {
+      if (!useTimerStore.getState().hydrated) useTimerStore.setState({ hydrated: true });
+    };
+    try {
+      void Promise.resolve(useTimerStore.persist.rehydrate()).finally(markHydrated);
+    } catch {
+      markHydrated();
+    }
   }, []);
   return null;
 }
