@@ -5,10 +5,10 @@ baseline, `npm test`, build, relecture `code-reviewer`, commit séparé.
 
 | Lot | Contenu | Dépend de | Supabase | État |
 |-----|---------|-----------|----------|------|
-| 0 | **La session survit à la navigation** : minuteur sur échéance (`endsAt`), session en cours persistée, rattrapage au retour, pastille « Session en cours » + ⌘K « Retour à la session », « Reprendre » n'écrase plus une session | | non | en cours |
-| P | **Logique pure** : `lib/agendaFit.ts`, `lib/icsRead.ts`, `lib/radio.ts`, `lib/quickLaunch.ts`, `lib/videoSchedule.ts` + tests | | non | en cours |
-| 1 | **FocusFlow dans le système** (V1 n°1) : titre d'onglet, Media Session (métadonnées, temps restant, play/pause/suivant), élément audio silencieux qui « possède » la session média quand le son vient d'un iframe | 0 | non | à faire |
-| 2 | **Lancer en une phrase** (V2 n°8) : ⌘K comprend la phrase, résolution affichée, lancement direct de `/session` ; « Relancer comme la dernière fois » | 0, P | non | à faire |
+| 0 | **La session survit à la navigation** : minuteur sur échéance (`endsAt`), session en cours persistée, rattrapage au retour, pastille « Session en cours » + ⌘K « Retour à la session », « Reprendre » n'écrase plus une session | | non | **livré** (relu GO, build + e2e verts) |
+| P | **Logique pure** : `lib/agendaFit.ts`, `lib/icsRead.ts`, `lib/radio.ts`, `lib/quickLaunch.ts`, `lib/videoSchedule.ts` + tests | | non | **livré** (85 tests) |
+| 1 | **FocusFlow dans le système** (V1 n°1) : titre d'onglet, Media Session (métadonnées, temps restant, play/pause/suivant), élément audio silencieux qui « possède » la session média quand le son vient d'un iframe | 0 | non | en cours |
+| 2 | **Lancer en une phrase** (V2 n°8) : ⌘K comprend la phrase, résolution affichée, lancement direct de `/session` ; « Relancer comme la dernière fois » | 0, P | non | en cours |
 | 3 | **Dernier train** (V2 n°9) : heure d'arrêt dans `/settings`, durées des cycles issues du plan, objectif atteignable | 0, P | non | à faire |
 | 4 | **Agenda** (V2 n°3) : URL iCal privée (locale), route `app/api/calendar/import` (lit sans stocker ni journaliser), proposition visible de raccourcir le cycle, invitation à reprendre après la réunion | 3 | non | à faire |
 | 5 | **Calé sur la vidéo** (V2 n°1) : chapitres YouTube via la page watch (route existante + `lib/ytParse.ts`), annotation `schedule` du catalogue, minuteur piloté par `currentTime` | 0, P | non | à faire |
