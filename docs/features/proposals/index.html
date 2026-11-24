@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Propositions de features</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --fg: #16181d; --muted: #5d636e; --line: #e2e3e0; --card: #ffffff;
+    --accent: oklch(0.50 0.13 228); --sodium: oklch(0.62 0.15 62); --chip: #eef0f2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #07090d; --fg: #e9ebef; --muted: #8d939e; --line: #1d2229; --card: #0d1117;
+      --accent: oklch(0.72 0.13 210); --sodium: oklch(0.78 0.15 70); --chip: #161b22;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #07090d; --fg: #e9ebef; --muted: #8d939e; --line: #1d2229; --card: #0d1117;
+    --accent: oklch(0.72 0.13 210); --sodium: oklch(0.78 0.15 70); --chip: #161b22;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 48px 16px 96px; }
+  .eyebrow { font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-size: clamp(28px, 4vw, 40px); margin: 10px 0 8px; letter-spacing: -.01em; }
+  h2 { font-size: 24px; margin: 6px 0 4px; }
+  h3 { font-size: 13px; margin: 22px 0 6px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  p { margin: 0 0 10px; }
+  .lede { color: var(--muted); max-width: 680px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font: 500 10px/1 ui-monospace, Menlo, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  td.num, th.num { text-align: right; font-family: ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  a { color: var(--accent); }
+  .idea { margin-top: 64px; padding-top: 28px; border-top: 1px solid var(--line); }
+  .head { display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  .rank { font: 600 13px ui-monospace, Menlo, monospace; color: var(--muted); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 14px; }
+  .chip { background: var(--chip); border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px; font: 12px ui-monospace, Menlo, monospace; }
+  .chip.v { color: var(--sodium); }
+  .pitch { font-size: 18px; margin: 4px 0 10px; }
+  .shot { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); margin: 8px 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  ol, ul { margin: 0 0 10px; padding-left: 20px; }
+  li { margin: 3px 0; }
+  code { font: 12.5px ui-monospace, Menlo, monospace; background: var(--chip); padding: 1px 5px; border-radius: 5px; }
+  .mermaid { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; overflow-x: auto; }
+  .note { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; padding: 12px 14px; margin: 12px 0; font-size: 14px; }
+  .scroll { overflow-x: auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="eyebrow">FocusFlow · mode proposition · 24 novembre 2026</div>
+<h1>10 features proposées</h1>
+<p class="lede">Rien n'est implémenté. Les maquettes sont statiques (route <code>/lab/features</code>, capturées avec Playwright) et servent à comprendre l'idée, pas à juger le style. Triées par rapport valeur / effort. Cadrage et veille faits avec l'agent product-lead.</p>
+
+<h3>Ce qui guide la sélection</h3>
+<ul>
+  <li><strong>Le vrai manque est entre le minuteur et la musique.</strong> Aujourd'hui la musique est coupée net en pause (<code>app/session/page.tsx</code> : <code>if (!isBreak &amp;&amp; isRunning) adapter.play(); else adapter.pause();</code>), rien n'apparaît dans les contrôles média du système, et aucun concurrent (Lofidoro, Pomofocus, Lofizen…) ne soigne cette jonction. C'est pourtant la priorité produit « timer + lecteur ensemble ».</li>
+  <li><strong>Les données sont par jour, pas par session.</strong> <code>statsStore</code>, <code>distractionStore</code> et <code>playHistoryStore</code> ne relient pas titres écoutés, distractions et heure. Un petit journal par pomodoro (<code>sessionLogStore</code>, local) ouvre l'idée la plus différenciante (« Tes titres qui marchent »).</li>
+  <li><strong>Le planning ne lance rien.</strong> Seul le Sprint a un bouton « Go ». Opal démarre ses sessions planifiées tout seul.</li>
+  <li><strong>Social sans Focus Rooms.</strong> Duolingo annonce +22 % de régularité avec les séries entre amis (<a href="https://blog.duolingo.com/friend-streak/">blog</a>). Tout reste asynchrone : aucun minuteur partagé, aucune salle.</li>
+</ul>
+
+<h3>Classement</h3>
+<div class="scroll">
+<table>
+  <thead><tr><th>#</th><th>Idée</th><th>Catégorie</th><th class="num">Effort</th><th class="num">Valeur</th><th>Supabase</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><a href="#systeme">FocusFlow dans le système</a></td><td>Cœur</td><td class="num">S</td><td class="num">4,5</td><td>Non</td></tr>
+    <tr><td>2</td><td><a href="#reprise">Reprendre là où tu t'es arrêté</a></td><td>Cœur</td><td class="num">S</td><td class="num">4,5</td><td>Non</td></tr>
+    <tr><td>3</td><td><a href="#go-blocs">Go sur tous les blocs</a></td><td>Organisation</td><td class="num">S</td><td class="num">3,5</td><td>Non</td></tr>
+    <tr><td>4</td><td><a href="#lien">Partager par lien</a></td><td>Petite idée / social</td><td class="num">S</td><td class="num">3,5</td><td>Non</td></tr>
+    <tr><td>5</td><td><a href="#pauses-en-musique">Pauses en musique</a></td><td>Cœur / musique</td><td class="num">M (lot A : S)</td><td class="num">4,5</td><td>Non</td></tr>
+    <tr><td>6</td><td><a href="#titres-qui-marchent">Tes titres qui marchent</a> <em>(audacieuse)</em></td><td>Musique</td><td class="num">M</td><td class="num">4</td><td>Non</td></tr>
+    <tr><td>7</td><td><a href="#serie-a-deux">Série à deux, avec jour de repos</a></td><td>Social / motivation</td><td class="num">M (lot 0 : S)</td><td class="num">4</td><td>Lot 0 non, duo oui</td></tr>
+    <tr><td>8</td><td><a href="#revue">Revue du dimanche</a></td><td>Organisation</td><td class="num">M</td><td class="num">4</td><td>Non</td></tr>
+    <tr><td>9</td><td><a href="#promesse">Promesse aux amis</a> <em>(audacieuse)</em></td><td>Social / motivation</td><td class="num">M</td><td class="num">3,5</td><td>Oui, sans migration</td></tr>
+    <tr><td>10</td><td><a href="#radio-commune">Radio commune</a> <em>(audacieuse)</em></td><td>Musique / social</td><td class="num">M</td><td class="num">3,5</td><td>Non (amis en bonus)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- 1 ─────────────────────────────────────────────────────────── -->
+<section class="idea" id="systeme">
+  <div class="head"><span class="rank">01</span><h2>FocusFlow dans le système</h2></div>
+  <div class="chips"><span class="chip">Cœur</span><span class="chip">Effort S</span><span class="chip v">Valeur 4,5 / 5</span><span class="chip">Local</span></div>
+  <p class="pitch">Le temps restant et le titre en cours dans l'onglet, sur l'écran verrouillé et dans les contrôles média. Les touches média pilotent la session.</p>
+  <img class="shot" src="shots/systeme.png" alt="Écran verrouillé avec le minuteur et le titre, onglet affichant le temps restant">
+  <div class="grid">
+    <div>
+      <h3>Problème, pour qui</h3>
+      <p>Tu rédiges dans Google Docs, FocusFlow est dans un autre onglet. Pour savoir combien il reste, ou pour couper la musique quand le téléphone sonne, il faut revenir sur l'onglet. Sur téléphone, écran verrouillé, tu ne vois rien du tout.</p>
+      <h3>Parcours</h3>
+      <ol>
+        <li>Pendant la session, l'onglet s'appelle « 18:42 · Focus ».</li>
+        <li>Les contrôles média de l'ordinateur et l'écran verrouillé affichent « Focus · 18:42 restantes », le morceau et sa miniature.</li>
+        <li>Touche lecture/pause : musique et minuteur s'arrêtent ensemble.</li>
+        <li>Touche suivant : titre suivant.</li>
+        <li>En pause : « Pause · 04:12 ».</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Fonctionnement</h3>
+      <pre class="mermaid">
+flowchart LR
+  T["timerStore (secondsLeft, mode)"] --> H["useMediaSession (nouveau hook)"]
+  M["useSessionMedia (piste en cours)"] --> H
+  H --> D["document.title"]
+  H --> MS["navigator.mediaSession (metadata, positionState)"]
+  K["Touches média / écran verrouillé"] --> MS
+  MS -- "play / pause" --> P["timer.pause + adapter.pause"]
+  MS -- "nexttrack" --> N["adapter.next"]
+      </pre>
+    </div>
+  </div>
+  <h3>Impact technique</h3>
+  <ul>
+    <li>Nouveau <code>lib/useMediaSession.ts</code>, monté dans <code>app/session/page.tsx</code>. Lit <code>store/timerStore.ts</code> et <code>lib/playback/useSessionMedia.ts</code>. Mêmes actions que <code>components/PipTimer.tsx</code>.</li>
+    <li>Pas de Supabase, pas d'API externe (Media Session API du navigateur), pas de dépendance.</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul>
+    <li>Le son YouTube sort d'un iframe d'un autre domaine : le navigateur peut attribuer la session média à l'iframe. Le SDK Spotify pose peut-être ses propres handlers. Une demi-journée d'essai sur Chrome, Firefox et Safari iOS avant de s'engager.</li>
+    <li>Repli garanti : le titre d'onglet seul, qui a déjà beaucoup de valeur et marche partout.</li>
+  </ul>
+  <p><strong>Gratuit / local-first :</strong> oui, sans compte.</p>
+</section>
+
+<!-- 2 ─────────────────────────────────────────────────────────── -->
+<section class="idea" id="reprise">
+  <div class="head"><span class="rank">02</span><h2>Reprendre là où tu t'es arrêté</h2></div>
+  <div class="chips"><span class="chip">Cœur</span><span class="chip">Effort S</span><span class="chip v">Valeur 4,5 / 5</span><span class="chip">Local</span></div>
+  <p class="pitch">En fin de session, une ligne pour dire où tu en es. Le lendemain, elle t'attend sur l'accueil, avec la vidéo reprise à la bonne seconde.</p>
+  <img class="shot" src="shots/reprise-1.png" alt="Fin de session : où en es-tu ?">
+  <img class="shot" src="shots/reprise-2.png" alt="Accueil : carte Reprendre avec la note de la veille">
+  <div class="grid">
+    <div>
+      <h3>Problème, pour qui</h3>
+      <p>Le soir, tu arrêtes en plein chapitre. Le lendemain matin, tu perds dix minutes à te rappeler où tu en étais, et la vidéo « Study with me » de 3 h repart de zéro. C'est l'astuce d'Hemingway (s'arrêter en sachant quoi faire ensuite), rendue automatique.</p>
+      <p class="note">Ce n'est pas la « capture rapide d'idées » refusée : une seule note, au moment de partir, qui ne sert qu'à reprendre.</p>
+      <h3>Parcours</h3>
+      <ol>
+        <li>Clic sur Terminer : un champ « Où en es-tu ? » (facultatif, Entrée pour valider, Échap pour passer).</li>
+        <li>La position de la vidéo est gardée automatiquement.</li>
+        <li>Le lendemain, la carte « Reprendre » de l'accueil montre la note, le média et le rythme.</li>
+        <li>Un clic : même média, même seconde, même preset, la note épinglée dans la session.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Fonctionnement</h3>
+      <pre class="mermaid">
+flowchart TD
+  E["Terminer (session)"] --> Q{"Note saisie ?"}
+  Q -- oui --> S["resumeStore : note, mediaKey, position, preset"]
+  Q -- non --> S2["resumeStore : mediaKey, position, preset"]
+  S --> C["TodayDashboard : carte Reprendre"]
+  S2 --> C
+  C -- "Reprendre" --> L["sessionStore.selectVideo + timer preset"]
+  L --> P["adapter.load(startSeconds) puis /session"]
+  P --> N["Note affichée en haut de la session"]
+      </pre>
+    </div>
+  </div>
+  <h3>Impact technique</h3>
+  <ul>
+    <li>Nouveau petit store <code>store/resumeStore.ts</code> (persist, une entrée). Ou un champ dans <code>playHistoryStore</code>.</li>
+    <li><code>app/session/page.tsx</code> (Terminer), <code>lib/playback/youtube.ts</code> (position actuelle et <code>startSeconds</code>, déjà déclaré dans <code>YTPlayer.loadPlaylist</code>), <code>components/TodayDashboard.tsx</code> (la carte « Reprendre » existe déjà via <code>lib/suggestions.ts</code>, on l'enrichit, pas de tuile en plus).</li>
+    <li>Sync facultative via <code>lib/stateSync.ts</code> (clé <code>user_state</code> existante, aucune migration).</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul><li>Spotify : la position se reprend aussi (<code>position_ms</code>). Twitch live : pas de position, on garde la note seule.</li><li>Ne pas alourdir la sortie : le champ doit pouvoir être ignoré sans clic.</li></ul>
+  <p><strong>Gratuit / local-first :</strong> oui.</p>
+</section>
+
+<!-- 3 ─────────────────────────────────────────────────────────── -->
+<section class="idea" id="go-blocs">
+  <div class="head"><span class="rank">03</span><h2>Go sur tous les blocs du planning</h2></div>
+  <div class="chips"><span class="chip">Organisation</span><span class="chip">Effort S</span><span class="chip v">Valeur 3,5 / 5</span><span class="chip">Local</span></div>
+  <p class="pitch">Quand un bloc planifié commence, une invitation « Rédaction commence » le lance en un clic, avec la bonne durée et la tâche.</p>
+  <img class="shot" src="shots/go-blocs.png" alt="Frise du jour et invitation à démarrer un bloc">
+  <div class="grid">
+    <div>
+      <h3>Problème, pour qui</h3>
+      <p>Tu as posé tes blocs de la semaine dans le planning. À 14 h, il faut tout reconfigurer à la main (média, preset, tâche), alors le bloc reste théorique. Le Sprint a déjà son « Go », les blocs ordinaires non.</p>
+      <h3>Parcours</h3>
+      <ol>
+        <li>14:00, app ouverte : toast et notification « Rédaction commence · 50 min ».</li>
+        <li>Démarrer : preset choisi selon la durée (même logique que le Go du Sprint), le libellé devient la tâche, ton dernier média est repris.</li>
+        <li>« Dans 10 min » repousse une fois, « Pas aujourd'hui » ignore.</li>
+        <li>À la fin, le bloc est marqué fait. Chaque bloc à venir de la frise a aussi son Go.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Fonctionnement</h3>
+      <pre class="mermaid">
+flowchart LR
+  P["planStore.blocksForDate(aujourd'hui)"] --> W["Veilleur (1 / min)"]
+  W -- "startMin atteint" --> T["Toast + Notification"]
+  T -- "Démarrer" --> G["lib/goBlock.ts (extrait du Go Sprint)"]
+  G --> S["sessionStore.addTodo + selectVideo"]
+  G --> TM["timerStore preset"]
+  G --> R["/session"]
+  R -- "fin" --> D["planStore.toggleDone"]
+      </pre>
+    </div>
+  </div>
+  <h3>Impact technique</h3>
+  <ul>
+    <li><code>store/planStore.ts</code>, <code>components/TodayDashboard.tsx</code> et <code>store/sprintStore.ts</code> (logique Go à extraire dans <code>lib/</code>), <code>components/WeekPlanner.tsx</code>, <code>store/sessionStore.ts</code>, <code>components/Toast.tsx</code>.</li>
+    <li>Pas de Supabase, pas d'API.</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul><li>Ne marche que si un onglet est ouvert (pas de push sans PWA, refusée). L'alarme ICS (-10 min) couvre déjà l'app fermée : le dire dans l'UI.</li><li>Ne pas doubler les blocs Sprint, qui ont déjà leur Go.</li></ul>
+  <p><strong>Gratuit / local-first :</strong> oui.</p>
+</section>
+
+<!-- 4 ─────────────────────────────────────────────────────────── -->
+<section class="idea" id="lien">
+  <div class="head"><span class="rank">04</span><h2>Partager par lien</h2></div>
+  <div class="chips"><span class="chip">Petite idée / social sans compte</span><span class="chip">Effort S</span><span class="chip v">Valeur 3,5 / 5</span><span class="chip">Local</span></div>
+  <p class="pitch">Une session prête à démarrer, une playlist locale ou une routine, entièrement contenue dans un lien. Celui qui l'ouvre voit l'aperçu et l'importe, sans compte ni serveur.</p>
+  <img class="shot" src="shots/lien.png" alt="Fenêtre de partage et page d'arrivée du lien">
+  <div class="grid">
+    <div>
+      <h3>Problème, pour qui</h3>
+      <p>Tu as monté une playlist de révision ou une routine qui marche, et tu veux la donner à ton groupe de TD. Aujourd'hui c'est impossible hors amis Supabase. C'est aussi le premier pas honnête vers la « marketplace » de la roadmap, et un moyen d'acquisition (le lien fonctionne sans compte).</p>
+      <h3>Parcours</h3>
+      <ol>
+        <li>Menu d'une playlist, d'une routine, ou de la session en cours : « Partager par lien ».</li>
+        <li>On choisit ce qu'on inclut (ambiance et rythme, tâches, démarrage auto).</li>
+        <li>L'ami ouvre le lien : aperçu, puis Commencer ou Ajouter à ma bibliothèque.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Fonctionnement</h3>
+      <pre class="mermaid">
+flowchart LR
+  A["Playlist / routine / session"] --> E["lib/shareLink.ts encode (version, IDs YouTube, preset)"]
+  E --> U["/import#v1..."]
+  U --> V["Validation stricte (regex IDs, bornes)"]
+  V --> O["oEmbed : titres et miniatures"]
+  O --> I["Aperçu"]
+  I -- "Ajouter" --> L["localPlaylistStore / routineStore"]
+  I -- "Commencer" --> S["/settings ou /session"]
+      </pre>
+    </div>
+  </div>
+  <h3>Impact technique</h3>
+  <ul>
+    <li>Nouveau <code>lib/shareLink.ts</code> (codec testé avec vitest) et <code>app/import/page.tsx</code> (hors AuthGate). <code>store/localPlaylistStore.ts</code>, <code>store/routineStore.ts</code>, <code>lib/routines.ts</code>, <code>components/LocalPlaylistModal.tsx</code>, <code>components/RoutinesManager.tsx</code>.</li>
+    <li>Pas de Supabase. API : oEmbed YouTube, déjà utilisé (<code>fetchVideoMeta</code>).</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul><li>Entrée non fiable : validation stricte, 200 titres maximum (environ 2,5 ko d'URL).</li><li>Une routine Spotify ne marche pas chez un ami sans Premium : le signaler dans l'aperçu.</li></ul>
+  <p><strong>Gratuit / local-first :</strong> oui, la partie après <code>#</code> ne part même pas au serveur.</p>
+</section>
+
+<!-- 5 ─────────────────────────────────────────────────────────── -->
+<section class="idea" id="pauses-en-musique">
+  <div class="head"><span class="rank">05</span><h2>Pauses en musique</h2></div>
+  <div class="chips"><span class="chip">Cœur / musique</span><span class="chip">Effort M (lot A : S)</span><span class="chip v">Valeur 4,5 / 5</span><span class="chip">Local</span></div>
+  <p class="pitch">Plus de coupure sèche : la musique s'efface en fin de focus et revient en douceur. Pendant la pause, tu choisis : silence, même musique plus bas, ou ta playlist « Pauses ».</p>
+  <img class="shot" src="shots/pauses-en-musique.png" alt="Écran de pause avec fondu, mini-lecteur et choix de la musique de pause">
+  <div class="grid">
+    <div>
+      <h3>Problème, pour qui</h3>
+      <p>À 00:00 la musique est coupée en plein morceau, puis la reprise repart à plein volume. Et en pause, ceux qui veulent autre chose relancent YouTube à la main, et perdent leur place dans la file.</p>
+      <h3>Parcours</h3>
+      <ol>
+        <li>Les 15 dernières secondes, le volume descend. Le son de fin passe par-dessus.</li>
+        <li>Pause : selon le réglage (dans <code>/settings</code> ou la routine), silence, même musique à 30 %, ou une playlist locale.</li>
+        <li>Au retour en focus, la file reprend au même titre, à la même seconde, avec une montée de 3 s.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Fonctionnement</h3>
+      <pre class="mermaid">
+flowchart TD
+  F["Focus : secondsLeft &lt;= 15"] --> FD["Fondu : adapter.setVolume par paliers"]
+  FD --> B{"Réglage pause"}
+  B -- "Silence" --> S1["adapter.pause (actuel)"]
+  B -- "Plus bas" --> S2["setVolume 30 %"]
+  B -- "Ma playlist" --> S3["Sauver (titre, position) puis jouer la playlist Pauses (lecteur visible)"]
+  S1 --> R["Retour focus : restaurer titre + position, montée 3 s"]
+  S2 --> R
+  S3 --> R
+      </pre>
+    </div>
+  </div>
+  <h3>Impact technique</h3>
+  <ul>
+    <li><code>app/session/page.tsx</code> (effet play/pause), <code>lib/playback/types.ts</code> (<code>setVolume</code>, <code>caps.volume</code> existent), <code>lib/playback/{youtube,spotify,twitch}.ts</code>, <code>lib/playback/queue.ts</code>, <code>store/playbackPrefsStore.ts</code>, <code>store/localPlaylistStore.ts</code>, <code>store/routineStore.ts</code> + <code>lib/routines.ts</code> (champ optionnel <code>breakMedia</code>).</li>
+    <li>Pas de Supabase (le champ de routine suit la sync existante). Pas d'API.</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul>
+    <li><strong>Règles YouTube</strong> : jouer l'audio d'un lecteur caché est interdit. La musique de pause YouTube impose un mini-lecteur visible (200 × 200 px minimum) par-dessus la rue de pause. À arbitrer avec la règle « rue jamais sous une vidéo » : ici c'est une vignette sur la rue, pas la rue sous une vidéo plein écran.</li>
+    <li>Reprise de position fragile sur YouTube (seek après chargement) et Spotify (changement de contexte). Twitch : silence ou plus bas uniquement.</li>
+    <li>Restaurer exactement le volume de l'utilisateur, même s'il quitte pendant un fondu.</li>
+  </ul>
+  <p><strong>Lots :</strong> A fondus + « plus bas » (S) · B playlist de pause YouTube · C Spotify. <strong>Gratuit / local-first :</strong> oui.</p>
+</section>
+
+<!-- 6 ─────────────────────────────────────────────────────────── -->
+<section class="idea" id="titres-qui-marchent">
+  <div class="head"><span class="rank">06</span><h2>Tes titres qui marchent</h2></div>
+  <div class="chips"><span class="chip">Musique · audacieuse</span><span class="chip">Effort M</span><span class="chip v">Valeur 4 / 5</span><span class="chip">100 % local</span></div>
+  <p class="pitch">FocusFlow repère les morceaux avec lesquels tu te concentres le mieux, et en fait une playlist.</p>
+  <img class="shot" src="shots/titres-qui-marchent.png" alt="Statistiques : titres qui semblent t'aider">
+  <div class="grid">
+    <div>
+      <h3>Problème, pour qui</h3>
+      <p>Tu changes de musique au hasard sans savoir ce qui t'aide vraiment. Endel ou Spotify optimisent l'écoute, aucun concurrent ne relie la musique à une concentration mesurée. FocusFlow a les deux moitiés : ce qui joue, et les distractions marquées.</p>
+      <h3>Parcours</h3>
+      <ol>
+        <li>Après une dizaine de sessions, une carte apparaît dans Activité, Statistiques.</li>
+        <li>Top des titres qui « semblent t'aider » (moins de distractions par pomodoro, sessions menées au bout).</li>
+        <li>Créer la playlist : elle part dans tes playlists locales, lisible en un clic.</li>
+        <li>Une ligne discrète « Te dispersent peut-être ».</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Fonctionnement</h3>
+      <pre class="mermaid">
+flowchart LR
+  S["/session (fin de pomodoro)"] --> L["sessionLogStore (nouveau) : début, fin, minutes, distractions, titres"]
+  D["distractionStore.sessionCount"] --> L
+  M["useSessionMedia (titres joués)"] --> L
+  L --> C["lib/musicFocus.ts (calcul pur, seuils)"]
+  C --> UI["Carte dans InsightsContent"]
+  UI -- "Créer la playlist" --> P["localPlaylistStore.createPlaylist + addTrack"]
+      </pre>
+    </div>
+  </div>
+  <h3>Impact technique</h3>
+  <ul>
+    <li>Fondation <code>store/sessionLogStore.ts</code> (local, plafonné à 500 entrées), alimentée par <code>app/session/page.tsx</code>. Nouveau <code>lib/musicFocus.ts</code> testé avec vitest. Carte dans la vue Statistiques (<code>app/insights/page.tsx</code> / <code>InsightsContent</code>). <code>store/localPlaylistStore.ts</code>.</li>
+    <li>Pas de Supabase (sync <code>user_state</code> en option plus tard). Pas d'API.</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul><li>Statistique fragile : peu de données, biais d'heure et de fatigue. Seuil minimal (3 sessions par titre), formulation prudente, carte masquée sous le seuil.</li><li>Les mix d'une heure dominent : raisonner en minutes. Twitch exclu.</li></ul>
+  <p><strong>Gratuit / local-first :</strong> oui, rien ne quitte l'appareil.</p>
+</section>
+
+<!-- 7 ─────────────────────────────────────────────────────────── -->
+<section class="idea" id="serie-a-deux">
+  <div class="head"><span class="rank">07</span><h2>Série à deux, avec jour de repos</h2></div>
+  <div class="chips"><span class="chip">Social / motivation</span><span class="chip">Effort M (lot 0 : S)</span><span class="chip v">Valeur 4 / 5</span><span class="chip">Lot 0 local, duo en ligne</span></div>
+  <p class="pitch">Une série commune avec un ami : elle grandit chaque jour où vous faites tous les deux au moins un pomodoro. Et un jour de repos par semaine est toléré, en solo comme à deux.</p>
+  <img class="shot" src="shots/serie-a-deux.png" alt="Liste d'amis avec séries et détail d'une série à deux">
+  <div class="grid">
+    <div>
+      <h3>Problème, pour qui</h3>
+      <p>Ta série solo casse au premier dimanche off et culpabilise. Seul, on lâche vite. Avec Léa, qui révise le même concours, une série partagée vous tient tous les deux. Les amis existent déjà dans FocusFlow, mais aucun engagement réciproque.</p>
+      <h3>Parcours</h3>
+      <ol>
+        <li>Lot 0 (pour tous, sans compte) : un jour off par semaine ne casse plus la série.</li>
+        <li>Dans la conversation d'un ami : « Proposer une série ». Il accepte.</li>
+        <li>Pastille « 23 j » à côté de l'ami, détail dans sa conversation.</li>
+        <li>Le soir, si l'un des deux n'a rien fait, rappel discret et bouton Encourager (déjà existant).</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Fonctionnement</h3>
+      <pre class="mermaid">
+flowchart TD
+  A["Chat : Proposer une série"] --> R1["RPC propose_duo_streak"]
+  R1 --> B["L'ami accepte : RPC accept_duo_streak"]
+  B --> T["duo_streaks (paire, compteur, dernier jour)"]
+  ST["statsStore (jour local)"] --> TK["RPC tick_duo_streak (contrôle serveur)"]
+  TK --> T
+  T --> UI["FriendsPanel + FriendChat"]
+  ST --> L0["Lot 0 : getStreak tolère 1 jour / semaine"]
+      </pre>
+    </div>
+  </div>
+  <h3>Impact technique</h3>
+  <ul>
+    <li>Lot 0 : <code>store/statsStore.ts</code> (<code>getStreak</code>), affichages de série (<code>StatsSection</code>, <code>TodayDashboard</code>, <code>lib/achievements.ts</code> à vérifier).</li>
+    <li>Duo : <code>supabase/schema.sql</code> (table <code>duo_streaks</code>, RLS, RPC SECURITY DEFINER comme <code>accept_friend_request</code>), <code>lib/friends.ts</code>, <code>store/friendsStore.ts</code>, <code>components/FriendChat.tsx</code>, <code>components/FriendsPanel.tsx</code>.</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul><li>Fuseaux horaires : chaque jour est jugé sur la date locale de chacun. Contrôle côté serveur, sinon on peut forger une série.</li><li>Pression sociale : 3 séries maximum, arrêt silencieux possible.</li><li>SQL à exécuter côté Supabase pour le duo.</li></ul>
+  <p><strong>Gratuit / local-first :</strong> lot 0 oui. Le duo est un bonus en ligne, comme tout le volet amis.</p>
+</section>
+
+<!-- 8 ─────────────────────────────────────────────────────────── -->
+<section class="idea" id="revue">
+  <div class="head"><span class="rank">08</span><h2>Revue du dimanche</h2></div>
+  <div class="chips"><span class="chip">Organisation</span><span class="chip">Effort M</span><span class="chip v">Valeur 4 / 5</span><span class="chip">Local</span></div>
+  <p class="pitch">Trois minutes guidées pour clore la semaine : ce qui a été fait, ce qui ne l'est pas (garder, reporter, abandonner), puis les blocs de la semaine suivante.</p>
+  <img class="shot" src="shots/revue.png" alt="Revue de la semaine, étape 2 : tâches non finies">
+  <div class="grid">
+    <div>
+      <h3>Problème, pour qui</h3>
+      <p>Le Kanban se remplit de tâches à moitié faites, le planning de la semaine prochaine est vide, et le Wrapped montre des chiffres sans rien faire décider. Dimanche soir, tu veux repartir propre lundi sans y passer une heure.</p>
+      <h3>Parcours</h3>
+      <ol>
+        <li>Dimanche (ou lundi matin), une invitation sur l'accueil, à la place de la bannière Wrapped.</li>
+        <li>Étape 1 : la semaine en 3 chiffres (temps, prévu vs fait, meilleur jour).</li>
+        <li>Étape 2 : chaque tâche non finie, un clic : lundi, semaine prochaine, abandonner.</li>
+        <li>Étape 3 : poser les blocs de la semaine (reprend ceux de la semaine passée en un clic).</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Fonctionnement</h3>
+      <pre class="mermaid">
+flowchart LR
+  W["lib/wrapped.ts (agrégats)"] --> E1["Étape 1 : bilan"]
+  P["planStore (prévu vs fait)"] --> E1
+  E1 --> E2["Étape 2 : sessionStore.todos non faites"]
+  E2 -- "reporter / abandonner" --> TD["sessionStore.updateTodo / remove"]
+  E2 --> E3["Étape 3 : WeekPlanner pré-rempli"]
+  E3 --> PB["planStore.addBlock (puis ICS)"]
+  E3 --> F["reviewStore.lastWeekReviewed"]
+      </pre>
+    </div>
+  </div>
+  <h3>Impact technique</h3>
+  <ul>
+    <li>Nouveau composant <code>components/WeeklyReview.tsx</code> (sous-onglet ou modal portalé d'Organisation). Réutilise <code>lib/wrapped.ts</code>, <code>store/planStore.ts</code>, <code>store/sessionStore.ts</code>, <code>components/WeekPlanner.tsx</code>, <code>store/wrappedStore.ts</code> (même mécanique de bannière). Petit <code>store/reviewStore.ts</code>.</li>
+    <li>Pas de Supabase en plus (les blocs se synchronisent déjà). Pas d'API.</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul><li>Doit rester court, sinon personne ne la finit. Chaque étape doit pouvoir être sautée.</li><li>Les tâches n'ont pas de date aujourd'hui : « lundi » signifie les remonter en tête du Kanban, ou créer un bloc. Choix à faire.</li></ul>
+  <p><strong>Gratuit / local-first :</strong> oui.</p>
+</section>
+
+<!-- 9 ─────────────────────────────────────────────────────────── -->
+<section class="idea" id="promesse">
+  <div class="head"><span class="rank">09</span><h2>Promesse aux amis</h2></div>
+  <div class="chips"><span class="chip">Social / motivation · audacieuse</span><span class="chip">Effort M</span><span class="chip v">Valeur 3,5 / 5</span><span class="chip">En ligne, sans migration</span></div>
+  <p class="pitch">Tu annonces un objectif du soir (« 3 pomodoros avant 23:00 ») à quelques amis. Ils suivent ta progression et voient si tu l'as tenu.</p>
+  <img class="shot" src="shots/promesse.png" alt="Formulaire de promesse et promesses des amis">
+  <div class="grid">
+    <div>
+      <h3>Problème, pour qui</h3>
+      <p>L'objectif quotidien est privé : personne ne sait si tu le lâches. Le dire à quelqu'un change tout (c'est le ressort de Focusmate), mais sans réserver un créneau ni passer en visio. Ici, c'est asynchrone et ça tient en un geste.</p>
+      <h3>Parcours</h3>
+      <ol>
+        <li>Depuis l'accueil ou les amis : « Promettre », nombre de pomodoros, heure limite, qui peut voir.</li>
+        <li>Les amis choisis voient la promesse et la jauge avancer en direct, et peuvent encourager.</li>
+        <li>À l'heure limite : « tenue » ou « pas cette fois », sans reproche. Historique « 6 sur 7 ce mois-ci ».</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Fonctionnement</h3>
+      <pre class="mermaid">
+flowchart LR
+  F["Promettre (n, heure, amis)"] --> M["friend_messages : corps réservé (comme CHEER_BODY)"]
+  S["statsStore.days[aujourd'hui].sessions"] --> FS["friend_stats (agrégats déjà partagés)"]
+  M --> V["Chez l'ami : carte promesse"]
+  FS --> V
+  V -- "Encourager" --> C["Encouragement existant"]
+  H["Heure limite"] --> R["Résultat calculé côté client"]
+      </pre>
+    </div>
+  </div>
+  <h3>Impact technique</h3>
+  <ul>
+    <li>Réutilise le canal des encouragements : message au corps réservé dans <code>friend_messages</code> (aucune migration), progression lue dans <code>friend_stats</code> (déjà partagé). <code>lib/friends.ts</code>, <code>store/chatStore.ts</code>, <code>components/FriendsPanel.tsx</code>, <code>components/FriendChat.tsx</code>, <code>components/TodayDashboard.tsx</code>.</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul><li>Résultat calculé côté client : on peut tricher (comme l'anti-spam actuel). Acceptable entre amis, ou RPC plus tard.</li><li>Ton : jamais culpabilisant. Promesse ratée = message neutre, visible seulement des amis choisis.</li><li>Chevauche un peu la série à deux : l'une est quotidienne et durable, l'autre ponctuelle. On peut n'en garder qu'une.</li></ul>
+  <p><strong>Gratuit / local-first :</strong> bonus en ligne (comme tout le volet amis).</p>
+</section>
+
+<!-- 10 ────────────────────────────────────────────────────────── -->
+<section class="idea" id="radio-commune">
+  <div class="head"><span class="rank">10</span><h2>Radio commune</h2></div>
+  <div class="chips"><span class="chip">Musique / social · audacieuse</span><span class="chip">Effort M</span><span class="chip v">Valeur 3,5 / 5</span><span class="chip">Sans serveur</span></div>
+  <p class="pitch">Une radio FocusFlow : tout le monde entend la même vidéo du catalogue au même moment, comme une vraie radio. Sans serveur : le programme se calcule à partir de l'heure.</p>
+  <img class="shot" src="shots/radio-commune.png" alt="Onglet Radio : en direct, programme, amis à l'écoute">
+  <div class="grid">
+    <div>
+      <h3>Problème, pour qui</h3>
+      <p>Choisir sa musique est en soi une source de procrastination, et travailler seul pèse. La radio enlève le choix et donne la sensation d'être plusieurs (comme le live Lofi Girl), sans salle ni minuteur partagé, donc sans retomber dans les Focus Rooms refusées.</p>
+      <h3>Parcours</h3>
+      <ol>
+        <li>Écouter, onglet Radio : ce qui passe maintenant, la suite du programme.</li>
+        <li>« Rejoindre et lancer un focus » : la session démarre sur la vidéo, à la bonne seconde.</li>
+        <li>Connecté : « 3 amis écoutent en ce moment ».</li>
+        <li>À la fin d'une vidéo, la suivante du programme enchaîne pour tout le monde.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Fonctionnement</h3>
+      <pre class="mermaid">
+flowchart LR
+  C["data/videos.ts + durées fixes"] --> G["lib/radio.ts : programme(epoch UTC)"]
+  CL["Horloge (Date.now)"] --> G
+  G --> N["vidéo + seconde de départ"]
+  N --> Y["adapter.load(videoId, startSeconds)"]
+  Y -- "ENDED" --> G
+  FS["friend_stats.activity = Radio (bonus)"] --> UI["3 amis écoutent"]
+      </pre>
+    </div>
+  </div>
+  <h3>Impact technique</h3>
+  <ul>
+    <li>Nouveau <code>lib/radio.ts</code> (calcul pur, testé), durées des vidéos du catalogue figées dans <code>data/videos.ts</code>. Nouvel onglet dans <code>app/page.tsx</code> (<code>MediaTab</code>, <code>store/navStore.ts</code>). <code>lib/playback/youtube.ts</code> (<code>startSeconds</code>), <code>lib/playback/useSessionMedia.ts</code> (nouvelle source « radio »).</li>
+    <li>Pas de Supabase obligatoire (compte des amis via <code>friend_stats.activity</code> existant). Pas d'API.</li>
+  </ul>
+  <h3>Risques</h3>
+  <ul><li>Horloges des appareils décalées de quelques secondes : sans importance pour de la musique d'ambiance.</li><li>Pas de compteur « 1 284 auditeurs » sans serveur : seulement les amis. Une vidéo du catalogue retirée de YouTube casse le programme : passer à la suivante.</li><li>Les lives et les vidéos très longues (3 h) dominent le temps d'antenne : programme à équilibrer.</li></ul>
+  <p><strong>Gratuit / local-first :</strong> oui.</p>
+</section>
+
+<section class="idea">
+  <h2>Écartées en route</h2>
+  <ul>
+    <li><strong>Finir sur la fin du morceau</strong> (le pomodoro s'étire de ±3 min) : casse le contrat du minuteur (stats, XP, objectif), durées YouTube peu fiables. Les fondus règlent l'essentiel.</li>
+    <li><strong>Fantôme d'hier</strong> (course contre toi la semaine passée) : chevauche « semaine vs S-1 » des insights, risque de culpabiliser. À revoir si le journal de session existe.</li>
+    <li><strong>Écouter pareil</strong> (lancer la même musique qu'un ami en focus) : trop proche des Focus Rooms refusées.</li>
+    <li><strong>Carnet de rues à débloquer</strong> et <strong>pauses actives guidées</strong> : doublons du jardin de focus et de la respiration.</li>
+    <li><strong>Intégration Todoist / Notion</strong> : jeton à faire transiter par un serveur, cible faible. <strong>DJ vocal</strong> : ton « généré ». <strong>Photo façon BeReal</strong> : stockage et vie privée.</li>
+  </ul>
+  <h3>Sources de la veille</h3>
+  <ul>
+    <li>Duolingo, séries entre amis : <a href="https://blog.duolingo.com/friend-streak/">blog.duolingo.com/friend-streak</a> · <a href="https://blog.duolingo.com/how-duolingo-streak-builds-habit">streak et habitude</a></li>
+    <li>Forest, Plant Together : <a href="https://forestapp.cc/">forestapp.cc</a> · Opal, sessions planifiées : <a href="https://opal.so/focus-sessions">opal.so/focus-sessions</a></li>
+    <li>Session (intention et réflexion) : <a href="https://apps.apple.com/us/app/id1521432881?l=en-us">App Store</a> · Lofidoro : <a href="https://chromewebstore.google.com/detail/lofidoro/pjgoihdbljhplcmojnnfokmacpoonnee">Chrome Web Store</a></li>
+    <li>Media Session API : <a href="https://developer.mozilla.org/docs/Web/API/Media_Session_API">MDN</a> · <a href="https://web.dev/articles/media-session">web.dev</a></li>
+  </ul>
+</section>
+
+</div>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+  const dark = document.documentElement.dataset.theme === "dark" ||
+    (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+  mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", flowchart: { htmlLabels: true, curve: "basis" } });
+</script>
+</body>
+</html>
