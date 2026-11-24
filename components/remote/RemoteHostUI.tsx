@@ -42,6 +42,7 @@ export function RemoteLayer({ remote }: { remote: RemoteHost }) {
   return createPortal(
     <>
       {remote.open && remote.available && <RemotePanel remote={remote} />}
+      {remote.ask && <AskCard remote={remote} />}
       {remote.gate?.visible && <ResumeGate gate={remote.gate} />}
     </>,
     document.body,
@@ -86,7 +87,7 @@ function RemotePanel({ remote }: { remote: RemoteHost }) {
 
       <div className="flex gap-4 p-4">
         {url ? (
-          <QrCode text={url} size={132} label={tab === "remote" ? "QR code de la télécommande" : "QR code pour continuer sur le téléphone"} />
+          <QrCode text={url} size={132} testId="remote-qr" label={tab === "remote" ? "QR code de la télécommande" : "QR code pour continuer sur le téléphone"} />
         ) : (
           <div className="flex h-[132px] w-[132px] shrink-0 items-center justify-center rounded-lg border border-dashed border-white/15 text-center text-[11px] text-white/45">
             Aucun code
@@ -95,7 +96,7 @@ function RemotePanel({ remote }: { remote: RemoteHost }) {
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/35">Code</p>
           <p data-testid="remote-code" className="mt-1 font-mono text-[26px] leading-none tracking-[0.18em] tabular-nums">{code ?? "------"}</p>
-          {url && <p className="mt-2 break-all font-mono text-[10px] text-white/45 select-all">{url}</p>}
+          <p className="mt-2 text-[11px] leading-snug text-white/45">Le QR code contient une clé secrète : chaque téléphone doit ensuite être autorisé ici.</p>
           <p role="status" className="mt-3 flex items-center gap-2 text-xs text-white/75">
             <span aria-hidden className={cn("h-1.5 w-1.5 shrink-0 rounded-full", connected || handingOff ? "bg-focus" : "bg-white/30")} />
             {status}
@@ -118,6 +119,28 @@ function RemotePanel({ remote }: { remote: RemoteHost }) {
             Déconnecter
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Un téléphone a scanné le QR : rien ne se passe sans « Autoriser » ici. */
+function AskCard({ remote }: { remote: RemoteHost }) {
+  const handoff = remote.ask?.kind === "handoff";
+  return (
+    <div
+      role="alertdialog"
+      aria-label={handoff ? "Un téléphone demande la session" : "Un téléphone veut se connecter"}
+      data-testid="remote-ask"
+      className="fixed z-[115] left-1/2 top-20 w-[min(22rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-xl border border-white/15 bg-night/95 p-4 text-white backdrop-blur-sm shadow-[0_16px_40px_-12px_rgba(0,0,0,0.9)]"
+    >
+      <p className="text-sm">{handoff ? "Un téléphone demande la session. Autoriser ?" : "Un téléphone veut se connecter. Autoriser ?"}</p>
+      <p className="mt-1 text-[11px] text-white/50">
+        {handoff ? "La session continuera sur le téléphone et s'arrêtera ici." : "Il pourra mettre en pause, noter une distraction et passer au titre suivant."}
+      </p>
+      <div className="mt-3 flex gap-2">
+        <button onClick={remote.authorize} className="h-9 rounded-lg bg-white px-4 text-xs font-medium text-black hover:bg-white/90">Autoriser</button>
+        <button onClick={remote.deny} className="h-9 rounded-lg border border-white/15 px-4 text-xs text-white/75 hover:text-white">Refuser</button>
       </div>
     </div>
   );

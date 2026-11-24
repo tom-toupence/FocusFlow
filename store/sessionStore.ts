@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { Video, defaultVideos } from "@/data/videos";
 import { getCurrentUserId } from "@/lib/authState";
+import { useQueueStore } from "@/store/queueStore";
 import { upsertCustomVideo, deleteCustomVideo, upsertTodo, deleteTodo as dbDeleteTodo } from "@/lib/db";
 
 export type TodoStatus = "todo" | "in-progress" | "done";
@@ -55,6 +56,10 @@ interface SessionState {
   clearDone: () => void;
 }
 
+const clearSessionQueue = () => {
+  if (useQueueStore.getState().sessionItems) useQueueStore.getState().setSessionItems(null);
+};
+
 function localDate(): string {
   const d = new Date();
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
@@ -70,10 +75,11 @@ export const useSessionStore = create<SessionState>()(
       customVideos: [],
       todos: [],
 
-      selectVideo: (id) => set({ selectedVideoId: id, selectedPlaylistId: null, playQueue: false, playRadio: false }),
-      selectPlaylist: (id) => set({ selectedPlaylistId: id, selectedVideoId: null, playQueue: false, playRadio: false }),
-      selectQueue: () => set({ playQueue: true, selectedVideoId: null, selectedPlaylistId: null, playRadio: false }),
-      selectRadio: () => set({ playRadio: true, playQueue: false, selectedVideoId: null, selectedPlaylistId: null }),
+      // Toute nouvelle sélection oublie la file d'une session reprise (non persistée).
+      selectVideo: (id) => { clearSessionQueue(); set({ selectedVideoId: id, selectedPlaylistId: null, playQueue: false, playRadio: false }); },
+      selectPlaylist: (id) => { clearSessionQueue(); set({ selectedPlaylistId: id, selectedVideoId: null, playQueue: false, playRadio: false }); },
+      selectQueue: () => { clearSessionQueue(); set({ playQueue: true, selectedVideoId: null, selectedPlaylistId: null, playRadio: false }); },
+      selectRadio: () => { clearSessionQueue(); set({ playRadio: true, playQueue: false, selectedVideoId: null, selectedPlaylistId: null }); },
 
       addCustomVideo: (video) => {
         const { customVideos } = get();

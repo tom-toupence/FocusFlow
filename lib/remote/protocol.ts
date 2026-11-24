@@ -25,6 +25,10 @@ export const HOST_TIMEOUT_MS = 10_000;
 /** Un handoff sans accusé dans ce délai est abandonné (l'ordinateur continue). */
 export const HANDOFF_ACK_TIMEOUT_MS = 10_000;
 
+/** Décalage d'horloge au-delà duquel on prévient (et plafond de l'estimation). */
+export const SKEW_WARN_MS = 30_000;
+export const MAX_SKEW_MS = 24 * 3600_000;
+
 export const MAX_TITLE = 200;
 export const MAX_TODOS = 50;
 export const MAX_TRACKS = 200;
@@ -34,7 +38,9 @@ const NONCE_RE = /^[A-Za-z0-9_-]{8,32}$/;
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const YT_ID_RE = /^[\w-]{11}$/;
 const YT_LIST_RE = /^[\w-]{2,64}$/;
-const SPOTIFY_URI_RE = /^spotify:[a-z]+:[A-Za-z0-9]{1,64}$/;
+const SPOTIFY_URI_RE = /^spotify:(playlist|album):[A-Za-z0-9]{22}$/;
+/** Nonce d'accusé : envoyé seulement dans le message de handoff (signé). */
+const ACK_RE = /^[A-Za-z0-9_-]{16,32}$/;
 const TWITCH_CHANNEL_RE = /^\w{1,25}$/;
 const TWITCH_VOD_RE = /^\d{1,15}$/;
 
@@ -77,6 +83,8 @@ export function newNonce(rand: RandomBytes = cryptoBytes): string {
 
 export type RemoteCommand = "pause" | "resume" | "distraction" | "next";
 export type ByeReason = "expired" | "ended" | "disconnected" | "handed-off";
+/** denied : refusé sur l'ordinateur ; taken : code déjà servi ; changed : la session a bougé avant l'accusé. */
+export type RefuseReason = "denied" | "taken" | "changed";
 
 /** Ce que le téléphone affiche, diffusé par l'ordinateur. */
 export interface RemoteState {
@@ -135,13 +143,21 @@ export interface HandoffState {
 }
 
 interface Envelope { v: 1; n: string; t: number }
+/**
+ * `id` : identifiant d'appareil (télécommande, gardé dans le stockage du
+ * téléphone) ou de demande (handoff, un par page).
+ */
 export type RemoteMessage =
   | (Envelope & { type: "hello"; role: "remote" | "handoff"; id: string })
+  /** L'ordinateur a vu la demande : en attente d'« Autoriser » sur l'ordinateur. */
+  | (Envelope & { type: "wait"; id: string })
+  /** Cet appareil est appairé : ses commandes seront appliquées. */
+  | (Envelope & { type: "paired"; id: string })
   | (Envelope & { type: "state"; s: RemoteState })
-  | (Envelope & { type: "cmd"; cmd: RemoteCommand })
-  | (Envelope & { type: "handoff"; id: string; state: HandoffState })
-  | (Envelope & { type: "ack"; id: string })
-  | (Envelope & { type: "refused"; id: string })
+  | (Envelope & { type: "cmd"; id: string; cmd: RemoteCommand })
+  | (Envelope & { type: "handoff"; id: string; ack: string; state: HandoffState })
+  | (Envelope & { type: "ack"; id: string; ack: string })
+  | (Envelope & { type: "refused"; id: string; reason: RefuseReason })
   | (Envelope & { type: "bye"; reason: ByeReason });
 
 type Body<T> = T extends Envelope ? Omit<T, keyof Envelope> : never;
@@ -175,6 +191,7 @@ const MODES = new Set<TimerMode>(["work", "short-break", "long-break"]);
 const PRESETS = new Set<TimerPreset>(["classic", "deep", "custom", "flowtime"]);
 const COMMANDS = new Set<RemoteCommand>(["pause", "resume", "distraction", "next"]);
 const BYES = new Set<ByeReason>(["expired", "ended", "disconnected", "handed-off"]);
+const REFUSALS = new Set<RefuseReason>(["denied", "taken", "changed"]);
 const STATUSES = new Set(["todo", "in-progress", "done"]);
 const DAY = 24 * 3600;
 
@@ -241,6 +258,9 @@ export function validHandoffState(h: unknown): h is HandoffState {
   return todosOk && validHandoffMedia(h.media);
 }
 
+const validId = (x: unknown) => isStr(x, 64) && ID_RE.test(x as string);
+const validAck = (x: unknown) => isStr(x, 32) && ACK_RE.test(x as string);
+
 /** Forme stricte d'un message ; null pour tout ce qui n'est pas un message v1 connu et valide. */
 export function parseMessage(raw: unknown): RemoteMessage | null {
   if (!isObj(raw)) return null;
@@ -250,16 +270,20 @@ export function parseMessage(raw: unknown): RemoteMessage | null {
     case "hello":
       return hasKeys(raw, [...env, "role", "id"]) && (raw.role === "remote" || raw.role === "handoff")
         && isStr(raw.id, 64) && ID_RE.test(raw.id as string) ? (raw as unknown as RemoteMessage) : null;
+    case "wait":
+    case "paired":
+      return hasKeys(raw, [...env, "id"]) && validId(raw.id) ? (raw as unknown as RemoteMessage) : null;
     case "state":
       return hasKeys(raw, [...env, "s"]) && validRemoteState(raw.s) ? (raw as unknown as RemoteMessage) : null;
     case "cmd":
-      return hasKeys(raw, [...env, "cmd"]) && COMMANDS.has(raw.cmd as RemoteCommand) ? (raw as unknown as RemoteMessage) : null;
+      return hasKeys(raw, [...env, "id", "cmd"]) && validId(raw.id) && COMMANDS.has(raw.cmd as RemoteCommand) ? (raw as unknown as RemoteMessage) : null;
     case "handoff":
-      return hasKeys(raw, [...env, "id", "state"]) && isStr(raw.id, 64) && ID_RE.test(raw.id as string)
+      return hasKeys(raw, [...env, "id", "ack", "state"]) && validId(raw.id) && validAck(raw.ack)
         && validHandoffState(raw.state) ? (raw as unknown as RemoteMessage) : null;
     case "ack":
+      return hasKeys(raw, [...env, "id", "ack"]) && validId(raw.id) && validAck(raw.ack) ? (raw as unknown as RemoteMessage) : null;
     case "refused":
-      return hasKeys(raw, [...env, "id"]) && isStr(raw.id, 64) && ID_RE.test(raw.id as string) ? (raw as unknown as RemoteMessage) : null;
+      return hasKeys(raw, [...env, "id", "reason"]) && validId(raw.id) && REFUSALS.has(raw.reason as RefuseReason) ? (raw as unknown as RemoteMessage) : null;
     case "bye":
       return hasKeys(raw, [...env, "reason"]) && BYES.has(raw.reason as ByeReason) ? (raw as unknown as RemoteMessage) : null;
     default:
@@ -270,18 +294,30 @@ export function parseMessage(raw: unknown): RemoteMessage | null {
 // ─── Anti-rejeu ───────────────────────────────────────────────────────────────
 
 /**
- * Garde de réception : forme valide, âge ≤ 30 s (dans les deux sens, pour une
- * horloge en avance), nonce jamais vu. Les nonces sont oubliés après 2 × 30 s
- * (un message plus vieux est de toute façon refusé par l'âge).
+ * Garde de réception (après vérification de la signature) : forme valide, âge
+ * ≤ 30 s dans les deux sens, nonce jamais vu. Les nonces sont oubliés après
+ * 2 × 30 s (un message plus vieux est de toute façon refusé par l'âge).
+ *
+ * `offset` = horloge locale − horloge de l'ordinateur. L'ordinateur est la
+ * référence (0) ; le téléphone l'estime sur le premier message signé reçu
+ * (`calibrate`), puis date ses propres messages à l'heure de l'ordinateur.
  */
 export class ReplayGuard {
   private seen = new Map<string, number>();
-  constructor(private maxAge = MAX_MESSAGE_AGE_MS) {}
+  offset: number | null;
+  constructor(private maxAge = MAX_MESSAGE_AGE_MS, offset: number | null = 0) { this.offset = offset; }
+
+  /** Premier message signé : pose le décalage (au plus 24 h, au-delà on n'y croit pas). */
+  calibrate(raw: unknown, now = Date.now()) {
+    if (this.offset != null) return;
+    const m = parseMessage(raw);
+    if (m && Math.abs(now - m.t) <= MAX_SKEW_MS) this.offset = now - m.t;
+  }
 
   accept(raw: unknown, now = Date.now()): RemoteMessage | null {
     const m = parseMessage(raw);
-    if (!m) return null;
-    if (Math.abs(now - m.t) > this.maxAge) return null;
+    if (!m || this.offset == null) return null;
+    if (Math.abs(now - this.offset - m.t) > this.maxAge) return null;
     if (this.seen.has(m.n)) return null;
     this.seen.set(m.n, now);
     if (this.seen.size > 500) this.prune(now);

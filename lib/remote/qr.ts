@@ -68,7 +68,7 @@ function alignmentPositions(ver: number, size: number): number[] {
 }
 
 /** Matrice QR : `true` = module sombre. Lève une erreur si le texte est trop long. */
-export function encodeQr(text: string): boolean[][] {
+export function encodeQr(text: string, opts: { mask?: number } = {}): boolean[][] {
   const bytes = Array.from(new TextEncoder().encode(text));
   let ver = 1;
   for (; ver <= MAX_VERSION; ver++) {
@@ -196,7 +196,9 @@ export function encodeQr(text: string): boolean[][] {
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (!isFn[y][x] && maskFn(m, x, y)) modules[y][x] = !modules[y][x];
   };
   let best = 0, bestPenalty = Infinity;
+  // Masque imposé (tests contre une matrice de référence) : pas de recherche.
   for (let m = 0; m < 8; m++) {
+    if (opts.mask != null && m !== opts.mask) continue;
     applyMask(m);
     drawFormat(m);
     const p = penalty(modules);

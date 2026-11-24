@@ -41,7 +41,9 @@ export interface SessionMedia {
 export function useSessionMedia(): SessionMedia {
   const { selectedVideoId, selectedPlaylistId, playQueue, playRadio, getAllVideos } = useSessionStore();
   const { playlists } = usePlaylistStore();
-  const { items: queueItems } = useQueueStore();
+  const { items: savedQueue, sessionItems } = useQueueStore();
+  // Session reprise d'un ordinateur : sa file, sans toucher à la File d'attente enregistrée.
+  const queueItems = sessionItems ?? savedQueue;
   const { selectedPlaylistUri, accessToken, playlists: spotifyPlaylists } = useSpotifyStore();
   const { selectedChannel, selectedVodId, accessToken: twitchToken } = useTwitchStore();
 

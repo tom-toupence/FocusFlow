@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { isPhonePath } from "@/lib/remote/paths";
 import { cn } from "@/lib/utils";
 
 // Écran d'arrivée : le wordmark « FocusFlow » repose sous une surface d'eau
@@ -122,7 +123,7 @@ function drawWordmark(width: number, height: number): HTMLCanvasElement | null {
 export default function SplashIntro() {
   const pathname = usePathname();
   // Ni sur la télécommande ni sur la reprise au téléphone (lot 7) : on y vient pour agir.
-  if (pathname?.startsWith("/lab") || pathname?.startsWith("/remote/") || pathname?.startsWith("/handoff/")) return null;
+  if (pathname?.startsWith("/lab") || isPhonePath(pathname)) return null;
   return <SplashIntroInner />;
 }
 

@@ -17,7 +17,7 @@ import { useStatsStore, localToday } from "@/store/statsStore";
 import { closeActiveSession } from "@/lib/sessionEnd";
 import type { Todo } from "@/store/sessionStore";
 import {
-  buildHandoffState, mediaForHandoff, phoneTimerPatch, splitCredit, isSameSession, mergeTodos, resumePosition,
+  buildHandoffState, mediaForHandoff, sessionTodos, phoneTimerPatch, splitCredit, isSameSession, mergeTodos, resumePosition,
   type MediaSnapshot, type TimerSnapshot,
 } from "./handoff";
 import { makeMessage, parseMessage, MAX_TODOS, MAX_TRACKS } from "./protocol";
@@ -40,7 +40,7 @@ const todos: Todo[] = [
 
 /** Aller-retour réseau : JSON puis validation stricte du message. */
 function roundTrip(state: ReturnType<typeof buildHandoffState>) {
-  const wire = JSON.parse(JSON.stringify(makeMessage({ type: "handoff", id: "req12345", state }, T0)));
+  const wire = JSON.parse(JSON.stringify(makeMessage({ type: "handoff", id: "req12345", ack: "ackNONCEack123456", state }, T0)));
   const m = parseMessage(wire);
   if (!m || m.type !== "handoff") throw new Error("message refusé");
   return m.state;
@@ -72,6 +72,13 @@ describe("sérialisation de la session", () => {
     expect(m.position).toBe(42);
   });
 
+  it("tâches de la session : pas celles terminées avant son départ", () => {
+    const all: Todo[] = [
+      { id: "a", text: "A", status: "todo" }, { id: "b", text: "B", status: "done" }, { id: "c", text: "C", status: "done" },
+    ];
+    expect(sessionTodos(all, ["b"]).map((t) => t.id)).toEqual(["a", "c"]);
+  });
+
   it("tâches bornées, non terminées d'abord", () => {
     const many: Todo[] = Array.from({ length: 80 }, (_, i) => ({ id: `id${i}`, text: `T${i}`, status: i % 2 ? "done" : "todo" }));
     const s = roundTrip(buildHandoffState(timer(), many, video, T0));
@@ -88,11 +95,14 @@ describe("sérialisation de la session", () => {
 
   it("refuse un état corrompu (média, minuteur, tâches)", () => {
     const s = buildHandoffState(timer(), todos, video, T0);
-    const send = (state: unknown) => parseMessage(makeMessage({ type: "handoff", id: "req12345", state } as never, T0));
+    const send = (state: unknown) => parseMessage(makeMessage({ type: "handoff", id: "req12345", ack: "ackNONCEack123456", state } as never, T0));
     expect(send({ ...s, media: { kind: "video", id: "pas-un-id", title: "x", sub: null, position: 0, playing: true } })).toBeNull();
     expect(send({ ...s, timer: { ...s.timer, mode: "sieste" } })).toBeNull();
     expect(send({ ...s, todos: [{ id: "a", text: "", status: "todo" }] })).toBeNull();
     expect(send({ ...s, media: { kind: "spotify", uri: "javascript:alert(1)" } })).toBeNull();
+    expect(send({ ...s, media: { kind: "spotify", uri: "spotify:track:37i9dQZF1DX8Uebhn9wzrS" } })).toBeNull();
+    expect(send({ ...s, media: { kind: "spotify", uri: "spotify:playlist:short" } })).toBeNull();
+    expect(send({ ...s, media: { kind: "spotify", uri: "spotify:album:37i9dQZF1DX8Uebhn9wzrS" } })).not.toBeNull();
   });
 });
 
@@ -134,11 +144,11 @@ describe("désérialisation côté téléphone", () => {
     expect(isSameSession({ ...local, active: false }, s, 0)).toBe(false);
   });
 
-  it("fusion des tâches par id", () => {
-    const local: Todo[] = [{ id: "t1", text: "ancien", status: "todo" }, { id: "p1", text: "à moi", status: "todo" }];
+  it("fusion des tâches par id : statut seulement pour une tâche connue, texte local gardé", () => {
+    const local: Todo[] = [{ id: "t1", text: "texte local", status: "todo" }, { id: "p1", text: "à moi", status: "todo" }];
     const merged = mergeTodos(local, [{ id: "t1", text: "Finir le rapport", status: "done" }, { id: "t3", text: "Nouveau", status: "todo" }], "2026-11-24");
     expect(merged.map((t) => [t.id, t.text, t.status])).toEqual([
-      ["t1", "Finir le rapport", "done"], ["p1", "à moi", "todo"], ["t3", "Nouveau", "todo"],
+      ["t1", "texte local", "done"], ["p1", "à moi", "todo"], ["t3", "Nouveau", "todo"],
     ]);
     expect(merged[0].completedAt).toBe("2026-11-24");
   });

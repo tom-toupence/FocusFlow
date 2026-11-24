@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { encodeQr, qrSvgPath } from "./qr";
+import reference from "../__fixtures__/qr-reference.json";
 
 // Le décodage réel a été vérifié avec OpenCV (QRCodeDetector) pour les versions
 // 1 à 10 ; ici, la structure : taille, motifs de repère, ligne de synchronisation.
@@ -22,6 +23,13 @@ describe("encodeur QR", () => {
     finderAt(0, 0); finderAt(n - 7, 0); finderAt(0, n - 7);
     for (let i = 8; i < n - 8; i++) { expect(m[6][i]).toBe(i % 2 === 0); expect(m[i][6]).toBe(i % 2 === 0); }
     expect(m[n - 8][8]).toBe(true); // module sombre fixe
+  });
+
+  it("identique, module à module, à une matrice de référence (python-qrcode, même masque)", () => {
+    for (const ref of reference as { text: string; mask: number; rows: string[] }[]) {
+      const m = encodeQr(ref.text, { mask: ref.mask });
+      expect(m.map((r) => r.map((c) => (c ? "1" : "0")).join(""))).toEqual(ref.rows);
+    }
   });
 
   it("refuse un texte trop long", () => {

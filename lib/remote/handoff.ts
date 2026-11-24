@@ -78,7 +78,16 @@ export function mediaForHandoff(m: MediaSnapshot): HandoffMedia {
   };
 }
 
-/** Tâches de la session : les non terminées d'abord, bornées. */
+/**
+ * Tâches de LA SESSION : celles qui ne sont pas terminées, et celles terminées
+ * pendant la session (pas les terminées avant son départ).
+ */
+export function sessionTodos(todos: Todo[], doneAtStart: string[]): Todo[] {
+  const before = new Set(doneAtStart);
+  return todos.filter((t) => t.status !== "done" || !before.has(t.id));
+}
+
+/** Tâches transférées : les non terminées d'abord, bornées. */
 export function todosForHandoff(todos: Todo[]): HandoffTodo[] {
   const valid = todos.filter((t) => /^[A-Za-z0-9_-]{1,64}$/.test(t.id) && t.text.trim().length > 0);
   const ordered = [...valid.filter((t) => t.status !== "done"), ...valid.filter((t) => t.status === "done")];
@@ -184,14 +193,19 @@ export function isSameSession(
   return !local.isRunning && local.secondsLeft === t.secondsLeft;
 }
 
-/** Fusion des tâches : celles de l'ordinateur remplacent ou complètent celles du téléphone (par id). */
+/**
+ * Fusion des tâches par id : une tâche déjà connue du téléphone ne prend que le
+ * statut (son texte, peut-être modifié ailleurs, n'est pas réécrit) ; les
+ * autres sont ajoutées.
+ */
 export function mergeTodos(local: Todo[], incoming: HandoffTodo[], today: string): Todo[] {
   const byId = new Map(incoming.map((t) => [t.id, t]));
   const merged = local.map((t) => {
     const x = byId.get(t.id);
     if (!x) return t;
     byId.delete(t.id);
-    return { ...t, text: x.text, status: x.status, completedAt: x.status === "done" ? (t.completedAt ?? today) : undefined };
+    if (x.status === t.status) return t;
+    return { ...t, status: x.status, completedAt: x.status === "done" ? (t.completedAt ?? today) : undefined };
   });
   for (const x of byId.values()) {
     merged.push({ id: x.id, text: x.text, status: x.status, createdAt: today, completedAt: x.status === "done" ? today : undefined, priority: "normal", pomodoroEstimate: 1, pomodorosUsed: 0 });

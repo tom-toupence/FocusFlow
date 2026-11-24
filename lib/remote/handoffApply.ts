@@ -15,10 +15,10 @@ import { defaultVideos } from "@/data/videos";
 import { closeActiveSession } from "@/lib/sessionEnd";
 import { isSameSession, mergeTodos, phoneTimerPatch } from "./handoff";
 import type { HandoffMedia, HandoffState } from "./protocol";
+import { GUEST_KEY } from "./paths";
+export { isHandoffGuest, clearHandoffGuest } from "./paths";
 
 const RESUME_KEY = "focusflow-handoff-resume";
-/** Session reprise sans compte : /session et /summary passent l'AuthGate dans cet onglet. */
-export const GUEST_KEY = "focusflow-handoff-guest";
 
 export interface PendingResume {
   /** Piste à caler (id YouTube), null : rien à caler (radio, Spotify, Twitch). */
@@ -44,9 +44,7 @@ export function clearPendingResume() {
   try { sessionStorage.removeItem(RESUME_KEY); } catch { /* stockage bloqué */ }
 }
 
-export function isHandoffGuest(): boolean {
-  try { return sessionStorage.getItem(GUEST_KEY) === "1"; } catch { return false; }
-}
+
 
 /**
  * Sélectionne le média reçu sur ce téléphone. Rend un message à afficher quand
@@ -65,14 +63,15 @@ function applyMedia(m: HandoffMedia): string | null {
     case "video": {
       const cat = defaultVideos.find((v) => v.youtubeId === m.id);
       if (cat) { session.selectVideo(cat.id); return null; }
-      // Vidéo hors catalogue : jouée comme une file d'un titre (la File d'attente est remplacée).
-      useQueueStore.setState({ items: [{ id: crypto.randomUUID(), youtubeId: m.id, title: m.title }] });
+      // Vidéo hors catalogue : jouée comme une file de session d'un titre.
       session.selectQueue();
+      useQueueStore.getState().setSessionItems([{ id: crypto.randomUUID(), youtubeId: m.id, title: m.title }]);
       return null;
     }
     case "queue":
-      useQueueStore.setState({ items: m.tracks.map((t) => ({ id: crypto.randomUUID(), youtubeId: t.id, title: t.title })) });
+      // File de session non persistée : la File d'attente de l'utilisateur reste intacte.
       session.selectQueue();
+      useQueueStore.getState().setSessionItems(m.tracks.map((t) => ({ id: crypto.randomUUID(), youtubeId: t.id, title: t.title })));
       return null;
     case "radio":
       session.selectRadio();

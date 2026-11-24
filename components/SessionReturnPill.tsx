@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { isPhonePath } from "@/lib/remote/paths";
 import { motion, useReducedMotion } from "motion/react";
 import { useTimerStore, type TimerMode } from "@/store/timerStore";
 import { remainingSeconds, formatClock } from "@/lib/timerClock";
@@ -34,7 +35,7 @@ export default function SessionReturnPill() {
   const flowtime = useTimerStore((s) => s.settings.preset === "flowtime");
 
   const visible = mounted && active && !HIDDEN_ON.includes(pathname)
-    && !pathname.startsWith("/remote/") && !pathname.startsWith("/handoff/");
+    && !isPhonePath(pathname);
 
   // Rafraîchi chaque seconde, seulement quand la pastille est affichée.
   const [now, setNow] = useState(() => Date.now());

@@ -3,12 +3,14 @@
 import { useMemo } from "react";
 import { encodeQr, qrSvgPath } from "@/lib/remote/qr";
 
-export default function QrCode({ text, size = 168, label }: { text: string; size?: number; label: string }) {
+export default function QrCode({ text, size = 168, label, testId }: { text: string; size?: number; label: string; testId?: string }) {
   const { d, size: n } = useMemo(() => qrSvgPath(encodeQr(text)), [text]);
   return (
     <svg
       role="img"
       aria-label={label}
+      data-testid={testId}
+      data-url={testId ? text : undefined}
       viewBox={`0 0 ${n} ${n}`}
       width={size}
       height={size}

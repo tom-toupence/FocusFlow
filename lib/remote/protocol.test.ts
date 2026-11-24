@@ -44,20 +44,26 @@ describe("validation des messages", () => {
   it("accepte les messages v1 bien formés", () => {
     const now = 1_000_000;
     expect(parseMessage(makeMessage({ type: "state", s: STATE }, now))).not.toBeNull();
-    expect(parseMessage(makeMessage({ type: "cmd", cmd: "pause" }, now))).not.toBeNull();
+    expect(parseMessage(makeMessage({ type: "cmd", id: "device1234", cmd: "pause" }, now))).not.toBeNull();
     expect(parseMessage(makeMessage({ type: "hello", role: "remote", id: "abcdEFGH12" }, now))).not.toBeNull();
     expect(parseMessage(makeMessage({ type: "bye", reason: "expired" }, now))).not.toBeNull();
-    expect(parseMessage(makeMessage({ type: "ack", id: "abcdEFGH12" }, now))).not.toBeNull();
+    expect(parseMessage(makeMessage({ type: "wait", id: "abcdEFGH12" }, now))).not.toBeNull();
+    expect(parseMessage(makeMessage({ type: "paired", id: "abcdEFGH12" }, now))).not.toBeNull();
+    expect(parseMessage(makeMessage({ type: "refused", id: "abcdEFGH12", reason: "changed" }, now))).not.toBeNull();
+    expect(parseMessage(makeMessage({ type: "ack", id: "abcdEFGH12", ack: "nonceNONCEnonce123" }, now))).not.toBeNull();
   });
 
   it("ignore les types inconnus, les autres versions et les formes lâches", () => {
-    const base = makeMessage({ type: "cmd", cmd: "pause" }, 1_000_000);
+    const base = makeMessage({ type: "cmd", id: "device1234", cmd: "pause" }, 1_000_000);
     expect(parseMessage({ ...base, type: "shutdown" })).toBeNull();
     expect(parseMessage({ ...base, v: 2 })).toBeNull();
     expect(parseMessage({ ...base, cmd: "reboot" })).toBeNull();
     expect(parseMessage({ ...base, extra: 1 })).toBeNull(); // clé en trop
     expect(parseMessage({ ...base, n: "court" })).toBeNull();
     expect(parseMessage({ ...base, t: "hier" })).toBeNull();
+    expect(parseMessage({ ...base, id: undefined })).toBeNull(); // commande sans appareil
+    expect(parseMessage(makeMessage({ type: "ack", id: "abcdEFGH12", ack: "court" }, 1_000_000))).toBeNull();
+    expect(parseMessage(makeMessage({ type: "refused", id: "abcdEFGH12", reason: "parce que" } as never, 1_000_000))).toBeNull();
     expect(parseMessage(null)).toBeNull();
     expect(parseMessage("cmd")).toBeNull();
     expect(parseMessage([base])).toBeNull();
@@ -80,23 +86,39 @@ describe("validation des messages", () => {
 describe("anti-rejeu", () => {
   it("refuse un message vu deux fois", () => {
     const g = new ReplayGuard();
-    const m = makeMessage({ type: "cmd", cmd: "distraction" }, 1_000_000);
+    const m = makeMessage({ type: "cmd", id: "device1234", cmd: "distraction" }, 1_000_000);
     expect(g.accept(m, 1_000_100)).not.toBeNull();
     expect(g.accept(m, 1_000_200)).toBeNull();
   });
 
   it("refuse un message de plus de 30 s (ou daté du futur de plus de 30 s)", () => {
     const g = new ReplayGuard();
-    expect(g.accept(makeMessage({ type: "cmd", cmd: "pause" }, 1_000_000), 1_000_000 + MAX_MESSAGE_AGE_MS + 1)).toBeNull();
-    expect(g.accept(makeMessage({ type: "cmd", cmd: "pause" }, 1_000_000), 1_000_000 - MAX_MESSAGE_AGE_MS - 1)).toBeNull();
-    expect(g.accept(makeMessage({ type: "cmd", cmd: "pause" }, 1_000_000), 1_000_000 + MAX_MESSAGE_AGE_MS)).not.toBeNull();
+    expect(g.accept(makeMessage({ type: "cmd", id: "device1234", cmd: "pause" }, 1_000_000), 1_000_000 + MAX_MESSAGE_AGE_MS + 1)).toBeNull();
+    expect(g.accept(makeMessage({ type: "cmd", id: "device1234", cmd: "pause" }, 1_000_000), 1_000_000 - MAX_MESSAGE_AGE_MS - 1)).toBeNull();
+    expect(g.accept(makeMessage({ type: "cmd", id: "device1234", cmd: "pause" }, 1_000_000), 1_000_000 + MAX_MESSAGE_AGE_MS)).not.toBeNull();
+  });
+
+  it("téléphone : décalage estimé sur le premier message signé, puis fenêtre de 30 s corrigée", () => {
+    const g = new ReplayGuard(undefined, null);
+    const hostT = 1_000_000;
+    const phoneNow = hostT + 5 * 60_000; // téléphone en avance de 5 min
+    const first = makeMessage({ type: "wait", id: "abcdEFGH12" }, hostT);
+    expect(g.accept(first, phoneNow)).toBeNull(); // pas encore calé
+    g.calibrate(first, phoneNow);
+    expect(g.offset).toBe(5 * 60_000);
+    expect(g.accept(first, phoneNow)).not.toBeNull();
+    expect(g.accept(makeMessage({ type: "wait", id: "abcdEFGH12" }, hostT - 40_000), phoneNow)).toBeNull();
+    // Au-delà de 24 h, pas de calage.
+    const g2 = new ReplayGuard(undefined, null);
+    g2.calibrate(makeMessage({ type: "wait", id: "abcdEFGH12" }, 1), 9e12);
+    expect(g2.offset).toBeNull();
   });
 
   it("reste borné en mémoire sous une inondation de nonces", () => {
     const g = new ReplayGuard();
-    for (let i = 0; i < 2000; i++) g.accept(makeMessage({ type: "cmd", cmd: "pause" }, 1_000_000), 1_000_000);
+    for (let i = 0; i < 2000; i++) g.accept(makeMessage({ type: "cmd", id: "device1234", cmd: "pause" }, 1_000_000), 1_000_000);
     // Toujours fonctionnel : un nouveau message passe.
-    expect(g.accept(makeMessage({ type: "cmd", cmd: "next" }, 1_000_000), 1_000_000)).not.toBeNull();
+    expect(g.accept(makeMessage({ type: "cmd", id: "device1234", cmd: "next" }, 1_000_000), 1_000_000)).not.toBeNull();
   });
 });
 

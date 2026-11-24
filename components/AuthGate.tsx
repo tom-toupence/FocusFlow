@@ -10,7 +10,7 @@ import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
-import { isHandoffGuest } from "@/lib/remote/handoffApply";
+import { isHandoffGuest, clearHandoffGuest, isPhonePath, isGuestPath } from "@/lib/remote/paths";
 
 // Lazy-load : la landing (photo plein écran + motion) n'est chargée QUE pour les
 // visiteurs NON connectés → le bundle in-app (session/dashboard) n'en paie pas
@@ -27,7 +27,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     || pathname === "/auth/spotify/callback"
     || pathname === "/auth/twitch/callback";
   // Télécommande et reprise sur le téléphone (lot 7) : sans compte.
-  const isPhoneRoute = pathname?.startsWith("/remote/") || pathname?.startsWith("/handoff/");
+  const isPhoneRoute = isPhonePath(pathname);
   if (!supabase || isCallbackRoute || isPhoneRoute) return <>{children}</>;
 
   return <AuthGateInner pathname={pathname}>{children}</AuthGateInner>;
@@ -40,6 +40,13 @@ function AuthGateInner({ children, pathname }: { children: React.ReactNode; path
   const [guest, setGuest] = useState(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setGuest(isHandoffGuest()), []);
+  // La faveur s'arrête à la connexion et dès qu'on quitte la session et son résumé.
+  useEffect(() => {
+    if ((user && user !== "loading") || !isGuestPath(pathname)) {
+      clearHandoffGuest();
+      setGuest(false); // eslint-disable-line react-hooks/set-state-in-effect
+    }
+  }, [user, pathname]);
 
   useEffect(() => {
     // Get current session
@@ -61,7 +68,7 @@ function AuthGateInner({ children, pathname }: { children: React.ReactNode; path
     );
   }
 
-  if (!user && !(guest && (pathname === "/session" || pathname === "/summary"))) return <LandingPage />;
+  if (!user && !(guest && isGuestPath(pathname))) return <LandingPage />;
 
   return <>{children}</>;
 }

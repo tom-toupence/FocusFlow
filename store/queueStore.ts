@@ -17,6 +17,13 @@ export interface QueueItem {
 
 interface QueueState {
   items: QueueItem[];
+  /**
+   * File de la session en cours, NON persistée (session reprise d'un ordinateur,
+   * lot 7) : jouée à la place de `items` sans écraser la File d'attente de
+   * l'utilisateur. Effacée par toute nouvelle sélection (sessionStore.select*).
+   */
+  sessionItems: QueueItem[] | null;
+  setSessionItems: (items: QueueItem[] | null) => void;
   addItem: (item: Omit<QueueItem, "id">) => void;
   removeItem: (id: string) => void;
   moveItem: (id: string, dir: "up" | "down") => void;
@@ -27,6 +34,8 @@ export const useQueueStore = create<QueueState>()(
   persist(
     (set, get) => ({
       items: [],
+      sessionItems: null,
+      setSessionItems: (sessionItems) => set({ sessionItems }),
       addItem: (item) => {
         // Évite les doublons exacts (même vidéo déjà dans la file).
         if (get().items.some((i) => i.youtubeId === item.youtubeId)) return;
@@ -44,7 +53,7 @@ export const useQueueStore = create<QueueState>()(
       },
       clear: () => set({ items: [] }),
     }),
-    { name: "focusflow-queue" }
+    { name: "focusflow-queue", partialize: (s) => ({ items: s.items }) }
   )
 );
 

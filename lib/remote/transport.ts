@@ -12,15 +12,16 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export interface RemoteTransport {
   readonly kind: "supabase" | "local";
-  /** Envoie un message (sérialisable JSON). Résolu une fois parti (ou abandonné). */
-  send(msg: unknown): Promise<void>;
+  /** Envoie un message (sérialisable JSON). true s'il est parti, false sinon. */
+  send(msg: unknown): Promise<boolean>;
   /** Abonne un récepteur ; rend la fonction de désabonnement. */
   onMessage(cb: (msg: unknown) => void): () => void;
   close(): void;
 }
 
-const CHANNEL_PREFIX = "ff-remote-";
 const EVENT = "m";
+/** Attente bornée de l'état « joined » avant un envoi Supabase. */
+const JOIN_WAIT_MS = 5000;
 /** Clé de lab : force le transport local quand il est permis (tests e2e). */
 export const FORCE_LOCAL_KEY = "focusflow-remote-transport";
 
@@ -42,10 +43,11 @@ export function transportKind(): RemoteTransport["kind"] | null {
   return local ? "local" : null;
 }
 
-export function openTransport(code: string): RemoteTransport | null {
+/** `name` : nom du canal, dérivé du code et du secret (lib/remote/crypto.ts). */
+export function openTransport(name: string): RemoteTransport | null {
   const kind = transportKind();
-  if (kind === "supabase") return new SupabaseTransport(code);
-  if (kind === "local") return new LocalTransport(code);
+  if (kind === "supabase") return new SupabaseTransport(name);
+  if (kind === "local") return new LocalTransport(name);
   return null;
 }
 
@@ -57,15 +59,15 @@ class LocalTransport implements RemoteTransport {
   private listeners = new Set<(m: unknown) => void>();
   private closed = false;
 
-  constructor(code: string) {
-    this.ch = new BroadcastChannel(CHANNEL_PREFIX + code);
+  constructor(name: string) {
+    this.ch = new BroadcastChannel(name);
     // Un BroadcastChannel ne se renvoie pas ses propres messages (comme self:false).
     this.ch.onmessage = (e: MessageEvent) => this.listeners.forEach((l) => l(e.data));
   }
 
   async send(msg: unknown) {
-    if (this.closed) return;
-    try { this.ch.postMessage(msg); } catch { /* message non clonable : ignoré */ }
+    if (this.closed) return false;
+    try { this.ch.postMessage(msg); return true; } catch { return false; }
   }
 
   onMessage(cb: (m: unknown) => void) {
@@ -87,29 +89,34 @@ class SupabaseTransport implements RemoteTransport {
   readonly kind = "supabase" as const;
   private ch: RealtimeChannel;
   private listeners = new Set<(m: unknown) => void>();
-  private ready: Promise<boolean>;
   private closed = false;
 
-  constructor(code: string) {
+  constructor(name: string) {
     const client = supabase!;
-    this.ch = client.channel(CHANNEL_PREFIX + code, { config: { broadcast: { self: false } } });
+    this.ch = client.channel(name, { config: { broadcast: { self: false } } });
     this.ch.on("broadcast", { event: EVENT }, ({ payload }) => this.listeners.forEach((l) => l(payload)));
-    // Les envois attendent l'abonnement (sinon ils partent par l'API REST, ou se perdent).
-    this.ready = new Promise((resolve) => {
-      this.ch.subscribe((status) => {
-        if (status === "SUBSCRIBED") resolve(true);
-        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") resolve(false);
-      });
-    });
+    // supabase-js rejoint seul après une coupure : l'état est relu à chaque envoi.
+    this.ch.subscribe();
+  }
+
+  /** Attend l'état « joined » (borné) : sinon l'envoi partirait par REST ou se perdrait. */
+  private async joined(): Promise<boolean> {
+    const deadline = Date.now() + JOIN_WAIT_MS;
+    while (!this.closed && this.ch.state !== "joined") {
+      if (Date.now() > deadline) return false;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return !this.closed;
   }
 
   async send(msg: unknown) {
-    if (this.closed) return;
-    const ok = await Promise.race([this.ready, new Promise<boolean>((r) => setTimeout(() => r(false), 8000))]);
-    if (!ok || this.closed) return;
+    if (this.closed || !(await this.joined())) return false;
     try {
-      await this.ch.send({ type: "broadcast", event: EVENT, payload: msg });
-    } catch { /* réseau : le prochain état partira dans 5 s */ }
+      const r = await this.ch.send({ type: "broadcast", event: EVENT, payload: msg });
+      return r === "ok";
+    } catch {
+      return false;
+    }
   }
 
   onMessage(cb: (m: unknown) => void) {

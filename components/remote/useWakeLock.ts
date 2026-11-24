@@ -11,6 +11,10 @@ export function useWakeLock(on: boolean) {
     let lock: WakeLockSentinel | null = null;
     let alive = true;
     const request = async () => {
+      // L'ancien verrou est libéré avant d'en redemander un (jamais deux à la fois).
+      const old = lock;
+      lock = null;
+      if (old && !old.released) await old.release().catch(() => {});
       try {
         const l = await navigator.wakeLock.request("screen");
         if (alive) lock = l; else void l.release();
