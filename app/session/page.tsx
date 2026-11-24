@@ -717,11 +717,11 @@ export default function SessionPage() {
             className="absolute inset-0"
             label={stopReached ? "La halte : une rue de nuit, l'heure d'arrêt est atteinte." : `La halte : une rue de nuit, il reste ${formatTime(secondsLeft)} de pause.`}
           />
-          <FriendWindowsList className="absolute z-20 top-3 right-3 md:top-5 md:right-5" />
-          {/* Voile de lecture : à gauche sur grand écran, en bas sur mobile. */}
-          <div aria-hidden className="absolute inset-0 pointer-events-none bg-[linear-gradient(90deg,#07090d_0%,rgba(7,9,13,0.86)_32%,rgba(7,9,13,0.15)_62%,transparent_80%)] max-md:bg-[linear-gradient(0deg,#07090d_0%,rgba(7,9,13,0.9)_45%,rgba(7,9,13,0.2)_70%,transparent_85%)]" />
+          {/* Le voile de lecture est rendu par PauseStreet (il dépend du décor). */}
+          <FriendWindowsList defaultOpen={false} className="absolute z-20 top-3 right-3 md:top-5 md:right-5" />
           <div className="relative z-10 h-full overflow-y-auto flex items-end md:items-center px-5 sm:px-10 lg:px-16 py-8">
-            <div className="flex flex-col gap-6 max-w-md text-white">
+            {/* data-pause-text : « Ta rue » cadre sa façade dans la place laissée libre. */}
+            <div data-pause-text className="flex flex-col gap-6 max-w-md text-white">
               {stopReached ? (
                 <>
                   <div>

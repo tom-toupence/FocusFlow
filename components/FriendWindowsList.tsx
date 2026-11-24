@@ -23,7 +23,11 @@ function WindowGlyph({ state }: { state: FriendWindowState }) {
   );
 }
 
-export default function FriendWindowsList({ className }: { className?: string }) {
+export default function FriendWindowsList({ className, defaultOpen }: {
+  className?: string;
+  /** Ouverte au départ ? Par défaut : ouverte sur grand écran, repliée sur téléphone. */
+  defaultOpen?: boolean;
+}) {
   const friends = useFriendsStore((s) => s.friends);
   const setHighlight = useFriendWindowsStore((s) => s.setHighlight);
   const offFrame = useFriendWindowsStore((s) => s.offFrame);
@@ -33,10 +37,11 @@ export default function FriendWindowsList({ className }: { className?: string })
   // Repliée par défaut (téléphone), ouverte au montage sur grand écran : pas
   // de mismatch d'hydratation, pas d'ouverture puis fermeture visible.
   useEffect(() => {
-    if (!window.matchMedia("(max-width: 767px)").matches) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (defaultOpen ?? !window.matchMedia("(max-width: 767px)").matches) {
       setOpen(true);
     }
+    // Lu au montage seulement.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => () => setHighlight(null), [setHighlight]);
 

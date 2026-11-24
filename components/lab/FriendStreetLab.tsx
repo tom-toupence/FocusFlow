@@ -31,9 +31,8 @@ export default function FriendStreetLab() {
       <FriendStreet layout={full ? "full" : "pause"} className="absolute inset-0" label="Ta rue : une façade de nuit, tes amis sont les fenêtres." />
       {!full && (
         <>
-          <div aria-hidden className="absolute inset-0 pointer-events-none bg-[linear-gradient(90deg,#07090d_0%,rgba(7,9,13,0.86)_32%,rgba(7,9,13,0.15)_62%,transparent_80%)] max-md:bg-[linear-gradient(0deg,#07090d_0%,rgba(7,9,13,0.9)_45%,rgba(7,9,13,0.2)_70%,transparent_85%)]" />
           <div className="absolute inset-0 flex items-end md:items-center px-5 sm:px-10 lg:px-16 py-8 pointer-events-none">
-            <div className="max-w-md">
+            <div data-pause-text className="max-w-md">
               <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-focus">Pause courte</p>
               <h1 className="mt-2 font-semibold tracking-tight text-[clamp(2.75rem,7vw,5rem)] leading-[0.95]">Pause</h1>
               <p className="mt-3 text-[15px] text-white/75">Pomodoro 2 terminé. Lève les yeux de l&apos;écran.</p>
@@ -42,7 +41,7 @@ export default function FriendStreetLab() {
           </div>
         </>
       )}
-      <FriendWindowsList className="absolute z-20 top-3 right-3 md:top-5 md:right-5" />
+      <FriendWindowsList defaultOpen={false} className="absolute z-20 top-3 right-3 md:top-5 md:right-5" />
 
       <div className="absolute top-3 left-3 z-30 text-xs">
         <button onClick={() => setPanel((v) => !v)} className="px-2 py-1 rounded bg-black/60 border border-white/15">

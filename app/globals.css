@@ -403,7 +403,7 @@
 .ff-win[data-hi="1"] { outline: 2px solid var(--focus); outline-offset: 3px; }
 .ff-plate {
   position: absolute; top: calc(100% + 3px); left: 50%; transform: translateX(-50%);
-  max-width: 8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: min(8rem, 140%); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   padding: 1px 5px; border: 1px solid rgba(255,255,255,0.12); border-radius: 2px;
   background: rgba(7,9,13,0.8); color: rgba(255,255,255,0.88);
   font-family: var(--font-mono); font-size: 10px; line-height: 13px;

@@ -203,14 +203,20 @@ choisir le média, qui enchaîne sur `/settings`. Les **routines** appliquent le
   (`FriendWindowsLayer`). Scènes de jour et téléphone (photo fixe) : la liste seule. No-op sans amis.
   Depuis le lot 8b, à la PAUSE c'est « Ta rue » qui s'affiche (ci-dessous) ; le lot 8 reste en mode Spotify.
 - **Ta rue** (lot 8b) : écran de pause dédié quand tu as des amis. Photo de façade de nuit (CC0,
-  `public/rues-amis/facade/`, 39 fenêtres annotées dans `windows.json`), chaque ami EST une fenêtre
+  `public/rues-amis/facade/`, bloc compact de 28 fenêtres, 4 colonnes x 7 étages, dans `windows.json`), chaque ami EST une fenêtre
   (hash, `lib/rue/friendStreet.ts`, ta fenêtre « Toi » d'abord, tamisée) avec une plaque à son
   prénom ; en ligne = lumière chaude (tungstène, lampe ou néon froid, rideau/store/rien selon l'ami),
   en focus = plus vive + lueur d'écran, hors ligne = verre sombre. Allumage : fondu, ou néon qui
   s'amorce en 3 battements sous 3 Hz ; rien sous mouvement réduit. Tout en CSS (`.ff-win` dans
-  `globals.css`), aucun travail par image côté JS. Attribution sur les 39 fenêtres (stable quel que
-  soit l'écran ; plus d'amis que de fenêtres = les allumés d'abord), puis les fenêtres sous le texte
-  de la pause ou la liste sont MASQUÉES (`pauseZones`) et l'ami est « hors cadre » dans la liste.
+  `globals.css`), aucun travail par image côté JS. Attribution sur les 28 fenêtres, stable par id
+  quel que soit l'écran (24 amis au plus + « Toi » ; au-delà, les allumés d'abord). **Cadrage** :
+  la photo n'est pas en cover, `framePause` (`lib/rue/friendStreet.ts`) cadre le BLOC des fenêtres
+  dans la place libre à côté du texte de la pause, mesuré dans la page (`[data-pause-text]`) :
+  à droite du texte sur bureau et paysage, au-dessus sur téléphone (sous le bouton Post-it) ; la
+  photo couvre l'écran quand c'est possible, sinon bords fondus. Tous les amis sont donc visibles
+  (testé en 1440x900, 1280x720, 390x844, 844x390). Le voile de lecture est dessiné par
+  `FriendStreet`, calé sur le texte ; la liste est repliée par défaut (les plaques suffisent).
+  Garde-fou : une fenêtre qui sortirait de la zone est masquée et l'ami marqué « hors cadre ».
   Calques affichés après le chargement de la photo ; néons décalés (jamais deux battements
   ensemble) ; halo en pseudo-élément animé en opacité. Accessibilité : résumé complet en sr-only,
   fenêtres focusables (bulle au focus). Survol/toucher = bulle (portail), pas sur un bouton. Mode Spotify : inchangé (rue + fenêtres du lot 8), pour ne pas
@@ -890,6 +896,11 @@ TodoStatusDropdown, callback Twitch) ; build vert ; vitest 33/33 ; e2e 13/13 sur
   HTML (`/wiki/Category:...`), la recherche REST limite vite (429).
 - Fenêtres : grille mesurée à la main sur la photo (colonnes lues à la règle, rangées ajustées par
   colonne), 39 retenues, vérifiées en superposition ; testées (`lib/rue/friendStreet.test.ts`).
+- Relecture : attribution stable par id (plus de dépendance à l'écran), accessibilité (résumé
+  sr-only, fenêtres focusables), néons décalés, calques après chargement. Puis « amis masqués »
+  tranché : bloc compact de 28 fenêtres (2e annotation) + cadrage du bloc dans la place libre
+  (piste « a » + « c ») ; la pause de `app/session/page.tsx` ne gagne que `data-pause-text` et la
+  liste repliée, le voile passe dans `PauseStreet`/`FriendStreet`.
 - `components/PauseStreet.tsx` (Ta rue si amis, sinon `RueScene`), `components/FriendStreet.tsx`,
   `components/lab/FriendStreetLab.tsx` (`/lab/amis`), `components/lab/fakeFriends.ts` (partagé avec
   `/lab/rue`), e2e `e2e/lab-amis.spec.ts` (ignoré si le build n'a pas `NEXT_PUBLIC_LAB=1`).

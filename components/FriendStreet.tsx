@@ -15,7 +15,7 @@ import { createPortal } from "react-dom";
 import { getCurrentUserId } from "@/lib/authState";
 import { FACADES, facadePhoto } from "@/lib/rue/facades";
 import {
-  assignStreet, blindOf, coverLayout, fullZones, lightOf, pauseZones, quadBox, usableWindows, windowRect,
+  assignStreet, blindOf, frameFacade, framePause, fullZone, lightOf, POSTIT_PHONE, quadBox, usableWindows, windowRect,
   type Blind, type Light, type Rect,
 } from "@/lib/rue/friendStreet";
 import { firstName, friendActivityLine, friendWindowState, type FriendWindowState } from "@/lib/rue/friendWindows";
@@ -57,6 +57,32 @@ interface Win {
   userId: string | null;
 }
 
+/**
+ * Bords fondus quand la photo ne couvre pas tout l'écran (le bloc de fenêtres
+ * passe avant la couverture) : la façade se perd dans la nuit au lieu de
+ * s'arrêter net.
+ */
+function edgeFade(img: Rect, c: { w: number; h: number }): CSSProperties {
+  const f = (a: boolean, b: boolean, dir: string) =>
+    a || b ? `linear-gradient(${dir}, ${a ? "transparent 0, #000 9%" : "#000 0"}, ${b ? "#000 91%, transparent 100%" : "#000 100%"})` : null;
+  const v = f(img.y > 0.5, img.y + img.h < c.h - 0.5, "to bottom");
+  const h = f(img.x > 0.5, img.x + img.w < c.w - 0.5, "to right");
+  const masks = [v, h].filter(Boolean) as string[];
+  if (!masks.length) return {};
+  const image = masks.join(", ");
+  return { maskImage: image, WebkitMaskImage: image, maskComposite: "intersect", WebkitMaskComposite: "source-in" } as CSSProperties;
+}
+
+/** Voile sous le texte de la pause : à gauche sur grand écran, en bas sur téléphone. */
+function readingVeil(cw: number, ch: number, t: Rect): string {
+  if (cw >= 768) {
+    const r = t.x + t.w;
+    return `linear-gradient(90deg, #07090d 0px, rgba(7,9,13,0.86) ${Math.max(0, r - 60)}px, rgba(7,9,13,0.2) ${r + 8}px, transparent ${r + 24}px)`;
+  }
+  const d = ch - t.y;
+  return `linear-gradient(0deg, #07090d 0px, rgba(7,9,13,0.9) ${Math.max(0, d - 70)}px, rgba(7,9,13,0.3) ${d}px, transparent ${d + 8}px)`;
+}
+
 const RANK: Record<FriendWindowState, number> = { focus: 0, on: 1, off: 2 };
 const STATE_WORD: Record<FriendWindowState, string> = { focus: "en focus", on: "en ligne", off: "hors ligne" };
 const INTERACTIVE = 'button, a, input, textarea, select, label, summary, [role="button"], [role="dialog"], [contenteditable="true"]';
@@ -69,35 +95,43 @@ export default function FriendStreet({ layout = "pause", className, label }: Pro
   const setOffFrame = useFriendWindowsStore((s) => s.setOffFrame);
   const now = useNowTick(friends.length > 0);
   const box = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  // Taille du conteneur et bloc de texte de la pause ([data-pause-text], dans la
+  // page) : la façade se cadre dans la place libre. Regroupé par image.
+  const [size, setSize] = useState<{ w: number; h: number; text: Rect | null } | null>(null);
   const [loaded, setLoaded] = useState(false);
 
-  // Taille du conteneur, regroupée par image (un seul rendu par redimensionnement).
   useEffect(() => {
     const el = box.current;
     if (!el) return;
     let raf = 0;
-    const ro = new ResizeObserver(() => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        const w = Math.round(el.clientWidth), h = Math.round(el.clientHeight);
-        setSize((s) => (s && s.w === w && s.h === h ? s : { w, h }));
-      });
-    });
+    const measure = () => {
+      raf = 0;
+      const r = el.getBoundingClientRect();
+      const t = layout === "pause" ? document.querySelector("[data-pause-text]")?.getBoundingClientRect() : null;
+      const text = t && t.width > 0 ? { x: Math.round(t.left - r.left), y: Math.round(t.top - r.top), w: Math.round(t.width), h: Math.round(t.height) } : null;
+      const w = Math.round(r.width), h = Math.round(r.height);
+      setSize((s) => (s && s.w === w && s.h === h && JSON.stringify(s.text) === JSON.stringify(text) ? s : { w, h, text }));
+    };
+    const ro = new ResizeObserver(() => { if (!raf) raf = requestAnimationFrame(measure); });
     ro.observe(el);
+    const textEl = layout === "pause" ? document.querySelector("[data-pause-text]") : null;
+    if (textEl) ro.observe(textEl);
     return () => { ro.disconnect(); if (raf) cancelAnimationFrame(raf); };
-  }, []);
+  }, [layout]);
 
-  const img: Rect | null = size ? coverLayout(size.w, size.h, facade.width, facade.height, facade.focusX) : null;
-  // Fenêtres visibles (hors texte de la pause et liste) : sert à MASQUER, jamais à attribuer.
-  const visibleKey = useMemo(() => {
-    if (!size || !img) return "";
-    const z = layout === "pause" ? pauseZones(size.w, size.h, size.w >= 768) : fullZones(size.w, size.h, size.w >= 768);
-    return usableWindows(facade.windows, img, z.zone, z.avoid).join(",");
-    // img dérive de size.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const frame = useMemo(() => {
+    if (!size) return null;
+    if (layout === "pause") return framePause(size.w, size.h, size.text, facade);
+    const zone = fullZone(size.w, size.h);
+    return { zone, img: frameFacade(size.w, size.h, zone, facade) };
   }, [size, layout, facade]);
+  const img: Rect | null = frame?.img ?? null;
+  // Fenêtres visibles : le cadrage les met toutes dans la place libre ; ce
+  // filtre ne sert que de garde-fou (très petit écran), jamais à attribuer.
+  const visibleKey = useMemo(() => {
+    if (!frame || !size) return "";
+    return usableWindows(facade.windows, frame.img, frame.zone, size.w < 768 && layout === "pause" ? [POSTIT_PHONE] : []).join(",");
+  }, [frame, size, layout, facade]);
   const visible = useMemo(() => new Set(visibleKey ? visibleKey.split(",").map(Number) : []), [visibleKey]);
 
   // Clé d'état stable : rien n'est recalculé tant qu'aucun ami ne change d'état.
@@ -212,7 +246,7 @@ export default function FriendStreet({ layout = "pause", className, label }: Pro
     <div ref={box} className={cn("overflow-hidden bg-night", className)} role="group" aria-label={label} data-testid="friend-street">
       <p className="sr-only">{summary ? `Fenêtres de la façade. ${summary}.` : "Fenêtres de la façade."}</p>
       {img && (
-        <div className="absolute" style={{ left: img.x, top: img.y, width: img.w, height: img.h }}>
+        <div className="absolute" style={{ left: img.x, top: img.y, width: img.w, height: img.h, ...edgeFade(img, size!) }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             ref={(el) => { if (el?.complete && el.naturalWidth && !loaded) setLoaded(true); }}
@@ -274,6 +308,8 @@ export default function FriendStreet({ layout = "pause", className, label }: Pro
         </div>,
         document.body,
       )}
+      {/* Voile de lecture calé sur le texte de la pause : il s'arrête avant la façade. */}
+      {layout === "pause" && size?.text && <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: readingVeil(size.w, size.h, size.text) }} />}
       <p className="pointer-events-none absolute bottom-2 right-3 text-[10px] text-white/45">{facade.credit}</p>
     </div>
   );
