@@ -48,19 +48,29 @@ export default function RueLoop({ onScene, className, label }: Props) {
   useEffect(() => { onSceneRef.current = onScene; }, [onScene]);
 
   useEffect(() => {
-    const saveData = !!(navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
-    if (saveData) return;
+    const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+    // Économie de données ou connexion lente : la photo fixe suffit.
+    if (conn?.saveData || /(^|-)2g$|^3g$/.test(conn?.effectiveType ?? "")) return;
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const q = window.matchMedia("(max-width: 767px)").matches ? "720" : "1080";
-    // Choisie au montage (le serveur ne connaît ni l'écran ni les préférences),
-    // puis suit la préférence de mouvement réduit si elle change.
+    // Une seule qualité, 720p (environ 9 Mo) : la vidéo est derrière un voile, la
+    // 1080p doublait la bande passante servie par Vercel pour aucun gain visible.
     const apply = () => {
       if (mq.matches) { setSrc(null); setStill(true); }
-      else setSrc({ webm: `/rue/loop/rue-${q}.webm`, mp4: `/rue/loop/rue-${q}.mp4` });
+      else setSrc({ webm: "/rue/loop/rue-720.webm", mp4: "/rue/loop/rue-720.mp4" });
     };
-    apply();
+    // Chargée seulement une fois la page affichée et le navigateur au repos :
+    // un visiteur qui repart tout de suite ne télécharge pas la vidéo.
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    let idle = 0;
+    const timer = window.setTimeout(() => {
+      idle = w.requestIdleCallback ? w.requestIdleCallback(apply, { timeout: 2000 }) : window.setTimeout(apply, 0);
+    }, 1500);
     mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
+    return () => {
+      window.clearTimeout(timer);
+      if (idle) { if (w.cancelIdleCallback) w.cancelIdleCallback(idle); else window.clearTimeout(idle); }
+      mq.removeEventListener("change", apply);
+    };
   }, []);
 
   useEffect(() => {
@@ -93,7 +103,7 @@ export default function RueLoop({ onScene, className, label }: Props) {
             loop
             playsInline
             autoPlay
-            preload="auto"
+            preload="metadata"
             aria-hidden
             className={cn("absolute inset-0 w-full h-full object-cover transition-opacity duration-1000", still ? "opacity-0" : "opacity-100")}
           >

@@ -4,6 +4,13 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Photos des rues et boucle vidéo : cache navigateur 7 jours (par défaut
+        // Vercel revalide à chaque visite). Un fichier modifié doit changer de nom
+        // ou attendre l'expiration.
+        source: "/(rue|rues-amis)/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }],
+      },
+      {
         source: "/(.*)",
         headers: [
           {
