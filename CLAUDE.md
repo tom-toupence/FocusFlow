@@ -766,8 +766,10 @@ TodoStatusDropdown, callback Twitch) ; build vert ; vitest 33/33 ; e2e 13/13 sur
   par scène), effet `dessin` sur les photos de jour, étalonnage néon bas (0,12) sur les nouvelles
   scènes de nuit (à 0,5 les lumières chaudes viraient au vert). `still.webp` = image rendue par le
   moteur (lab `?record`).
-- La boucle vidéo de la landing garde ses 11 rues de nuit ; les nouvelles scènes tournent dans l'app
-  (rue du jour en fond, pause de session, mode Spotify) et sur `/lab/rue`.
+- Retour utilisateur : pas de rails (rue du train, Chicago retirées), des **rizières en terrasses**
+  (Sapa, Tegallalang, Batad, Banaue) et des **ruelles plus belles** (Hoi An, Kanazawa, Ninenzaka).
+- Toutes les scènes sont dans la boucle vidéo de la landing (ordre alterné nuit/jour, `RUE_LOOP_ORDER`)
+  et dans l'app (rue du jour en fond, pause de session, mode Spotify), et sur `/lab/rue`.
 
 ## La landing
 
@@ -775,9 +777,9 @@ TodoStatusDropdown, callback Twitch) ; build vert ; vitest 33/33 ; e2e 13/13 sur
 
 ### L'idée : « Une rue de plus »
 
-Derrière toute la page, une **boucle vidéo continue des onze rues** (`components/RueLoop.tsx`,
+Derrière toute la page, une **boucle vidéo continue des 34 scènes** (`components/RueLoop.tsx`,
 `public/rue/loop/rue-{1080,720}.{webm,mp4}`) : chaque rue rendue à l'avance par le moteur
-`lib/rue/` (pluie, néons, caméra qui respire), 6 s par rue, fondus de 1,5 s, raccord de boucle
+`lib/rue/` (pluie, néons, caméra qui respire), 4,5 s par scène, fondus de 1,2 s (≈ 2 min 30), raccord de boucle
 invisible. Produite par `scripts/rue/loop_record.cjs` + `scripts/rue/loop.sh` (ordre =
 `RUE_LOOP_ORDER`, le crédit affiché suit le temps de la vidéo). Pourquoi une vidéo et pas le
 WebGL en direct (2026-11-23, retour utilisateur : transitions « bizarres », il voulait la vidéo

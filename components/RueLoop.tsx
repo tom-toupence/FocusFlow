@@ -1,6 +1,6 @@
 "use client";
 
-// La rue de nuit en BOUCLE VIDÉO : les onze rues rendues à l'avance par le
+// La rue en BOUCLE VIDÉO : les 34 scènes (rues de nuit, ruelles, rizières…) rendues à l'avance par le
 // moteur (lib/rue, pluie, néons, caméra qui respire), enchaînées par des
 // fondus, en une seule vidéo qui boucle sans couture. Fond de la landing.
 //
@@ -16,11 +16,18 @@ import { RUE_SCENES, rueStill, type RueSceneInfo } from "@/lib/rue/scenes";
 import { cn } from "@/lib/utils";
 
 /** Ordre des rues dans la vidéo (doit suivre scripts/rue/loop.sh). */
-export const RUE_LOOP_ORDER = ["kabukicho", "pont", "avenue", "pavillon", "ruelle", "boulevard", "fleuve", "carrefour", "ecrans", "viaduc", "tours"];
+export const RUE_LOOP_ORDER = [
+  "kabukicho", "pont", "sannenzaka", "ninenzaka", "hoian-nuit", "dotonbori",
+  "sapa", "sapa-vallee", "avenue", "ruelle", "kanazawa", "takayama",
+  "gion-nuit", "shirakawa", "tegallalang", "batad", "carrefour", "ecrans",
+  "hoian", "ubud-maisons", "banaue", "bandung", "manhattan", "times-square",
+  "seattle", "reine", "sakrisoy", "geiranger", "bryggen", "viaduc",
+  "pavillon", "boulevard", "fleuve", "tours",
+];
 /** Durée de chaque rue dans la boucle, fondu compris (secondes). */
-const SEG = 6;
+const SEG = 4.5;
 /** Moitié du fondu : la rue suivante prend le dessus au milieu du fondu. */
-const HALF_FADE = 0.75;
+const HALF_FADE = 0.6;
 
 interface Props {
   onScene?: (scene: RueSceneInfo) => void;
