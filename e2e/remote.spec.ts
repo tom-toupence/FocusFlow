@@ -43,10 +43,13 @@ async function linkOf(pc: Page, code: string) {
   return url;
 }
 
-/** « Autoriser » sur l'ordinateur. */
-async function allow(pc: Page, text: RegExp) {
+/** « Autoriser » sur l'ordinateur, après avoir vérifié le même code de confirmation des deux côtés. */
+async function allow(pc: Page, phone: Page, text: RegExp) {
   const ask = pc.getByTestId("remote-ask");
   await expect(ask).toContainText(text);
+  const hostCode = (await pc.getByTestId("remote-ask-code").textContent())!.trim();
+  expect(hostCode).toMatch(/^\d{4}$/);
+  await expect(phone.getByTestId("confirm-code")).toContainText(hostCode);
   await ask.getByRole("button", { name: "Autoriser" }).click();
   await expect(ask).toHaveCount(0);
 }
@@ -70,7 +73,7 @@ test("télécommande : temps et titre de l'ordinateur, pause, distraction, suiva
   // Rien sans « Autoriser » sur l'ordinateur.
   await expect(phone.getByTestId("remote-status")).toHaveText("Autorise ce téléphone");
   await expect(pc.getByTestId("remote-panel").getByRole("status")).toHaveText("En attente du téléphone");
-  await allow(pc, /veut se connecter/);
+  await allow(pc, phone, /veut se connecter/);
   await expect(phone.getByTestId("remote-title")).toHaveText("Premier titre");
   const hostTime = secs((await pc.getByRole("timer").first().textContent())!);
   const phoneTime = secs((await phone.getByTestId("remote-time").textContent())!);
@@ -104,7 +107,33 @@ test("télécommande : temps et titre de l'ordinateur, pause, distraction, suiva
   await expect(phone.getByTestId("remote-status")).toHaveText("Télécommande déconnectée");
 });
 
-test("emporter la session : même temps restant, même titre, l'ordinateur s'arrête sans double crédit", async ({ page: pc, context }) => {
+/**
+ * Côté téléphone : perd le premier message qui suit la réception du handoff
+ * (le gros message), c'est-à-dire le « bye handed-off ». Les messages sont
+ * chiffrés : on ne peut les reconnaître qu'à leur taille et leur ordre.
+ */
+const DROP_FIRST_BYE = () => {
+  const Orig = window.BroadcastChannel;
+  class Lossy extends Orig {
+    set onmessage(fn: ((e: MessageEvent) => void) | null) {
+      let sawHandoff = false;
+      let dropped = false;
+      super.onmessage = (e: MessageEvent) => {
+        if (sawHandoff && !dropped) {
+          dropped = true;
+          (window as unknown as { __dropped: number }).__dropped = 1;
+          return;
+        }
+        if (JSON.stringify(e.data).length > 600) sawHandoff = true;
+        fn?.(e);
+      };
+    }
+    get onmessage() { return super.onmessage; }
+  }
+  window.BroadcastChannel = Lossy;
+};
+
+for (const lostBye of [false, true]) test(`emporter la session${lostBye ? " (bye perdu : l'accusé répété le fait redire)" : ""} : même temps restant, même titre, l'ordinateur s'arrête sans double crédit`, async ({ page: pc, context }) => {
   // Pomodoro classique commencé il y a 3 min : 22 min restantes.
   const endsAt = Date.now() + 22 * 60_000;
   await prepare(pc, { queue: QUEUE, loop: true });
@@ -133,12 +162,16 @@ test("emporter la session : même temps restant, même titre, l'ordinateur s'arr
   const link = await linkOf(pc, (await pc.getByTestId("remote-code").textContent())!.trim());
 
   const phone = await phonePage(context);
+  if (lostBye) await phone.addInitScript(DROP_FIRST_BYE);
   await phone.goto(link);
+  // Le fragment (code et secret) est retiré de la barre d'adresse.
+  await expect.poll(() => new URL(phone.url()).hash).toBe("");
   await expect(phone.getByTestId("handoff-status")).toHaveText("Autorise sur l'ordinateur");
   // Avant Autoriser, la session tourne toujours sur l'ordinateur.
   expect(new URL(pc.url()).pathname).toBe("/session");
-  await allow(pc, /demande la session/);
+  await allow(pc, phone, /demande la session/);
   await phone.waitForURL(/\/session$/);
+  if (lostBye) expect(await phone.evaluate(() => (window as unknown as { __dropped?: number }).__dropped)).toBe(1);
 
   // L'ordinateur s'arrête, prévient, et ne compte que ses 3 min.
   await pc.waitForURL((u) => !u.pathname.startsWith("/session"));
@@ -155,6 +188,7 @@ test("emporter la session : même temps restant, même titre, l'ordinateur s'arr
   const shown = secs((await phone.getByRole("timer").first().textContent())!);
   expect(Math.abs(shown - expected)).toBeLessThanOrEqual(2);
   await expect(phone.getByText("Deuxième titre").first()).toBeAttached();
+  await phone.waitForFunction(() => (window as unknown as W).__yt?.loaded.length);
   const before = await yt(phone);
   expect(before.loaded[0]).toBe("bbbbbbbbbb2");
   await phone.getByTestId("resume-gate").click();
@@ -186,10 +220,16 @@ test("lien invalide, puis ordinateur introuvable", async ({ context }) => {
   const phone = await phonePage(context);
   await phone.goto("/remote");
   await expect(phone.getByTestId("remote-status")).toHaveText("Lien invalide");
-  await phone.goto("/remote#c=ZZZZ22&k=AAAAAAAAAAAAAAAAAAAAAA");
-  await phone.reload(); // un changement de fragment seul ne recharge pas la page
+  // Une page neuve : le lien est lu une seule fois (puis retiré de la barre d'adresse).
+  await phone.close();
+  const phone2 = await phonePage(context);
+  await phone2.goto("/remote#c=ZZZZ22&k=AAAAAAAAAAAAAAAAAAAAAA");
+  await testLost(phone2);
+});
+
+async function testLost(phone: Page) {
   await expect(phone.getByTestId("remote-status")).not.toHaveText("Lien invalide");
   test.skip((await phone.getByTestId("remote-status").textContent()) === "Télécommande indisponible", "transport local absent (build sans NEXT_PUBLIC_LAB=1)");
   await expect(phone.getByTestId("remote-status")).toHaveText("Connexion à l'ordinateur…");
   await expect(phone.getByTestId("remote-status")).toHaveText("Ordinateur introuvable", { timeout: 15_000 });
-});
+}

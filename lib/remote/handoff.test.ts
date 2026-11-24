@@ -17,7 +17,7 @@ import { useStatsStore, localToday } from "@/store/statsStore";
 import { closeActiveSession } from "@/lib/sessionEnd";
 import type { Todo } from "@/store/sessionStore";
 import {
-  buildHandoffState, mediaForHandoff, sessionTodos, phoneTimerPatch, splitCredit, isSameSession, mergeTodos, resumePosition,
+  buildHandoffState, mediaForHandoff, sessionTodos, fitHandoff, phoneTimerPatch, splitCredit, isSameSession, mergeTodos, resumePosition,
   type MediaSnapshot, type TimerSnapshot,
 } from "./handoff";
 import { makeMessage, parseMessage, MAX_TODOS, MAX_TRACKS } from "./protocol";
@@ -70,6 +70,17 @@ describe("sérialisation de la session", () => {
     expect(m.tracks[1].id).toBe(tracks[4].id);
     expect(m.index).toBe(0);
     expect(m.position).toBe(42);
+  });
+
+  it("taille contrôlée : la file est réduite (piste en cours gardée en tête) jusqu'à tenir", () => {
+    const tracks = Array.from({ length: 200 }, (_, i) => ({ id: `vid${String(i).padStart(8, "0")}`, title: "T".repeat(200) }));
+    const big = buildHandoffState(timer(), todos, { ...video, youtube: { type: "queue", tracks }, trackId: tracks[7].id }, T0);
+    const fitted = fitHandoff(big, 20 * 1024);
+    expect(new TextEncoder().encode(JSON.stringify(fitted)).length).toBeLessThanOrEqual(20 * 1024);
+    expect(fitted.media.kind === "queue" && fitted.media.tracks[0].id).toBe(tracks[7].id);
+    expect(fitted.media.kind === "queue" && fitted.media.tracks.length).toBeLessThan(200);
+    expect(fitHandoff(big)).toBe(big); // ~45 Ko : tient déjà sous la limite réelle
+    expect(roundTrip(fitted).media.kind).toBe("queue");
   });
 
   it("tâches de la session : pas celles terminées avant son départ", () => {

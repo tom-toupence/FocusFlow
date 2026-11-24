@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildLink, channelName, hmacKey, newSecret, parseLink, seal, unseal } from "./crypto";
+import { buildLink, channelName, MAX_SEALED, newSecret, parseLink, seal, sealKey, unseal } from "./crypto";
 import { makeMessage } from "./protocol";
 
 const SECRET = "AbCdEfGhIjKlMnOpQrStUv";
@@ -30,18 +30,29 @@ describe("secret et lien", () => {
   });
 });
 
-describe("signature HMAC", () => {
-  it("un message signé passe, altéré ou non signé ou d'une autre clé est ignoré", async () => {
-    const key = await hmacKey("ABC234", SECRET);
-    const msg = makeMessage({ type: "cmd", id: "device1234", cmd: "pause" }, 1_000_000);
-    const sealed = await seal(key, msg);
+describe("scellement AES-GCM", () => {
+  it("chiffré et authentifié : altéré, non scellé ou d'une autre clé = ignoré", async () => {
+    const key = await sealKey("ABC234", SECRET);
+    const msg = makeMessage({ type: "bye", reason: "ended" }, 1_000_000);
+    const sealed = (await seal(key, msg))!;
+    expect(sealed.iv).toMatch(/^[A-Za-z0-9_-]{16}$/);
+    expect(sealed.c).not.toContain("ended"); // le relais ne lit rien
     expect(await unseal(key, sealed)).toEqual(msg);
-    expect(await unseal(key, { ...sealed, d: sealed.d.replace("pause", "next") })).toBeNull();
-    expect(await unseal(key, msg)).toBeNull(); // non signé
-    expect(await unseal(key, { d: sealed.d })).toBeNull();
+    // IV aléatoire : deux scellements du même message diffèrent.
+    expect((await seal(key, msg))!.c).not.toBe(sealed.c);
+    const flipped = sealed.c.slice(0, 5) + (sealed.c[5] === "A" ? "B" : "A") + sealed.c.slice(6);
+    expect(await unseal(key, { ...sealed, c: flipped })).toBeNull();
+    expect(await unseal(key, msg)).toBeNull(); // en clair
+    expect(await unseal(key, { iv: sealed.iv })).toBeNull();
     expect(await unseal(key, { ...sealed, extra: 1 })).toBeNull();
-    const other = await hmacKey("ABC234", "AbCdEfGhIjKlMnOpQrStUw");
-    expect(await unseal(other, sealed)).toBeNull();
-    expect(await unseal(key, { d: "x".repeat(70_000), s: sealed.s })).toBeNull();
+    expect(await unseal(await sealKey("ABC234", "AbCdEfGhIjKlMnOpQrStUw"), sealed)).toBeNull();
+    expect(await unseal(await sealKey("ABC235", SECRET), sealed)).toBeNull(); // autre code (sel HKDF)
+  });
+
+  it("taille : au-delà de 160 Ko, rien n'est scellé (l'appelant réduit)", async () => {
+    const key = await sealKey("ABC234", SECRET);
+    expect(await seal(key, { big: "x".repeat(130 * 1024) })).toBeNull();
+    expect(await seal(key, { big: "x".repeat(100 * 1024) })).not.toBeNull();
+    expect(await unseal(key, { iv: "AAAAAAAAAAAAAAAA", c: "A".repeat(MAX_SEALED + 1) })).toBeNull();
   });
 });

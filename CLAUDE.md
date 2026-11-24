@@ -124,8 +124,8 @@ choisir le média, qui enchaîne sur `/settings`. Les **routines** appliquent le
 - **Téléphone télécommande** (lot 7) : bouton « Télécommande » (icône téléphone) dans la rangée de la
   session → panneau QR (SVG généré localement, `lib/remote/qr.ts`, sans dépendance) + code de 6 caractères,
   lien `/remote#c=<code>&k=<secret>`. Le téléphone doit être **autorisé sur l'ordinateur** (« Un téléphone
-  veut se connecter. Autoriser ? ») ; seules les commandes d'un appareil appairé (id d'appareil gardé
-  dans son stockage) sont appliquées. Le téléphone (sans compte, hors AuthGate) affiche le temps restant en sodium
+  veut se connecter. Autoriser ? »), après avoir comparé le **code de confirmation** à 4 chiffres affiché
+  des deux côtés ; seules les commandes d'un appareil appairé, **signées par sa clé ECDSA**, sont appliquées. Le téléphone (sans compte, hors AuthGate) affiche le temps restant en sodium
   (depuis `endsAt`, corrigé du décalage d'horloge) et envoie Pause/Reprendre, Distraction, Suivant : mêmes
   chemins que les boutons, la touche D et la Media Session. « Téléphone connecté » si un message < 15 s.
   Promesse honnête : marche tant que l'écran du téléphone est allumé (Wake Lock demandé), pas de vibration,
@@ -150,9 +150,14 @@ choisir le média, qui enchaîne sur `/settings`. Les **routines** appliquent le
   (`focusflow-handoff-guest`, sessionStorage, effacé à la connexion et dès qu'on quitte ces pages,
   `lib/remote/paths.ts`).
   **Realtime broadcast requis, aucune table** : canal `ff-remote-<SHA-256 tronqué de code+secret>`
-  (Supabase Realtime en broadcast, clé anon, rien en base, pas de `lib/db.ts`), messages signés
-  HMAC-SHA256 (WebCrypto, clé dérivée du secret ; non signé ou mal signé = ignoré, `lib/remote/crypto.ts`,
-  `channel.ts`) ; WebCrypto exige https (ou localhost) ; sans Supabase, bouton masqué en production,
+  (Supabase Realtime en broadcast, clé anon, rien en base, pas de `lib/db.ts`). **Messages chiffrés et
+  authentifiés en AES-GCM 256** (clé dérivée du secret par HKDF-SHA-256, sel = code, IV aléatoire de 96 bits,
+  données associées « ff-remote v1 » ; altéré, d'une autre clé ou en clair = ignoré ; le relais ne lit
+  rien), 160 Ko au plus (le handoff est réduit à l'envoi, `fitHandoff`), `lib/remote/crypto.ts`,
+  `channel.ts`. **Identité du téléphone** : paire ECDSA P-256 par appareil (clé privée non extractible,
+  IndexedDB `focusflow-remote`, régénérée si indisponible), id = empreinte SHA-256 de la clé publique
+  (pas un jeton copiable), code de confirmation dérivé de la même empreinte ; commandes et accusé signés
+  (`lib/remote/deviceKey.ts`). WebCrypto exige https (ou localhost) ; sans Supabase, bouton masqué en production,
   BroadcastChannel en dev ou build `NEXT_PUBLIC_LAB=1` (forçable par `focusflow-remote-transport=local`).
 - **Le minuteur qui connaît ton agenda** (lot 4) : adresse iCal privée collée dans le profil
   (section « Agenda », `components/AgendaSettings.tsx`, Tester / Retirer). Au démarrage d'un pomodoro, une
@@ -1063,13 +1068,22 @@ contenu animé sont peu fiables ; valider avec `npm run dev` sur une vraie machi
   `send` rend un booléen), décalage d'horloge estimé sur le premier message signé (le téléphone date ses
   messages à l'heure de l'ordinateur et affiche « Horloge du téléphone décalée »), URI Spotify limitées à
   `spotify:(playlist|album):<22>`, Wake Lock libéré avant d'être redemandé, `pagehide` ferme le canal.
+- **2e relecture (GO, 5 points réglés)** : HMAC remplacé par AES-GCM (HKDF) ; paire ECDSA par appareil +
+  code de confirmation sur les deux écrans ; calage d'horloge seulement sur une réponse (wait, paired,
+  refused) qui renvoie le défi `ch` du hello ; après le transfert, le canal reste ouvert 12 s et redit
+  « bye » à chaque accusé du même nonce (`HANDOFF_LINGER_MS`), le téléphone garde « Transfert incertain »
+  sans réponse ; limite 160 Ko avec réduction de la file à l'envoi ; le fragment est retiré de la barre
+  d'adresse à l'ouverture (`history.replaceState`, secret gardé en mémoire : un rechargement demande de
+  rescanner).
 - **Limite de sécurité** : quiconque voit le QR (ou le lien) a le secret ; il ne peut quand même rien
   faire sans un « Autoriser » sur l'ordinateur. La saisie manuelle du code a été **retirée** (un code
   seul ne permettrait pas de dériver le canal ni la clé). Un appareil autorisé le reste pour la durée
-  du code (2 h) ou jusqu'à « Déconnecter ». Les textes de tâches transitent par Realtime (signés, non
-  chiffrés, non stockés). Le tiroir Amis peut apparaître sur `/remote` pour un compte
+  du code (2 h) ou jusqu'à « Déconnecter ». Le code de confirmation (4 chiffres) protège contre un
+  appareil inattendu tant que l'utilisateur le compare vraiment. Les textes de tâches transitent par
+  Realtime chiffrés (AES-GCM) et ne sont pas stockés. Le tiroir Amis peut apparaître sur `/remote` pour un compte
   connecté (fichiers Amis non modifiés volontairement).
-- Tests : vitest `lib/remote/{protocol,handoff,qr,crypto,host}.test.ts` (QR comparé module à module à
+- Tests : vitest `lib/remote/{protocol,handoff,qr,crypto,host,deviceKey}.test.ts` (QR comparé module à module à
   des matrices de python-qrcode, `lib/__fixtures__/qr-reference.json`) ; e2e `e2e/remote.spec.ts` (deux pages du
-  même contexte, BroadcastChannel ; ignoré si le build n'a ni Supabase ni `NEXT_PUBLIC_LAB=1`).
+  même contexte, BroadcastChannel ; ignoré si le build n'a ni Supabase ni `NEXT_PUBLIC_LAB=1` ; dont un
+  scénario « bye perdu » qui jette côté téléphone le premier message après le handoff).
   **À vérifier sur de vrais téléphones avec Supabase** (Realtime, iOS autoplay, Wake Lock).

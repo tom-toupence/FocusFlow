@@ -135,7 +135,11 @@ function AskCard({ remote }: { remote: RemoteHost }) {
       className="fixed z-[115] left-1/2 top-20 w-[min(22rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-xl border border-white/15 bg-night/95 p-4 text-white backdrop-blur-sm shadow-[0_16px_40px_-12px_rgba(0,0,0,0.9)]"
     >
       <p className="text-sm">{handoff ? "Un téléphone demande la session. Autoriser ?" : "Un téléphone veut se connecter. Autoriser ?"}</p>
+      <p className="mt-2 text-xs text-white/70">
+        Code de confirmation : <span data-testid="remote-ask-code" className="font-mono text-base tracking-[0.2em] text-white">{remote.ask?.code}</span>
+      </p>
       <p className="mt-1 text-[11px] text-white/50">
+        Vérifie que le téléphone affiche le même code.{" "}
         {handoff ? "La session continuera sur le téléphone et s'arrêtera ici." : "Il pourra mettre en pause, noter une distraction et passer au titre suivant."}
       </p>
       <div className="mt-3 flex gap-2">

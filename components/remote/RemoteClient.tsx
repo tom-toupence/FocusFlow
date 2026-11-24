@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
 import { formatClock } from "@/lib/timerClock";
 import { formatHM } from "@/lib/stopPlan";
 import { SecureChannel } from "@/lib/remote/channel";
-import { parseLink } from "@/lib/remote/crypto";
+import { useLinkOnce } from "@/lib/remote/useLink";
+import { deviceIdentity, deviceSigner, type DeviceIdentity } from "@/lib/remote/deviceKey";
 import {
   displaySeconds, HOST_TIMEOUT_MS, newNonce, STATE_INTERVAL_MS,
   type RemoteCommand, type RemoteState,
@@ -19,50 +20,40 @@ import { useWakeLock } from "./useWakeLock";
 type Status = "starting" | "connecting" | "waiting" | "live" | "lost" | "denied" | "expired" | "ended" | "handed" | "invalid" | "unavailable";
 
 const MODE_LABEL: Record<RemoteState["mode"], string> = { work: "Focus", "short-break": "Pause courte", "long-break": "Longue pause" };
-const DEVICE_KEY = "focusflow-remote-device";
-
-/** Identifiant de cet appareil (gardé : un téléphone autorisé le reste au rechargement). */
-function deviceId(): string {
-  try {
-    const saved = localStorage.getItem(DEVICE_KEY);
-    if (saved && /^[A-Za-z0-9_-]{8,32}$/.test(saved)) return saved;
-    const id = newNonce();
-    localStorage.setItem(DEVICE_KEY, id);
-    return id;
-  } catch {
-    return newNonce();
-  }
-}
-
 export default function RemoteClient() {
   const [status, setStatus] = useState<Status>("starting");
   const [code, setCode] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const readLink = useLinkOnce();
   const [state, setState] = useState<RemoteState | null>(null);
   const [offset, setOffset] = useState(0);
   const [skewed, setSkewed] = useState(false);
   const [now, setNow] = useState(0);
   const [flash, setFlash] = useState(0);
   const channelRef = useRef<SecureChannel | null>(null);
-  const deviceRef = useRef<string>("");
+  const deviceRef = useRef<DeviceIdentity | null>(null);
   useWakeLock(status === "live");
 
   useEffect(() => {
-    const link = parseLink(window.location.hash);
+    const link = readLink();
     if (!link) { setStatus("invalid"); return; } // eslint-disable-line react-hooks/set-state-in-effect
     setCode(link.code);
     setStatus("connecting");
-    const device = deviceId();
-    deviceRef.current = device;
+    // Défi du hello : l'horloge ne se cale que sur une réponse qui le renvoie.
+    const challenge = newNonce();
     let alive = true;
     let finished = false;
     let paired = false;
     let lastHeard = Date.now();
     let cleanup = () => {};
-    void SecureChannel.open(link.code, link.secret, "phone").then((ch) => {
+    void Promise.all([SecureChannel.open(link.code, link.secret, { challenge }), deviceIdentity().catch(() => null)]).then(([ch, me]) => {
       if (!alive) { ch?.close(); return; }
-      if (!ch) { setStatus("unavailable"); return; }
+      if (!ch || !me) { ch?.close(); setStatus("unavailable"); return; }
       channelRef.current = ch;
-      const hello = () => void ch.send({ type: "hello", role: "remote", id: device });
+      deviceRef.current = me;
+      setConfirm(me.code);
+      const device = me.id;
+      const hello = () => void ch.send({ type: "hello", role: "remote", id: device, pub: me.pub, ch: challenge });
       const unsub = ch.onMessage((m) => {
         if (finished) return;
         lastHeard = Date.now();
@@ -89,7 +80,7 @@ export default function RemoteClient() {
       cleanup = () => { clearInterval(beat); clearTimeout(first); unsub(); ch.close(); channelRef.current = null; };
     });
     return () => { alive = false; cleanup(); };
-  }, []);
+  }, [readLink]);
 
   // Horloge d'affichage : une fois par seconde.
   useEffect(() => {
@@ -104,12 +95,13 @@ export default function RemoteClient() {
   const shown: Status = status === "live" && expired ? "expired" : status;
 
   const send = (cmd: RemoteCommand) => {
-    void channelRef.current?.send({ type: "cmd", id: deviceRef.current, cmd });
+    const me = deviceRef.current;
+    if (me) void channelRef.current?.send({ type: "cmd", id: me.id, cmd, sig: "" }, deviceSigner(me));
     if (cmd === "distraction") setFlash((n) => n + 1);
   };
 
-  if (shown !== "live") return <RemoteMessage status={shown} code={code} skewed={skewed} />;
-  if (!state) return <RemoteMessage status="connecting" code={code} skewed={skewed} />;
+  if (shown !== "live") return <RemoteMessage status={shown} code={code} confirm={confirm} skewed={skewed} />;
+  if (!state) return <RemoteMessage status="connecting" code={code} confirm={confirm} skewed={skewed} />;
 
   const seconds = now > 0 ? displaySeconds(state, offset, now) : state.seconds;
   const progress = !state.flow && state.total > 0 ? Math.min(1, Math.max(0, 1 - seconds / state.total)) : 0;
@@ -175,6 +167,15 @@ export default function RemoteClient() {
   );
 }
 
+/** Code de confirmation : le même doit s'afficher sur l'ordinateur avant « Autoriser ». */
+export function ConfirmCode({ code }: { code: string }) {
+  return (
+    <p data-testid="confirm-code" className="mt-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/80">
+      Code de confirmation : <span className="font-mono text-lg tracking-[0.2em] text-white">{code}</span>
+    </p>
+  );
+}
+
 function SkewNote() {
   return (
     <p data-testid="remote-skew" className="rounded-xl border border-amber-300/25 bg-amber-300/[0.06] px-4 py-3 text-xs leading-relaxed text-amber-100/80">
@@ -186,7 +187,7 @@ function SkewNote() {
 const MESSAGES: Record<Exclude<Status, "live">, { title: string; body: string }> = {
   starting: { title: "Télécommande", body: "" },
   connecting: { title: "Connexion à l'ordinateur…", body: "Garde la session ouverte sur l'ordinateur." },
-  waiting: { title: "Autorise ce téléphone", body: "Clique sur « Autoriser » sur l'ordinateur." },
+  waiting: { title: "Autorise ce téléphone", body: "Vérifie que l'ordinateur affiche le même code, puis clique sur « Autoriser »." },
   lost: { title: "Ordinateur introuvable", body: "Vérifie que la session est ouverte sur l'ordinateur. On réessaie tout seul." },
   denied: { title: "Connexion refusée", body: "L'ordinateur a refusé ce téléphone." },
   expired: { title: "Code expiré", body: "Ouvre la télécommande sur l'ordinateur pour avoir un nouveau QR code." },
@@ -196,13 +197,14 @@ const MESSAGES: Record<Exclude<Status, "live">, { title: string; body: string }>
   unavailable: { title: "Télécommande indisponible", body: "Ouvre ce lien en https, avec une version de FocusFlow qui a un canal pour la télécommande." },
 };
 
-function RemoteMessage({ status, code, skewed }: { status: Exclude<Status, "live">; code: string | null; skewed: boolean }) {
+function RemoteMessage({ status, code, confirm, skewed }: { status: Exclude<Status, "live">; code: string | null; confirm: string | null; skewed: boolean }) {
   const m = MESSAGES[status];
   return (
     <main className="min-h-[100dvh] bg-night text-white flex flex-col items-center justify-center gap-3 px-8 text-center">
       <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Télécommande{code ? ` · code ${code}` : ""}</p>
       <h1 data-testid="remote-status" className="text-2xl font-semibold tracking-tight">{m.title}</h1>
       {m.body && <p className="max-w-xs text-sm text-white/60">{m.body}</p>}
+      {status === "waiting" && confirm && <ConfirmCode code={confirm} />}
       {skewed && <div className="max-w-xs"><SkewNote /></div>}
     </main>
   );

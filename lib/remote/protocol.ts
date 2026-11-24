@@ -148,16 +148,18 @@ interface Envelope { v: 1; n: string; t: number }
  * téléphone) ou de demande (handoff, un par page).
  */
 export type RemoteMessage =
-  | (Envelope & { type: "hello"; role: "remote" | "handoff"; id: string })
+  /** `pub` : clé publique ECDSA de l'appareil (id = son empreinte) ; `ch` : défi pour caler l'horloge. */
+  | (Envelope & { type: "hello"; role: "remote" | "handoff"; id: string; pub: string; ch: string })
   /** L'ordinateur a vu la demande : en attente d'« Autoriser » sur l'ordinateur. */
-  | (Envelope & { type: "wait"; id: string })
+  | (Envelope & { type: "wait"; id: string; ch: string })
   /** Cet appareil est appairé : ses commandes seront appliquées. */
-  | (Envelope & { type: "paired"; id: string })
+  | (Envelope & { type: "paired"; id: string; ch: string })
   | (Envelope & { type: "state"; s: RemoteState })
-  | (Envelope & { type: "cmd"; id: string; cmd: RemoteCommand })
+  /** `sig` : signature ECDSA de l'appareil (deviceSigningInput). */
+  | (Envelope & { type: "cmd"; id: string; cmd: RemoteCommand; sig: string })
   | (Envelope & { type: "handoff"; id: string; ack: string; state: HandoffState })
-  | (Envelope & { type: "ack"; id: string; ack: string })
-  | (Envelope & { type: "refused"; id: string; reason: RefuseReason })
+  | (Envelope & { type: "ack"; id: string; ack: string; sig: string })
+  | (Envelope & { type: "refused"; id: string; reason: RefuseReason; ch: string })
   | (Envelope & { type: "bye"; reason: ByeReason });
 
 type Body<T> = T extends Envelope ? Omit<T, keyof Envelope> : never;
@@ -260,6 +262,9 @@ export function validHandoffState(h: unknown): h is HandoffState {
 
 const validId = (x: unknown) => isStr(x, 64) && ID_RE.test(x as string);
 const validAck = (x: unknown) => isStr(x, 32) && ACK_RE.test(x as string);
+const validPub = (x: unknown) => isStr(x, 140) && /^[A-Za-z0-9_-]{100,140}$/.test(x as string);
+const validSig = (x: unknown) => isStr(x, 86) && /^[A-Za-z0-9_-]{86}$/.test(x as string);
+const validCh = (x: unknown) => isStr(x, 32) && NONCE_RE.test(x as string);
 
 /** Forme stricte d'un message ; null pour tout ce qui n'est pas un message v1 connu et valide. */
 export function parseMessage(raw: unknown): RemoteMessage | null {
@@ -268,22 +273,22 @@ export function parseMessage(raw: unknown): RemoteMessage | null {
   const env = ["v", "n", "t", "type"];
   switch (raw.type) {
     case "hello":
-      return hasKeys(raw, [...env, "role", "id"]) && (raw.role === "remote" || raw.role === "handoff")
-        && isStr(raw.id, 64) && ID_RE.test(raw.id as string) ? (raw as unknown as RemoteMessage) : null;
+      return hasKeys(raw, [...env, "role", "id", "pub", "ch"]) && (raw.role === "remote" || raw.role === "handoff")
+        && validId(raw.id) && validPub(raw.pub) && validCh(raw.ch) ? (raw as unknown as RemoteMessage) : null;
     case "wait":
     case "paired":
-      return hasKeys(raw, [...env, "id"]) && validId(raw.id) ? (raw as unknown as RemoteMessage) : null;
+      return hasKeys(raw, [...env, "id", "ch"]) && validId(raw.id) && validCh(raw.ch) ? (raw as unknown as RemoteMessage) : null;
     case "state":
       return hasKeys(raw, [...env, "s"]) && validRemoteState(raw.s) ? (raw as unknown as RemoteMessage) : null;
     case "cmd":
-      return hasKeys(raw, [...env, "id", "cmd"]) && validId(raw.id) && COMMANDS.has(raw.cmd as RemoteCommand) ? (raw as unknown as RemoteMessage) : null;
+      return hasKeys(raw, [...env, "id", "cmd", "sig"]) && validId(raw.id) && COMMANDS.has(raw.cmd as RemoteCommand) && validSig(raw.sig) ? (raw as unknown as RemoteMessage) : null;
     case "handoff":
       return hasKeys(raw, [...env, "id", "ack", "state"]) && validId(raw.id) && validAck(raw.ack)
         && validHandoffState(raw.state) ? (raw as unknown as RemoteMessage) : null;
     case "ack":
-      return hasKeys(raw, [...env, "id", "ack"]) && validId(raw.id) && validAck(raw.ack) ? (raw as unknown as RemoteMessage) : null;
+      return hasKeys(raw, [...env, "id", "ack", "sig"]) && validId(raw.id) && validAck(raw.ack) && validSig(raw.sig) ? (raw as unknown as RemoteMessage) : null;
     case "refused":
-      return hasKeys(raw, [...env, "id", "reason"]) && validId(raw.id) && REFUSALS.has(raw.reason as RefuseReason) ? (raw as unknown as RemoteMessage) : null;
+      return hasKeys(raw, [...env, "id", "reason", "ch"]) && validId(raw.id) && REFUSALS.has(raw.reason as RefuseReason) && validCh(raw.ch) ? (raw as unknown as RemoteMessage) : null;
     case "bye":
       return hasKeys(raw, [...env, "reason"]) && BYES.has(raw.reason as ByeReason) ? (raw as unknown as RemoteMessage) : null;
     default:
@@ -299,19 +304,22 @@ export function parseMessage(raw: unknown): RemoteMessage | null {
  * 2 × 30 s (un message plus vieux est de toute façon refusé par l'âge).
  *
  * `offset` = horloge locale − horloge de l'ordinateur. L'ordinateur est la
- * référence (0) ; le téléphone l'estime sur le premier message signé reçu
- * (`calibrate`), puis date ses propres messages à l'heure de l'ordinateur.
+ * référence (0) ; le téléphone l'estime sur la première réponse qui renvoie SON
+ * défi (`ch` du hello, dans wait/paired/refused : `calibrate`), puis date ses
+ * propres messages à l'heure de l'ordinateur. Un vieux message rejoué ne peut
+ * donc pas fausser le calage.
  */
 export class ReplayGuard {
   private seen = new Map<string, number>();
   offset: number | null;
   constructor(private maxAge = MAX_MESSAGE_AGE_MS, offset: number | null = 0) { this.offset = offset; }
 
-  /** Premier message signé : pose le décalage (au plus 24 h, au-delà on n'y croit pas). */
-  calibrate(raw: unknown, now = Date.now()) {
+  /** Pose le décalage sur une réponse à notre défi (au plus 24 h, au-delà on n'y croit pas). */
+  calibrate(raw: unknown, challenge: string, now = Date.now()) {
     if (this.offset != null) return;
     const m = parseMessage(raw);
-    if (m && Math.abs(now - m.t) <= MAX_SKEW_MS) this.offset = now - m.t;
+    if (!m || (m.type !== "wait" && m.type !== "paired" && m.type !== "refused") || m.ch !== challenge) return;
+    if (Math.abs(now - m.t) <= MAX_SKEW_MS) this.offset = now - m.t;
   }
 
   accept(raw: unknown, now = Date.now()): RemoteMessage | null {

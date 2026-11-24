@@ -10,7 +10,9 @@ import { useRouter } from "next/navigation";
 import { useTimerStore } from "@/store/timerStore";
 import { toast } from "@/components/Toast";
 import { SecureChannel } from "@/lib/remote/channel";
-import { parseLink } from "@/lib/remote/crypto";
+import { useLinkOnce } from "@/lib/remote/useLink";
+import { deviceIdentity, deviceSigner } from "@/lib/remote/deviceKey";
+import { ConfirmCode } from "./RemoteClient";
 import { applyHandoff } from "@/lib/remote/handoffApply";
 import { HANDOFF_ACK_TIMEOUT_MS, HOST_TIMEOUT_MS, newNonce, type HandoffState } from "@/lib/remote/protocol";
 
@@ -27,22 +29,27 @@ export default function HandoffClient() {
   const hydrated = useTimerStore((s) => s.hydrated);
   const [status, setStatus] = useState<Status>("starting");
   const [code, setCode] = useState<string | null>(null);
-  // Stable d'un rendu à l'autre (et entre les deux passages d'effet du mode strict) :
-  // l'ordinateur reconnaît la même demande.
-  const [requestId] = useState(() => newNonce());
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const readLink = useLinkOnce();
   const appliedRef = useRef(false);
 
   useEffect(() => {
     if (!hydrated || appliedRef.current) return;
-    const link = parseLink(window.location.hash);
+    const link = readLink();
     if (!link) { setStatus("invalid"); return; } // eslint-disable-line react-hooks/set-state-in-effect
     setCode(link.code);
     setStatus((s) => (s === "starting" ? "connecting" : s));
     let alive = true;
     let cleanup = () => {};
-    void SecureChannel.open(link.code, link.secret, "phone").then((ch) => {
+    // Défi du hello : l'horloge ne se cale que sur une réponse qui le renvoie.
+    const challenge = newNonce();
+    void Promise.all([SecureChannel.open(link.code, link.secret, { challenge }), deviceIdentity().catch(() => null)]).then(([ch, me]) => {
       if (!alive) { ch?.close(); return; }
-      if (!ch) { setStatus("unavailable"); return; }
+      if (!ch || !me) { ch?.close(); setStatus("unavailable"); return; }
+      // La demande porte l'identité de l'appareil : l'accusé sera signé par lui.
+      const requestId = me.id;
+      const sign = deviceSigner(me);
+      setConfirm(me.code);
       const startedAt = Date.now();
       let heard = false;
       let done = false;
@@ -50,7 +57,7 @@ export default function HandoffClient() {
       let ackTimer: ReturnType<typeof setInterval> | null = null;
       let ackDeadline: ReturnType<typeof setTimeout> | null = null;
       const stopAck = () => { if (ackTimer) clearInterval(ackTimer); if (ackDeadline) clearTimeout(ackDeadline); };
-      const hello = () => void ch.send({ type: "hello", role: "handoff", id: requestId });
+      const hello = () => void ch.send({ type: "hello", role: "handoff", id: requestId, pub: me.pub, ch: challenge });
       const unsub = ch.onMessage((m) => {
         if (done) return;
         heard = true;
@@ -58,7 +65,7 @@ export default function HandoffClient() {
         else if (m.type === "handoff" && m.id === requestId && !received) {
           received = { state: m.state, t: m.t, ack: m.ack };
           setStatus("transferring");
-          const ack = () => void ch.send({ type: "ack", id: requestId, ack: m.ack });
+          const ack = () => void ch.send({ type: "ack", id: requestId, ack: m.ack, sig: "" }, sign);
           ack();
           ackTimer = setInterval(ack, ACK_EVERY_MS);
           ackDeadline = setTimeout(() => { if (!done) { done = true; stopAck(); setStatus("uncertain"); } }, HANDOFF_ACK_TIMEOUT_MS);
@@ -90,7 +97,7 @@ export default function HandoffClient() {
       cleanup = () => { clearInterval(beat); stopAck(); unsub(); ch.close(); };
     });
     return () => { alive = false; cleanup(); };
-  }, [hydrated, requestId, router]);
+  }, [hydrated, readLink, router]);
 
   const m = MESSAGES[status];
   return (
@@ -98,6 +105,7 @@ export default function HandoffClient() {
       <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">Continuer sur le téléphone{code ? ` · code ${code}` : ""}</p>
       <h1 data-testid="handoff-status" className="text-2xl font-semibold tracking-tight">{m.title}</h1>
       {m.body && <p className="max-w-xs text-sm text-white/60">{m.body}</p>}
+      {status === "waiting" && confirm && <ConfirmCode code={confirm} />}
     </main>
   );
 }
@@ -105,7 +113,7 @@ export default function HandoffClient() {
 const MESSAGES: Record<Status, { title: string; body: string }> = {
   starting: { title: "Continuer sur le téléphone", body: "" },
   connecting: { title: "Récupération de la session…", body: "Garde la session ouverte sur l'ordinateur." },
-  waiting: { title: "Autorise sur l'ordinateur", body: "Clique sur « Autoriser » sur l'ordinateur pour reprendre la session ici." },
+  waiting: { title: "Autorise sur l'ordinateur", body: "Vérifie que l'ordinateur affiche le même code, puis clique sur « Autoriser »." },
   transferring: { title: "Transfert de la session…", body: "L'ordinateur compte son temps et s'arrête." },
   uncertain: { title: "Transfert incertain", body: "Vérifie l'ordinateur : si la session y tourne encore, elle n'a pas été transférée." },
   lost: { title: "Ordinateur introuvable", body: "Vérifie que la session est ouverte sur l'ordinateur. On réessaie tout seul." },

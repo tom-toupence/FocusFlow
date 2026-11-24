@@ -120,6 +120,28 @@ export function buildHandoffState(timer: TimerSnapshot, todos: Todo[], media: Me
   };
 }
 
+/** Taille max du handoff en clair (octets UTF-8) : scellé, il reste sous 160 Ko. */
+export const HANDOFF_MAX_BYTES = 110 * 1024;
+
+const byteSize = (x: unknown) => new TextEncoder().encode(JSON.stringify(x)).length;
+
+/**
+ * Réduit l'état jusqu'à ce qu'il tienne : d'abord la file (moitié par moitié,
+ * la piste en cours reste en tête), puis les tâches.
+ */
+export function fitHandoff(state: HandoffState, maxBytes = HANDOFF_MAX_BYTES): HandoffState {
+  let s = state;
+  while (byteSize(s) > maxBytes) {
+    const m = s.media;
+    if (m.kind === "queue" && m.tracks.length > 1) {
+      s = { ...s, media: { ...m, tracks: m.tracks.slice(0, Math.ceil(m.tracks.length / 2)) } };
+    } else if (s.todos.length > 0) {
+      s = { ...s, todos: s.todos.slice(0, Math.floor(s.todos.length / 2)) };
+    } else break;
+  }
+  return s;
+}
+
 /**
  * Part créditée par chacun : l'ordinateur, le travail fait au moment de
  * l'envoi ; le téléphone, ce qui restait (la durée créditable de son cycle).

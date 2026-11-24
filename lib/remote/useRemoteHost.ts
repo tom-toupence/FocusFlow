@@ -23,13 +23,17 @@ import type { SessionMedia } from "@/lib/playback/useSessionMedia";
 import { transportKind } from "./transport";
 import { SecureChannel } from "./channel";
 import { buildLink, cryptoReady, newSecret } from "./crypto";
-import { buildHandoffState, resumePosition, sessionTodos, type MediaSnapshot } from "./handoff";
+import { buildHandoffState, fitHandoff, resumePosition, sessionTodos, type MediaSnapshot } from "./handoff";
+import { deviceSigningInput, deviceVerify, importDeviceKey } from "./deviceKey";
 import { HostLogic, type Ask, type HandoffBuild, type HostAction } from "./host";
 import { readPendingResume, clearPendingResume, type PendingResume } from "./handoffApply";
 import {
   clip, CODE_TTL_MS, generateCode, isExpired, isPhoneConnected, newNonce, STATE_INTERVAL_MS,
-  type ByeReason, type RemoteMessageBody, type RemoteState,
+  type ByeReason, type RemoteMessage, type RemoteMessageBody, type RemoteState,
 } from "./protocol";
+
+/** Après le transfert, le canal reste ouvert ce temps pour redire « bye » à un accusé répété. */
+export const HANDOFF_LINGER_MS = 12_000;
 
 export interface RemoteHostOptions {
   adapter: PlayerAdapter | null;
@@ -112,6 +116,18 @@ function mediaSnapshot(media: SessionMedia, adapter: PlayerAdapter | null, pb: P
   };
 }
 
+const snapshotNow = () => {
+  const s = useTimerStore.getState();
+  return { mode: s.mode, sessionsCompleted: s.sessionsCompleted };
+};
+
+/** Commande ou accusé signé par la clé de l'appareil vue à son hello. */
+async function verifiedDevice(keys: Map<string, CryptoKey>, m: RemoteMessage): Promise<boolean> {
+  if (m.type !== "cmd" && m.type !== "ack") return false;
+  const key = keys.get(m.id);
+  return !!key && deviceVerify(key, m.sig, deviceSigningInput(m));
+}
+
 /** L'état complet de la session, figé au moment d'« Autoriser ». */
 function buildForHandoff(o: RemoteHostOptions, now: number): HandoffBuild {
   const st = useTimerStore.getState();
@@ -125,8 +141,10 @@ function buildForHandoff(o: RemoteHostOptions, now: number): HandoffBuild {
     mediaSnapshot(o.media, o.adapter, o.pb),
     now,
   );
+  // Taille contrôlée à l'envoi : la file est réduite si le message scellé dépasserait la limite.
+  const fitted = fitHandoff(state);
   const creditable = st.mode === "work" && st.settings.preset !== "flowtime";
-  return { state, mode: st.mode, sessionsCompleted: st.sessionsCompleted, leftSeconds: creditable ? state.timer.secondsLeft : null };
+  return { state: fitted, mode: st.mode, sessionsCompleted: st.sessionsCompleted, leftSeconds: creditable ? fitted.timer.secondsLeft : null };
 }
 
 export function useRemoteHost(opts: RemoteHostOptions): RemoteHost {
@@ -153,6 +171,8 @@ export function useRemoteHost(opts: RemoteHostOptions): RemoteHost {
   const channelRef = useRef<SecureChannel | null>(null);
   const unsubRef = useRef<(() => void) | null>(null);
   const logicRef = useRef(new HostLogic());
+  /** Clés publiques des appareils vus (id = empreinte, vérifiée au hello). */
+  const keysRef = useRef(new Map<string, CryptoKey>());
   const expiresRef = useRef<number>(0);
   const lastSeenRef = useRef<number | null>(null);
   /** Ouverture en cours (dérivation des clés asynchrone) : une seule à la fois. */
@@ -188,6 +208,29 @@ export function useRemoteHost(opts: RemoteHostOptions): RemoteHost {
       .then(() => ch.send({ type: "bye", reason })).finally(() => ch.close());
   }, []);
 
+  /**
+   * Transfert fait : le canal est détaché de la page (qui va se fermer) mais
+   * reste ouvert 12 s, le temps de redire « bye » à chaque accusé du même nonce
+   * (un bye perdu ne laisse pas le téléphone dans le doute).
+   */
+  const lingerAfterHandoff = useCallback(() => {
+    generationRef.current++;
+    const ch = channelRef.current;
+    if (!ch) return;
+    channelRef.current = null;
+    unsubRef.current?.();
+    unsubRef.current = null;
+    lastSeenRef.current = null;
+    const logic = logicRef.current;
+    const keys = keysRef.current;
+    void ch.send({ type: "bye", reason: "handed-off" });
+    const off = ch.onMessage(async (m) => {
+      if (m.type !== "ack" || !(await verifiedDevice(keys, m))) return;
+      for (const a of logic.receive(m, Date.now(), snapshotNow)) if (a.type === "send") void ch.send(a.body);
+    });
+    setTimeout(() => { off(); ch.close(); }, HANDOFF_LINGER_MS);
+  }, []);
+
   const run = useCallback((actions: HostAction[]) => {
     for (const a of actions) {
       switch (a.type) {
@@ -211,31 +254,42 @@ export function useRemoteHost(opts: RemoteHostOptions): RemoteHost {
         }
         case "pending": setHandingOff(a.pending != null); break;
         case "handedOff":
-          closeChannel("handed-off");
+          lingerAfterHandoff();
           resetUi();
           setOpenState(false);
           latest.current.onHandedOff(a.pending.leftSeconds);
           break;
       }
     }
-  }, [closeChannel, resetUi, send, sendState]);
+  }, [lingerAfterHandoff, resetUi, send, sendState]);
 
   const startChannel = useCallback(async () => {
     closeChannel("disconnected");
     const gen = generationRef.current;
     const c = generateCode();
     const k = newSecret();
-    const ch = await SecureChannel.open(c, k, "host");
+    const ch = await SecureChannel.open(c, k);
     if (!ch || gen !== generationRef.current) { ch?.close(); return; }
     channelRef.current = ch;
-    logicRef.current = new HostLogic();
+    const logic = new HostLogic();
+    const keys = new Map<string, CryptoKey>();
+    logicRef.current = logic;
+    keysRef.current = keys;
     expiresRef.current = Date.now() + CODE_TTL_MS;
-    unsubRef.current = ch.onMessage((m) => {
+    unsubRef.current = ch.onMessage(async (m) => {
       if (channelRef.current !== ch || isExpired(expiresRef.current, Date.now())) return;
-      run(logicRef.current.receive(m, Date.now(), () => {
-        const s = useTimerStore.getState();
-        return { mode: s.mode, sessionsCompleted: s.sessionsCompleted };
-      }));
+      let code = "";
+      if (m.type === "hello") {
+        // La clé annoncée doit correspondre à l'id (son empreinte) : sinon, ignoré.
+        const dev = await importDeviceKey(m.id, m.pub);
+        if (!dev) return;
+        keys.set(m.id, dev.key);
+        code = dev.code;
+      } else if ((m.type === "cmd" || m.type === "ack") && !(await verifiedDevice(keys, m))) {
+        return; // commande ou accusé non signé par l'appareil : ignoré
+      }
+      if (channelRef.current !== ch) return;
+      run(logic.receive(m, Date.now(), snapshotNow, code));
     });
     setCode(c);
     setSecret(k);
