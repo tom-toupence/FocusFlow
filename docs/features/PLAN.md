@@ -15,6 +15,8 @@ baseline, `npm test`, build, relecture `code-reviewer`, commit séparé.
 | 6 | **Radio commune** (V1 n°10) : onglet Radio, programme déterministe, lecture à la bonne seconde, « N amis écoutent » si connecté | 0, P | bonus | à faire |
 | 7 | **Téléphone télécommande** (V2 n°5) puis **Emporter la session** (V2 n°2) : canal Supabase Realtime broadcast (clé anon, code aléatoire court), routes `/remote/[code]` et `/handoff/[code]` | 0, 1 | **requis** (config app, pas de compte) | à faire |
 
+| 8 | **Les fenêtres allumées** (V3 n°2, variante de l'utilisateur) : chaque ami = une fenêtre fixe de la rue de nuit (pause, mode Spotify), allumée si connecté, plus vive en focus, éteinte hors ligne ; liste des amis avec leur fenêtre et ce qu'ils écoutent | 6 | **requis** pour voir des amis (sans compte : rue inchangée) | en cours |
+
 ## Ce qui ne peut pas être vérifié dans le conteneur
 
 - **Téléphone réel** (écran verrouillé, touches média, iOS) : à valider sur appareil.

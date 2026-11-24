@@ -34,4 +34,7 @@ Feu vert d'implémentation donné le 2026-11-24 pour toutes les idées « Oui »
 
 ## Vague 3 (2026-11-24) : `vague-3.html`
 
-En attente de réponse idée par idée.
+| # | Idée | Décision |
+|---|------|----------|
+| 2 | Les fenêtres allumées | **Oui, avec une variante** : TOUS les amis sont dans la rue ; connecté = fenêtre allumée (plus vive en focus), hors ligne = fenêtre éteinte ; une liste montre chaque ami avec sa fenêtre et ce qu'il écoute. Implémentation lancée (lot 8). |
+| 1, 3 à 10 | (autres idées) | En attente de réponse |
