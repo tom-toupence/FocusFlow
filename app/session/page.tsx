@@ -130,7 +130,14 @@ export default function SessionPage() {
   }, [mode]);
 
   // ── Record session start ─────────────────────────────────────────────────
+  // Retour sur une session déjà en cours (navigation ou rechargement) : on ne la
+  // réinitialise pas, on la reprend telle quelle (en pause, elle reste en pause).
+  const resumedRef = useRef(false);
   useEffect(() => {
+    if (useTimerStore.getState().active) {
+      resumedRef.current = true;
+      return;
+    }
     const doneTodoIds = todos.filter((t) => t.status === "done").map((t) => t.id);
     startSession(settings.workDuration, doneTodoIds);
     resetDistractions();
@@ -188,6 +195,13 @@ export default function SessionPage() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [isRunning, tick]);
 
+  // Onglet en arrière-plan : les minuteurs sont bridés, on recalcule au retour.
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible") tick(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [tick]);
+
   // Lu dans des callbacks mémorisés : toujours la description courante.
   const playEntryRef = useRef(media.playEntry);
   useEffect(() => { playEntryRef.current = media.playEntry; });
@@ -216,7 +230,7 @@ export default function SessionPage() {
   };
 
   // ── Session end ───────────────────────────────────────────────────────────
-  const handleSessionEnd = useCallback(() => {
+  const handleSessionEnd = useCallback((autoStart = true) => {
     if (typeof window !== "undefined" && Notification.permission === "granted") {
       new Notification("FocusFlow", {
         body: mode === "work" ? "Session terminée ! Pause en cours." : "Pause terminée ! C'est reparti.",
@@ -234,13 +248,28 @@ export default function SessionPage() {
     } else {
       sessionEndedRef.current = false;
     }
-    nextSession(true);
+    nextSession(autoStart);
   }, [mode, nextSession, recordSession, recordPlay, settings.workDuration]);
 
   useEffect(() => {
     if (prevSecondsRef.current > 0 && secondsLeft === 0) handleSessionEnd();
     prevSecondsRef.current = secondsLeft;
   }, [secondsLeft, handleSessionEnd]);
+
+  // ── Rattrapage au retour : un cycle a pu finir pendant qu'on était ailleurs ──
+  // Traité une seule fois, au montage, et un seul cycle est crédité même si
+  // plusieurs se seraient écoulés. On reste ensuite en attente (pas d'enchaînement).
+  // Le rendu initial lit un secondsLeft périmé : la transition passe donc par cet
+  // effet, qui change le mode dans la même passe (le rendu ne voit jamais 0).
+  const catchUpDoneRef = useRef(false);
+  useEffect(() => {
+    if (catchUpDoneRef.current || !resumedRef.current) return;
+    catchUpDoneRef.current = true;
+    tick();
+    const st = useTimerStore.getState();
+    const flowWork = st.settings.preset === "flowtime" && st.mode === "work";
+    if (st.isRunning && !flowWork && st.secondsLeft === 0) handleSessionEnd(false);
+  }, [tick, handleSessionEnd]);
 
   // ── Flowtime: end the stretch and start the earned break ────────────────
   const handleFlowBreak = () => {

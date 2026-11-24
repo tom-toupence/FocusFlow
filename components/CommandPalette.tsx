@@ -5,6 +5,7 @@ import { create } from "zustand";
 import { useRouter } from "next/navigation";
 import { useNavStore, NavSection, MediaSource, OrgTab, ActivityTab } from "@/store/navStore";
 import { useFriendsDrawer } from "@/store/friendsDrawerStore";
+import { useTimerStore } from "@/store/timerStore";
 import { cn } from "@/lib/utils";
 
 // État d'ouverture partagé : ⌘K (clavier) + bouton header peuvent tous deux l'ouvrir.
@@ -60,7 +61,12 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
   const create = (k: "project" | "sprint") => () => { useNavStore.getState().requestCreate(k); router.push("/"); onClose(); };
   const openFriends = () => { useFriendsDrawer.getState().setOpen(true); onClose(); };
 
+  const sessionActive = useTimerStore((s) => s.active);
+
   const commands: Command[] = [
+    ...(sessionActive
+      ? [{ id: "return-session", label: "Retour à la session", hint: "Session en cours", keywords: "retour reprendre session en cours minuteur timer", run: goRoute("/session") }]
+      : []),
     { id: "start", label: "Démarrer une session", hint: "Choisir une ambiance", keywords: "demarrer session focus pomodoro play lancer", run: goMedia("catalogue") },
     { id: "accueil", label: "Aujourd'hui", hint: "Tableau de bord", keywords: "accueil home dashboard aujourdhui", run: goSection("accueil") },
     { id: "ecouter", label: "Écouter", hint: "Catalogue & sources", keywords: "ecouter musique media son", run: goSection("ecouter") },

@@ -255,6 +255,7 @@ export default function TodayDashboard({
   const { blocks } = usePlanStore();
   const { lastSeenWeekStart } = useWrappedStore();
   const { sprint } = useSprintStore();
+  const sessionActive = useTimerStore((st) => st.active);
 
   const [mounted, setMounted] = useState(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -291,6 +292,8 @@ export default function TodayDashboard({
   const chooseAmbiance = () => onNavigateTab("catalogue");
 
   const resume = () => {
+    // Session déjà en cours : on y retourne, sans rien écraser.
+    if (useTimerStore.getState().active) return router.push("/session");
     if (!suggestedVideo) return chooseAmbiance();
     // « Reprendre » en un clic : dernière ambiance + preset Pomodoro persisté
     // → session directe, sans repasser par /settings.
@@ -313,7 +316,15 @@ export default function TodayDashboard({
 
   // ── LA décision : une seule action primaire, choisie par priorité ──────
   const decision: { kicker: string; headline: string; detail: string; cta: string; run: () => void } =
-    sprint && sprintStatus?.todayBlock
+    sessionActive
+      ? {
+          kicker: "Session en cours",
+          headline: "Ta session t'attend",
+          detail: "Le minuteur continue, reprends où tu en étais.",
+          cta: "Retour à la session",
+          run: () => router.push("/session"),
+        }
+    : sprint && sprintStatus?.todayBlock
       ? {
           kicker: sprintStatus.overdue ? "Sprint, deadline dépassée" : `Sprint, J-${sprintStatus.daysLeft}`,
           headline: sprint.objective,

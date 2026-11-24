@@ -5,6 +5,7 @@ import SupabaseProvider from "@/components/SupabaseProvider";
 import AuthGate from "@/components/AuthGate";
 import ToastHost from "@/components/Toast";
 import CommandPalette from "@/components/CommandPalette";
+import SessionReturnPill from "@/components/SessionReturnPill";
 import AmbientProvider from "@/components/AmbientProvider";
 import SplashIntro from "@/components/SplashIntro";
 import FriendsDrawer from "@/components/FriendsDrawer";
@@ -49,6 +50,7 @@ export default function RootLayout({
         <SupabaseProvider>
           <AuthGate>
             <FriendsLayoutShell>{children}</FriendsLayoutShell>
+            <SessionReturnPill />
           </AuthGate>
         </SupabaseProvider>
         <ToastHost />
