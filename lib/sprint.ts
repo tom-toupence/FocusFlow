@@ -11,8 +11,7 @@ import { usePlanStore } from "@/store/planStore";
 import { useSessionStore } from "@/store/sessionStore";
 import { useTimerStore } from "@/store/timerStore";
 import { closeActiveSession } from "@/lib/sessionEnd";
-import { useSpotifyStore } from "@/store/spotifyStore";
-import { useTwitchStore } from "@/store/twitchStore";
+import { selectMedia } from "@/lib/launch";
 import { useNotesStore } from "@/store/notesStore";
 import { useSprintStore, type Sprint } from "@/store/sprintStore";
 
@@ -168,9 +167,7 @@ export function launchSprintSession(sprint: Sprint, blockDurationMin?: number): 
   // Media: random curated video in the sprint mood
   const candidates = defaultVideos.filter((v) => v.mood === sprint.mood);
   const video = candidates[Math.floor(Math.random() * candidates.length)] ?? defaultVideos[0];
-  useSpotifyStore.getState().selectPlaylist(null);
-  useTwitchStore.getState().clear();
-  useSessionStore.getState().selectVideo(video.id);
+  selectMedia({ type: "video", id: video.id });
 
   // Timer: deep blocks get the 50/10 preset, shorter ones the classic 25/5
   closeActiveSession();

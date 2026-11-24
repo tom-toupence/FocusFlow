@@ -76,7 +76,12 @@ pilotée par `store/navStore.ts` (`section` : accueil / ecouter / organisation /
 La section **Écouter** regroupe les 4 sources média (Catalogue · Ma bibliothèque · Spotify · Twitch)
 derrière un **sous-sélecteur** (`MediaTab` dans `app/page.tsx`, `navStore.mediaSource`).
 **Palette de commandes ⌘K / Ctrl+K** globale (`components/CommandPalette.tsx`, montée dans `layout.tsx`)
-pour sauter à toute section/action au clavier. `app/page.tsx` dérive l'ancien `activeTab` de `navStore`
+pour sauter à toute section/action au clavier. **Lancer en une phrase** (2026-11-24) : la palette comprend
+« 50 min rapport lofi kyoto », un lien YouTube/Spotify/Twitch collé, « deep spotify », « comme hier »
+(analyse `lib/quickLaunch.ts`, plan pur `lib/launchPlan.ts`, application `lib/launch.ts` →
+`/session` direct, sans `/settings`). Bloc « Compris » (pastilles Durée/Tâche/Musique, Tab pour
+corriger) ; ambiguïté = choix listés, jamais de lancement silencieux. `selectMedia()` (lib/launch.ts)
+est partagé avec les routines et le « Go » du sprint. `app/page.tsx` dérive l'ancien `activeTab` de `navStore`
 (blocs de contenu inchangés).
 
 ## Flux principal (routes)

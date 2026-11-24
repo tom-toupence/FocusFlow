@@ -5,7 +5,7 @@ import { closeActiveSession } from "@/lib/sessionEnd";
 import { useSessionStore } from "@/store/sessionStore";
 import { useSpotifyStore } from "@/store/spotifyStore";
 import { useTwitchStore } from "@/store/twitchStore";
-import { defaultVideos } from "@/data/videos";
+import { selectMedia } from "@/lib/launch";
 import type { Routine } from "@/store/routineStore";
 
 /**
@@ -30,32 +30,18 @@ export function applyRoutine(r: Routine) {
 
   // Media
   const session = useSessionStore.getState();
-  useSpotifyStore.getState().selectPlaylist(null);
-  useTwitchStore.getState().clear();
   if (r.media) {
-    switch (r.media.kind) {
-      case "video":
-        session.selectVideo(r.media.ref);
-        break;
-      case "playlist":
-        session.selectPlaylist(r.media.ref);
-        break;
-      case "spotify":
-        session.selectVideo(defaultVideos[0].id);
-        useSessionStore.setState({ selectedPlaylistId: null });
-        useSpotifyStore.getState().selectPlaylist(r.media.ref);
-        break;
-      case "twitch-channel":
-        session.selectVideo(defaultVideos[0].id);
-        useSessionStore.setState({ selectedPlaylistId: null });
-        useTwitchStore.getState().selectChannel(r.media.ref);
-        break;
-      case "twitch-vod":
-        session.selectVideo(defaultVideos[0].id);
-        useSessionStore.setState({ selectedPlaylistId: null });
-        useTwitchStore.getState().selectVod(r.media.ref);
-        break;
-    }
+    const { kind, ref } = r.media;
+    selectMedia(
+      kind === "video" ? { type: "video", id: ref }
+      : kind === "playlist" ? { type: "yt-playlist", id: ref }
+      : kind === "spotify" ? { type: "spotify", uri: ref }
+      : kind === "twitch-channel" ? { type: "twitch-channel", login: ref }
+      : { type: "twitch-vod", id: ref }
+    );
+  } else {
+    useSpotifyStore.getState().selectPlaylist(null);
+    useTwitchStore.getState().clear();
   }
 
   // Template tasks (skip ones already present)
