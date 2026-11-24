@@ -10,7 +10,8 @@
 # Chaque rue dure SEG s dans la boucle (4,5 par défaut), fondu FADE compris. La boucle
 # commence 1,5 s dans la première rue et se termine par un fondu vers le
 # début de cette même rue : le raccord de la boucle est invisible.
-# L'ordre doit rester celui de RUE_LOOP_ORDER (components/RueLoop.tsx).
+# L'ordre doit rester celui de RUE_LOOP_ORDER (components/RueLoop.tsx), et SEG / HALF_FADE
+# (= FADE / 2) ceux de ce même fichier, sinon le crédit affiché se décale.
 set -euo pipefail
 W=${1:?dossier des captures}
 OUT=${2:-public/rue/loop}
