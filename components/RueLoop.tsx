@@ -52,11 +52,10 @@ export default function RueLoop({ onScene, className, label }: Props) {
     // Économie de données ou connexion lente : la photo fixe suffit.
     if (conn?.saveData || /(^|-)2g$|^3g$/.test(conn?.effectiveType ?? "")) return;
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    // Une seule qualité, 720p (environ 9 Mo) : la vidéo est derrière un voile, la
-    // 1080p doublait la bande passante servie par Vercel pour aucun gain visible.
+    const q = window.matchMedia("(max-width: 767px)").matches ? "720" : "1080";
     const apply = () => {
       if (mq.matches) { setSrc(null); setStill(true); }
-      else setSrc({ webm: "/rue/loop/rue-720.webm", mp4: "/rue/loop/rue-720.mp4" });
+      else setSrc({ webm: `/rue/loop/rue-${q}.webm`, mp4: `/rue/loop/rue-${q}.mp4` });
     };
     // Chargée seulement une fois la page affichée et le navigateur au repos :
     // un visiteur qui repart tout de suite ne télécharge pas la vidéo.

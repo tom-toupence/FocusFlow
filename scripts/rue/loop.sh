@@ -33,10 +33,11 @@ for i in $(seq 1 $n); do
   prev=x$i
 done
 total=$(echo "$SEG*$n" | bc)
-filter+="[$prev]trim=duration=$total,setpts=PTS-STARTPTS,split=2[b][d];[b]scale=1280:720:flags=lanczos[o720];[d]scale=1280:720:flags=lanczos[w720]"
-# 720p seulement (2026-11-24) : la vidéo est derrière un voile, la 1080p doublait la bande passante Vercel.
+filter+="[$prev]trim=duration=$total,setpts=PTS-STARTPTS,split=4[a][b][c][d];[a]scale=1920:1080:flags=lanczos[o1080];[b]scale=1280:720:flags=lanczos[o720];[c]scale=1920:1080:flags=lanczos[w1080];[d]scale=1280:720:flags=lanczos[w720]"
 
 ffmpeg -y -v error "${inputs[@]}" -filter_complex "$filter" \
+  -map "[o1080]" -c:v libx264 -preset slow -crf 37 -pix_fmt yuv420p -movflags +faststart -an "$OUT/rue-1080.mp4" \
   -map "[o720]"  -c:v libx264 -preset slow -crf 35 -pix_fmt yuv420p -movflags +faststart -an "$OUT/rue-720.mp4" \
+  -map "[w1080]" -c:v libsvtav1 -preset 6 -crf 58 -pix_fmt yuv420p -an "$OUT/rue-1080.webm" \
   -map "[w720]"  -c:v libsvtav1 -preset 6 -crf 56 -pix_fmt yuv420p -an "$OUT/rue-720.webm"
 ls -la "$OUT"

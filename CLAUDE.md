@@ -929,7 +929,7 @@ TodoStatusDropdown, callback Twitch) ; build vert ; vitest 33/33 ; e2e 13/13 sur
 ### L'idée : « Une rue de plus »
 
 Derrière toute la page, une **boucle vidéo continue des 34 scènes** (`components/RueLoop.tsx`,
-`public/rue/loop/rue-720.{webm,mp4}`, 720p seulement, chargée après l'affichage et au repos du navigateur, jamais en économie de données ni en 2g/3g) : chaque rue rendue à l'avance par le moteur
+`public/rue/loop/rue-{1080,720}.{webm,mp4}`, chargée après l'affichage et au repos du navigateur, jamais en économie de données ni en 2g/3g) : chaque rue rendue à l'avance par le moteur
 `lib/rue/` (pluie, néons, caméra qui respire), 4,5 s par scène, fondus de 1,2 s (≈ 2 min 30), raccord de boucle
 invisible. Produite par `scripts/rue/loop_record.cjs` + `scripts/rue/loop.sh` (ordre =
 `RUE_LOOP_ORDER`, le crédit affiché suit le temps de la vidéo). Pourquoi une vidéo et pas le
@@ -975,7 +975,7 @@ Vaut pour la landing ET l'app (toasts, écran de pause).
 - Formes : angles droits, boutons rectangulaires à filet. Police : Geist. Seule exception : la
   réplique de session, qui montre l'app telle qu'elle est (donc ses rayons).
 - **Repli** : économie de données ou `prefers-reduced-motion` → **photo fixe** de la première
-  rue (poster, aussi affiché tant que la vidéo n'a pas démarré). Vidéo 720p partout (2026-11-24, bande passante Vercel). Sous
+  rue (poster, aussi affiché tant que la vidéo n'a pas démarré). Téléphone : vidéo 720p. Sous
   mouvement réduit, rien n'est épinglé ni scrubé. (`RueScene`, le moteur en direct, reste
   utilisé par la pause de session et le mode Spotify ; son repli photo fixe fait un vrai
   fondu enchaîné, l'ancienne photo reste dessous.)
@@ -1095,6 +1095,5 @@ contenu animé sont peu fiables ; valider avec `npm run dev` sur une vraie machi
   vidéo de la landing (14 à 17 Mo en 1080p, `preload="auto"`, à chaque visiteur).
 - `vercel.json` : déploiements automatiques désactivés pour `claude/**`, et `ignoreCommand` qui ne
   construit que `master`. **Ne pas retirer** sans accord : chaque push d'un agent coûtait un build.
-- Landing : vidéo 720p seulement (fichiers 1080p supprimés, `scripts/rue/loop.sh` ne les produit plus),
-  chargée 1,5 s après l'affichage puis au repos du navigateur, `preload="metadata"`, rien en économie
+- Landing : 1080p gardée (l'utilisateur la juge correcte), vidéo chargée 1,5 s après l'affichage puis au repos du navigateur, `preload="metadata"`, rien en économie
   de données ni en 2g/3g. `next.config.ts` : `/rue/*` et `/rues-amis/*` en cache navigateur 7 jours.
